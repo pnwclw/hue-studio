@@ -1,0 +1,96 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wybierz mostek Hue",
+        "description": "Hue Studio korzysta z połączenia integracji Philips Hue, więc nie trzeba ponownie parować mostka.",
+        "data": {
+          "hue_entry_id": "Mostek Hue"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Wszystkie mostki Hue są już skonfigurowane w Hue Studio.",
+      "bridge_not_found": "Wybrany mostek Hue nie jest już dostępny.",
+      "no_bridges": "Nie skonfigurowano mostka Philips Hue z API v2. Najpierw skonfiguruj integrację Philips Hue."
+    }
+  },
+  "exceptions": {
+    "hue_entry_missing": {
+      "message": "Wpis konfiguracji Philips Hue używany przez Hue Studio już nie istnieje. Usuń i dodaj ponownie Hue Studio."
+    },
+    "bridge_auth_failed": {
+      "message": "Mostek Hue odrzucił klucz aplikacji integracji Philips Hue. Najpierw ponownie uwierzytelnij integrację Philips Hue."
+    },
+    "bridge_unreachable": {
+      "message": "Nie można połączyć się z mostkiem Hue pod adresem {host}."
+    },
+    "not_hue_light": {
+      "message": "{entity_id} nie jest światłem Hue na mostku połączonym z Hue Studio."
+    },
+    "not_gradient_light": {
+      "message": "{entity_id} nie obsługuje gradientów."
+    },
+    "no_lights": {
+      "message": "Nie wybrano świateł."
+    },
+    "unknown_gallery_scene": {
+      "message": "Nieznana scena z galerii: {scene}."
+    },
+    "command_failed": {
+      "message": "Mostek Hue nie przyjął polecenia dla {entity_id}."
+    }
+  },
+  "services": {
+    "apply_palette": {
+      "name": "Zastosuj paletę",
+      "description": "Stosuje paletę do świateł Hue: światła z gradientem dostają całą paletę, pozostałe po jednym kolorze.",
+      "fields": {
+        "gallery_scene": {
+          "name": "Scena z galerii",
+          "description": "ID sceny z wbudowanej galerii."
+        },
+        "points": {
+          "name": "Kolory",
+          "description": "1-5 punktów CIE xy, np. [[0.56, 0.40], [0.46, 0.41]]."
+        },
+        "mirek": {
+          "name": "Temperatura bieli",
+          "description": "Temperatura barwowa w miredach, dla białej palety."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność w procentach. Domyślnie jasność palety."
+        }
+      }
+    },
+    "set_gradient": {
+      "name": "Ustaw gradient",
+      "description": "Ustawia punkty kolorów świateł Hue z gradientem.",
+      "fields": {
+        "points": {
+          "name": "Kolory",
+          "description": "2-5 punktów CIE xy."
+        },
+        "mode": {
+          "name": "Tryb",
+          "description": "Jak punkty są rozłożone na świetle."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność w procentach."
+        }
+      }
+    }
+  },
+  "selector": {
+    "gradient_mode": {
+      "options": {
+        "interpolated_palette": "Płynny",
+        "interpolated_palette_mirrored": "Płynny, lustrzany",
+        "random_pixelated": "Losowe piksele",
+        "segmented_palette": "Segmenty"
+      }
+    }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose a Hue bridge",
+        "description": "Hue Studio reuses the connection of the Philips Hue integration, so no extra pairing is needed.",
+        "data": {
+          "hue_entry_id": "Hue bridge"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "All Hue bridges are already set up in Hue Studio.",
+      "bridge_not_found": "The selected Hue bridge is no longer available.",
+      "no_bridges": "No Philips Hue bridge with API v2 is configured. Set up the Philips Hue integration first."
+    }
+  },
+  "exceptions": {
+    "hue_entry_missing": {
+      "message": "The Philips Hue config entry used by Hue Studio no longer exists. Remove and re-add Hue Studio."
+    },
+    "bridge_auth_failed": {
+      "message": "The Hue bridge rejected the app key of the Philips Hue integration. Re-authenticate the Philips Hue integration first."
+    },
+    "bridge_unreachable": {
+      "message": "Cannot connect to the Hue bridge at {host}."
+    },
+    "not_hue_light": {
+      "message": "{entity_id} is not a Hue light on a bridge connected to Hue Studio."
+    },
+    "not_gradient_light": {
+      "message": "{entity_id} does not support gradients."
+    },
+    "no_lights": {
+      "message": "No lights selected."
+    },
+    "unknown_gallery_scene": {
+      "message": "Unknown gallery scene: {scene}."
+    },
+    "command_failed": {
+      "message": "The Hue bridge did not accept the command for {entity_id}."
+    }
+  },
+  "services": {
+    "apply_palette": {
+      "name": "Apply palette",
+      "description": "Applies a palette to Hue lights: gradient lights get the whole palette, other lights one color each.",
+      "fields": {
+        "gallery_scene": {
+          "name": "Gallery scene",
+          "description": "ID of a scene from the bundled gallery."
+        },
+        "points": {
+          "name": "Colors",
+          "description": "1-5 CIE xy points, e.g. [[0.56, 0.40], [0.46, 0.41]]."
+        },
+        "mirek": {
+          "name": "White temperature",
+          "description": "Color temperature in mired, for a white palette."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness in percent. Defaults to the palette's own brightness."
+        }
+      }
+    },
+    "set_gradient": {
+      "name": "Set gradient",
+      "description": "Sets the color points of Hue gradient lights.",
+      "fields": {
+        "points": {
+          "name": "Colors",
+          "description": "2-5 CIE xy points."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "How the points are spread over the light."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness in percent."
+        }
+      }
+    }
+  },
+  "selector": {
+    "gradient_mode": {
+      "options": {
+        "interpolated_palette": "Interpolated",
+        "interpolated_palette_mirrored": "Interpolated, mirrored",
+        "random_pixelated": "Random pixels",
+        "segmented_palette": "Segments"
+      }
+    }
+  }
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<!--
+  Dev harness: renders the panel outside Home Assistant with a fake `hass` (dev/fixture.js).
+  Serve the repository root (e.g. `python3 -m http.server 8765`) and open
+  http://localhost:8765/dev/panel.html?lang=en&path=/room/area.office
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Hue Studio panel</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #111; }
+    hue-studio-panel { height: 100%; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import "../custom_components/hue_studio/frontend/hue-studio-panel.js";
+    import { createHass } from "./fixture.js";
+
+    // <ha-icon> exists only inside HA; render MDI icons from the CDN here (dev only).
+    customElements.define("ha-icon", class extends HTMLElement {
+      static observedAttributes = ["icon"];
+      attributeChangedCallback() {
+        const name = (this.getAttribute("icon") || "").replace("mdi:", "");
+        fetch(`https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/${name}.svg`)
+          .then((r) => r.text())
+          .then((svg) => {
+            this.innerHTML = svg;
+            const el = this.querySelector("svg");
+            const size = "var(--mdc-icon-size, 24px)";
+            Object.assign(el.style, { width: size, height: size, fill: "currentColor" });
+          })
+          .catch(() => {});
+      }
+    });
+
+    const params = new URLSearchParams(location.search);
+    const panel = document.createElement("hue-studio-panel");
+    const narrow = () => window.matchMedia("(max-width: 870px)").matches;
+    const hass = createHass({ language: params.get("lang") || "en", onChange: (h) => { panel.hass = h; } });
+
+    panel.narrow = narrow();
+    panel.route = { prefix: "/hue", path: params.get("path") || "" };
+    panel.hass = hass;
+    window.addEventListener("resize", () => { panel.narrow = narrow(); });
+    window.addEventListener("location-changed", () => {
+      panel.route = { prefix: "/hue", path: location.pathname.replace(/^\/hue/, "") };
+    });
+    window.addEventListener("popstate", () => {
+      panel.route = { prefix: "/hue", path: location.pathname.replace(/^\/hue/, "") };
+    });
+    panel.addEventListener("hass-toggle-menu", () => console.info("hass-toggle-menu"));
+    document.body.append(panel);
+  </script>
+</body>
+</html>

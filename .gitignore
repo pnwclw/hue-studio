@@ -1,0 +1,21 @@
+# Private, machine-local notes (addresses, entity names, deployment details)
+CLAUDE.local.md
+# Read-only copy of the legacy prototype, contains private data
+reference/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local Home Assistant dev instance
+config/
+
+# OS / editors
+.DS_Store
+.idea/workspace.xml
+.idea/shelf/

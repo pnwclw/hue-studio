@@ -1,0 +1,10 @@
+{
+  "services": {
+    "apply_palette": {
+      "service": "mdi:palette"
+    },
+    "set_gradient": {
+      "service": "mdi:gradient-horizontal"
+    }
+  }
+}

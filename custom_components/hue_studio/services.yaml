@@ -1,0 +1,54 @@
+apply_palette:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    gallery_scene:
+      example: ocean_dawn
+      selector:
+        text:
+    points:
+      example: "[[0.561, 0.4042], [0.4596, 0.4105]]"
+      selector:
+        object:
+    mirek:
+      example: 346
+      selector:
+        number:
+          min: 153
+          max: 500
+          unit_of_measurement: mired
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+set_gradient:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    points:
+      required: true
+      example: "[[0.561, 0.4042], [0.4596, 0.4105], [0.3227, 0.329]]"
+      selector:
+        object:
+    mode:
+      selector:
+        select:
+          translation_key: gradient_mode
+          options:
+            - interpolated_palette
+            - interpolated_palette_mirrored
+            - random_pixelated
+            - segmented_palette
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"

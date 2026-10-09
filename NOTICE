@@ -1,0 +1,12 @@
+Hue Studio
+Copyright (c) 2026 pnwclw. Licensed under the MIT License (see LICENSE).
+
+This product bundles third-party material:
+
+custom_components/hue_studio/frontend/gallery/
+  Scene presets (names, colors, brightness) and pictures derived from
+  Hypfer/hass-scene_presets — https://github.com/Hypfer/hass-scene_presets
+  Licensed under the Apache License, Version 2.0:
+  https://www.apache.org/licenses/LICENSE-2.0
+  Changes: converted to gallery.json, pictures cropped to 16:9 and resized to 480x270
+  (scripts/build_gallery.py). The source commit is recorded in gallery.json.
