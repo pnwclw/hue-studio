@@ -153,8 +153,12 @@ directly. Per HA area with auto light settings:
 3. ~~Service `apply_auto_light`~~ — done (area, transition, `force`, `resume`; through
    `apply_palette`, so Adaptive Lighting marking and streaming lights are handled).
    Settings over WebSocket: `hue_studio/auto_light/settings`.
-4. Settings in the panel (Settings tab): phase boundaries, weather / light sensor /
-   season source, pools, holidays, exclusions, offsets.
+4. ~~Settings in the panel~~ — done: Settings → Auto light (areas, add an area) and a
+   screen per area: who controls the lights, today's scene (another one, show now,
+   never this one), pools by phase/season/weather or day step with a gallery picker,
+   phase boundaries, brightness (curve or fixed, offsets), weather / light sensor /
+   season / gradient layout, holidays, excluded scenes, turning auto light off for the
+   area. Still to do: screenshots on a live HA.
 5. Live switch-over: the legacy template sensors, helpers and the light config shim go;
    the existing automations call `apply_auto_light`.
 

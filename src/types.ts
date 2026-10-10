@@ -249,3 +249,63 @@ export interface SyncChange {
   entertainment_area?: string;
   brightness?: number;
 }
+
+export type Phase = "morning" | "day" | "golden" | "evening" | "night";
+export type Season = "winter" | "spring" | "summer" | "autumn";
+export type LightControl = "auto" | "manual" | "off";
+
+/** How an area's phases, season, weather and brightness are worked out. */
+export interface AutoLightSettings {
+  /** "HH:MM". */
+  night_from?: string;
+  /** Minutes: morning/day from sunrise, golden before and evening after sunset. */
+  shifts?: Partial<Record<"morning" | "day" | "golden" | "evening", number>>;
+  weather?: string | null;
+  light_sensor?: string | null;
+  season?: string | null;
+  /** Fixed brightness per phase (else the curve). */
+  brightness?: Partial<Record<Phase, number>>;
+  gradient_mode?: string | null;
+}
+
+export interface Holiday {
+  /** "MM-DD". */
+  from: string;
+  to: string;
+  phases: Phase[];
+  pool: string[];
+}
+
+/** An area's auto light settings (hue_studio/auto_light/subscribe). */
+export interface AutoLightConfig {
+  /** pools[phase][season | "all"][mood]: gallery ids; the day phase has four lists. */
+  pools: Record<string, Record<string, Record<string, string[] | string[][]>>>;
+  holidays: Holiday[];
+  names: Record<string, string>;
+  excluded: string[];
+  offsets: Partial<Record<Phase, number>>;
+  settings: AutoLightSettings;
+  control: "auto" | "off";
+}
+
+/** What auto light shows in an area right now. */
+export interface AutoLightState {
+  control: LightControl;
+  phase?: Phase;
+  pool_phase?: Phase;
+  season?: Season;
+  mood?: "clear" | "gloomy";
+  holiday?: boolean;
+  scene?: string | null;
+  scene_name?: string | null;
+  brightness?: number;
+  step?: number | null;
+  pool?: string[];
+}
+
+export interface AutoLightMessage {
+  areas: Record<string, AutoLightConfig>;
+  state: Record<string, AutoLightState>;
+  /** Area -> entity key ("light_control", …) -> entity id. */
+  entities: Record<string, Record<string, string>>;
+}

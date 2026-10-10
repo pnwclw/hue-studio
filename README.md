@@ -64,7 +64,8 @@ dashboards and automations:
 | `number.<area>_light_offset` | Your brightness offset for the current phase |
 | `button.<area>_next_light_scene` | Another scene for the rest of the day |
 
-*When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
+Pools, holidays, phases, brightness and inputs are edited in the panel (Settings →
+Auto light). *When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
 example on presence, with `resume: true`, and again when the scene or brightness
 sensor changes).
 

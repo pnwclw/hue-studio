@@ -9,6 +9,7 @@ import { adaptiveFor, buildHome, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
 import { confirmed, predictSync } from "./sync.ts";
 import type {
+  AutoLightMessage,
   Gallery,
   Hass,
   LightInfo,
@@ -54,6 +55,8 @@ export class StudioContext {
   rooms: RoomsPlan | null = null;
   /** The backend could not send the plan (older version, or no bridge). */
   roomsUnavailable = false;
+  /** Auto light settings and state of the areas (null until known). */
+  autoLight: AutoLightMessage | null = null;
   /** Sync Boxes by config entry id, with pending predictions applied. */
   boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
@@ -145,6 +148,9 @@ export class StudioContext {
     sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
       this.rawBoxes = msg.boxes;
     });
+    sub<AutoLightMessage>("hue_studio/auto_light/subscribe", (msg) => {
+      this.autoLight = msg;
+    });
     sub<RoomsPlan>(
       "hue_studio/rooms/subscribe",
       (msg) => {
@@ -233,6 +239,18 @@ export class StudioContext {
       this.onChange();
     }
     return ok;
+  }
+
+  /** One WebSocket command; failures show a toast. Resolves to true on success. */
+  async ws(msg: { type: string } & Record<string, unknown>): Promise<boolean> {
+    if (!this.raw?.callWS) return false;
+    try {
+      await this.raw.callWS(msg);
+      return true;
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
   }
 
   /** Put a Hue light into an HA area (null: no area). Resolves to true on success. */

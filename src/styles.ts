@@ -18,7 +18,7 @@ export const CSS = `
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; }
-  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-effects,
+  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-effects,
   hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
@@ -418,6 +418,46 @@ export const CSS = `
   .check svg { width: 16px; height: 16px; opacity: 0; }
   .on > .check { border-color: var(--accent); background: var(--accent); }
   .on > .check svg { opacity: 1; }
+  /* auto light */
+  .rows .item img.thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
+  .rows .item.wrap { flex-wrap: wrap; }
+  .rows .item.wrap .grow { min-width: 140px; }
+  .rows .item .plain { padding: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .lead.pad { padding: 0 16px 16px; }
+  .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+  .seg button:disabled { opacity: 0.4; }
+  .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--radius);
+           background: var(--surface); }
+  .today .pic { width: 64px; height: 64px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+  .today .text { flex: 1; min-width: 160px; }
+  .today .name { font-size: 18px; font-weight: 600; margin: 2px 0; }
+  .today-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .today-actions .pill { text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .empty-today { color: var(--text-2); font-size: 14px; }
+  .scene-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
+  .scene-tiles.small { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .scene-tiles .tile { border: none; padding: 0; text-align: left; font: inherit; color: inherit; }
+  .scene-tiles .tile .remove { position: absolute; top: 6px; right: 6px; z-index: 2; }
+  .scene-tiles .tile.dimmed { opacity: 0.55; }
+  .add-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: transparent !important;
+              box-shadow: inset 0 0 0 1.5px rgba(120, 120, 128, 0.45) !important; color: var(--text-2); }
+  .add-tile::after { display: none; }
+  .add-tile span { position: static !important; text-shadow: none !important; color: var(--text-2) !important; }
+  .picker-grid { max-height: 52vh; overflow-y: auto; padding: 0 16px; margin: 12px 0 0; }
+  .picker-grid .tile .check { position: absolute; top: 6px; right: 6px; z-index: 2; width: 22px; height: 22px; background: rgba(0, 0, 0, 0.35);
+                              border-color: rgba(255, 255, 255, 0.7); }
+  .picker-grid .tile.on { box-shadow: 0 0 0 2px #fff; }
+  .sheet .box.picker, .sheet .box.holiday-editor { width: min(100%, 560px); }
+  .stepper { display: flex; align-items: center; gap: 6px; flex: none; }
+  .stepper .value { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .round.mini-step { width: 30px; height: 30px; font-size: 17px; line-height: 1; }
+  .round.mini-step:disabled { opacity: 0.35; }
+  .round.mini-step svg { width: 16px; height: 16px; }
+  .select.time { max-width: 120px; color-scheme: dark; }
+  .md-row { display: flex; align-items: center; gap: 10px; }
+  .sheet .field.md { width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
+  .holiday-editor .chips { margin-top: 12px; flex-wrap: wrap; }
+
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
   .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
   .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

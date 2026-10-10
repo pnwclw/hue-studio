@@ -66,7 +66,11 @@ async def test_import_legacy(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "hue_studio/auto_light/subscribe"})
     assert (await client.receive_json())["success"]
-    assert (await client.receive_json())["event"] == {"areas": {}}
+    assert (await client.receive_json())["event"] == {
+        "areas": {},
+        "state": {},
+        "entities": {},
+    }
 
     result = await _call(hass, "import_legacy", {}, response=True)
     assert result == {"imported": [office, garden], "skipped": [], "palettes": 1}
@@ -76,6 +80,7 @@ async def test_import_legacy(
     assert stored[garden]["pools"] == {}
     event = (await client.receive_json())["event"]
     assert office in event["areas"]
+    assert event["state"][office]["control"] == "auto"
 
     # Existing areas are kept unless told to overwrite.
     result = await _call(hass, "import_legacy", {}, response=True)

@@ -25,20 +25,15 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from homeassistant.components import websocket_api
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
     ServiceResponse,
     SupportsResponse,
-    callback,
 )
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import area_registry as ar, config_validation as cv
-from homeassistant.helpers.dispatcher import (
-    async_dispatcher_connect,
-    async_dispatcher_send,
-)
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
@@ -158,6 +153,12 @@ class AutoLightStore:
     def area(self, area_id: str) -> dict[str, Any]:
         """Settings of an area (empty settings for one without any yet)."""
         return deepcopy(self.areas.get(area_id) or AREA_CONFIG({}))
+
+    async def async_remove(self, area_id: str) -> None:
+        """Forget an area's auto light."""
+        if self.areas.pop(area_id, None) is not None:
+            await self._store.async_save({"areas": self.areas})
+            async_dispatcher_send(self.hass, SIGNAL_AUTO_LIGHT_UPDATED)
 
     async def async_set(self, area_id: str, config: dict[str, Any]) -> None:
         """Replace an area's settings; written at once so other readers see it."""
@@ -313,35 +314,6 @@ async def async_setup_auto_light(hass: HomeAssistant) -> None:
         ),
         supports_response=SupportsResponse.ONLY,
     )
-    websocket_api.async_register_command(hass, ws_subscribe_auto_light)
-
-
-@websocket_api.websocket_command(
-    {vol.Required("type"): "hue_studio/auto_light/subscribe"}
-)
-@callback
-def ws_subscribe_auto_light(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Send the auto light settings now and whenever they change.
-
-    Event payload: {"areas": {area_id: settings}}.
-    """
-    store = hass.data[_DATA]
-
-    @callback
-    def send() -> None:
-        connection.send_message(
-            websocket_api.event_message(msg["id"], {"areas": store.areas})
-        )
-
-    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
-        hass, SIGNAL_AUTO_LIGHT_UPDATED, send
-    )
-    connection.send_result(msg["id"])
-    send()
 
 
 def _invalid(key: str, **placeholders: str) -> ServiceValidationError:

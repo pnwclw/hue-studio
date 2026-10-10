@@ -186,10 +186,11 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms/subscribe, hue_studio/lights/set_area, hue_studio/config/set
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
-  auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,
+  auto_light.py                 auto light settings per area in a Store: pool/exclude/offset services,
                                 import of the legacy lights.json
   auto_select.py                pure: phase, season, weather, pool, scene of the day, brightness; manual-change tolerance
-  auto_control.py               selections and who controls each area (auto/manual/off), apply_auto_light, settings WS
+  auto_control.py               selections and who controls each area (auto/manual/off), apply_auto_light,
+                                hue_studio/auto_light/subscribe|settings|update|remove
   auto_entity.py, button.py     per-area auto light entities (phase, scene, brightness, control, offset, next scene)
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
@@ -209,7 +210,9 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
-  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones) — one Lit element per screen
+  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
+                                auto-light (per area) — one Lit element per screen
+  auto-light.ts                 pure: pools of the auto light editor, areas with/without auto light
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale

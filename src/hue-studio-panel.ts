@@ -9,6 +9,7 @@
 //   /gallery?room=<key>        scene gallery
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
+//   /settings/auto/<area>      auto light of an area
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -22,6 +23,7 @@ import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
 import { icon, type IconName } from "./ui.ts";
+import "./views/auto-light.ts";
 import "./views/color.ts";
 import "./views/gallery.ts";
 import "./views/home.ts";
@@ -39,7 +41,8 @@ type Route =
   | { name: "gallery"; room: string | null }
   | { name: "sync"; box: string | null }
   | { name: "rooms" }
-  | { name: "settings" };
+  | { name: "settings" }
+  | { name: "auto"; area: string };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -54,6 +57,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
+  if (parts[0] === "settings" && parts[1] === "auto" && parts[2]) return { name: "auto", area: parts[2] };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
 }
@@ -105,7 +109,7 @@ export class HueStudioPanel extends LitElement {
         ? "gallery"
         : route.name === "sync"
           ? "sync"
-          : route.name === "settings" || route.name === "rooms"
+          : route.name === "settings" || route.name === "rooms" || route.name === "auto"
             ? "settings"
             : "home";
     const tabs: [string, string, IconName, string][] = [
@@ -144,6 +148,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":
         return html`<hue-studio-sync-view .ctx=${ctx} .rev=${rev} .box=${route.box}></hue-studio-sync-view>`;
+      case "auto":
+        return html`<hue-studio-auto-light-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-auto-light-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "rooms":

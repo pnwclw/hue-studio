@@ -180,3 +180,41 @@ async def test_errors_and_settings(
     assert "night_from" not in store.areas["office"]["settings"]
     assert not await settings("office", {"night_from": "late"})
     assert not await settings("nowhere", {})
+
+
+async def test_subscribe_update_remove(
+    hass: HomeAssistant, auto: MagicMock, hass_ws_client: WebSocketGenerator
+) -> None:
+    """The panel gets settings, state and entity ids; holidays, exclusions, removal."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "hue_studio/auto_light/subscribe"})
+    assert (await client.receive_json())["success"]
+    event = (await client.receive_json())["event"]
+    assert event["state"]["office"]["control"] == "auto"
+    assert event["state"]["office"]["scene"] in ("rest", "relax")
+    assert event["entities"]["office"]["light_control"] == "select.office_light_control"
+
+    async def command(**data: Any) -> bool:
+        await client.send_json_auto_id(data)
+        while "event" in (msg := await client.receive_json()):
+            pass
+        return msg["success"]
+
+    holidays = [{"from": "12-20", "to": "01-06", "phases": ["night"], "pool": ["rest"]}]
+    assert await command(
+        type="hue_studio/auto_light/update",
+        area_id="office",
+        holidays=holidays,
+        excluded=["relax"],
+    )
+    store = auto_control.auto_light_manager(hass).store
+    assert store.areas["office"]["holidays"] == holidays
+    assert store.areas["office"]["excluded"] == ["relax"]
+    assert not await command(
+        type="hue_studio/auto_light/update", area_id="office", holidays=[{"to": 1}]
+    )
+
+    assert await command(type="hue_studio/auto_light/remove", area_id="office")
+    await hass.async_block_till_done()
+    assert "office" not in store.areas
+    assert er.async_get(hass).async_get("select.office_light_control") is None

@@ -25,6 +25,8 @@ const names = (ctx: StudioContext, ids: string[]): string => ids.map((id) => fri
 const areaName = (ctx: StudioContext, id: string | null): string => (id && ctx.hass.areas?.[id]?.name) || id || "";
 const lightsCount = (ctx: StudioContext, n: number): string =>
   n === 1 ? ctx.t("rooms.one_light") : ctx.t("rooms.lights_count", { count: n });
+export const scenesCount = (ctx: StudioContext, n: number): string =>
+  n === 1 ? ctx.t("rooms.one_scene") : ctx.t("rooms.scenes_count", { count: n });
 
 const row = (iconName: string, text: string | TemplateResult, sub?: string | TemplateResult | typeof nothing, end?: TemplateResult) =>
   html`<div class="item"><ha-icon icon=${iconName}></ha-icon><div class="grow">${text}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>${end ?? nothing}</div>`;
@@ -174,7 +176,7 @@ export class RoomsView extends StudioView {
 
   private zoneRow(z: Zone) {
     const { ctx } = this;
-    const meta = ctx.t("rooms.zone_meta", { lights: lightsCount(ctx, z.lights.length), scenes: ctx.t("rooms.scenes_count", { count: z.scenes }) });
+    const meta = ctx.t("rooms.zone_meta", { lights: lightsCount(ctx, z.lights.length), scenes: scenesCount(ctx, z.scenes) });
     return html`<button class="item" @click=${() => this.edit(z)}>
       <ha-icon icon="mdi:texture-box"></ha-icon>
       <div class="grow">${z.name}<div class="dim small">${meta}</div></div>

@@ -1,15 +1,19 @@
 // Settings (a tab of the panel): rooms and zones, how the Hue rooms follow the HA areas,
-// and the integration's own options page for what has no screen here yet.
+// auto light per area, and the integration's own options page for the rest.
 
 import { html, nothing } from "lit";
-import { customElement } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 
 import { hueZones, lightsWithoutArea, planHasNews } from "../rooms.ts";
 import { icon, toggle } from "../ui.ts";
+import { addAreaSheet, autoLightRows } from "./auto-light.ts";
 import { StudioView } from "./base.ts";
 
 @customElement("hue-studio-settings-view")
 export class SettingsView extends StudioView {
+  /** The "add an area to auto light" sheet is open. */
+  @state() private accessor adding = false;
+
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
@@ -47,6 +51,9 @@ export class SettingsView extends StudioView {
       <p class="lead small">
         ${t("settings.counts", { zones, lights: loose })}
       </p>
+      <h2 class="label">${t("settings.auto_light")}</h2>
+      <p class="lead">${t("settings.auto_light_hint")}</p>
+      ${autoLightRows(ctx, () => (this.adding = true))}
       <h2 class="label">${t("settings.more")}</h2>
       <div class="rows">
         <button class="item" @click=${() => ctx.openSettings()}>
@@ -58,7 +65,8 @@ export class SettingsView extends StudioView {
           ${icon("open")}
         </button>
       </div>
-    </div>`;
+    </div>
+    ${this.adding ? addAreaSheet(ctx, () => (this.adding = false)) : nothing}`;
   }
 }
 

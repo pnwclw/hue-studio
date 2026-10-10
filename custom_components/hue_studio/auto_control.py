@@ -16,6 +16,7 @@ keeps track of is control:
 from __future__ import annotations
 
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
@@ -73,6 +74,17 @@ _LOGGER = logging.getLogger(__name__)
 SIGNAL_AREA = f"{DOMAIN}_auto_light_area"
 # Areas were added or removed.
 SIGNAL_AREAS = f"{DOMAIN}_auto_light_areas"
+# Any area's state changed (for the panel's subscription).
+SIGNAL_ANY_AREA = f"{DOMAIN}_auto_light_any_area"
+# Entity keys of an area (auto_entity.py) -> their platform.
+ENTITY_KEYS = {
+    "light_control": "select",
+    "light_phase": "sensor",
+    "light_scene": "sensor",
+    "light_brightness": "sensor",
+    "light_offset": "number",
+    "next_light_scene": "button",
+}
 REFRESH_INTERVAL = timedelta(minutes=1)
 # Changes within this long after auto light's own command are its own.
 QUIET_SECONDS = 15
@@ -113,10 +125,13 @@ class AutoLightManager:
     @callback
     def async_start(self) -> None:
         """Compute now, then keep up with time, inputs and the lights."""
+
+        @callback
+        def tick(_: datetime) -> None:
+            self.async_refresh()
+
         self._unsubs.append(
-            async_track_time_interval(
-                self.hass, lambda _: self.async_refresh(), REFRESH_INTERVAL
-            )
+            async_track_time_interval(self.hass, tick, REFRESH_INTERVAL)
         )
         self._unsubs.append(
             async_dispatcher_connect(
@@ -155,6 +170,34 @@ class AutoLightManager:
         self.async_refresh()
 
     # ---- selection ----
+
+    @callback
+    def _async_changed(self, area_id: str) -> None:
+        async_dispatcher_send(self.hass, f"{SIGNAL_AREA}_{area_id}")
+        async_dispatcher_send(self.hass, SIGNAL_ANY_AREA)
+
+    @callback
+    def panel_state(self, area_id: str) -> dict[str, Any]:
+        """What the panel shows of an area: its selection and who controls it."""
+        state = self.areas.get(area_id)
+        selection = state.selection if state else None
+        info: dict[str, Any] = {"control": self.control(area_id)}
+        if selection is not None:
+            info |= {
+                "phase": selection.phase,
+                "pool_phase": selection.pool_phase,
+                "season": selection.season,
+                "mood": selection.mood,
+                "holiday": selection.holiday,
+                "scene": selection.scene,
+                "scene_name": self.scene_name(area_id, selection.scene)
+                if selection.scene
+                else None,
+                "brightness": selection.brightness,
+                "step": selection.step,
+                "pool": list(selection.pool),
+            }
+        return info
 
     def _settings(self, area_id: str) -> dict[str, Any]:
         return (self.store.areas.get(area_id) or {}).get("settings") or {}
@@ -204,7 +247,7 @@ class AutoLightManager:
             selection = auto_select.select(config, self.inputs(area), config["skip"])
             if selection != state.selection:
                 state.selection = selection
-                async_dispatcher_send(self.hass, f"{SIGNAL_AREA}_{area}")
+                self._async_changed(area)
 
     # ---- control ----
 
@@ -225,7 +268,7 @@ class AutoLightManager:
         if config["control"] != stored:
             config["control"] = stored
             await self.store.async_set(area_id, config)
-        async_dispatcher_send(self.hass, f"{SIGNAL_AREA}_{area_id}")
+        self._async_changed(area_id)
 
     @callback
     def _watched(self, data: EventStateChangedData) -> bool:
@@ -264,7 +307,7 @@ class AutoLightManager:
         if auto_select.is_real_change(before, after):
             _LOGGER.debug("%s changed by hand: %s is manual now", entity_id, area_id)
             state.manual = True
-            async_dispatcher_send(self.hass, f"{SIGNAL_AREA}_{area_id}")
+            self._async_changed(area_id)
 
     # ---- acting ----
 
@@ -369,7 +412,12 @@ async def async_setup_auto_control(hass: HomeAssistant) -> None:
     gallery = await async_gallery_scenes(hass)
     manager.gallery_names = {key: scene["name"] for key, scene in gallery.items()}
     manager.async_start()
-    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, lambda _: manager.async_stop())
+
+    @callback
+    def stop(_: Event) -> None:
+        manager.async_stop()
+
+    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, stop)
 
     async def apply(call: ServiceCall) -> None:
         for area_id in call.data[ATTR_AREA]:
@@ -403,6 +451,9 @@ async def async_setup_auto_control(hass: HomeAssistant) -> None:
         ),
     )
     websocket_api.async_register_command(hass, ws_auto_light_settings)
+    websocket_api.async_register_command(hass, ws_subscribe_auto_light)
+    websocket_api.async_register_command(hass, ws_auto_light_update)
+    websocket_api.async_register_command(hass, ws_auto_light_remove)
 
 
 @websocket_api.require_admin
@@ -436,4 +487,127 @@ async def ws_auto_light_settings(
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/auto_light/subscribe"}
+)
+@callback
+def ws_subscribe_auto_light(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send auto light settings and state now and whenever they change.
+
+    Event payload (always complete):
+        {"areas": {area_id: settings (auto_light.py)},
+         "state": {area_id: {"control", "phase", "pool_phase", "season", "mood",
+                             "holiday", "scene", "scene_name", "brightness", "step",
+                             "pool"}},
+         "entities": {area_id: {entity key: entity_id}}}
+    """
+    manager = auto_light_manager(hass)
+    entities = er.async_get(hass)
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        payload = {
+            "areas": manager.store.areas,
+            "state": {
+                area_id: manager.panel_state(area_id) for area_id in manager.areas
+            },
+            "entities": {
+                area_id: {
+                    key: entity_id
+                    for key, platform in ENTITY_KEYS.items()
+                    if (
+                        entity_id := entities.async_get_entity_id(
+                            platform, DOMAIN, f"auto_light_{area_id}_{key}"
+                        )
+                    )
+                }
+                for area_id in manager.areas
+            },
+        }
+        if payload == last.get("payload"):
+            return
+        last["payload"] = deepcopy(payload)
+        connection.send_message(websocket_api.event_message(msg["id"], payload))
+
+    @callback
+    def registry_changed(_: Event) -> None:
+        send()
+
+    unsubs = [
+        async_dispatcher_connect(hass, SIGNAL_AUTO_LIGHT_UPDATED, send),
+        async_dispatcher_connect(hass, SIGNAL_ANY_AREA, send),
+        # Entities are registered a moment after an area appears.
+        hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, registry_changed),
+    ]
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/auto_light/update",
+        vol.Required("area_id"): str,
+        vol.Optional("holidays"): list,
+        vol.Optional("excluded"): [str],
+    }
+)
+@websocket_api.async_response
+async def ws_auto_light_update(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Replace an area's holidays or excluded scenes (pools: auto_light_pool)."""
+    store = auto_light_store(hass)
+    area_id = msg["area_id"]
+    if area_id not in store.areas:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, area_id)
+        return
+    config = store.area(area_id)
+    for key in ("holidays", "excluded"):
+        if key in msg:
+            config[key] = msg[key]
+    try:
+        await store.async_set(area_id, config)
+    except vol.Invalid as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/auto_light/remove",
+        vol.Required("area_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_auto_light_remove(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Take auto light away from an area: its settings, entities and device."""
+    area_id = msg["area_id"]
+    await auto_light_store(hass).async_remove(area_id)
+    devices = dr.async_get(hass)
+    if device := devices.async_get_device({(DOMAIN, f"auto_light_{area_id}")}):
+        devices.async_remove_device(device.id)
     connection.send_result(msg["id"])
