@@ -28,8 +28,7 @@ export class HomeView extends StudioView {
     return html`<div class="page">
       ${this.head(
         ctx.hass.config?.location_name || t("home.title"),
-        html`<button class="round rooms" aria-label=${t("rooms.open")} @click=${() => ctx.go("/rooms")}>${icon("rooms")}</button>
-          ${groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing}`,
+        groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing,
       )}
       ${planHasNews(ctx.rooms)
         ? html`<button class="notice" @click=${() => ctx.go("/rooms")}>

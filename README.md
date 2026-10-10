@@ -50,13 +50,12 @@ streams to them (Sync Box, PC or TV sync): the stream would overwrite them anywa
 ## Rooms and zones
 
 Home Assistant areas decide which room a light is in; the Hue bridge (and so the Hue
-app) follows. The panel's **Rooms and zones** screen (the floor plan button on the home
-screen) shows how the Hue rooms differ from your areas — rooms to create or rename,
+app) follows. The panel's **Rooms and zones** screen (in the Settings tab) shows how the Hue rooms differ from your areas — rooms to create or rename,
 lights to move, scenes that lose or gain lights — and aligns them on confirmation. A
 light moved in the Hue app shows up in its room with "move in Home Assistant" or "move
 back in Hue"; Hue lights without an area are listed under "No room" with an area
 picker. Zones (any lights from any rooms) are created and edited on the same screen.
-With "Rooms follow areas" turned on in the integration options, every area change is
+With "Rooms follow areas" turned on (Settings tab, or the integration options), every area change is
 written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-and-scenes.md).
 
 ## Hue Play HDMI Sync Box

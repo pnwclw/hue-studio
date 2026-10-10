@@ -286,3 +286,18 @@ async def test_auto_align(
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=4))
     await hass.async_block_till_done()
     assert [c.args[0] for c in rooms_bridge.request.mock_calls] == ["put", "post"]
+
+
+async def test_ws_set_config(
+    hass: HomeAssistant,
+    rooms_bridge: MagicMock,
+    studio_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """The panel's settings change the options of the bridge entries."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {"type": "hue_studio/config/set", "auto_align": True}
+    )
+    assert (await client.receive_json())["success"]
+    assert studio_entry.options[CONF_AUTO_ALIGN] is True

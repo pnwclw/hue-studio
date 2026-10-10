@@ -183,7 +183,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
   services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
                                 align_rooms, save_scene, reset_scene, recall_scene, set_sync
-  websocket.py                  hue_studio/lights|scenes|config|sync|rooms/subscribe, hue_studio/lights/set_area
+  websocket.py                  hue_studio/lights|scenes|config|sync|rooms/subscribe, hue_studio/lights/set_area, hue_studio/config/set
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,
@@ -206,7 +206,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
-  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, rooms (rooms and zones) — one Lit element per screen
+  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones) — one Lit element per screen
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale

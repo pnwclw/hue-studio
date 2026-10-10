@@ -247,6 +247,22 @@ export class StudioContext {
     }
   }
 
+  /** Change integration options from the panel (hue_studio/config/set); shown at once. */
+  async setConfig(change: Pick<StudioConfig, "auto_align">): Promise<boolean> {
+    if (!this.raw?.callWS) return false;
+    const before = this.config;
+    this.config = { ...this.config, ...change };
+    this.onChange();
+    try {
+      await this.raw.callWS({ type: "hue_studio/config/set", ...change });
+      return true;
+    } catch (err) {
+      this.config = before;
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
+  }
+
   /** Scenes change lights behind HA's back: tell Adaptive Lighting they are manual now. */
   async markManual(group: Group): Promise<void> {
     for (const al of adaptiveFor(this.hass, group)) {

@@ -1,4 +1,4 @@
-// Rooms and zones: how the Hue rooms on the bridge differ from the HA areas (and aligning
+// Rooms and zones (opened from Settings): how the Hue rooms on the bridge differ from the HA areas (and aligning
 // them), the Hue zones with an editor, and Hue lights that have no area yet.
 // Areas are Home Assistant's truth; rooms on the bridge follow them (hue_studio.align_rooms).
 
@@ -73,7 +73,7 @@ export class RoomsView extends StudioView {
     const loose = noRoomRows(ctx);
     return html`<div class="page rooms-page">
         <div class="topbar">
-          <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("")}>${icon("back")}</button>
+          <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("/settings")}>${icon("back")}</button>
           <div class="grow"></div>
         </div>
         <h1 class="big">${t("rooms.title")}</h1>
@@ -103,7 +103,7 @@ export class RoomsView extends StudioView {
     if (!plan) return html`<p class="lead">${t(ctx.roomsUnavailable ? "rooms.unavailable" : "rooms.loading")}</p>`;
     const auto = html`<p class="lead small">
       ${ctx.config.auto_align ? t("rooms.auto_on") : t("rooms.auto_off")}
-      <button class="text-link" @click=${() => ctx.openSettings()}>${t("room.mapping")}</button>
+      <button class="text-link" @click=${() => ctx.go("/settings")}>${t("room.mapping")}</button>
     </p>`;
     if (!plan.changed && !plan.empty.length) {
       return html`<div class="rows">

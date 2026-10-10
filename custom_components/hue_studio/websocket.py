@@ -15,7 +15,13 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
-from .const import SIGNAL_CONFIG_UPDATED, SIGNAL_ENTERTAINMENT_UPDATED
+from .const import (
+    CONF_AUTO_ALIGN,
+    CONF_HUE_ENTRY_ID,
+    DOMAIN,
+    SIGNAL_CONFIG_UPDATED,
+    SIGNAL_ENTERTAINMENT_UPDATED,
+)
 from .lights import (
     HUE_DOMAIN,
     LIGHT_DOMAIN,
@@ -38,6 +44,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe_sync)
     websocket_api.async_register_command(hass, ws_subscribe_rooms)
     websocket_api.async_register_command(hass, ws_set_light_area)
+    websocket_api.async_register_command(hass, ws_set_config)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -269,4 +276,31 @@ def ws_set_light_area(
     except ServiceValidationError as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/config/set",
+        vol.Optional(CONF_AUTO_ALIGN): bool,
+    }
+)
+@callback
+def ws_set_config(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Change options from the panel's settings (every bridge entry alike).
+
+    The same options as the options flow; open panels get them through
+    hue_studio/config/subscribe.
+    """
+    changes = {k: v for k, v in msg.items() if k == CONF_AUTO_ALIGN}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if CONF_HUE_ENTRY_ID in entry.data:
+            hass.config_entries.async_update_entry(
+                entry, options={**entry.options, **changes}
+            )
     connection.send_result(msg["id"])

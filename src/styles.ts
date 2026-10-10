@@ -18,7 +18,7 @@ export const CSS = `
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; }
-  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-effects,
+  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-effects,
   hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
@@ -403,6 +403,8 @@ export const CSS = `
   .rows button.item { width: 100%; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .rows button.item:active { background: rgba(255, 255, 255, 0.04); }
   .rows .item .chevron { --mdc-icon-size: 20px; }
+  .rows .item > svg { color: var(--text-2); }
+  .dot-badge { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #6c9dff; }
   .rows.plan .item, .rows.conflicts .item { font-size: 15px; }
   .rows.conflicts ha-icon { color: #ffb340; }
   .select { flex: none; max-width: 46%; height: 34px; padding: 0 10px; border: none; border-radius: 10px; font: inherit; font-size: 14px;

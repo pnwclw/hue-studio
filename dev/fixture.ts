@@ -11,6 +11,7 @@ import type {
   LightsMessage,
   Palette,
   RoomsPlan,
+  StudioConfig,
   SceneInfo,
   ServiceData,
   SyncBoxInfo,
@@ -296,6 +297,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   showSync();
 
   const roomListeners = new Set<(msg: unknown) => void>();
+  const configListeners = new Set<(msg: unknown) => void>();
+  let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
   /** A small copy of the backend's alignment plan (alignment.py), one light per device. */
   const planRooms = (): RoomsPlan => {
     const ids = Object.keys(LIGHTS);
@@ -495,6 +498,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     },
     async callWS<T>(msg: { type: string } & Record<string, unknown>): Promise<T> {
       console.info("callWS", JSON.stringify(msg));
+      if (msg.type === "hue_studio/config/set") {
+        config = { ...config, auto_align: !!msg.auto_align };
+        setTimeout(() => configListeners.forEach((cb) => cb(config)), 80);
+        return null as T;
+      }
       if (msg.type !== "hue_studio/lights/set_area") throw new Error("unknown command");
       devices[`dev_${String(msg.entity_id).replace("light.", "")}`].area_id = (msg.area_id as string | null) ?? null;
       pushRooms();
@@ -512,8 +520,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           };
         }
         if (msg.type === "hue_studio/config/subscribe") {
-          setTimeout(() => send({ groups: {}, rooms: {} }), 30);
-          return () => {};
+          configListeners.add(send);
+          setTimeout(() => send(config), 30);
+          return () => {
+            configListeners.delete(send);
+          };
         }
         if (msg.type === "hue_studio/scenes/subscribe") {
           sceneListeners.add(send);

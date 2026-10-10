@@ -8,6 +8,7 @@
 //   /room/<key>/scene/<scene>  scene editor
 //   /gallery?room=<key>        scene gallery
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
+//   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -26,6 +27,7 @@ import "./views/gallery.ts";
 import "./views/home.ts";
 import "./views/room.ts";
 import "./views/rooms.ts";
+import "./views/settings.ts";
 import "./views/scene.ts";
 import "./views/sync.ts";
 
@@ -36,7 +38,8 @@ type Route =
   | { name: "scene"; key: string; scene: string }
   | { name: "gallery"; room: string | null }
   | { name: "sync"; box: string | null }
-  | { name: "rooms" };
+  | { name: "rooms" }
+  | { name: "settings" };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -51,6 +54,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
+  if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
 }
 
@@ -96,12 +100,20 @@ export class HueStudioPanel extends LitElement {
     const ctx = this.ctx;
     if (!ctx?.ready) return nothing;
     const route = parseRoute(this.route?.path ?? location.pathname.replace(PANEL_PATH, ""), location.search);
-    const tab = route.name === "gallery" && !route.room ? "gallery" : route.name === "sync" ? "sync" : "home";
+    const tab =
+      route.name === "gallery" && !route.room
+        ? "gallery"
+        : route.name === "sync"
+          ? "sync"
+          : route.name === "settings" || route.name === "rooms"
+            ? "settings"
+            : "home";
     const tabs: [string, string, IconName, string][] = [
       ["home", "", "home", ctx.t("nav.home")],
       ["gallery", "/gallery", "explore", ctx.t("nav.gallery")],
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
+    tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
     const full = route.name === "color" || route.name === "scene";
     return html`
       <main class=${route.name === "color" ? "colorview" : ""}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
@@ -132,6 +144,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":
         return html`<hue-studio-sync-view .ctx=${ctx} .rev=${rev} .box=${route.box}></hue-studio-sync-view>`;
+      case "settings":
+        return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "rooms":
         return html`<hue-studio-rooms-view .ctx=${ctx} .rev=${rev}></hue-studio-rooms-view>`;
       case "gallery":

@@ -129,11 +129,38 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 5. On the live bridge: dry run, review, then apply (see `rooms-and-scenes.md`, Work 5).
 6. Later: a split room's scenes moved to a zone over the same lights.
 
-### D. Phase 4 — auto light (the main difference from the Hue app)
+### D. Phase 4 — auto light as building blocks (the main difference from the Hue app)
 
-- Phases, seasons, weather, holidays and offsets in Python, replacing template sensors and
-  automations; settings UI in the panel.
-- Manual mode, quiet hours, Adaptive Lighting interplay.
+Hue Studio decides *what* to show; *when* stays with Home Assistant automations (no
+presence or time-window logic in the integration, no blueprints). What matters are
+entities that dashboards (Lovelace, Mushroom, Bubble Card) and automations can use
+directly. Per HA area with auto light settings:
+
+1. Selection engine (pure, tested): phase of the day from the sun (with offsets, night
+   from a time), pool by season, weather and holidays, scene of the day (another one per
+   "next scene"), brightness (light sensor, sun elevation, fixed per phase, offsets).
+   Same results as the legacy templates on the same inputs.
+2. Entities, with translations, icons, device classes and an `entity_picture` where it
+   helps cards:
+   - **light control** (`select`: auto / manual / off): who controls the lights right
+     now. Hue Studio sets `manual` when the lights change by anything but auto light
+     and back to `auto` once the area's lights are all off; `off` disables auto light
+     for the area;
+   - phase (`sensor`, enum), scene of the day (`sensor`, the gallery picture as
+     `entity_picture`), brightness (`sensor`, %), brightness offset of the current
+     phase (`number`), next scene (`button`).
+3. Service `apply_auto_light` (area target, transition; does nothing while the area is
+   `manual` or `off` unless `force`), Adaptive Lighting marking.
+4. Settings in the panel (Settings tab): phase boundaries, weather / light sensor /
+   season source, pools, holidays, exclusions, offsets.
+5. Live switch-over: the legacy template sensors, helpers and the light config shim go;
+   the existing automations call `apply_auto_light`.
+
+### D2. Cards
+
+- Hue lights, sensors and scenes behave in Lovelace, Mushroom and Bubble Card: the
+  more-info override catches their more-info, everything else stays stock.
+- Our entities render well in those cards (state names, icons, pictures).
 
 ### E. Later
 
@@ -148,7 +175,7 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ## Order
 
-A -> B1–B2 -> R -> D -> C -> rest of B -> E.
+A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
