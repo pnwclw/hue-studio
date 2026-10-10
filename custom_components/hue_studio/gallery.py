@@ -14,14 +14,19 @@ GALLERY_FILE = Path(__file__).parent / "frontend" / "gallery" / "gallery.json"
 _GALLERY: HassKey[dict[str, dict[str, Any]]] = HassKey("hue_studio_gallery")
 
 
-async def async_get_gallery_scene(
-    hass: HomeAssistant, scene_id: str
-) -> dict[str, Any] | None:
-    """Return a gallery scene by id, loading the file once."""
+async def async_gallery_scenes(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
+    """Every gallery scene by id, loading the file once."""
     if (scenes := hass.data.get(_GALLERY)) is None:
         data = await hass.async_add_executor_job(_load)
         scenes = hass.data[_GALLERY] = {s["id"]: s for s in data["scenes"]}
-    return scenes.get(scene_id)
+    return scenes
+
+
+async def async_get_gallery_scene(
+    hass: HomeAssistant, scene_id: str
+) -> dict[str, Any] | None:
+    """Return a gallery scene by id."""
+    return (await async_gallery_scenes(hass)).get(scene_id)
 
 
 def _load() -> dict[str, Any]:

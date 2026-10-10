@@ -1,13 +1,16 @@
 """Tests for Hue Studio services."""
 
+import base64
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from aiohue.errors import AiohueException
+from aiohue.v2.models.feature import GradientMode
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 
 from custom_components.hue_studio.const import DOMAIN
@@ -338,3 +341,69 @@ async def test_delete_scene(hass: HomeAssistant, hue_room: MagicMock) -> None:
     hue_room.request.assert_awaited_once_with(
         "delete", "clip/v2/resource/scene/res-scene"
     )
+
+
+def _b64(palette: dict[str, object]) -> str:
+    return "b64:" + base64.b64encode(json.dumps(palette).encode()).decode()
+
+
+async def test_apply_palette_references(
+    hass: HomeAssistant, hue_lights: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """gallery:/b64: references, transition and gradient mode (legacy `apply`)."""
+    await hass.services.async_call(
+        DOMAIN,
+        "apply_palette",
+        {"entity_id": "light.bulb", "palette": "gallery:rest", "transition": 1.5},
+        blocking=True,
+    )
+    bulb = _sent(hue_lights)["res-bulb"]
+    assert bulb.dynamics.duration == 1500
+    assert bulb.dimming.brightness == 35
+
+    hue_lights.lights.update.reset_mock()
+    monkeypatch.setattr(
+        LIGHTS["res-strip"].gradient,
+        "mode_values",
+        [GradientMode.INTERPOLATED_PALETTE, GradientMode.RANDOM_PIXELATED],
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "apply_palette",
+        {
+            "entity_id": "light.strip",
+            "palette": _b64({"points": [[0.6, 0.35], [0.2, 0.3]], "brightness": 70}),
+            "mode": "random_pixelated",
+        },
+        blocking=True,
+    )
+    strip = _sent(hue_lights)["res-strip"]
+    assert strip.gradient.mode.value == "random_pixelated"
+    assert strip.dimming.brightness == 70
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "apply_palette",
+            {"entity_id": "light.bulb", "palette": "b64:bm9wZQ=="},
+            blocking=True,
+        )
+    assert err.value.translation_key == "bad_palette"
+
+
+async def test_apply_palette_area_skips_other_lights(
+    hass: HomeAssistant, hue_lights: MagicMock
+) -> None:
+    """An area target uses its Hue lights; other brands in it are left alone."""
+    office = ar.async_get(hass).async_create("Office")
+    registry = er.async_get(hass)
+    for entity_id in ("light.bulb", "light.other_brand"):
+        registry.async_update_entity(entity_id, area_id=office.id)
+    hass.states.async_set("light.other_brand", "on")
+    await hass.services.async_call(
+        DOMAIN,
+        "apply_palette",
+        {"area_id": office.id, "palette": "rest"},
+        blocking=True,
+    )
+    assert list(_sent(hue_lights)) == ["res-bulb"]

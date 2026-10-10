@@ -184,6 +184,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, save_scene, reset_scene, recall_scene,
                                 set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
+  auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,
+                                import of the legacy lights.json
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities

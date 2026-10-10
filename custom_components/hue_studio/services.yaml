@@ -4,6 +4,10 @@ apply_palette:
       integration: hue
       domain: light
   fields:
+    palette:
+      example: gallery:ocean_dawn
+      selector:
+        text:
     gallery_scene:
       example: ocean_dawn
       selector:
@@ -25,6 +29,22 @@ apply_palette:
           min: 1
           max: 100
           unit_of_measurement: "%"
+    transition:
+      selector:
+        number:
+          min: 0
+          max: 300
+          step: 0.1
+          unit_of_measurement: s
+    mode:
+      selector:
+        select:
+          translation_key: gradient_mode
+          options:
+            - interpolated_palette
+            - interpolated_palette_mirrored
+            - random_pixelated
+            - segmented_palette
 
 set_gradient:
   target:
@@ -232,3 +252,79 @@ set_sync:
           min: 1
           max: 100
           unit_of_measurement: "%"
+
+auto_light_exclude:
+  fields:
+    area:
+      required: true
+      selector:
+        area:
+    scene:
+      required: true
+      example: ocean_dawn
+      selector:
+        text:
+    excluded:
+      default: true
+      selector:
+        boolean:
+
+auto_light_pool:
+  fields:
+    area:
+      required: true
+      selector:
+        area:
+    phase:
+      required: true
+      selector:
+        select:
+          translation_key: phase
+          options: [morning, day, golden, evening, night]
+    season:
+      required: true
+      selector:
+        select:
+          translation_key: season
+          options: [all, winter, spring, summer, autumn]
+    step:
+      required: true
+      example: clear
+      selector:
+        text:
+    scenes:
+      required: true
+      example: "[ocean_dawn, blossom]"
+      selector:
+        object:
+
+auto_light_offset:
+  fields:
+    area:
+      required: true
+      selector:
+        area:
+    phase:
+      required: true
+      selector:
+        select:
+          translation_key: phase
+          options: [morning, day, golden, evening, night]
+    delta:
+      required: true
+      selector:
+        number:
+          min: -100
+          max: 100
+          unit_of_measurement: "%"
+
+import_legacy:
+  fields:
+    path:
+      default: lights.json
+      selector:
+        text:
+    overwrite:
+      default: false
+      selector:
+        boolean:

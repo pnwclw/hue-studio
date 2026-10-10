@@ -152,6 +152,18 @@
     },
     "scene_name_taken": {
       "message": "W tym pomieszczeniu lub strefie jest już scena o nazwie {name}."
+    },
+    "auto_light_bad_step": {
+      "message": "Nieznana pula {step}: użyj clear lub gloomy albo 0-3 dla pory „day”."
+    },
+    "legacy_unreadable": {
+      "message": "Nie można odczytać {path}."
+    },
+    "unknown_ha_area": {
+      "message": "Nieznany obszar: {area}."
+    },
+    "bad_palette": {
+      "message": "Paleta nie jest poprawnym JSON-em w base64 z punktami albo bielą (mirek)."
     }
   },
   "services": {
@@ -159,6 +171,10 @@
       "name": "Zastosuj paletę",
       "description": "Stosuje paletę do świateł Hue: światła z gradientem dostają całą paletę, pozostałe po jednym kolorze.",
       "fields": {
+        "palette": {
+          "name": "Paleta",
+          "description": "gallery:<id>, b64:<paleta jako JSON w base64> albo identyfikator sceny z galerii."
+        },
         "gallery_scene": {
           "name": "Scena z galerii",
           "description": "ID sceny z wbudowanej galerii."
@@ -174,6 +190,14 @@
         "brightness": {
           "name": "Jasność",
           "description": "Jasność w procentach. Domyślnie jasność palety."
+        },
+        "transition": {
+          "name": "Przejście",
+          "description": "Czas przejścia w sekundach."
+        },
+        "mode": {
+          "name": "Tryb gradientu",
+          "description": "Jak światła gradientowe układają kolory (jeśli to obsługują)."
         }
       }
     },
@@ -330,6 +354,82 @@
           "description": "Jasność synchronizacji w procentach."
         }
       }
+    },
+    "auto_light_exclude": {
+      "name": "Automatyczne światło: wyklucz scenę",
+      "description": "Nigdy (lub znowu) nie wybieraj sceny z galerii w automatycznym świetle obszaru.",
+      "fields": {
+        "area": {
+          "name": "Obszar",
+          "description": "Obszar, którego automatyczne światło się zmienia."
+        },
+        "scene": {
+          "name": "Scena z galerii",
+          "description": "Identyfikator sceny z galerii."
+        },
+        "excluded": {
+          "name": "Wykluczona",
+          "description": "Wyłącz, aby scena znowu mogła być wybierana."
+        }
+      }
+    },
+    "auto_light_pool": {
+      "name": "Automatyczne światło: ustaw pulę",
+      "description": "Ustawia sceny z galerii jednej puli automatycznego światła obszaru.",
+      "fields": {
+        "area": {
+          "name": "Obszar",
+          "description": "Obszar, którego automatyczne światło się zmienia."
+        },
+        "phase": {
+          "name": "Pora",
+          "description": "Pora dnia."
+        },
+        "season": {
+          "name": "Pora roku",
+          "description": "Pora roku albo wszystkie."
+        },
+        "step": {
+          "name": "Pula",
+          "description": "clear lub gloomy; dla pory dnia „day” stopień jasności 0-3."
+        },
+        "scenes": {
+          "name": "Sceny",
+          "description": "Identyfikatory scen z galerii."
+        }
+      }
+    },
+    "auto_light_offset": {
+      "name": "Automatyczne światło: korekta jasności",
+      "description": "Przesuwa jasność pory dnia o podany procent; 0 ją zeruje. Zwraca nową korektę.",
+      "fields": {
+        "area": {
+          "name": "Obszar",
+          "description": "Obszar, którego automatyczne światło się zmienia."
+        },
+        "phase": {
+          "name": "Pora",
+          "description": "Pora dnia."
+        },
+        "delta": {
+          "name": "Zmiana",
+          "description": "Procent do dodania; 0 zeruje korektę."
+        }
+      }
+    },
+    "import_legacy": {
+      "name": "Importuj stare ustawienia",
+      "description": "Importuje automatyczne światło pokoi ze starego lights.json; pokoje są dopasowywane do obszarów po identyfikatorze lub nazwie. Zwraca, co zaimportowano.",
+      "fields": {
+        "path": {
+          "name": "Plik",
+          "description": "Ścieżka względem katalogu konfiguracji."
+        },
+        "overwrite": {
+          "name": "Nadpisz",
+          "description": "Zastąp obszary, które już mają ustawienia automatycznego światła."
+        }
+      }
     }
   },
   "selector": {
@@ -369,6 +469,24 @@
         "moderate": "Umiarkowana",
         "high": "Wysoka",
         "intense": "Intensywna"
+      }
+    },
+    "phase": {
+      "options": {
+        "morning": "Rano",
+        "day": "Dzień",
+        "golden": "Złota godzina",
+        "evening": "Wieczór",
+        "night": "Noc"
+      }
+    },
+    "season": {
+      "options": {
+        "all": "Wszystkie pory roku",
+        "winter": "Zima",
+        "spring": "Wiosna",
+        "summer": "Lato",
+        "autumn": "Jesień"
       }
     }
   },

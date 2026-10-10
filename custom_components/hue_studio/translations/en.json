@@ -152,6 +152,18 @@
     },
     "scene_name_taken": {
       "message": "There already is a scene named {name} in this room or zone."
+    },
+    "auto_light_bad_step": {
+      "message": "Unknown pool {step}: use clear or gloomy, or 0-3 for the day phase."
+    },
+    "legacy_unreadable": {
+      "message": "Cannot read {path}."
+    },
+    "unknown_ha_area": {
+      "message": "Unknown area: {area}."
+    },
+    "bad_palette": {
+      "message": "The palette is not valid base64 JSON with points or a white (mirek)."
     }
   },
   "services": {
@@ -159,6 +171,10 @@
       "name": "Apply palette",
       "description": "Applies a palette to Hue lights: gradient lights get the whole palette, other lights one color each.",
       "fields": {
+        "palette": {
+          "name": "Palette",
+          "description": "gallery:<id>, b64:<base64 JSON palette> or a gallery scene id."
+        },
         "gallery_scene": {
           "name": "Gallery scene",
           "description": "ID of a scene from the bundled gallery."
@@ -174,6 +190,14 @@
         "brightness": {
           "name": "Brightness",
           "description": "Brightness in percent. Defaults to the palette's own brightness."
+        },
+        "transition": {
+          "name": "Transition",
+          "description": "Transition time in seconds."
+        },
+        "mode": {
+          "name": "Gradient mode",
+          "description": "How gradient lights lay the colors out (when they support it)."
         }
       }
     },
@@ -330,6 +354,82 @@
           "description": "Sync brightness in percent."
         }
       }
+    },
+    "auto_light_exclude": {
+      "name": "Auto light: exclude scene",
+      "description": "Never (or again) pick a gallery scene in an area's auto light.",
+      "fields": {
+        "area": {
+          "name": "Area",
+          "description": "Area whose auto light changes."
+        },
+        "scene": {
+          "name": "Gallery scene",
+          "description": "Id of a gallery scene."
+        },
+        "excluded": {
+          "name": "Excluded",
+          "description": "Off to pick the scene again."
+        }
+      }
+    },
+    "auto_light_pool": {
+      "name": "Auto light: set pool",
+      "description": "Sets the gallery scenes of one pool of an area's auto light.",
+      "fields": {
+        "area": {
+          "name": "Area",
+          "description": "Area whose auto light changes."
+        },
+        "phase": {
+          "name": "Phase",
+          "description": "Time of day."
+        },
+        "season": {
+          "name": "Season",
+          "description": "Season, or all of them."
+        },
+        "step": {
+          "name": "Pool",
+          "description": "clear or gloomy; for the day phase the brightness step 0-3."
+        },
+        "scenes": {
+          "name": "Scenes",
+          "description": "Ids of gallery scenes."
+        }
+      }
+    },
+    "auto_light_offset": {
+      "name": "Auto light: brightness offset",
+      "description": "Shifts the brightness of a phase by the given percent; 0 resets it. Returns the new offset.",
+      "fields": {
+        "area": {
+          "name": "Area",
+          "description": "Area whose auto light changes."
+        },
+        "phase": {
+          "name": "Phase",
+          "description": "Time of day."
+        },
+        "delta": {
+          "name": "Change",
+          "description": "Percent to add; 0 resets the offset."
+        }
+      }
+    },
+    "import_legacy": {
+      "name": "Import legacy settings",
+      "description": "Imports the auto light of rooms from a legacy lights.json; rooms are matched to areas by id or name. Returns what was imported.",
+      "fields": {
+        "path": {
+          "name": "File",
+          "description": "Path relative to the config directory."
+        },
+        "overwrite": {
+          "name": "Overwrite",
+          "description": "Replace areas that already have auto light settings."
+        }
+      }
     }
   },
   "selector": {
@@ -369,6 +469,24 @@
         "moderate": "Moderate",
         "high": "High",
         "intense": "Intense"
+      }
+    },
+    "phase": {
+      "options": {
+        "morning": "Morning",
+        "day": "Day",
+        "golden": "Golden hour",
+        "evening": "Evening",
+        "night": "Night"
+      }
+    },
+    "season": {
+      "options": {
+        "all": "All seasons",
+        "winter": "Winter",
+        "spring": "Spring",
+        "summer": "Summer",
+        "autumn": "Autumn"
       }
     }
   },

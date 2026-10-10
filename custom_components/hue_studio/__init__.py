@@ -28,6 +28,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
+from .auto_light import async_setup_auto_light
 from .const import (
     CONF_BOX_ID,
     CONF_HUE_ENTRY_ID,
@@ -88,6 +89,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register services and the WebSocket API (once, independent of entries)."""
     async_setup_services(hass)
     async_setup_websocket(hass)
+    await async_setup_auto_light(hass)
     return True
 
 

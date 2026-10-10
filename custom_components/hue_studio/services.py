@@ -6,6 +6,8 @@ the Sync Box.
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 from typing import Any
 
@@ -18,6 +20,7 @@ from aiohue.v2.models.feature import (
     ColorPoint,
     ColorTemperatureFeaturePut,
     DimmingFeaturePut,
+    DynamicsFeaturePut,
     EffectsFeaturePut,
     EffectStatus,
     EffectsV2ActionPut,
@@ -44,6 +47,10 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.service import async_extract_entity_ids
+from homeassistant.helpers.target import (
+    TargetSelection,
+    async_extract_referenced_entity_ids,
+)
 import voluptuous as vol
 
 from .adaptive import async_mark_manual
@@ -51,11 +58,18 @@ from .const import (
     CONF_KIND,
     CONF_SYNC_ENTRY_ID,
     DOMAIN,
+    HUE_DOMAIN,
     KIND_SYNC_BOX,
     KIND_SYNC_BOX_LINK,
 )
 from .gallery import async_get_gallery_scene
-from .lights import NOT_EFFECTS, HueLight, async_resolve_lights, supported_effects
+from .lights import (
+    LIGHT_DOMAIN,
+    NOT_EFFECTS,
+    HueLight,
+    async_resolve_lights,
+    supported_effects,
+)
 from .scenes import (
     SCENE_DOMAIN,
     HueScene,
@@ -94,6 +108,8 @@ SERVICE_RECALL_SCENE = "recall_scene"
 SERVICE_SET_SYNC = "set_sync"
 
 ATTR_GALLERY_SCENE = "gallery_scene"
+ATTR_PALETTE = "palette"
+ATTR_TRANSITION = "transition"
 ATTR_POINTS = "points"
 ATTR_MIREK = "mirek"
 ATTR_BRIGHTNESS = "brightness"
@@ -121,20 +137,46 @@ BRIGHTNESS = vol.All(vol.Coerce(float), vol.Range(min=1, max=100))
 MIREK = vol.All(vol.Coerce(int), vol.Range(min=153, max=500))
 # Percent, like the native `hue.activate_scene`; the bridge wants 0-1.
 SPEED = vol.All(vol.Coerce(float), vol.Range(min=0, max=100))
+# Seconds; the bridge takes up to 6000 s in 100 ms steps.
+TRANSITION = vol.All(vol.Coerce(float), vol.Range(min=0, max=6000))
 EFFECTS = [effect.value for effect in EffectStatus if effect != EffectStatus.UNKNOWN]
 
 APPLY_PALETTE_SCHEMA = vol.All(
     cv.make_entity_service_schema(
         {
+            # "gallery:<id>", "b64:<json palette>" or a gallery id.
+            vol.Exclusive(ATTR_PALETTE, "palette"): cv.string,
             vol.Exclusive(ATTR_GALLERY_SCENE, "palette"): cv.string,
             vol.Exclusive(ATTR_POINTS, "palette"): vol.All(
                 [XY_POINT], vol.Length(min=1, max=5)
             ),
             vol.Exclusive(ATTR_MIREK, "palette"): MIREK,
             vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+            vol.Optional(ATTR_TRANSITION): TRANSITION,
+            # How gradient lights lay the colors out (if they support the mode).
+            vol.Optional(ATTR_MODE): vol.In([mode.value for mode in GradientMode]),
         }
     ),
-    cv.has_at_least_one_key(ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK),
+    cv.has_at_least_one_key(ATTR_PALETTE, ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK),
+)
+
+INLINE_PALETTE = vol.Any(
+    vol.Schema(
+        {
+            vol.Required("kind"): "white",
+            vol.Required(ATTR_MIREK): MIREK,
+            vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+        },
+        extra=vol.REMOVE_EXTRA,
+    ),
+    vol.Schema(
+        {
+            vol.Optional("kind", default="gradient"): "gradient",
+            vol.Required(ATTR_POINTS): vol.All([XY_POINT], vol.Length(min=1, max=5)),
+            vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+        },
+        extra=vol.REMOVE_EXTRA,
+    ),
 )
 
 SET_GRADIENT_SCHEMA = cv.make_entity_service_schema(
@@ -227,10 +269,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
         lights = await _async_target_lights(hass, call)
         palette = await _async_palette(hass, call.data)
         brightness = call.data.get(ATTR_BRIGHTNESS, palette.get("brightness"))
+        transition = call.data.get(ATTR_TRANSITION)
+        mode = call.data.get(ATTR_MODE)
         # Sequential on purpose: one command per light, at most a handful per room;
         # aiohue additionally caps concurrent requests and retries on 429.
         for index, light in enumerate(lights):
-            await _async_update(light, _palette_put(light, palette, index, brightness))
+            put = _palette_put(light, palette, index, brightness, mode)
+            if transition is not None:
+                put.dynamics = DynamicsFeaturePut(duration=round(transition * 1000))
+            await _async_update(light, put)
         await async_mark_manual(hass, _touched(call, lights))
 
     async def set_gradient(call: ServiceCall) -> None:
@@ -415,10 +462,23 @@ async def _async_target_lights(
 ) -> list[HueLight]:
     """Resolve the service target; explicitly listed entities keep their order.
 
-    Lights that an entertainment area streams to right now (Sync Box, PC or TV sync)
-    are left alone: the stream would overwrite the command anyway.
+    Areas, devices and labels contribute their Hue lights (and Hue rooms/zones) only;
+    an explicitly listed light that is not a Hue light is an error. Lights that an
+    entertainment area streams to right now (Sync Box, PC or TV sync) are left alone:
+    the stream would overwrite the command anyway.
     """
-    found = await async_extract_entity_ids(call, expand_group=False)
+    selected = async_extract_referenced_entity_ids(
+        hass, TargetSelection(call.data), expand_group=False
+    )
+    registry = er.async_get(hass)
+    indirect = {
+        entity_id
+        for entity_id in selected.indirectly_referenced
+        if (entry := registry.async_get(entity_id)) is not None
+        and entry.domain == LIGHT_DOMAIN
+        and entry.platform == HUE_DOMAIN
+    }
+    found = selected.referenced | indirect
     explicit = [e for e in _explicit_ids(call) if e in found]
     ordered = explicit + sorted(found.difference(explicit))
     if not ordered:
@@ -544,6 +604,10 @@ async def _async_target_scenes(
 
 async def _async_palette(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Return a palette dict: {"kind": "gradient", "points": [...]} or white."""
+    if (reference := data.get(ATTR_PALETTE)) is not None:
+        if reference.startswith("b64:"):
+            return _inline_palette(reference[4:])
+        data = {ATTR_GALLERY_SCENE: reference.removeprefix("gallery:")}
     if (scene_id := data.get(ATTR_GALLERY_SCENE)) is not None:
         scene = await async_get_gallery_scene(hass, scene_id)
         if scene is None:
@@ -556,6 +620,17 @@ async def _async_palette(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if ATTR_MIREK in data:
         return {"kind": "white", "mirek": data[ATTR_MIREK]}
     return {"kind": "gradient", "points": data[ATTR_POINTS]}
+
+
+def _inline_palette(encoded: str) -> dict[str, Any]:
+    """A palette passed as base64 JSON: {"kind": "white", "mirek"} or with "points"."""
+    try:
+        palette = json.loads(base64.b64decode(encoded, validate=True))
+        return INLINE_PALETTE(palette)
+    except (ValueError, TypeError, vol.Invalid) as err:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="bad_palette"
+        ) from err
 
 
 def _touched(call: ServiceCall, lights: list[HueLight]) -> list[str]:
@@ -577,7 +652,11 @@ def _base_put(brightness: float | None) -> LightPut:
 
 
 def _palette_put(
-    light: HueLight, palette: dict[str, Any], index: int, brightness: float | None
+    light: HueLight,
+    palette: dict[str, Any],
+    index: int,
+    brightness: float | None,
+    mode: str | None = None,
 ) -> LightPut:
     """Gradient lights get the whole palette, other lights one color each."""
     put = _base_put(brightness)
@@ -592,7 +671,8 @@ def _palette_put(
         return put
     points: list[list[float]] = palette["points"]
     if resource.gradient is not None and len(points) >= 2:
-        put.gradient = _gradient(light, points, None)
+        supported = {m.value for m in resource.gradient.mode_values}
+        put.gradient = _gradient(light, points, mode if mode in supported else None)
     elif resource.color is not None:
         x, y = points[index % len(points)]
         put.color = ColorFeaturePut(xy=ColorPoint(x, y))

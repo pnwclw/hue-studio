@@ -72,9 +72,13 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
    match (same lights); an empty row is a zone; only deviations from the automatic
    match are stored. Creating a zone on the bridge for an area without a Hue group
    belongs to the panel (A1/B1). Still to do: screenshots on a live HA.
-4. `hue_studio.import_legacy`: move auto-light data from `lights.json` into the Store.
-5. Import of scenes from the bridge; `gallery:<id>` and `b64:<json>` palette references in
-   `apply_palette`.
+4. ~~Auto light settings in the Store~~ — done: `auto_light.py` (`.storage/
+   hue_studio.auto_light`, per area id), services `auto_light_pool`, `auto_light_exclude`,
+   `auto_light_offset`, `import_legacy`, WS `hue_studio/auto_light/subscribe`.
+5. ~~Palette references~~ — done: `apply_palette` takes `palette` (`gallery:<id>`,
+   `b64:<json>`, a gallery id), `transition` and gradient `mode`, and area targets use
+   their Hue lights only. Importing bridge scenes as palettes is obsolete: palettes are
+   bridge scenes now.
 6. ~~Honour `sync`~~ — done without configuration: lights streaming from an
    entertainment area are known from the bridge. The legacy `sync` room key can go.
 7. Switch the legacy cards and automations over to Hue Studio services and remove the
