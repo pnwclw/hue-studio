@@ -17,15 +17,15 @@
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
-        "description": "Sparuj urządzenie z Hue Studio albo korzystaj z niego przez integrację Sync Box, w której już jest. Jedno urządzenie działa tylko w jeden sposób.",
+        "description": "Zalecane: sparuj urządzenie bezpośrednio z Hue Studio — wszystkie funkcje i własne encje. Tryb zgodności: użyj urządzenia, które ma już integracja Sync Box z HACS — nic nie trzeba parować, ale dostępne jest tylko to, co ta integracja udostępnia. Jedno urządzenie działa tylko w jeden sposób.",
         "menu_options": {
-          "sync_box_pair": "Sparuj bezpośrednio z Hue Studio",
-          "sync_box_integration": "Użyj integracji Sync Box"
+          "sync_box_pair": "Sparuj bezpośrednio z Hue Studio (zalecane)",
+          "sync_box_integration": "Użyj integracji Sync Box (tryb zgodności)"
         }
       },
       "sync_box_pair": {
         "title": "Hue Play HDMI Sync Box",
-        "description": "Podaj adres Sync Box. Potem przytrzymasz jego przycisk, aby sparować go z Hue Studio.",
+        "description": "Podaj adres Sync Box. Potem przytrzymasz jego przycisk, aby sparować go z Hue Studio. Korzystasz już z integracji Sync Box z HACS? Hue Studio może też działać przez nią (tryb zgodności): pojawi się tutaj, gdy ta integracja będzie mieć urządzenie.",
         "data": {
           "host": "Host"
         },
@@ -34,15 +34,15 @@
         }
       },
       "sync_box_integration": {
-        "title": "Użyj integracji Sync Box",
-        "description": "Hue Studio korzysta z encji i usługi integracji Sync Box dla tego urządzenia: nic nie trzeba parować, a jej encje pozostają bez zmian.",
+        "title": "Tryb zgodności: integracja Sync Box",
+        "description": "Hue Studio korzysta z encji i usługi integracji Sync Box dla tego urządzenia: nic nie trzeba parować, a jej encje pozostają bez zmian. Ograniczenia: obszary rozrywki są dopasowywane po nazwie, typy wejść i niektóre szczegóły są niedostępne, a nowe funkcje Hue Studio dla Sync Box wymagają bezpośredniego parowania. Aby przejść później, usuń urządzenie z integracji Sync Box i sparuj je z Hue Studio.",
         "data": {
           "sync_entry_id": "Sync Box"
         }
       },
       "sync_box_use_integration": {
         "title": "{name}",
-        "description": "{name} jest już skonfigurowany w integracji Sync Box ({entry}). Hue Studio skorzysta z niego przez tę integrację, zamiast parować go drugi raz."
+        "description": "{name} jest już skonfigurowany w integracji Sync Box ({entry}). Hue Studio może z niego korzystać przez tę integrację (tryb zgodności): nic nie trzeba parować, ale dostępne jest tylko to, co ta integracja udostępnia. Aby sparować bezpośrednio (zalecane, wszystkie funkcje), anuluj tutaj, usuń urządzenie z integracji Sync Box i dodaj je ponownie."
       },
       "sync_box_confirm": {
         "title": "{name}",

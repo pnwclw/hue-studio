@@ -17,15 +17,15 @@
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
-        "description": "Pair the box with Hue Studio, or use it through the Sync Box integration that already has it. One box is used one way only.",
+        "description": "Recommended: pair the box directly with Hue Studio — all features, its own entities. Compatibility mode: use a box the HACS Sync Box integration already has — nothing to pair, but only what that integration exposes. One box is used one way only.",
         "menu_options": {
-          "sync_box_pair": "Pair directly with Hue Studio",
-          "sync_box_integration": "Use the Sync Box integration"
+          "sync_box_pair": "Pair directly with Hue Studio (recommended)",
+          "sync_box_integration": "Use the Sync Box integration (compatibility mode)"
         }
       },
       "sync_box_pair": {
         "title": "Hue Play HDMI Sync Box",
-        "description": "Enter the address of the Sync Box. You will then hold its button to pair it with Hue Studio.",
+        "description": "Enter the address of the Sync Box. You will then hold its button to pair it with Hue Studio. Already using the Sync Box integration from HACS? Hue Studio can also work through it (compatibility mode): it is offered here once that integration has the box.",
         "data": {
           "host": "Host"
         },
@@ -34,15 +34,15 @@
         }
       },
       "sync_box_integration": {
-        "title": "Use the Sync Box integration",
-        "description": "Hue Studio uses the entities and service of the Sync Box integration for this box: nothing to pair, and its entities stay as they are.",
+        "title": "Compatibility mode: Sync Box integration",
+        "description": "Hue Studio uses the entities and service of the Sync Box integration for this box: nothing to pair, and its entities stay as they are. Limits: entertainment areas are matched by name, input types and some details are not available, and new Hue Studio features for the Sync Box need direct pairing. To switch later, remove the box from the Sync Box integration and pair it with Hue Studio.",
         "data": {
           "sync_entry_id": "Sync Box"
         }
       },
       "sync_box_use_integration": {
         "title": "{name}",
-        "description": "{name} is already set up in the Sync Box integration ({entry}). Hue Studio will use it through that integration instead of pairing it a second time."
+        "description": "{name} is already set up in the Sync Box integration ({entry}). Hue Studio can use it through that integration (compatibility mode): nothing to pair, but only what the integration exposes. For direct pairing (recommended, all features), cancel here, remove the box from the Sync Box integration and add it again."
       },
       "sync_box_confirm": {
         "title": "{name}",

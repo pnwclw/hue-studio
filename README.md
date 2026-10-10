@@ -38,26 +38,42 @@ streams to them (Sync Box, PC or TV sync): the stream would overwrite them anywa
 
 ## Hue Play HDMI Sync Box
 
-Two ways to use a Sync Box, chosen when you add it (one box is only ever set up one
-way):
+There are two ways to use a Sync Box with Hue Studio. You choose when you add it, and
+one box is only ever set up one way.
 
-1. **Pair directly** — Hue Studio talks to the box itself (local API via
-   [aiohuesyncbox](https://github.com/mvdwetering/aiohuesyncbox)) and pairs with its
-   button. It brings its own entities: power and light sync switches; sync mode,
-   intensity, HDMI input, entertainment area and LED selects; brightness; HDMI port,
-   content, bridge connection and Wi-Fi sensors. Entity ids and option values match the
-   HACS Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
-   with your input names, …), so automations keep working when you switch over: remove
-   the old integration first, then add the box to Hue Studio.
-2. **Use the Sync Box integration** — keep the box in the HACS
-   [Hue Sync Box integration](https://github.com/mvdwetering/huesyncbox) and let Hue
-   Studio use it: nothing to pair and no entities of Hue Studio's own; it reads that
-   integration's entities and controls the box with its `huesyncbox.set_sync_state`
-   service. Entertainment areas are matched with the bridge by name, so renaming one in
-   the Hue app only takes effect once the integration picks it up. When the integration
-   already has a box you discover or try to pair, Hue Studio offers this mode instead.
+### Pair directly (recommended)
 
-Either way you get:
+Hue Studio talks to the box itself (local API via
+[aiohuesyncbox](https://github.com/mvdwetering/aiohuesyncbox)) and pairs with its
+button. This mode has every feature, and new Sync Box features in Hue Studio are built
+for it. It brings its own entities: power and light sync switches; sync mode,
+intensity, HDMI input, entertainment area and LED selects; brightness; HDMI port,
+content, bridge connection and Wi-Fi sensors. Entity ids and option values match the
+HACS Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
+with your input names, …), so automations keep working when you switch over: remove the
+box from that integration first, then add it to Hue Studio.
+
+### Compatibility mode: through the Sync Box integration
+
+Already using the HACS [Hue Sync Box integration](https://github.com/mvdwetering/huesyncbox)
+and want to keep it? Hue Studio can work through it instead: nothing to pair and no
+entities of Hue Studio's own. It reads that integration's entities and controls the box
+with its `huesyncbox.set_sync_state` service. The panel, the Sync tab and
+`hue_studio.set_sync` work the same; when you discover or try to pair a box that the
+integration already has, Hue Studio offers this mode.
+
+Limits, because Hue Studio only sees what that integration exposes:
+
+- entertainment areas are matched with the bridge by name (a renamed area needs the
+  integration to pick up the new name);
+- input types (the icons of HDMI inputs) and whether the current content can be synced
+  are not available;
+- new Sync Box features of Hue Studio need direct pairing.
+
+To switch to direct pairing later, remove the box from the Sync Box integration and
+add it to Hue Studio again.
+
+### In both modes
 
 - **Panel**: a Sync tab like in the Hue app, a Sync card in rooms whose lights the box
   syncs, and no scenes on those lights while it syncs.
@@ -70,8 +86,9 @@ Both Hue Studio and the Sync Box integration require aiohuesyncbox; Hue Studio a
 any 0.1.x release from 0.1.6 on, so the two share one copy.
 
 Add it under **Settings → Devices & services → Add integration → Hue Studio → Hue
-Play HDMI Sync Box** (or accept the discovered device). Pairing directly asks you to hold
-the button on the box for about 3 seconds.
+Play HDMI Sync Box** (or accept the discovered device), then pick **Pair directly
+(recommended)** — hold the button on the box for about 3 seconds — or, when the Sync
+Box integration is installed, **Use the Sync Box integration (compatibility mode)**.
 
 ## Requirements
 

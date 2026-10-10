@@ -64,17 +64,20 @@ touching anything outside this repository.
    - **cards** for regular dashboards.
 4. **Hue Play HDMI Sync Box**, two kinds of config entries, keyed by the box id so one box
    is only ever set up one way:
-   - `kind: sync_box` — paired with the box's button (our own registration — never reuse
+   - `kind: sync_box` — **the recommended mode**, paired with the box's button (our own registration — never reuse
      another integration's token: it revokes it when removed). Driven by `aiohuesyncbox`
      (extend on its models/controllers, not raw JSON), polled; own entities whose ids and
      option values stay compatible with the HACS `huesyncbox` integration.
-   - `kind: sync_box_link` — the box stays with HACS `huesyncbox`; we use only its public
+   - `kind: sync_box_link` — **compatibility mode**, always mentioned in the UI and docs
+     as an option, with its limits. The box stays with HACS `huesyncbox`; we use only its public
      side (its entities by unique id `<key>_<box id>`, its `set_sync_state` service),
      never its internals — the same rule as for `hue`. Areas are matched with the bridge
      by name. A box that `huesyncbox` has is offered as a link instead of being paired.
    Both feed the same `hue_studio/sync/subscribe` payload and `hue_studio.set_sync`, so
    the panel does not know the difference; entertainment areas are matched with the
-   bridge to know which lights sync.
+   bridge to know which lights sync. New Sync Box features (presets, IR codes, music
+   palettes, input types, …) are built for direct pairing only; the link mode keeps
+   working with what `huesyncbox` exposes and degrades to "unavailable" if it changes.
 5. Later (not in the first iteration): a global "Liquid Glass" footer instead of the
    sidebar, with the `/hue` panel as one of its tabs.
 

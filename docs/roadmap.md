@@ -45,9 +45,10 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 - Hue Play HDMI Sync Box: own pairing and entities (compatible with the HACS Sync Box
   integration), `set_sync`, `hue_studio/sync/subscribe`, a Sync tab, a Sync card in
   rooms, scenes locked while syncing; services skip lights that are streaming.
-- Sync Box alternatively through the HACS `huesyncbox` integration (`kind:
-  sync_box_link`): its entities and `set_sync_state` service, same panel and
-  `set_sync`; discovered/paired boxes it already has are linked, never paired twice.
+- Sync Box modes: direct pairing (recommended, all features) or compatibility mode
+  through the HACS `huesyncbox` integration (`kind: sync_box_link`: its entities and
+  `set_sync_state` service, same panel and `set_sync`); boxes it already has are
+  offered as a link, never paired twice.
 
 ## To do
 
@@ -91,6 +92,8 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ### E. Later
 
+- Sync Box, direct pairing only: presets, IR codes, music palettes, background
+  lighting (aiohuesyncbox already has them).
 - Dashboard cards replacing the legacy gallery and auto-light cards.
 - "Liquid Glass" footer with `/hue` as a tab.
 - Submission to the HACS default repository list.
