@@ -39,6 +39,18 @@
     },
     "command_failed": {
       "message": "The Hue bridge did not accept the command for {entity_id}."
+    },
+    "effect_not_supported": {
+      "message": "{entity_id} cannot play the effect {effect}."
+    },
+    "not_hue_scene": {
+      "message": "{entity_id} is not a Hue scene on a bridge connected to Hue Studio."
+    },
+    "no_scenes": {
+      "message": "No scenes selected."
+    },
+    "scene_not_resettable": {
+      "message": "{entity_id} has no palette to reset it from."
     }
   },
   "services": {
@@ -81,6 +93,78 @@
           "description": "Brightness in percent."
         }
       }
+    },
+    "set_effect": {
+      "name": "Set effect",
+      "description": "Plays a light effect (candle, fireplace, sparkle, …) with its color, speed and brightness.",
+      "fields": {
+        "effect": {
+          "name": "Effect",
+          "description": "The effect to play; No effect stops it."
+        },
+        "speed": {
+          "name": "Speed",
+          "description": "Effect speed in percent."
+        },
+        "xy_color": {
+          "name": "Color",
+          "description": "CIE xy color of the effect, e.g. [0.55, 0.4]."
+        },
+        "mirek": {
+          "name": "White temperature",
+          "description": "Color temperature of the effect in mired."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness in percent."
+        }
+      }
+    },
+    "save_scene": {
+      "name": "Save scene",
+      "description": "Stores what the scene's lights show now in the Hue scene; optionally renames it and sets its dynamic speed and auto-play.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "New name of the scene."
+        },
+        "speed": {
+          "name": "Dynamic speed",
+          "description": "Speed of the dynamic scene in percent."
+        },
+        "auto_dynamic": {
+          "name": "Auto-play",
+          "description": "Start the scene dynamically whenever it is activated."
+        }
+      }
+    },
+    "reset_scene": {
+      "name": "Reset scene",
+      "description": "Rebuilds the light settings of a Hue scene from its palette and activates it.",
+      "fields": {
+        "shuffle": {
+          "name": "Shuffle colors",
+          "description": "Spread the palette colors over the lights in random order."
+        },
+        "recall": {
+          "name": "Activate",
+          "description": "Activate the scene afterwards."
+        }
+      }
+    },
+    "recall_scene": {
+      "name": "Play scene",
+      "description": "Activates a Hue scene dynamically (colors keep changing) or statically, regardless of its auto-play setting.",
+      "fields": {
+        "dynamic": {
+          "name": "Dynamic",
+          "description": "Play the scene's palette dynamically; off shows it statically."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness in percent instead of the scene's own."
+        }
+      }
     }
   },
   "selector": {
@@ -96,6 +180,21 @@
       "options": {
         "auto": "Automatic",
         "zone": "Zone (no area)"
+      }
+    },
+    "effect": {
+      "options": {
+        "no_effect": "No effect",
+        "candle": "Candle",
+        "fire": "Fireplace",
+        "sparkle": "Sparkle",
+        "glisten": "Glisten",
+        "opal": "Opal",
+        "prism": "Prism",
+        "underwater": "Underwater",
+        "cosmos": "Cosmos",
+        "sunbeam": "Sunbeam",
+        "enchant": "Enchant"
       }
     }
   },

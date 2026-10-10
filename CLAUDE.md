@@ -151,9 +151,10 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 
 ```
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
-  lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient info
-  services.py, services.yaml    apply_palette, set_gradient
-  websocket.py                  hue_studio/lights/subscribe, hue_studio/config/subscribe
+  lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
+  scenes.py                     HA scene entity <-> bridge scene: info, save (capture lights), reset (palette)
+  services.py, services.yaml    apply_palette, set_gradient, set_effect, save_scene, reset_scene, recall_scene
+  websocket.py                  hue_studio/lights|scenes|config/subscribe
   config_flow.py                setup (pick a `hue` entry) + options: Hue room/zone -> HA area,
                                 motion/temperature sensors per room (Roborock-style menu)
   options.py                    option helpers; unique ids -> entity ids for the frontend
@@ -168,13 +169,14 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
-  views/                        home, room, color (wheel), gallery — one Lit element per screen
+  views/                        home, room, color (wheel), effects, scene (editor), gallery — one Lit element per screen
+  effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
   color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
   types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
   ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
   i18n.ts                       UI strings (en is the source; same keys in every locale)
-  ha-internals.ts               the only place that touches HA frontend internals
+  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing)
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
@@ -203,6 +205,12 @@ NOTICE                          third-party attribution (gallery, Apache-2.0)
   transitions while hidden and crops at 1440, so take final shots with headless Chrome
   (`--headless=new --window-size=1440,900 --virtual-time-budget=6000 --screenshot=…`,
   a fresh `--user-data-dir` per run; for 430 use a 520px window plus `&w=430` and crop).
-- Custom panels get no height from HA: the panel sizes itself to the viewport (`100dvh`),
-  otherwise the page doesn't scroll and the tab bar ends up below the content.
+- Custom panels get no height from HA: the panel sizes itself to the viewport
+  (`fitToViewport`), otherwise the page doesn't scroll and the tab bar ends up below the
+  content. The panel is registered with `handle_safe_area`: it pads the status bar and home
+  indicator itself (`--safe-area-inset-*`); without it HA pads `ha-panel-custom` and a
+  full-height panel overflows the screen in the mobile app. Harness: `&inset=59,34` fakes a
+  phone's safe areas, `&pad=59,34` additionally pads the slot like HA would.
+- Gradient lights always show `points_capable` pins on the wheel (fixed per device, like the
+  Hue app); a uniform light has them stacked. There is no point-count control.
 - UI, final check: screenshots (phone + desktop) on a live HA instance.

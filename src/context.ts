@@ -7,10 +7,29 @@ import { navigate } from "./ha-internals.ts";
 import { localize, type Translate } from "./i18n.ts";
 import { adaptiveFor, buildHome, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
-import type { Gallery, Hass, LightInfo, LightsMessage, ServiceData, StudioConfig, Unsubscribe } from "./types.ts";
+import type {
+  Gallery,
+  Hass,
+  LightInfo,
+  LightsMessage,
+  SceneInfo,
+  ScenesMessage,
+  ServiceData,
+  StudioConfig,
+  Unsubscribe,
+} from "./types.ts";
 import { type Throttled, throttle } from "./ui.ts";
 
 export const PANEL_PATH = "/hue";
+
+/** Edits of the scene editor; null = untouched (shown and kept as the bridge has it). */
+export interface SceneDraft {
+  scene: string;
+  name: string | null;
+  /** Speed step 1-12. */
+  speed: number | null;
+  autoplay: boolean | null;
+}
 
 const TOAST_MS = 3200;
 
@@ -20,6 +39,9 @@ export class StudioContext {
   t: Translate = localize(null);
   home: Home = { rooms: [], zones: [] };
   lightInfo: Record<string, LightInfo> = {};
+  sceneInfo: Record<string, SceneInfo> = {};
+  /** Unsaved edits of the scene editor; they survive a trip to the color wheel. */
+  sceneDraft: SceneDraft | null = null;
   config: StudioConfig = { groups: {}, rooms: {} };
   gallery: Gallery | null = null;
   galleryError = false;
@@ -91,6 +113,7 @@ export class StudioContext {
           }),
       );
     sub<LightsMessage>("hue_studio/lights/subscribe", (msg) => Object.assign(this.lightInfo, msg.lights));
+    sub<ScenesMessage>("hue_studio/scenes/subscribe", (msg) => Object.assign(this.sceneInfo, msg.scenes));
     sub<StudioConfig>("hue_studio/config/subscribe", (msg) => {
       this.config = msg;
     });

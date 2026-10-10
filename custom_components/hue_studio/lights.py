@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from aiohue import HueBridgeV2
+from aiohue.v2.models.feature import EffectStatus
 from aiohue.v2.models.light import Light
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, callback
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from . import HueStudioConfigEntry
 
 LIGHT_DOMAIN = "light"
+# Not real effects: "no effect" stops one, "unknown" is aiohue's fallback.
+NOT_EFFECTS = (EffectStatus.NO_EFFECT, EffectStatus.UNKNOWN)
 # State attribute set by the native integration on Hue rooms and zones.
 ATTR_IS_HUE_GROUP = "is_hue_group"
 
@@ -93,8 +96,43 @@ def async_resolve_lights(
     return lights
 
 
+def supported_effects(resource: Light) -> list[EffectStatus]:
+    """Effects the light can play (effects_v2, else the older effects feature)."""
+    if resource.effects_v2 is not None:
+        values = resource.effects_v2.action.effect_values
+    elif resource.effects is not None:
+        values = resource.effects.effect_values
+    else:
+        return []
+    return [effect for effect in values if effect not in NOT_EFFECTS]
+
+
+def _effect_info(resource: Light) -> dict[str, Any] | None:
+    """The running effect and its parameters, or None."""
+    if resource.effects_v2 is not None:
+        status = resource.effects_v2.status
+        if status.effect in NOT_EFFECTS:
+            return None
+        info: dict[str, Any] = {"effect": status.effect.value}
+        if (params := status.parameters) is not None:
+            if params.color is not None:
+                info["xy"] = [params.color.xy.x, params.color.xy.y]
+            if params.color_temperature is not None and params.color_temperature.mirek:
+                info["mirek"] = params.color_temperature.mirek
+            if params.speed is not None:
+                info["speed"] = params.speed
+        return info
+    if resource.effects is not None and resource.effects.status not in NOT_EFFECTS:
+        return {"effect": resource.effects.status.value}
+    return None
+
+
 def light_info(resource: Light) -> dict[str, Any]:
-    """Describe what the frontend needs and HA does not expose: gamut and gradient."""
+    """Describe what the frontend needs and HA does not expose.
+
+    Gamut, white range, gradient (points the light shows and how many it can show),
+    supported and running effects, and the product archetype (for its icon).
+    """
     info: dict[str, Any] = {"gamut": None, "gamut_type": None, "mirek": None}
     if resource.color is not None:
         info["gamut_type"] = resource.color.gamut_type.value
@@ -117,4 +155,8 @@ def light_info(resource: Light) -> dict[str, Any]:
         }
     else:
         info["gradient"] = None
+    info["effects"] = [effect.value for effect in supported_effects(resource)]
+    info["effect"] = _effect_info(resource)
+    archetype = resource.metadata.archetype if resource.metadata else None
+    info["archetype"] = archetype
     return info

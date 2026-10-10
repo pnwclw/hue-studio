@@ -48,6 +48,10 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         sidebar_icon=PANEL_ICON,
         # The version busts the browser cache after every update.
         module_url=f"{STATIC_URL}/hue-studio-panel.js?v={integration.version}",
+        # The panel pads the status bar / home indicator itself (full-bleed header and
+        # tab bar like the Hue app). Without this HA pads `ha-panel-custom` by the safe
+        # areas and a full-height panel overflows the screen in the mobile app.
+        handle_safe_area=True,
     )
 
 

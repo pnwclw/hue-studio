@@ -1,7 +1,8 @@
-// Color wheel. Every light gets as many pins as it currently shows colors: gradient lights
-// one per gradient point (2..points_capable, from the bridge), others one. The points of a
-// gradient light can be merged into one color or split again, and all lights of the group
-// can be merged into one pin (like the Hue app's link button) and split back.
+// Color wheel, like the Hue app. Every light has a fixed number of pins: a gradient light
+// one per color point it can show (`points_capable` from the bridge), joined by the path
+// its gradient blends along; any other light one. A uniform gradient light has its pins
+// stacked until they are dragged apart. All lights of the group can be merged into one
+// pin (the Hue app's link button) and split back. A third mode lists light effects.
 // Pins are clipped to each light's gamut; commands are throttled to the bridge limits.
 
 import { html, nothing, svg } from "lit";
@@ -12,6 +13,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import {
   clipToGamut,
+  gradientPath,
   mirekToRgb,
   mirekToWheelY,
   resample,
@@ -24,10 +26,12 @@ import {
   xyToWheel,
 } from "../color.ts";
 import { commandInterval, groupSlider } from "../controls.ts";
-import { friendlyName, type Group, groupState, lightColors } from "../model.ts";
+import { availableEffects } from "../effects.ts";
+import { friendlyName, type Group, groupState, lightColors, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import "./effects.ts";
 
 const COLOR_MODES = ["xy", "hs", "rgb", "rgbw", "rgbww"];
 const supportsColor = (s?: HassState) => !!s?.attributes.supported_color_modes?.some((m: string) => COLOR_MODES.includes(m));
@@ -43,7 +47,7 @@ const SENDER = "color:";
 const pct = (v: number) => `${((v + 1) / 2) * 100}%`;
 const LINK_ICON = svg`<svg viewBox="0 0 24 24"><circle cx="6" cy="10" r="3"/><circle cx="12" cy="10" r="3"/><circle cx="18" cy="10" r="3"/><rect x="4" y="16" width="16" height="2" rx="1"/></svg>`;
 
-type Mode = "color" | "white";
+type Mode = "color" | "white" | "effects";
 
 /** A pin on the wheel; `id` is ALL for the merged pin, `index` a gradient point or -1. */
 interface Pin {
@@ -65,6 +69,8 @@ export class ColorView extends StudioView {
   @property({ attribute: false }) accessor group: Group | null = null;
   /** Light to select first (opened from a light tile). */
   @property() accessor focusLight: string | null = null;
+  /** Where "Done" goes (default: the room). */
+  @property() accessor backPath: string | null = null;
   /** Inside the more-info dialog: no top bar. */
   @property({ type: Boolean }) accessor embedded = false;
 
@@ -100,7 +106,9 @@ export class ColorView extends StudioView {
 
   /** What the focused (or first lit) light shows now. */
   private initialMode(): Mode {
-    const { hass } = this.ctx;
+    const { hass, lightInfo } = this.ctx;
+    const ids = this.focusLight ? [this.focusLight] : (this.group?.lights ?? []);
+    if (ids.some((id) => hass.states[id]?.state === "on" && lightInfo[id]?.effect)) return "effects";
     const ref = (this.focusLight && hass.states[this.focusLight]) || this.group?.lights.map((id) => hass.states[id]).find((s) => s?.state === "on");
     return !this.colorLights.length || ref?.attributes.color_mode === "color_temp" ? "white" : "color";
   }
@@ -112,14 +120,21 @@ export class ColorView extends StudioView {
     return local && local.until > Date.now() ? local : null;
   }
 
-  /** Current color points (xy) of a light: local edit, bridge gradient, or HA's xy. */
+  /** Number of color pins of a light: its gradient points, else one. */
+  private capable(id: string): number {
+    const n = this.ctx.lightInfo[id]?.gradient?.points_capable || 0;
+    return n >= 2 ? n : 1;
+  }
+
+  /** Current colors (xy) of a light, always `capable(id)` of them. */
   private points(id: string): XY[] | null {
     const held = this.held(id);
     if (held?.points) return held.points;
+    const state = this.ctx.hass.states[id];
     const gradient = this.ctx.lightInfo[id]?.gradient?.points;
-    if (gradient && gradient.length > 1) return gradient;
-    const xy = this.ctx.hass.states[id]?.attributes.xy_color as XY | undefined;
-    return xy ? [xy] : null;
+    const xy = state?.attributes.xy_color as XY | undefined;
+    const current = gradient && gradient.length > 1 && state?.attributes.color_mode !== "color_temp" ? gradient : xy ? [xy] : null;
+    return current && resample(current, this.capable(id));
   }
 
   private mirek(id: string): number {
@@ -130,7 +145,7 @@ export class ColorView extends StudioView {
   }
 
   private lights(): string[] {
-    return this.currentMode === "color" ? this.colorLights : this.whiteLights;
+    return this.currentMode === "white" ? this.whiteLights : this.colorLights;
   }
 
   private pins(): Pin[] {
@@ -142,7 +157,7 @@ export class ColorView extends StudioView {
     }
     return lights.flatMap((id, order) => {
       if (this.currentMode === "white") return [{ key: `${id}#0`, id, index: -1, pos: this.posOf(id, 0, order) }];
-      const count = this.points(id)?.length || 1;
+      const count = this.capable(id);
       return Array.from({ length: count }, (_, i) => ({ key: `${id}#${i}`, id, index: count > 1 ? i : -1, pos: this.posOf(id, i, order) }));
     });
   }
@@ -164,9 +179,9 @@ export class ColorView extends StudioView {
 
     const mode = this.currentMode;
     const several = group.lights.length > 1;
-    const pins = this.pins();
     const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const back = () => ctx.go(`/room/${encodeURIComponent(group.key)}`);
+    const back = () => ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`);
+    const effects = availableEffects(group.lights, ctx.lightInfo).length > 0;
 
     return html`
       ${this.embedded
@@ -176,70 +191,97 @@ export class ColorView extends StudioView {
             <div class="grow" style="font-size:17px;font-weight:600">${group.name}</div>
             <button class="pill done" @click=${back}>${t("color.done")}</button>
           </div>`}
-      <div class="wheel-wrap">
-        <div class="wheel ${mode}" style="--wheel-color:${WHEEL_CSS};--wheel-white:${WHITE_CSS}">
-          ${repeat(pins, (p) => p.key, (p) => this.pin(p, mode))}
-          ${pins.length ? nothing : html`<p class="empty" style="text-align:center;padding:40% 12%">${t("color.no_color")}</p>`}
-        </div>
-      </div>
-      <div class="controls">
-        <div class="modes">
-          ${this.colorLights.length ? this.modeButton("color", "m-color", t("color.mode_color")) : nothing}
-          ${this.whiteLights.length ? this.modeButton("white", "m-white", t("color.mode_white")) : nothing}
+      ${mode === "effects" ? this.effectsBody(group) : this.wheel(mode)}
+      <div class="dock">
+        <div class="controls">
+          <div class="modes">
+            ${this.colorLights.length ? this.modeButton("color", "m-color", t("color.mode_color")) : nothing}
+            ${this.whiteLights.length ? this.modeButton("white", "m-white", t("color.mode_white")) : nothing}
+            ${effects
+              ? html`<span class="sep"></span>${this.modeButton("effects", "m-effects", t("color.mode_effects"), icon("effects"))}`
+              : nothing}
+          </div>
+          ${several && mode !== "effects"
+            ? html`<button
+                class=${classMap({ link: true, on: this.merged })}
+                aria-label=${t("color.merge_lights")}
+                title=${t("color.merge_lights")}
+                @click=${() => (this.merged = !this.merged)}
+              >${LINK_ICON}</button>`
+            : nothing}
+          <div
+            class=${classMap({ bright: true, off: !state.on })}
+            @value-input=${(e: CustomEvent<number>) => (this.dragBrightness = e.detail)}
+            @value-change=${() => (this.dragBrightness = null)}
+          >
+            <div class="value">${this.dragBrightness !== null ? `${this.dragBrightness}%` : state.on ? `${state.brightness}%` : ""}</div>
+            ${groupSlider(ctx, group, state, t("common.brightness"))}
+          </div>
         </div>
         ${several
-          ? html`<button
-              class=${classMap({ link: true, on: this.merged })}
-              aria-label=${t("color.merge_lights")}
-              title=${t("color.merge_lights")}
-              @click=${() => (this.merged = !this.merged)}
-            >${LINK_ICON}</button>`
+          ? html`<div class="chips">${group.lights.map((id) => {
+              const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
+              return html`<button
+                class=${classMap({ chip: true, on: id === this.selected })}
+                @click=${() => (this.selected = this.selected === id ? null : id)}
+              ><span class="swatch" style=${styleMap({ "--swatch": colors[0] || "#555" })}></span>${friendlyName(ctx.hass, id)}</button>`;
+            })}</div>`
           : nothing}
-        <div
-          class=${classMap({ bright: true, off: !state.on })}
-          @value-input=${(e: CustomEvent<number>) => (this.dragBrightness = e.detail)}
-          @value-change=${() => (this.dragBrightness = null)}
-        >
-          <div class="value">${this.dragBrightness !== null ? `${this.dragBrightness}%` : state.on ? `${state.brightness}%` : ""}</div>
-          ${groupSlider(ctx, group, state, t("common.brightness"))}
-        </div>
       </div>
-      ${this.pointsSelector()}
-      ${several
-        ? html`<div class="chips">${group.lights.map((id) => {
-            const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
-            return html`<button
-              class=${classMap({ chip: true, on: id === this.selected })}
-              @click=${() => (this.selected = this.selected === id ? null : id)}
-            ><span class="swatch" style=${styleMap({ "--swatch": colors[0] || "#555" })}></span>${friendlyName(ctx.hass, id)}</button>`;
-          })}</div>`
-        : nothing}
     `;
   }
 
-  private modeButton(mode: Mode, cls: string, label: string) {
-    return html`<button class=${classMap({ [cls]: true, on: this.currentMode === mode })} aria-label=${label} @click=${() => (this.mode = mode)}></button>`;
+  private wheel(mode: Mode) {
+    const pins = this.pins();
+    return html`<div class="wheel-wrap">
+      <div class="wheel ${mode}" style="--wheel-color:${WHEEL_CSS};--wheel-white:${WHITE_CSS}">
+        ${mode === "color" && !this.merged ? this.paths() : nothing}
+        ${repeat(pins, (p) => p.key, (p) => this.pin(p, mode))}
+        ${pins.length ? nothing : html`<p class="empty" style="text-align:center;padding:40% 12%">${this.ctx.t("color.no_color")}</p>`}
+      </div>
+    </div>`;
+  }
+
+  /** Lines joining the pins of each gradient light. */
+  private paths() {
+    const gradients = this.colorLights.filter((id) => this.capable(id) > 1);
+    return svg`<svg class="paths" viewBox="-1 -1 2 2" aria-hidden="true">${gradients.map((id) => {
+      const points = this.points(id);
+      return points ? svg`<path class=${id === this.selected ? "selected" : ""} d=${gradientPath(points)}></path>` : nothing;
+    })}</svg>`;
+  }
+
+  private effectsBody(group: Group) {
+    const { ctx } = this;
+    const lights = this.selected && group.lights.includes(this.selected) ? [this.selected] : group.lights;
+    return html`<hue-studio-effects .ctx=${ctx} .rev=${this.rev} .lights=${lights}></hue-studio-effects>`;
+  }
+
+  private modeButton(mode: Mode, cls: string, label: string, content: unknown = nothing) {
+    return html`<button class=${classMap({ [cls]: true, on: this.currentMode === mode })} aria-label=${label} title=${label} @click=${() => (this.mode = mode)}>${content}</button>`;
   }
 
   private pin(p: Pin, mode: Mode) {
+    const { ctx } = this;
     const lights = p.id === ALL ? this.lights() : [p.id];
     const drag = this.dragging?.key === p.key ? this.dragging : null;
     const [x, y] = drag?.pos ?? p.pos;
     const rgb = mode === "white" ? mirekToRgb(wheelYToMirek(y)) : wheelToRgb(x, y);
+    const glyph = p.id === ALL ? "mdi:lightbulb-group" : lightIcon(ctx.hass, p.id, ctx.lightInfo[p.id]);
     return html`<div
       class=${classMap({
         pin: true,
         merged: p.id === ALL,
         dragging: !!drag,
         selected: p.id === this.selected,
-        off: !lights.some((id) => this.ctx.hass.states[id]?.state === "on"),
+        off: !lights.some((id) => ctx.hass.states[id]?.state === "on"),
       })}
       style=${styleMap({ left: pct(x), top: pct(y), "--pin": rgbCss(rgb) })}
       @pointerdown=${(e: PointerEvent) => this.onPinDown(e, p)}
       @pointermove=${(e: PointerEvent) => this.dragging?.key === p.key && this.drag(p, this.wheelPos(e))}
       @pointerup=${(e: PointerEvent) => this.onPinUp(e, p)}
       @pointercancel=${(e: PointerEvent) => this.onPinUp(e, p)}
-    ><span>${p.index >= 0 ? p.index + 1 : ""}</span></div>`;
+    ><ha-icon icon=${glyph}></ha-icon></div>`;
   }
 
   // ---------- dragging ----------
@@ -259,6 +301,13 @@ export class ColorView extends StudioView {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     this.dragging = { key: p.key, pos: p.pos };
     if (p.id !== ALL) this.selected = p.id;
+    this.stopEffects(p.id === ALL ? this.lights() : [p.id]);
+  }
+
+  /** A color or white from the wheel replaces a running effect. */
+  private stopEffects(lights: string[]): void {
+    const running = lights.filter((id) => this.ctx.lightInfo[id]?.effect);
+    if (running.length) this.ctx.call("hue_studio", "set_effect", { entity_id: running, effect: "no_effect" }, { optimistic: false });
   }
 
   private onPinUp(e: PointerEvent, p: Pin): void {
@@ -298,11 +347,11 @@ export class ColorView extends StudioView {
     this.dragging = { key: p.key, pos: clipped === xy ? raw : xyToWheel(...clipped) };
 
     if (p.id === ALL) {
-      // One color for every light of the group: gradients collapse into it too.
-      lights.forEach((id) => this.hold(id, { points: [clipped] }));
+      // One color for every light of the group: gradient points all stack on it.
+      lights.forEach((id) => this.hold(id, { points: Array.from({ length: this.capable(id) }, () => clipped) }));
       this.send(`xy:${ALL}`, commandInterval(group), (c: XY) => ctx.call("light", "turn_on", { entity_id: group.target, xy_color: c }), clipped);
     } else if (p.index >= 0) {
-      const points = [...(this.points(p.id) ?? [])];
+      const points = [...(this.points(p.id) ?? Array.from({ length: this.capable(p.id) }, () => clipped))];
       points[p.index] = clipped;
       this.hold(p.id, { points });
       this.send(`grad:${p.id}`, GRADIENT_INTERVAL, (pts: XY[]) => ctx.call("hue_studio", "set_gradient", { entity_id: p.id, points: pts }), points);
@@ -310,37 +359,6 @@ export class ColorView extends StudioView {
       this.hold(p.id, { points: [clipped] });
       this.send(`xy:${p.id}`, LIGHT_INTERVAL, (c: XY) => ctx.call("light", "turn_on", { entity_id: p.id, xy_color: c }), clipped);
     }
-  }
-
-  // ---------- gradient point count (merge / split one light) ----------
-
-  /** The gradient light whose point count the selector edits. */
-  private pointsLight(): string | null {
-    if (this.currentMode !== "color" || this.merged) return null;
-    const capable = (id: string) => (this.ctx.lightInfo[id]?.gradient?.points_capable || 0) > 1;
-    if (this.selected && capable(this.selected)) return this.selected;
-    const gradients = this.colorLights.filter(capable);
-    return gradients.length === 1 ? gradients[0] : null;
-  }
-
-  private pointsSelector() {
-    const id = this.pointsLight();
-    if (!id) return nothing;
-    const capable = this.ctx.lightInfo[id].gradient!.points_capable;
-    const count = this.points(id)?.length || 1;
-    return html`<div class="points">
-      <span>${this.ctx.t("color.points")}</span>
-      ${Array.from({ length: capable }, (_, i) => html`<button class=${i + 1 === count ? "on" : ""} @click=${() => this.setPointCount(id, i + 1)}>${i + 1}</button>`)}
-    </div>`;
-  }
-
-  private setPointCount(id: string, n: number): void {
-    const current = this.points(id) || [[0.4573, 0.41]];
-    const points = resample(current, n);
-    this.hold(id, { points });
-    if (n === 1) this.ctx.call("light", "turn_on", { entity_id: id, xy_color: points[0] });
-    else this.ctx.call("hue_studio", "set_gradient", { entity_id: id, points });
-    this.requestUpdate();
   }
 }
 

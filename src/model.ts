@@ -235,3 +235,24 @@ export function needsDarkText(colors: string[]): boolean {
   const lum = rgbs.reduce((s, [r, g, b]) => s + (0.299 * r + 0.587 * g + 0.114 * b) / 255, 0) / rgbs.length;
   return lum > 0.72;
 }
+
+// Hue product archetypes -> MDI icons (what the Hue app draws on light tiles and pins).
+const ARCHETYPE_ICONS: [RegExp, string][] = [
+  [/lightstrip|light_bar|bollard|wall_lantern/, "mdi:led-strip-variant"],
+  [/^hue_play$/, "mdi:television-ambient-light"],
+  [/signe|floor/, "mdi:floor-lamp-torchiere-variant"],
+  [/string_globe|string_light|festavia/, "mdi:string-lights"],
+  [/christmas_tree/, "mdi:pine-tree"],
+  [/candle/, "mdi:candle"],
+  [/pendant|ceiling|recessed|spot/, "mdi:ceiling-light"],
+  [/table|hue_go|iris|bloom|desk|flexible/, "mdi:lamp"],
+  [/bulb/, "mdi:lightbulb"],
+];
+
+/** Icon of a light: the user's own (entity registry), else its Hue product, else a bulb. */
+export function lightIcon(hass: HassData, id: string, info?: LightInfo | null): string {
+  const own = hass.entities?.[id]?.icon;
+  if (own) return own;
+  const archetype = info?.archetype || "";
+  return ARCHETYPE_ICONS.find(([re]) => re.test(archetype))?.[1] || "mdi:lightbulb";
+}

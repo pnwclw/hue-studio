@@ -78,7 +78,7 @@ test("group state averages lit lights", () => {
 });
 
 import { adaptiveFor } from "../../src/model.ts";
-import { resample } from "../../src/color.ts";
+import { gradientPath, resample, xyToWheel } from "../../src/color.ts";
 
 test("options map a Hue group onto an area and mark another as a zone", () => {
   const { rooms, zones } = buildHome(hass, { groups: { "light.downstairs": "kitchen", "light.office": "zone" } });
@@ -121,13 +121,21 @@ test("adaptive lighting switches covering a room", () => {
   assert.deepEqual(adaptiveFor(h, office), [{ switch: "switch.al", on: true, manual: ["light.office"], lights: ["light.office"] }]);
 });
 
-test("gradient points resample when merging and splitting", () => {
+test("gradient points fit the fixed point count of a light", () => {
   const pts: XY[] = [[0.6, 0.35], [0.2, 0.3], [0.4, 0.4]];
   assert.deepEqual(resample(pts, 1), [[0.6, 0.35]]);
   assert.equal(resample(pts, 5).length, 5);
   assert.deepEqual(resample(pts, 5)[0], [0.6, 0.35]);
   assert.deepEqual(resample(pts, 5)[4], [0.4, 0.4]);
-  const split = resample([[0.5, 0.4]], 3);
-  assert.equal(split.length, 3);
-  assert.notDeepEqual(split[0], split[2]);
+  assert.equal(resample(pts, 3), pts);
+  // A single color is a uniform light: every pin sits on it until dragged apart.
+  assert.deepEqual(resample([[0.5, 0.4]], 3), [[0.5, 0.4], [0.5, 0.4], [0.5, 0.4]]);
+});
+
+test("gradient path runs through every point on the wheel", () => {
+  const pts: XY[] = [[0.6, 0.35], [0.2, 0.3]];
+  const d = gradientPath(pts, 4);
+  assert.equal(d.match(/[ML]/g)?.length, 5);
+  const [x0, y0] = xyToWheel(...pts[0]);
+  assert.ok(d.startsWith(`M${x0.toFixed(4)} ${y0.toFixed(4)}`));
 });

@@ -60,10 +60,44 @@ export interface LightInfo {
     mode?: string | null;
     modes?: string[];
   } | null;
+  /** Effects the light can play (no "no_effect"). */
+  effects?: string[];
+  /** The running effect and its parameters, or null. */
+  effect?: RunningEffect | null;
+  /** Hue product archetype (e.g. "hue_signe"), for the light's icon. */
+  archetype?: string | null;
+}
+
+export interface RunningEffect {
+  effect: string;
+  xy?: XY;
+  mirek?: number;
+  /** 0-1. */
+  speed?: number;
 }
 
 export interface LightsMessage {
   lights: Record<string, LightInfo>;
+}
+
+/** Bridge info of one Hue scene (hue_studio/scenes/subscribe). */
+export interface SceneInfo {
+  active: "inactive" | "static" | "dynamic_palette" | string;
+  /** Has a palette that can play dynamically. */
+  dynamic: boolean;
+  /** Has a palette to rebuild the scene from. */
+  resettable: boolean;
+  /** Dynamic speed, 0-1. */
+  speed: number;
+  auto_dynamic: boolean;
+  palette: XY[];
+  mirek: number[];
+  /** Light entity ids the scene sets. */
+  lights: string[];
+}
+
+export interface ScenesMessage {
+  scenes: Record<string, SceneInfo>;
 }
 
 export interface RoomSensors {

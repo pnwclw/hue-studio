@@ -3,10 +3,12 @@
 
 import { html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
 
 import type { StudioContext } from "./context.ts";
-import { colorsCss, type Group, groupState, type GroupState, needsDarkText } from "./model.ts";
-import { LightElement, type Throttled, throttle } from "./ui.ts";
+import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
+import { LightElement, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -15,10 +17,22 @@ import { LightElement, type Throttled, throttle } from "./ui.ts";
 export const commandInterval = (group: Group): number =>
   group.target.length === 1 && group.group ? 1000 : Math.max(120, 100 * group.target.length);
 
-/** Throttled brightness command for a group; one per group, kept across renders. */
+/** Up to this many lights, brightness goes to each light (~10/s) instead of the group (~1/s). */
+const DIRECT_LIGHTS = 4;
+/** Short fade while dragging: the bridge's default 0.4 s makes the light trail the finger. */
+const DRAG_TRANSITION = 0.15;
+
+/**
+ * Throttled brightness command for a group; one per group, kept across renders. A room
+ * with a few lights is dimmed light by light: a Hue group takes one command per second,
+ * single lights about ten in total, so the light follows the slider much more closely.
+ */
 export function brightnessSender(ctx: StudioContext, group: Group): Throttled<[number]> {
-  return ctx.sender(`bri:${group.key}:${group.target.join(",")}`, commandInterval(group), (v: number) =>
-    ctx.call("light", "turn_on", { entity_id: group.target, brightness_pct: v }),
+  const direct = group.lights.length <= DIRECT_LIGHTS;
+  const target = direct ? group.lights : group.target;
+  const interval = direct ? Math.max(100, 100 * target.length) : commandInterval(group);
+  return ctx.sender(`bri:${group.key}:${target.join(",")}`, interval, (v: number) =>
+    ctx.call("light", "turn_on", { entity_id: target, brightness_pct: v, transition: DRAG_TRANSITION }),
   );
 }
 
@@ -50,6 +64,18 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
   </div>`;
 }
 
+/** A light tile (room, scene editor): icon, name, toggle; colored like the light. */
+export function lightTile(ctx: StudioContext, id: string, open: () => void): TemplateResult {
+  const state = ctx.hass.states[id];
+  const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
+  const surface = surfaceOf({ on: colors.length > 0, colors, available: !!state && state.state !== "unavailable" });
+  return html`<div class=${classMap({ light: true, ...surface.classes, off: false })} style=${styleMap(surface.style)} @click=${open}>
+    <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
+    <div class="name">${friendlyName(ctx.hass, id)}</div>
+    ${toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
+  </div>`;
+}
+
 /** Brightness slider wired to a group: throttled while dragging, exact value on release. */
 export const groupSlider = (ctx: StudioContext, group: Group, state: GroupState, label: string): TemplateResult => {
   const send = brightnessSender(ctx, group);
@@ -65,12 +91,15 @@ export const groupSlider = (ctx: StudioContext, group: Group, state: GroupState,
 };
 
 /**
- * Horizontal brightness slider (1-100). Fires `value-input` while dragging and
- * `value-change` on release; ignores `value` from outside while the user drags it.
+ * Horizontal slider (brightness 1-100 by default, or any integer range). Fires
+ * `value-input` while dragging and `value-change` on release; ignores `value` from
+ * outside while the user drags it.
  */
 @customElement("hue-studio-slider")
 export class StudioSlider extends LightElement {
   @property({ type: Number }) accessor value = 0;
+  @property({ type: Number }) accessor min = 1;
+  @property({ type: Number }) accessor max = 100;
   @property() accessor label = "";
   private dragging = false;
   private shown = 0;
@@ -79,8 +108,6 @@ export class StudioSlider extends LightElement {
     super.connectedCallback();
     this.classList.add("slider");
     this.setAttribute("role", "slider");
-    this.setAttribute("aria-valuemin", "1");
-    this.setAttribute("aria-valuemax", "100");
     this.addEventListener("pointerdown", this.onDown);
     this.addEventListener("pointermove", this.onMove);
     this.addEventListener("pointerup", this.onEnd);
@@ -102,7 +129,9 @@ export class StudioSlider extends LightElement {
   }
 
   protected override render() {
-    this.style.setProperty("--value", `${this.shown}%`);
+    this.style.setProperty("--value", `${((this.shown - this.min) / (this.max - this.min)) * 100}%`);
+    this.setAttribute("aria-valuemin", String(this.min));
+    this.setAttribute("aria-valuemax", String(this.max));
     this.setAttribute("aria-label", this.label);
     this.setAttribute("aria-valuenow", String(this.shown));
     return html`<div class="fill"></div><div class="knob"></div>`;
@@ -110,7 +139,8 @@ export class StudioSlider extends LightElement {
 
   private valueAt(e: PointerEvent): number {
     const r = this.getBoundingClientRect();
-    return Math.max(1, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
+    const v = this.min + ((e.clientX - r.left) / r.width) * (this.max - this.min);
+    return Math.max(this.min, Math.min(this.max, Math.round(v)));
   }
 
   private show(v: number, event: "value-input" | "value-change"): void {

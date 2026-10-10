@@ -4,6 +4,8 @@
   Run `npm run watch` (builds the panel and dev/build/fixture.js), serve the repository root
   (e.g. `python3 -m http.server 8765`) and open
   http://localhost:8765/dev/panel.html?lang=en&path=/room/area.office  (&moreinfo=light.desk_lamp)
+  &inset=59,34 fakes a phone's safe areas (HA's --safe-area-inset-top/-bottom, in px);
+  &pad=59,34 also pads the panel's slot by them, as HA does without handle_safe_area.
 -->
 <html>
 <head>
@@ -12,7 +14,7 @@
   <title>Hue Studio panel</title>
   <style>
     html, body { margin: 0; height: 100%; background: #111; }
-    home-assistant { display: block; height: 100%; }
+    home-assistant { display: block; }
   </style>
 </head>
 <body>
@@ -54,6 +56,16 @@
     root.hass = hass;
     // ?w=430 pins the layout width (headless Chrome windows can't be narrower than ~500px).
     if (params.get("w")) root.style.width = `${params.get("w")}px`;
+    // ?pad=59,34: what ha-panel-custom does for panels without handle_safe_area.
+    if (params.get("pad")) {
+      const [top, bottom = "0"] = params.get("pad").split(",");
+      Object.assign(root.style, { paddingTop: `${top}px`, paddingBottom: `${bottom}px` });
+    }
+    if (params.get("inset")) {
+      const [top, bottom = "0"] = params.get("inset").split(",");
+      document.documentElement.style.setProperty("--safe-area-inset-top", `${top}px`);
+      document.documentElement.style.setProperty("--safe-area-inset-bottom", `${bottom}px`);
+    }
 
     panel.narrow = narrow();
     panel.route = { prefix: "/hue", path: params.get("path") || "" };

@@ -4,7 +4,8 @@
 // Routes (below the panel's /hue prefix):
 //   ""                         home: rooms and zones
 //   /room/<key>                room: scenes and lights
-//   /room/<key>/color?light=   color wheel
+//   /room/<key>/color?light=&back=   color wheel (effects too)
+//   /room/<key>/scene/<scene>  scene editor
 //   /gallery?room=<key>        scene gallery
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -13,7 +14,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 
 import { PANEL_PATH, StudioContext } from "./context.ts";
-import { toggleSidebar } from "./ha-internals.ts";
+import { fitToViewport, toggleSidebar } from "./ha-internals.ts";
 import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
@@ -22,17 +23,24 @@ import "./views/color.ts";
 import "./views/gallery.ts";
 import "./views/home.ts";
 import "./views/room.ts";
+import "./views/scene.ts";
 
 type Route =
   | { name: "home" }
   | { name: "room"; key: string }
-  | { name: "color"; key: string; light: string | null }
+  | { name: "color"; key: string; light: string | null; back: string | null }
+  | { name: "scene"; key: string; scene: string }
   | { name: "gallery"; room: string | null };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
   const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
-  if (parts[0] === "room" && parts[1] && parts[2] === "color") return { name: "color", key: parts[1], light: params.get("light") };
+  if (parts[0] === "room" && parts[1] && parts[2] === "color") {
+    // Only paths inside the panel: `back` comes from the URL.
+    const back = params.get("back");
+    return { name: "color", key: parts[1], light: params.get("light"), back: back?.startsWith("/room/") ? back : null };
+  }
+  if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3]) return { name: "scene", key: parts[1], scene: parts[3] };
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   return { name: "home" };
@@ -50,15 +58,18 @@ export class HueStudioPanel extends LitElement {
 
   private ctx: StudioContext | null = null;
   private lastRoute = "";
+  private unfit?: () => void;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.ctx ??= new StudioContext(() => this.rev++);
     this.ctx.toggleSidebar = () => toggleSidebar(this);
+    this.unfit = fitToViewport(this);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.unfit?.();
     this.ctx?.dispose();
     this.ctx = null;
   }
@@ -82,9 +93,10 @@ export class HueStudioPanel extends LitElement {
       ["home", "", "home", ctx.t("nav.home")],
       ["gallery", "/gallery", "explore", ctx.t("nav.gallery")],
     ];
+    const full = route.name === "color" || route.name === "scene";
     return html`
       <main class=${route.name === "color" ? "colorview" : ""}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
-      <nav class="tabs" ?hidden=${route.name === "color"}>
+      <nav class="tabs" ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) => html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(to)}>${icon(name)}${label}</button>`,
         )}
@@ -100,7 +112,15 @@ export class HueStudioPanel extends LitElement {
       case "room":
         return html`<hue-studio-room-view .ctx=${ctx} .rev=${rev} .key=${route.key}></hue-studio-room-view>`;
       case "color":
-        return html`<hue-studio-color-view .ctx=${ctx} .rev=${rev} .group=${findGroup(ctx.home, route.key)} .focusLight=${route.light}></hue-studio-color-view>`;
+        return html`<hue-studio-color-view
+          .ctx=${ctx}
+          .rev=${rev}
+          .group=${findGroup(ctx.home, route.key)}
+          .focusLight=${route.light}
+          .backPath=${route.back}
+        ></hue-studio-color-view>`;
+      case "scene":
+        return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "gallery":
         return html`<hue-studio-gallery-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-gallery-view>`;
       default:

@@ -166,21 +166,14 @@ export const mirekToWheelY = (mirek: number): number => ((clamp(mirek, MIREK_MIN
 
 // ---------- gradients ----------
 
-/** Spread n points around a single color (for splitting into a gradient). */
-function spread(xy: XY, n: number): XY[] {
-  const [px, py] = xyToWheel(...xy);
-  const radius = Math.max(0.4, Math.hypot(px, py));
-  const base = Math.atan2(py, px);
-  return Array.from({ length: n }, (_, i) => {
-    const a = base + ((i - (n - 1) / 2) * Math.PI) / 7;
-    return wheelToXy(Math.cos(a) * radius, Math.sin(a) * radius);
-  });
-}
-
-/** Resample a gradient to n points along its current colors. */
+/**
+ * Fit a light's colors to the n points it shows: a single color is stacked n times (the
+ * light is uniform; pins separate when dragged apart), a gradient is resampled along its
+ * colors.
+ */
 export function resample(points: XY[], n: number): XY[] {
-  if (points.length === 1) return n === 1 ? points : spread(points[0], n);
-  if (n === 1) return [points[0]];
+  if (points.length === n) return points;
+  if (points.length === 1 || n === 1) return Array.from({ length: n }, () => points[0]);
   return Array.from({ length: n }, (_, i) => {
     const t = (i * (points.length - 1)) / (n - 1);
     const a = points[Math.floor(t)];
@@ -188,4 +181,21 @@ export function resample(points: XY[], n: number): XY[] {
     const f = t - Math.floor(t);
     return [round4(a[0] + (b[0] - a[0]) * f), round4(a[1] + (b[1] - a[1]) * f)];
   });
+}
+
+/**
+ * Path on the wheel (SVG, viewBox -1 -1 2 2) through a gradient's points: straight lines
+ * in CIE xy — what the light blends through — which curve on the wheel, as in the Hue app.
+ */
+export function gradientPath(points: XY[], samples = 12): string {
+  const out: XY[] = [];
+  points.forEach((p, i) => {
+    if (i === 0) return void out.push(xyToWheel(...p));
+    const a = points[i - 1];
+    for (let k = 1; k <= samples; k++) {
+      const f = k / samples;
+      out.push(xyToWheel(a[0] + (p[0] - a[0]) * f, a[1] + (p[1] - a[1]) * f));
+    }
+  });
+  return out.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(4)} ${y.toFixed(4)}`).join("");
 }

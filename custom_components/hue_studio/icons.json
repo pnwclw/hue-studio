@@ -5,6 +5,18 @@
     },
     "set_gradient": {
       "service": "mdi:gradient-horizontal"
+    },
+    "set_effect": {
+      "service": "mdi:creation"
+    },
+    "save_scene": {
+      "service": "mdi:content-save"
+    },
+    "reset_scene": {
+      "service": "mdi:restore"
+    },
+    "recall_scene": {
+      "service": "mdi:play-circle-outline"
     }
   }
 }

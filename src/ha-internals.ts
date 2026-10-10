@@ -51,3 +51,50 @@ export function openStockMoreInfo(entityId: string): void {
     new CustomEvent("hass-more-info", { detail: { entityId, hueStudioBypass: true }, bubbles: true, composed: true }),
   );
 }
+
+/**
+ * Size a custom panel to the space HA leaves it. HA gives custom panels no height
+ * (`partial-panel-resolver` is `height: auto`). The panel is registered with
+ * `handle_safe_area`, so `ha-panel-custom` should not pad it by the safe areas; should
+ * HA pad it anyway (older/newer releases, other app versions), a `100dvh` panel would
+ * overflow the screen and the whole page would scroll. So measure where HA placed us and
+ * what it adds below, fill exactly the rest, and expose both as `--hue-top`/`--hue-bottom`
+ * so the panel pads only the part of the safe areas HA did not. Only layout measurements,
+ * no element names. Returns a stop function.
+ */
+export function fitToViewport(host: HTMLElement): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const fit = () => {
+    timer = undefined;
+    const viewport = window.innerHeight;
+    const doc = document.scrollingElement;
+    if (doc?.scrollTop) doc.scrollTop = 0;
+    const top = Math.max(0, Math.round(host.getBoundingClientRect().top));
+    host.style.height = `${viewport - top}px`;
+    // Whatever still overflows is HA's padding below us (if shrinking us helps at all).
+    const overflow = doc ? doc.scrollHeight - viewport : 0;
+    let bottom = 0;
+    if (overflow > 0) {
+      host.style.height = `${viewport - top - overflow}px`;
+      if (doc!.scrollHeight - viewport < overflow) bottom = overflow;
+      else host.style.height = `${viewport - top}px`;
+    }
+    host.style.setProperty("--hue-top", `${top}px`);
+    host.style.setProperty("--hue-bottom", `${bottom}px`);
+  };
+  // A timer, not requestAnimationFrame: frames don't run in a hidden tab or app.
+  const schedule = () => {
+    timer ??= setTimeout(fit, 0);
+  };
+  schedule();
+  // HA may still be laying out (sidebar, app chrome) right after the panel appears.
+  const late = setTimeout(schedule, 400);
+  window.addEventListener("resize", schedule);
+  window.visualViewport?.addEventListener("resize", schedule);
+  return () => {
+    clearTimeout(timer);
+    clearTimeout(late);
+    window.removeEventListener("resize", schedule);
+    window.visualViewport?.removeEventListener("resize", schedule);
+  };
+}

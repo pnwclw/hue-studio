@@ -52,3 +52,100 @@ set_gradient:
           min: 1
           max: 100
           unit_of_measurement: "%"
+
+set_effect:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    effect:
+      required: true
+      selector:
+        select:
+          translation_key: effect
+          options:
+            - no_effect
+            - candle
+            - fire
+            - sparkle
+            - glisten
+            - opal
+            - prism
+            - underwater
+            - cosmos
+            - sunbeam
+            - enchant
+    speed:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    xy_color:
+      example: "[0.55, 0.4]"
+      selector:
+        object:
+    mirek:
+      selector:
+        number:
+          min: 153
+          max: 500
+          unit_of_measurement: mired
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+save_scene:
+  target:
+    entity:
+      integration: hue
+      domain: scene
+  fields:
+    name:
+      selector:
+        text:
+    speed:
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    auto_dynamic:
+      selector:
+        boolean:
+
+reset_scene:
+  target:
+    entity:
+      integration: hue
+      domain: scene
+  fields:
+    shuffle:
+      default: false
+      selector:
+        boolean:
+    recall:
+      default: true
+      selector:
+        boolean:
+
+recall_scene:
+  target:
+    entity:
+      integration: hue
+      domain: scene
+  fields:
+    dynamic:
+      required: true
+      selector:
+        boolean:
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"

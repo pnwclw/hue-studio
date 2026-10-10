@@ -122,3 +122,120 @@ async def test_set_gradient(hass: HomeAssistant, hue_lights: MagicMock) -> None:
             {"entity_id": "light.bulb", "points": [[0.6, 0.35], [0.2, 0.3]]},
             blocking=True,
         )
+
+
+async def test_set_effect(hass: HomeAssistant, hue_lights: MagicMock) -> None:
+    """Effects carry color, speed (percent -> 0-1) and are checked per light."""
+    await hass.services.async_call(
+        DOMAIN,
+        "set_effect",
+        {
+            "entity_id": "light.strip",
+            "effect": "candle",
+            "speed": 50,
+            "xy_color": [0.55, 0.4],
+            "brightness": 70,
+        },
+        blocking=True,
+    )
+    put = _sent(hue_lights)["res-strip"]
+    action = put.effects_v2.action
+    assert action.effect.value == "candle"
+    assert action.parameters.speed == 0.5
+    assert (action.parameters.color.xy.x, action.parameters.color.xy.y) == (0.55, 0.4)
+    assert put.dimming.brightness == 70
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_effect",
+            {"entity_id": "light.strip", "effect": "prism"},
+            blocking=True,
+        )
+
+
+async def test_set_effect_off_when_idle(
+    hass: HomeAssistant, hue_lights: MagicMock
+) -> None:
+    """Stopping an effect that does not run sends no effect at all."""
+    await hass.services.async_call(
+        DOMAIN,
+        "set_effect",
+        {"entity_id": "light.bulb", "effect": "no_effect"},
+        blocking=True,
+    )
+    put = _sent(hue_lights)["res-bulb"]
+    assert put.effects_v2 is None
+    assert put.on.on is True
+
+
+async def test_save_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
+    """The scene stores what its lights show now, plus name and dynamics."""
+    await hass.services.async_call(
+        DOMAIN,
+        "save_scene",
+        {
+            "entity_id": "scene.sunset",
+            "name": "Dusk",
+            "speed": 25,
+            "auto_dynamic": True,
+        },
+        blocking=True,
+    )
+    scene_id, put = hue_lights.scenes.scene.update.call_args.args
+    assert scene_id == "res-scene"
+    assert put.metadata.name == "Dusk"
+    assert put.speed == 0.25
+    assert put.auto_dynamic is True
+    strip, bulb = (a.action for a in put.actions)
+    # The strip shows a 2-point gradient, the bulb a color (mirek is not valid).
+    assert [(p.color.xy.x, p.color.xy.y) for p in strip.gradient.points] == [
+        (0.6, 0.35),
+        (0.2, 0.3),
+    ]
+    assert (bulb.color.xy.x, bulb.color.xy.y) == (0.5, 0.4)
+    assert bulb.dimming.brightness == 50
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "save_scene", {"entity_id": "scene.missing"}, blocking=True
+        )
+
+
+async def test_reset_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
+    """The palette is spread over the lights; the gradient light gets all its points."""
+    await hass.services.async_call(
+        DOMAIN, "reset_scene", {"entity_id": "scene.sunset"}, blocking=True
+    )
+    put = hue_lights.scenes.scene.update.call_args.args[1]
+    strip, bulb = (a.action for a in put.actions)
+    # 5 points from a 3-color palette: stretched, not repeated.
+    assert [(p.color.xy.x, p.color.xy.y) for p in strip.gradient.points] == [
+        (0.6, 0.35),
+        (0.6, 0.35),
+        (0.2, 0.3),
+        (0.2, 0.3),
+        (0.4, 0.4),
+    ]
+    # The second light starts at the second palette color.
+    assert (bulb.color.xy.x, bulb.color.xy.y) == (0.2, 0.3)
+    assert bulb.dimming.brightness == 60
+    hue_lights.scenes.scene.recall.assert_awaited_once_with("res-scene")
+
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            DOMAIN, "reset_scene", {"entity_id": "scene.plain"}, blocking=True
+        )
+
+
+async def test_recall_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
+    """Dynamic and static playback map to the bridge's recall actions."""
+    for dynamic, expected in ((True, "dynamic_palette"), (False, "static")):
+        await hass.services.async_call(
+            DOMAIN,
+            "recall_scene",
+            {"entity_id": "scene.sunset", "dynamic": dynamic},
+            blocking=True,
+        )
+        put = hue_lights.scenes.scene.update.call_args.args[1]
+        assert put.recall.action.value == expected

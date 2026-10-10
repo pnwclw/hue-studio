@@ -39,6 +39,18 @@
     },
     "command_failed": {
       "message": "Mostek Hue nie przyjął polecenia dla {entity_id}."
+    },
+    "effect_not_supported": {
+      "message": "{entity_id} nie obsługuje efektu {effect}."
+    },
+    "not_hue_scene": {
+      "message": "{entity_id} nie jest sceną Hue na mostku połączonym z Hue Studio."
+    },
+    "no_scenes": {
+      "message": "Nie wybrano scen."
+    },
+    "scene_not_resettable": {
+      "message": "{entity_id} nie ma palety, z której można ją zresetować."
     }
   },
   "services": {
@@ -81,6 +93,78 @@
           "description": "Jasność w procentach."
         }
       }
+    },
+    "set_effect": {
+      "name": "Ustaw efekt",
+      "description": "Odtwarza efekt świetlny (świeca, kominek, iskrzenie, …) z kolorem, szybkością i jasnością.",
+      "fields": {
+        "effect": {
+          "name": "Efekt",
+          "description": "Efekt do odtworzenia; Bez efektu go zatrzymuje."
+        },
+        "speed": {
+          "name": "Szybkość",
+          "description": "Szybkość efektu w procentach."
+        },
+        "xy_color": {
+          "name": "Kolor",
+          "description": "Kolor efektu w CIE xy, np. [0.55, 0.4]."
+        },
+        "mirek": {
+          "name": "Temperatura bieli",
+          "description": "Temperatura barwowa efektu w miredach."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność w procentach."
+        }
+      }
+    },
+    "save_scene": {
+      "name": "Zapisz scenę",
+      "description": "Zapisuje w scenie Hue to, co teraz pokazują jej światła; opcjonalnie zmienia nazwę, szybkość dynamiki i autoodtwarzanie.",
+      "fields": {
+        "name": {
+          "name": "Nazwa",
+          "description": "Nowa nazwa sceny."
+        },
+        "speed": {
+          "name": "Szybkość dynamiki",
+          "description": "Szybkość dynamicznej sceny w procentach."
+        },
+        "auto_dynamic": {
+          "name": "Autoodtwarzanie",
+          "description": "Uruchamiaj scenę dynamicznie przy każdej aktywacji."
+        }
+      }
+    },
+    "reset_scene": {
+      "name": "Resetuj scenę",
+      "description": "Odtwarza ustawienia świateł sceny Hue z jej palety i ją aktywuje.",
+      "fields": {
+        "shuffle": {
+          "name": "Wymieszaj kolory",
+          "description": "Rozłóż kolory palety na światła w losowej kolejności."
+        },
+        "recall": {
+          "name": "Aktywuj",
+          "description": "Aktywuj scenę po resecie."
+        }
+      }
+    },
+    "recall_scene": {
+      "name": "Odtwórz scenę",
+      "description": "Aktywuje scenę Hue dynamicznie (kolory się zmieniają) lub statycznie, niezależnie od autoodtwarzania.",
+      "fields": {
+        "dynamic": {
+          "name": "Dynamicznie",
+          "description": "Odtwarzaj paletę sceny dynamicznie; wyłączone pokazuje ją statycznie."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność w procentach zamiast jasności sceny."
+        }
+      }
     }
   },
   "selector": {
@@ -96,6 +180,21 @@
       "options": {
         "auto": "Automatycznie",
         "zone": "Strefa (bez obszaru)"
+      }
+    },
+    "effect": {
+      "options": {
+        "no_effect": "Bez efektu",
+        "candle": "Świeca",
+        "fire": "Kominek",
+        "sparkle": "Iskrzenie",
+        "glisten": "Połysk",
+        "opal": "Opal",
+        "prism": "Pryzmat",
+        "underwater": "Pod wodą",
+        "cosmos": "Kosmos",
+        "sunbeam": "Promień słońca",
+        "enchant": "Czar"
       }
     }
   },

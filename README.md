@@ -15,7 +15,9 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 
 > **Status:** early development. So far: config flow, bridge connection, services and a
 > `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes and
-> lights, a gamut-aware color wheel with gradient points, and the scene gallery with
+> lights, a gamut-aware color wheel with one pin per gradient point, light effects
+> (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
+> dynamic speed, auto-play, reset, dynamic playback) and the scene gallery with
 > "set once". See the roadmap below.
 
 ## Services
@@ -24,6 +26,10 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 |---|---|
 | `hue_studio.apply_palette` | Apply a gallery scene (`gallery_scene`), up to 5 colors (`points`, CIE xy) or a white (`mirek`) to Hue lights, rooms or areas. Gradient lights get the whole palette, others one color each. |
 | `hue_studio.set_gradient` | Set 2-5 color points (and the mode) of Hue gradient lights. |
+| `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
+| `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
+| `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
+| `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
 
 ## Requirements
 

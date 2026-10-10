@@ -10,11 +10,30 @@ from aiohue.v2.models.feature import (
     ColorGamut,
     ColorPoint,
     ColorTemperatureFeature,
+    DimmingFeature,
+    DimmingFeatureBase,
+    EffectStatus,
+    EffectsV2ActionGet,
+    EffectsV2Feature,
+    EffectsV2Status,
     GamutType,
     GradientFeature,
     GradientMode,
     GradientPoint,
     MirekSchema,
+    OnFeature,
+    PaletteFeature,
+    PaletteFeatureColor,
+)
+from aiohue.v2.models.light import LightMetaData
+from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
+from aiohue.v2.models.scene import (
+    Action,
+    ActionAction,
+    Scene,
+    SceneActiveStatus,
+    SceneMetadata,
+    SceneStatus,
 )
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
@@ -90,15 +109,26 @@ def make_light(
     resource_id: str, *, gradient_points: int = 0, color: bool = True
 ) -> SimpleNamespace:
     """A stand-in for aiohue's Light with the features Hue Studio reads."""
+    effects = [EffectStatus.NO_EFFECT, EffectStatus.CANDLE, EffectStatus.FIRE]
     return SimpleNamespace(
         id=resource_id,
+        on=OnFeature(on=True),
+        dimming=DimmingFeature(brightness=50.0),
+        metadata=LightMetaData(archetype="hue_lightstrip", name=resource_id),
+        effects=None,
+        effects_v2=EffectsV2Feature(
+            action=EffectsV2ActionGet(effect_values=effects),
+            status=EffectsV2Status(
+                effect=EffectStatus.NO_EFFECT, effect_values=effects
+            ),
+        ),
         color=ColorFeature(
             xy=ColorPoint(0.5, 0.4), gamut_type=GamutType.C, gamut=GAMUT_C
         )
         if color
         else None,
         color_temperature=ColorTemperatureFeature(
-            mirek=300, mirek_schema=MirekSchema(153, 454), mirek_valid=True
+            mirek=None, mirek_schema=MirekSchema(153, 454), mirek_valid=False
         ),
         gradient=GradientFeature(
             points=[
@@ -121,6 +151,51 @@ LIGHTS = {
 }
 
 
+def _light_action(resource_id: str) -> Action:
+    return Action(
+        target=ResourceIdentifier(rid=resource_id, rtype=ResourceTypes.LIGHT),
+        action=ActionAction(on=OnFeature(on=True)),
+    )
+
+
+def _palette_color(x: float, y: float, brightness: float) -> PaletteFeatureColor:
+    return PaletteFeatureColor(
+        color=ColorFeatureBase(xy=ColorPoint(x, y)),
+        dimming=DimmingFeatureBase(brightness=brightness),
+    )
+
+
+def make_scene(resource_id: str, *, palette: bool = True) -> Scene:
+    """A Hue scene for the strip and the bulb, with a 3-color palette."""
+    return Scene(
+        id=resource_id,
+        metadata=SceneMetadata(name="Sunset"),
+        group=ResourceIdentifier(rid="res-room", rtype=ResourceTypes.ROOM),
+        actions=[_light_action("res-strip"), _light_action("res-bulb")],
+        speed=0.5,
+        auto_dynamic=False,
+        status=SceneStatus(active=SceneActiveStatus.STATIC),
+        palette=PaletteFeature(
+            color=[
+                _palette_color(0.6, 0.35, 80),
+                _palette_color(0.2, 0.3, 60),
+                _palette_color(0.4, 0.4, 40),
+            ],
+            dimming=[],
+            color_temperature=[],
+        )
+        if palette
+        else None,
+    )
+
+
+# resource id -> scene; entity ids are registered by the `hue_lights` fixture.
+SCENES = {
+    "res-scene": make_scene("res-scene"),
+    "res-plain": make_scene("res-plain", palette=False),
+}
+
+
 @pytest.fixture
 def mock_bridge() -> Generator[MagicMock]:
     """Patch aiohue's HueBridgeV2 used by Hue Studio."""
@@ -132,6 +207,11 @@ def mock_bridge() -> Generator[MagicMock]:
         bridge.lights.get.side_effect = LIGHTS.get
         bridge.lights.update = AsyncMock()
         bridge.lights.subscribe.return_value = MagicMock()
+        bridge.scenes = MagicMock()
+        bridge.scenes.scene.get.side_effect = SCENES.get
+        bridge.scenes.scene.update = AsyncMock()
+        bridge.scenes.scene.recall = AsyncMock()
+        bridge.scenes.scene.subscribe.return_value = MagicMock()
         yield bridge_cls
 
 
@@ -142,7 +222,7 @@ async def hue_lights(
     studio_entry: MockConfigEntry,
     mock_bridge: MagicMock,
 ) -> MagicMock:
-    """Register native Hue light entities and a Hue room; set up Hue Studio.
+    """Register native Hue lights, scenes and a Hue room; set up Hue Studio.
 
     Returns the mocked bridge instance.
     """
@@ -156,6 +236,15 @@ async def hue_lights(
             suggested_object_id=object_id,
         )
         hass.states.async_set(f"light.{object_id}", "on")
+    for object_id, unique_id in (("sunset", "res-scene"), ("plain", "res-plain")):
+        registry.async_get_or_create(
+            "scene",
+            HUE_DOMAIN,
+            unique_id,
+            config_entry=hue_entry,
+            suggested_object_id=object_id,
+        )
+        hass.states.async_set(f"scene.{object_id}", "unknown")
     registry.async_get_or_create(
         "light", "demo", "other", suggested_object_id="other_brand"
     )

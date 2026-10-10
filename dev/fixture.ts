@@ -2,7 +2,7 @@
 // the panel calls, so every screen can be clicked through without Home Assistant.
 
 import { mirekToRgb, xyToRgb } from "../src/color.ts";
-import type { Gallery, Hass, HassState, LightInfo, LightsMessage, Palette, ServiceData, XY } from "../src/types.ts";
+import type { Gallery, Hass, HassState, LightInfo, LightsMessage, Palette, SceneInfo, ServiceData, XY } from "../src/types.ts";
 
 /** Simulated light state. */
 interface Sim {
@@ -40,6 +40,31 @@ const SCENES: Record<string, string[]> = {
   tv_area: ["Movie", "Read"],
   balcony: ["Galaxy", "Fairy lights"],
 };
+
+// Scene palettes as the bridge reports them: colors (dynamic-capable) or one white.
+const SCENE_PALETTES: Record<string, { palette?: XY[]; mirek?: number }> = {
+  Read: { mirek: 346 },
+  Bright: { mirek: 233 },
+  Dimmed: { mirek: 370 },
+  "Nature's colors": { palette: [[0.3, 0.5], [0.45, 0.45], [0.55, 0.38], [0.22, 0.3]] },
+  "Ocean dawn": { palette: [[0.17, 0.2], [0.3, 0.3], [0.5, 0.38]] },
+  Movie: { palette: [[0.2, 0.1], [0.5, 0.25]] },
+  Galaxy: { palette: [[0.16, 0.08], [0.25, 0.1], [0.45, 0.2], [0.2, 0.25]] },
+  "Fairy lights": { palette: [[0.55, 0.4], [0.5, 0.42]] },
+};
+
+const ARCHETYPES: Record<string, string> = {
+  desk_lamp: "hue_signe",
+  tv_strip: "hue_lightstrip_tv",
+  play_left: "hue_play",
+  play_right: "hue_play",
+  candle: "candle_bulb",
+  kitchen_bulb: "classic_bulb",
+  string_lights: "string_light",
+  globe_lights: "string_globe",
+};
+
+const EFFECTS = ["candle", "fire", "prism", "sparkle", "opal", "glisten", "underwater", "cosmos", "sunbeam", "enchant"];
 
 const AREAS: NonNullable<Hass["areas"]> = {
   office: { name: "Office", icon: "mdi:chair-rolling", temperature_entity_id: "sensor.office_thermostat" },
@@ -101,20 +126,23 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     attributes: { friendly_name: "Adaptive Lighting: Office", configuration: { lights: ["light.desk_lamp"] }, manual_control: [] },
   };
 
-  for (const id of ["desk_lamp", "tv_strip"]) {
+  const gradients: Record<string, XY[]> = {
+    desk_lamp: [[0.5784, 0.3827], [0.62, 0.35], [0.38, 0.17], [0.5, 0.41], [0.45, 0.41]],
+    tv_strip: [],
+    globe_lights: [[0.2, 0.25], [0.17, 0.2], [0.25, 0.1], [0.3, 0.3], [0.2, 0.25]],
+  };
+  for (const id of Object.keys(LIGHTS)) {
+    const points = gradients[id];
     lightInfo[`light.${id}`] = {
       gamut: GAMUT_C,
       gamut_type: "C",
       mirek: [153, 454],
-      gradient: {
-        points_capable: 5,
-        points: id === "desk_lamp" ? [[0.5784, 0.3827], [0.62, 0.35], [0.55, 0.39], [0.5, 0.41], [0.45, 0.41]] : [],
-        mode: "interpolated_palette",
-        modes: ["interpolated_palette"],
-      },
+      gradient: points ? { points_capable: 5, points, mode: "interpolated_palette", modes: ["interpolated_palette", "random_pixelated"] } : null,
+      effects: EFFECTS,
+      effect: null,
+      archetype: ARCHETYPES[id],
     };
   }
-  for (const id of Object.keys(LIGHTS)) lightInfo[`light.${id}`] ??= { gamut: GAMUT_C, gamut_type: "C", mirek: [153, 454], gradient: null };
 
   const refreshGroups = () => {
     for (const [id, [name, type, members]] of Object.entries(GROUPS)) {
@@ -130,13 +158,41 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
   refreshGroups();
 
+  const sceneInfo: Record<string, SceneInfo> = {};
+  const sceneListeners = new Set<(msg: unknown) => void>();
   for (const [group, names] of Object.entries(SCENES)) {
     for (const name of names) {
       const id = `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
       states[id] = { entity_id: id, state: "unknown", attributes: { group_name: GROUPS[group][0], name, friendly_name: `${GROUPS[group][0]} ${name}` } };
       entities[id] = { platform: "hue" };
+      const { palette = [], mirek } = SCENE_PALETTES[name] ?? {};
+      sceneInfo[id] = {
+        active: id === "scene.office_ocean_dawn" ? "static" : "inactive",
+        dynamic: palette.length > 1,
+        resettable: true,
+        speed: 0.6,
+        auto_dynamic: false,
+        palette,
+        mirek: mirek ? [mirek] : [],
+        lights: GROUPS[group][2].map((m) => `light.${m}`),
+      };
     }
   }
+  const pushScenes = (ids: string[]) => sceneListeners.forEach((cb) => cb({ scenes: Object.fromEntries(ids.map((id) => [id, sceneInfo[id]])) }));
+  /** Mark a scene active (and the other scenes of its group inactive). */
+  const activate = (scene: string, active: string) => {
+    const group = states[scene].attributes.group_name;
+    const ids = Object.keys(sceneInfo).filter((id) => states[id].attributes.group_name === group);
+    ids.forEach((id) => (sceneInfo[id] = { ...sceneInfo[id], active: id === scene ? active : "inactive" }));
+    pushScenes(ids);
+  };
+  /** What the bridge does for a scene: its palette over its lights. */
+  const showScene = (scene: string, shuffle = false) => {
+    const info = sceneInfo[scene];
+    const points = shuffle ? [...info.palette].sort(() => Math.random() - 0.5) : info.palette;
+    const palette: Palette = info.palette.length ? { kind: "gradient", points, brightness: 80 } : { kind: "white", mirek: info.mirek[0] ?? 300, brightness: 90 };
+    applyPalette(info.lights, palette);
+  };
 
   const expand = (ids: string | string[] | undefined): string[] => [ids].flat().flatMap((id) => (!id ? [] : states[id]?.attributes.is_hue_group ? states[id].attributes.entity_id : [id]));
   const update = (id: string, patch: Sim) => setLight(id.replace("light.", ""), { ...states[id]._s, ...patch });
@@ -176,6 +232,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         lights: string[];
         manual_control?: boolean;
         points: XY[];
+        dynamic?: boolean;
+        shuffle?: boolean;
+        name?: string;
+        speed?: number;
+        auto_dynamic?: boolean;
+        effect?: string;
+        mirek?: number;
+        brightness?: number;
       };
       const one = String(data.entity_id);
       console.info("callService", domain, service, JSON.stringify(data));
@@ -193,10 +257,31 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         }
       }
       if (domain === "scene") {
-        const name = states[one].attributes.name;
-        const group = Object.entries(GROUPS).find(([, [n]]) => n === states[one].attributes.group_name);
-        const scene = gallery?.scenes.find((s) => s.name === name);
-        if (group) applyPalette(group[1][2].map((m) => `light.${m}`), scene || { kind: "white", mirek: 300, brightness: 80 });
+        showScene(one);
+        activate(one, sceneInfo[one].auto_dynamic ? "dynamic_palette" : "static");
+      }
+      if (domain === "hue_studio" && service === "recall_scene") {
+        showScene(one);
+        activate(one, d.dynamic ? "dynamic_palette" : "static");
+      }
+      if (domain === "hue_studio" && service === "reset_scene") {
+        showScene(one, d.shuffle);
+        activate(one, "static");
+      }
+      if (domain === "hue_studio" && service === "save_scene") {
+        const info = sceneInfo[one];
+        if (d.name) states[one] = { ...states[one], attributes: { ...states[one].attributes, name: d.name } };
+        sceneInfo[one] = { ...info, speed: d.speed !== undefined ? d.speed / 100 : info.speed, auto_dynamic: d.auto_dynamic ?? info.auto_dynamic };
+        pushScenes([one]);
+      }
+      if (domain === "hue_studio" && service === "apply_palette" && d.points) applyPalette(ids, { kind: "gradient", points: d.points });
+      if (domain === "hue_studio" && service === "set_effect") {
+        for (const id of ids) {
+          const running = d.effect === "no_effect" ? null : { effect: d.effect!, xy: d.xy_color, mirek: d.mirek, speed: d.speed !== undefined ? d.speed / 100 : 0.5 };
+          lightInfo[id] = { ...lightInfo[id], effect: running };
+          update(id, { on: true, ...(d.brightness ? { bri: d.brightness * 2.55 } : {}), ...(d.xy_color ? { xy: d.xy_color, mirek: null } : {}) });
+        }
+        push(Object.fromEntries(ids.map((id) => [id, lightInfo[id]])));
       }
       if (domain === "hue_studio" && service === "apply_palette") {
         const scene = gallery?.scenes.find((s) => s.id === d.gallery_scene);
@@ -234,6 +319,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         if (msg.type === "hue_studio/config/subscribe") {
           setTimeout(() => send({ groups: {}, rooms: {} }), 30);
           return () => {};
+        }
+        if (msg.type === "hue_studio/scenes/subscribe") {
+          sceneListeners.add(send);
+          setTimeout(() => send({ scenes: { ...sceneInfo } }), 40);
+          return () => {
+            sceneListeners.delete(send);
+          };
         }
         if (msg.type !== "hue_studio/lights/subscribe") throw new Error("unknown command");
         listeners.add(send);

@@ -5,10 +5,11 @@ import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt } from "../color.ts";
-import { groupSlider, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
+import { paletteArt, paletteColors } from "../color.ts";
+import { groupSlider, lightTile, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
-import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, groupState, lightColors, type Scene } from "../model.ts";
+import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, groupState, type Scene } from "../model.ts";
+import type { SceneInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -83,37 +84,71 @@ export class RoomView extends StudioView {
     </button>`;
   }
 
-  /** A scene tile; its dot shows the matching gallery picture (bridge scenes usually come from the gallery). */
+  /**
+   * A scene tile; its dot shows the matching gallery picture (bridge scenes usually come
+   * from the gallery), else its palette. The active scene is lit in its colors and gets
+   * edit and dynamic play/stop buttons, like in the Hue app.
+   */
   private scene(g: Group, s: Scene) {
     const { ctx } = this;
+    const { t } = ctx;
+    const info = ctx.sceneInfo[s.entity_id];
     const match = galleryMatch(ctx.gallery, s.name);
-    const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : FALLBACK_DOT;
+    const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
+    const active = !!info && info.active !== "inactive";
+    const playing = info?.active === "dynamic_palette";
+    const colors = info ? sceneColors(info) : [];
+    const surface = surfaceOf({ on: active, colors });
+    const room = encodeURIComponent(g.key);
     const apply = async () => {
       if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);
     };
-    return html`<button class="scene surface" @click=${apply}>
-      <div class="dot" style=${styleMap({ background: ctx.gallery ? dot : null })}></div>
+    const play = async (e: Event) => {
+      e.stopPropagation();
+      if (await ctx.call("hue_studio", "recall_scene", { entity_id: s.entity_id, dynamic: !playing }, { optimistic: false })) ctx.markManual(g);
+    };
+    const edit = (e: Event) => {
+      e.stopPropagation();
+      ctx.go(`/room/${room}/scene/${encodeURIComponent(s.entity_id)}`);
+    };
+    return html`<div class=${classMap({ scene: true, ...surface.classes, active })} style=${styleMap(surface.style)} role="button" tabindex="0" @click=${apply}>
+      <div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>
       <div class="name">${s.name}</div>
       ${s.group !== g.group ? html`<div class="sub">${friendlyName(ctx.hass, s.group)}</div>` : nothing}
-    </button>`;
+      ${active
+        ? html`<div class="scene-actions">
+            ${info.dynamic
+              ? html`<button class="round mini play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>
+                  ${icon(playing ? "pause" : "play")}
+                </button>`
+              : nothing}
+            <button class="round mini edit" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
+          </div>`
+        : nothing}
+    </div>`;
   }
 
   private light(g: Group, id: string) {
-    const { ctx } = this;
-    const state = ctx.hass.states[id];
-    const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
-    const surface = surfaceOf({ on: colors.length > 0, colors, available: !!state && state.state !== "unavailable" });
     const room = encodeURIComponent(g.key);
-    return html`<div
-      class=${classMap({ light: true, ...surface.classes, off: false })}
-      style=${styleMap(surface.style)}
-      @click=${() => ctx.go(`/room/${room}/color?light=${encodeURIComponent(id)}`)}
-    >
-      <ha-icon icon=${ctx.hass.entities?.[id]?.icon || "mdi:lightbulb"}></ha-icon>
-      <div class="name">${friendlyName(ctx.hass, id)}</div>
-      ${toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
-    </div>`;
+    return lightTile(this.ctx, id, () => this.ctx.go(`/room/${room}/color?light=${encodeURIComponent(id)}`));
   }
+}
+
+const FALLBACK_COLORS = ["rgb(255,231,184)", "rgb(242,166,90)"];
+
+/** Soft palette colors of a scene (or a warm fallback). */
+export function sceneColors(info: SceneInfo | undefined): string[] {
+  if (!info) return FALLBACK_COLORS;
+  if (info.palette.length) return paletteColors({ kind: "gradient", points: info.palette });
+  if (info.mirek.length) return info.mirek.flatMap((mirek) => paletteColors({ kind: "white", mirek }));
+  return FALLBACK_COLORS;
+}
+
+/** Background of a scene's round picture without a gallery match. */
+export function sceneArt(info: SceneInfo | undefined): string {
+  if (info?.palette.length) return paletteArt({ kind: "gradient", points: info.palette });
+  if (info?.mirek.length) return paletteArt({ kind: "white", mirek: info.mirek[0] });
+  return FALLBACK_DOT;
 }
 
 declare global {

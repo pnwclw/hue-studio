@@ -24,6 +24,8 @@ async def test_panel_lifecycle(
     custom = panel.config["_panel_custom"]
     assert custom["name"] == "hue-studio-panel"
     assert custom["module_url"].startswith(f"{STATIC_URL}/hue-studio-panel.js?v=")
+    # The panel pads the safe areas itself; HA must not pad it as well.
+    assert custom["handle_safe_area"] is True
 
     client = await hass_client()
     resp = await client.get(f"{STATIC_URL}/hue-studio-panel.js")
