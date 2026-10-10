@@ -2,18 +2,57 @@
   "config": {
     "step": {
       "user": {
+        "title": "Dodaj do Hue Studio",
+        "menu_options": {
+          "bridge": "Mostek Hue (z integracji Philips Hue)",
+          "sync_box": "Hue Play HDMI Sync Box"
+        }
+      },
+      "bridge": {
         "title": "Wybierz mostek Hue",
         "description": "Hue Studio korzysta z połączenia integracji Philips Hue, więc nie trzeba ponownie parować mostka.",
         "data": {
           "hue_entry_id": "Mostek Hue"
         }
+      },
+      "sync_box": {
+        "title": "Hue Play HDMI Sync Box",
+        "description": "Podaj adres Sync Box. Potem przytrzymasz jego przycisk, aby sparować go z Hue Studio.",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "Adres IP lub nazwa hosta Sync Box w Twojej sieci."
+        }
+      },
+      "sync_box_confirm": {
+        "title": "{name}",
+        "description": "Sparować {name} z Hue Studio? Za chwilę przytrzymasz przycisk na urządzeniu."
+      },
+      "sync_box_retry": {
+        "title": "{name}",
+        "description": "Upewnij się, że urządzenie jest włączone, spróbuj ponownie i przytrzymaj przycisk, aż dioda zamiga na zielono."
+      },
+      "reauth_confirm": {
+        "title": "{name}",
+        "description": "{name} nie akceptuje już Hue Studio (mogło zostać zresetowane). Sparuj je ponownie, przytrzymując przycisk."
       }
     },
     "abort": {
-      "already_configured": "Wszystkie mostki Hue są już skonfigurowane w Hue Studio.",
+      "already_configured": "To jest już skonfigurowane w Hue Studio.",
       "bridge_not_found": "Wybrany mostek Hue nie jest już dostępny.",
-      "no_bridges": "Nie skonfigurowano mostka Philips Hue z API v2. Najpierw skonfiguruj integrację Philips Hue."
-    }
+      "no_bridges": "Nie skonfigurowano mostka Philips Hue z API v2. Najpierw skonfiguruj integrację Philips Hue.",
+      "not_sync_box": "To urządzenie nie jest Sync Box.",
+      "reauth_successful": "Sync Box został ponownie sparowany."
+    },
+    "progress": {
+      "press_button": "Przytrzymaj przycisk na {name} przez ok. 3 sekundy, aż dioda zamiga na zielono."
+    },
+    "error": {
+      "cannot_connect": "Pod tym adresem nie odpowiada żaden Sync Box.",
+      "link_timeout": "Przycisk nie został przytrzymany na czas albo urządzenie nie odpowiedziało."
+    },
+    "flow_title": "{name}"
   },
   "exceptions": {
     "hue_entry_missing": {
@@ -51,6 +90,30 @@
     },
     "scene_not_resettable": {
       "message": "{entity_id} nie ma palety, z której można ją zresetować."
+    },
+    "sync_box_auth_failed": {
+      "message": "Sync Box odrzucił Hue Studio. Sparuj go ponownie."
+    },
+    "sync_box_unreachable": {
+      "message": "Nie można połączyć się z Sync Box pod adresem {host}."
+    },
+    "sync_box_command_failed": {
+      "message": "{name} nie przyjął polecenia."
+    },
+    "not_sync_box": {
+      "message": "{entity_id} nie należy do Sync Box w Hue Studio."
+    },
+    "no_sync_box": {
+      "message": "Nie wybrano Sync Box."
+    },
+    "unknown_input": {
+      "message": "Nieznane wejście HDMI: {input}."
+    },
+    "unknown_area": {
+      "message": "Nieznany obszar rozrywki: {area}."
+    },
+    "lights_syncing": {
+      "message": "{entity_id} są teraz synchronizowane z obszarem rozrywki."
     }
   },
   "services": {
@@ -165,6 +228,40 @@
           "description": "Jasność w procentach zamiast jasności sceny."
         }
       }
+    },
+    "set_sync": {
+      "name": "Ustaw Sync Box",
+      "description": "Zmienia Hue Play HDMI Sync Box jednym poleceniem: zasilanie, synchronizację światła, tryb, intensywność, wejście HDMI, obszar rozrywki i jasność.",
+      "fields": {
+        "power": {
+          "name": "Zasilanie",
+          "description": "Wł.: HDMI przechodzi; wył.: oszczędzanie energii."
+        },
+        "sync": {
+          "name": "Synchronizacja światła",
+          "description": "Uruchom lub zatrzymaj synchronizację świateł."
+        },
+        "mode": {
+          "name": "Tryb synchronizacji",
+          "description": "Wideo, muzyka lub gra; wybór trybu uruchamia w nim synchronizację."
+        },
+        "intensity": {
+          "name": "Intensywność",
+          "description": "Jak mocno reagują światła."
+        },
+        "input": {
+          "name": "Wejście HDMI",
+          "description": "input1-input4 albo nazwa nadana wejściu."
+        },
+        "entertainment_area": {
+          "name": "Obszar rozrywki",
+          "description": "Nazwa lub id obszaru rozrywki do synchronizacji."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność synchronizacji w procentach."
+        }
+      }
     }
   },
   "selector": {
@@ -195,6 +292,21 @@
         "cosmos": "Kosmos",
         "sunbeam": "Promień słońca",
         "enchant": "Czar"
+      }
+    },
+    "sync_mode": {
+      "options": {
+        "video": "Wideo",
+        "music": "Muzyka",
+        "game": "Gra"
+      }
+    },
+    "intensity": {
+      "options": {
+        "subtle": "Delikatna",
+        "moderate": "Umiarkowana",
+        "high": "Wysoka",
+        "intense": "Intensywna"
       }
     }
   },
@@ -240,6 +352,118 @@
     },
     "abort": {
       "no_groups": "Nie znaleziono pokoi ani stref Hue ani obszarów ze światłami Hue."
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": {
+        "name": "Zasilanie"
+      },
+      "light_sync": {
+        "name": "Synchronizacja światła"
+      }
+    },
+    "select": {
+      "sync_mode": {
+        "name": "Tryb synchronizacji",
+        "state": {
+          "video": "Wideo",
+          "music": "Muzyka",
+          "game": "Gra"
+        }
+      },
+      "intensity": {
+        "name": "Intensywność",
+        "state": {
+          "subtle": "Delikatna",
+          "moderate": "Umiarkowana",
+          "high": "Wysoka",
+          "intense": "Intensywna"
+        }
+      },
+      "hdmi_input": {
+        "name": "Wejście HDMI"
+      },
+      "entertainment_area": {
+        "name": "Obszar rozrywki"
+      },
+      "led_indicator": {
+        "name": "Wskaźnik LED",
+        "state": {
+          "off": "Wyłączony",
+          "normal": "Normalny",
+          "dimmed": "Przyciemniony"
+        }
+      }
+    },
+    "number": {
+      "brightness": {
+        "name": "Jasność"
+      }
+    },
+    "sensor": {
+      "hdmi1_status": {
+        "name": "Stan HDMI1",
+        "state": {
+          "unplugged": "Odłączone",
+          "plugged": "Podłączone",
+          "linked": "Połączone",
+          "unknown": "Nieznany"
+        }
+      },
+      "hdmi2_status": {
+        "name": "Stan HDMI2",
+        "state": {
+          "unplugged": "Odłączone",
+          "plugged": "Podłączone",
+          "linked": "Połączone",
+          "unknown": "Nieznany"
+        }
+      },
+      "hdmi3_status": {
+        "name": "Stan HDMI3",
+        "state": {
+          "unplugged": "Odłączone",
+          "plugged": "Podłączone",
+          "linked": "Połączone",
+          "unknown": "Nieznany"
+        }
+      },
+      "hdmi4_status": {
+        "name": "Stan HDMI4",
+        "state": {
+          "unplugged": "Odłączone",
+          "plugged": "Podłączone",
+          "linked": "Połączone",
+          "unknown": "Nieznany"
+        }
+      },
+      "content_info": {
+        "name": "Informacje o treści"
+      },
+      "bridge_connection": {
+        "name": "Połączenie z mostkiem",
+        "state": {
+          "uninitialized": "Nieskonfigurowane",
+          "disconnected": "Rozłączone",
+          "connecting": "Łączenie",
+          "unauthorized": "Brak autoryzacji",
+          "connected": "Połączone",
+          "invalidgroup": "Nieprawidłowy obszar rozrywki",
+          "streaming": "Strumieniowanie",
+          "busy": "Zajęte"
+        }
+      },
+      "wifi_quality": {
+        "name": "Jakość Wi-Fi",
+        "state": {
+          "not_connected": "Brak połączenia",
+          "weak": "Słaba",
+          "fair": "Średnia",
+          "good": "Dobra",
+          "excellent": "Doskonała"
+        }
+      }
     }
   }
 }

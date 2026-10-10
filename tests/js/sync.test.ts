@@ -1,0 +1,75 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { boxesForGroup, confirmed, predictSync, statusKey, syncedLights, syncingIn } from "../../src/sync.ts";
+import type { SyncBoxInfo } from "../../src/types.ts";
+
+const BOX: SyncBoxInfo = {
+  available: true,
+  entity_id: "switch.sync_box_light_sync",
+  name: "Sync Box",
+  power: true,
+  syncing: false,
+  mode: "video",
+  intensity: "high",
+  brightness: 50,
+  input: "input1",
+  inputs: [
+    { id: "input1", name: "Media player" },
+    { id: "input4", name: "PC" },
+  ],
+  area: "ent-tv",
+  areas: [
+    { id: "ent-tv", name: "TV area", active: false, lights: ["light.tv_strip", "light.play_left"] },
+    { id: "ent-desk", name: "Desk", active: false, lights: ["light.desk_lamp"] },
+  ],
+};
+
+const LIVING = { lights: ["light.tv_strip", "light.play_left", "light.candle"] };
+const OFFICE = { lights: ["light.desk_lamp"] };
+
+test("a box belongs to rooms that share lights with its current area", () => {
+  assert.deepEqual(boxesForGroup({ a: BOX }, LIVING).map(([id]) => id), ["a"]);
+  assert.deepEqual(boxesForGroup({ a: BOX }, OFFICE), []);
+  assert.deepEqual(boxesForGroup({ a: { ...BOX, available: false } }, LIVING), []);
+  // A syncing box comes first.
+  const order = boxesForGroup({ a: BOX, b: { ...BOX, syncing: true } }, LIVING).map(([id]) => id);
+  assert.deepEqual(order, ["b", "a"]);
+});
+
+test("only a syncing box locks lights", () => {
+  assert.deepEqual(syncedLights(BOX), []);
+  assert.deepEqual(syncingIn({ a: BOX }, LIVING), []);
+  const syncing = { ...BOX, syncing: true };
+  assert.deepEqual(syncedLights(syncing), ["light.tv_strip", "light.play_left"]);
+  assert.deepEqual(syncingIn({ a: syncing }, LIVING), ["light.tv_strip", "light.play_left"]);
+  assert.deepEqual(syncingIn({ a: syncing }, OFFICE), []);
+});
+
+test("predictions mirror the backend", () => {
+  assert.equal(predictSync(BOX, { sync: true }).syncing, true);
+  const game = predictSync(BOX, { mode: "game" });
+  assert.equal(game.mode, "game");
+  assert.equal(game.syncing, true);
+  const off = predictSync({ ...BOX, syncing: true }, { power: false, sync: true });
+  assert.equal(off.power, false);
+  assert.equal(off.syncing, false);
+  assert.equal(predictSync({ ...BOX, power: false }, { power: true }).power, true);
+  assert.equal(predictSync(BOX, { input: "PC" }).input, "input4");
+  assert.equal(predictSync(BOX, { entertainment_area: "Desk" }).area, "ent-desk");
+  assert.equal(predictSync(BOX, { input: "VCR" }).input, "input1");
+  assert.equal(predictSync(BOX, { brightness: 90 }).brightness, 90);
+});
+
+test("a prediction is confirmed when the box reports it", () => {
+  const predicted = predictSync(BOX, { sync: true, intensity: "subtle" });
+  assert.equal(confirmed(predicted, BOX), false);
+  assert.equal(confirmed(predicted, { ...BOX, syncing: true, intensity: "subtle", content: "4K" }), true);
+});
+
+test("status", () => {
+  assert.equal(statusKey(BOX), "sync.ready");
+  assert.equal(statusKey({ ...BOX, syncing: true }), "sync.syncing");
+  assert.equal(statusKey({ ...BOX, power: false }), "sync.off");
+  assert.equal(statusKey({ ...BOX, available: false }), "sync.unavailable");
+});

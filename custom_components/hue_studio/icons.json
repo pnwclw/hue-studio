@@ -17,6 +17,72 @@
     },
     "recall_scene": {
       "service": "mdi:play-circle-outline"
+    },
+    "set_sync": {
+      "service": "mdi:television-ambient-light"
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": {
+        "default": "mdi:power"
+      },
+      "light_sync": {
+        "default": "mdi:television-ambient-light",
+        "state": {
+          "off": "mdi:television"
+        }
+      }
+    },
+    "select": {
+      "sync_mode": {
+        "default": "mdi:sync",
+        "state": {
+          "video": "mdi:movie-open",
+          "music": "mdi:music",
+          "game": "mdi:gamepad-variant"
+        }
+      },
+      "intensity": {
+        "default": "mdi:sine-wave"
+      },
+      "hdmi_input": {
+        "default": "mdi:hdmi-port"
+      },
+      "entertainment_area": {
+        "default": "mdi:sofa-outline"
+      },
+      "led_indicator": {
+        "default": "mdi:led-on"
+      }
+    },
+    "number": {
+      "brightness": {
+        "default": "mdi:brightness-6"
+      }
+    },
+    "sensor": {
+      "hdmi1_status": {
+        "default": "mdi:hdmi-port"
+      },
+      "hdmi2_status": {
+        "default": "mdi:hdmi-port"
+      },
+      "hdmi3_status": {
+        "default": "mdi:hdmi-port"
+      },
+      "hdmi4_status": {
+        "default": "mdi:hdmi-port"
+      },
+      "content_info": {
+        "default": "mdi:information-outline"
+      },
+      "bridge_connection": {
+        "default": "mdi:bridge"
+      },
+      "wifi_quality": {
+        "default": "mdi:wifi"
+      }
     }
   }
 }

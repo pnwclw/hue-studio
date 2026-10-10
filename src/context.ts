@@ -7,6 +7,7 @@ import { navigate } from "./ha-internals.ts";
 import { localize, type Translate } from "./i18n.ts";
 import { adaptiveFor, buildHome, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
+import { confirmed, predictSync } from "./sync.ts";
 import type {
   Gallery,
   Hass,
@@ -16,6 +17,9 @@ import type {
   ScenesMessage,
   ServiceData,
   StudioConfig,
+  SyncBoxInfo,
+  SyncChange,
+  SyncMessage,
   Unsubscribe,
 } from "./types.ts";
 import { type Throttled, throttle } from "./ui.ts";
@@ -32,6 +36,8 @@ export interface SceneDraft {
 }
 
 const TOAST_MS = 3200;
+/** Like optimistic.ts: a prediction falls back to the real state after this long. */
+const SYNC_PREDICTION_MS = 5000;
 
 export class StudioContext {
   /** `hass` with pending optimistic patches applied. */
@@ -43,6 +49,8 @@ export class StudioContext {
   /** Unsaved edits of the scene editor; they survive a trip to the color wheel. */
   sceneDraft: SceneDraft | null = null;
   config: StudioConfig = { groups: {}, rooms: {} };
+  /** Sync Boxes by config entry id, with pending predictions applied. */
+  boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
   galleryError = false;
   narrow = false;
@@ -58,7 +66,10 @@ export class StudioContext {
   private raw: Hass | null = null;
   private unsubs: Promise<Unsubscribe>[] = [];
   private expiry?: ReturnType<typeof setTimeout>;
+  private syncExpiry?: ReturnType<typeof setTimeout>;
   private toastTimer?: ReturnType<typeof setTimeout>;
+  private rawBoxes: Record<string, SyncBoxInfo> = {};
+  private syncPredictions = new Map<string, { box: SyncBoxInfo; until: number }>();
 
   /** @param onChange called when anything shown may have changed */
   constructor(onChange: () => void) {
@@ -93,6 +104,13 @@ export class StudioContext {
     this.hass = this.optimistic.apply(this.raw);
     this.t = localize(this.hass);
     this.home = buildHome(this.hass, this.config);
+    const now = Date.now();
+    this.boxes = { ...this.rawBoxes };
+    for (const [id, p] of this.syncPredictions) {
+      const actual = this.rawBoxes[id];
+      if (!actual || p.until < now || confirmed(p.box, actual)) this.syncPredictions.delete(id);
+      else this.boxes[id] = p.box;
+    }
   }
 
   private subscribe(hass: Hass): void {
@@ -117,6 +135,9 @@ export class StudioContext {
     sub<StudioConfig>("hue_studio/config/subscribe", (msg) => {
       this.config = msg;
     });
+    sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
+      this.rawBoxes = msg.boxes;
+    });
   }
 
   dispose(): void {
@@ -124,6 +145,7 @@ export class StudioContext {
     this.unsubs = [];
     clearTimeout(this.expiry);
     clearTimeout(this.toastTimer);
+    clearTimeout(this.syncExpiry);
   }
 
   go(path: string): void {
@@ -171,6 +193,27 @@ export class StudioContext {
       this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
       return false;
     }
+  }
+
+  /** Change a Sync Box (one `hue_studio.set_sync` call); the result shows at once. */
+  async setSync(boxId: string, change: SyncChange): Promise<boolean> {
+    const box = this.boxes[boxId];
+    if (!box?.entity_id) return false;
+    this.syncPredictions.set(boxId, { box: predictSync(box, change), until: Date.now() + SYNC_PREDICTION_MS });
+    this.refresh();
+    this.onChange();
+    clearTimeout(this.syncExpiry);
+    this.syncExpiry = setTimeout(() => {
+      this.refresh();
+      this.onChange();
+    }, SYNC_PREDICTION_MS + 100);
+    const ok = await this.call("hue_studio", "set_sync", { entity_id: box.entity_id, ...change }, { optimistic: false });
+    if (!ok) {
+      this.syncPredictions.delete(boxId);
+      this.refresh();
+      this.onChange();
+    }
+    return ok;
   }
 
   /** Scenes change lights behind HA's back: tell Adaptive Lighting they are manual now. */

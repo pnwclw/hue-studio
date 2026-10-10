@@ -19,15 +19,25 @@ from custom_components.hue_studio.const import (
 from .conftest import BRIDGE_ID
 
 
+async def _bridge_flow(hass: HomeAssistant) -> dict:
+    """Start the user flow and pick "Hue bridge" in its menu."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["bridge", "sync_box"]
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "bridge"}
+    )
+
+
 async def test_user_flow_creates_entry(
     hass: HomeAssistant, hue_entry: MockConfigEntry
 ) -> None:
     """Picking a Hue bridge creates an entry keyed by the bridge id."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    result = await _bridge_flow(hass)
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "bridge"
 
     with patch(
         "custom_components.hue_studio.async_setup_entry", return_value=True
@@ -46,9 +56,7 @@ async def test_user_flow_creates_entry(
 
 async def test_user_flow_without_hue_bridges(hass: HomeAssistant) -> None:
     """Without a native Hue entry the flow aborts."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    result = await _bridge_flow(hass)
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "no_bridges"
 
@@ -65,9 +73,7 @@ async def test_user_flow_ignores_v1_bridges(hass: HomeAssistant) -> None:
         },
     ).add_to_hass(hass)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    result = await _bridge_flow(hass)
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "no_bridges"
 
@@ -76,8 +82,6 @@ async def test_user_flow_all_bridges_configured(
     hass: HomeAssistant, studio_entry: MockConfigEntry
 ) -> None:
     """A bridge that already has a Hue Studio entry is not offered again."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    result = await _bridge_flow(hass)
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"

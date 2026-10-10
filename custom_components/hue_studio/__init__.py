@@ -1,44 +1,73 @@
-"""Hue Studio: Hue-app-style light control on top of the native Hue integration."""
+"""Hue Studio: Hue-app-style light control on top of the native Hue integration.
+
+Two kinds of config entries: a Hue bridge (borrowed from the native `hue` entry) and a
+Hue Play HDMI Sync Box (paired directly, with entities of its own).
+"""
 
 from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import logging
 
 from aiohttp import ClientError
 from aiohue import HueBridgeV2, LinkButtonNotPressed, Unauthorized
 from aiohue.errors import BridgeBusy
+from aiohue.v2.controllers.events import EventType
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST
-from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, Platform
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    CONF_BOX_ID,
     CONF_HUE_ENTRY_ID,
+    CONF_KIND,
+    CONF_REGISTRATION_ID,
     DOMAIN,
     HUE_CONF_API_KEY,
+    KIND_SYNC_BOX,
     SIGNAL_CONFIG_UPDATED,
+    SIGNAL_ENTERTAINMENT_UPDATED,
 )
 from .panel import async_register_panel, async_unregister_panel
 from .services import async_setup_services
+from .sync import SyncBoxCoordinator, async_track_entertainment
+from .syncbox import SyncBox, SyncBoxError, async_ssl_context
 from .websocket import async_setup_websocket
+
+_LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 CONNECT_TIMEOUT = 10
 
+SYNC_BOX_PLATFORMS = [
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
+
 
 @dataclass
 class HueStudioData:
-    """Runtime data of a Hue Studio config entry."""
+    """Runtime data of a Hue Studio config entry (a bridge or a Sync Box)."""
 
-    bridge: HueBridgeV2
+    bridge: HueBridgeV2 | None = None
+    sync: SyncBoxCoordinator | None = None
 
 
 type HueStudioConfigEntry = ConfigEntry[HueStudioData]
+
+
+def is_sync_box(entry: ConfigEntry) -> bool:
+    """Whether the entry is a Sync Box (else a Hue bridge)."""
+    return entry.data.get(CONF_KIND) == KIND_SYNC_BOX
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -49,6 +78,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
+    """Set up a bridge or a Sync Box."""
+    if is_sync_box(entry):
+        return await _async_setup_sync_box(hass, entry)
+    return await _async_setup_bridge(hass, entry)
+
+
+async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
     """Connect to the bridge of the linked native Hue config entry."""
     hue_entry = hass.config_entries.async_get_entry(entry.data[CONF_HUE_ENTRY_ID])
     if hue_entry is None:
@@ -75,8 +111,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) ->
         ) from err
 
     entry.runtime_data = HueStudioData(bridge=bridge)
+
+    @callback
+    def on_entertainment(event_type: EventType, resource: object) -> None:
+        # Streaming started/stopped: Sync Boxes and open panels update at once.
+        async_dispatcher_send(hass, SIGNAL_ENTERTAINMENT_UPDATED)
+
+    entry.async_on_unload(
+        bridge.config.entertainment_configuration.subscribe(on_entertainment)
+    )
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await async_register_panel(hass)
+    return True
+
+
+async def _async_setup_sync_box(
+    hass: HomeAssistant, entry: HueStudioConfigEntry
+) -> bool:
+    """Start polling the box and add its entities."""
+    box = SyncBox(
+        async_get_clientsession(hass),
+        await async_ssl_context(hass),
+        entry.data[CONF_HOST],
+        entry.data[CONF_BOX_ID],
+        entry.data[CONF_ACCESS_TOKEN],
+    )
+    coordinator = SyncBoxCoordinator(hass, entry, box)
+    await coordinator.async_config_entry_first_refresh()
+    entry.runtime_data = HueStudioData(sync=coordinator)
+    async_track_entertainment(hass, coordinator)
+    await hass.config_entries.async_forward_entry_setups(entry, SYNC_BOX_PLATFORMS)
     return True
 
 
@@ -88,11 +152,36 @@ async def _async_options_updated(
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
-    """Close the bridge connection; drop the panel with the last entry."""
-    await entry.runtime_data.bridge.close()
+    """Close the bridge connection or drop the box's entities.
+
+    The panel goes with the last bridge.
+    """
+    if is_sync_box(entry):
+        return await hass.config_entries.async_unload_platforms(
+            entry, SYNC_BOX_PLATFORMS
+        )
+    if (bridge := entry.runtime_data.bridge) is not None:
+        await bridge.close()
     if not any(
-        other.entry_id != entry.entry_id
+        other.entry_id != entry.entry_id and not is_sync_box(other)
         for other in hass.config_entries.async_loaded_entries(DOMAIN)
     ):
         async_unregister_panel(hass)
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> None:
+    """Removing a Sync Box also removes our registration on it (best effort)."""
+    if not is_sync_box(entry) or CONF_REGISTRATION_ID not in entry.data:
+        return
+    box = SyncBox(
+        async_get_clientsession(hass),
+        await async_ssl_context(hass),
+        entry.data[CONF_HOST],
+        entry.data[CONF_BOX_ID],
+        entry.data[CONF_ACCESS_TOKEN],
+    )
+    try:
+        await box.unregister(entry.data[CONF_REGISTRATION_ID])
+    except SyncBoxError as err:
+        _LOGGER.info("Could not remove the registration from the Sync Box: %s", err)

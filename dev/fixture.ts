@@ -2,7 +2,20 @@
 // the panel calls, so every screen can be clicked through without Home Assistant.
 
 import { mirekToRgb, xyToRgb } from "../src/color.ts";
-import type { Gallery, Hass, HassState, LightInfo, LightsMessage, Palette, SceneInfo, ServiceData, XY } from "../src/types.ts";
+import { predictSync } from "../src/sync.ts";
+import type {
+  Gallery,
+  Hass,
+  HassState,
+  LightInfo,
+  LightsMessage,
+  Palette,
+  SceneInfo,
+  ServiceData,
+  SyncBoxInfo,
+  SyncChange,
+  XY,
+} from "../src/types.ts";
 
 /** Simulated light state. */
 interface Sim {
@@ -73,6 +86,41 @@ const AREAS: NonNullable<Hass["areas"]> = {
   bedroom: { name: "Bedroom", icon: "mdi:bed" },
   balcony: { name: "Balcony", icon: "mdi:balcony" },
   hallway: { name: "Hallway", icon: "mdi:door" },
+};
+
+// A Sync Box behind the TV; ?sync=1 starts the page with it syncing.
+const SYNC_BOX: SyncBoxInfo = {
+  available: true,
+  entity_id: "switch.sync_box_light_sync",
+  name: "Sync Box",
+  model: "Hue Play HDMI Sync Box 8K",
+  power: true,
+  syncing: false,
+  mode: "video",
+  intensity: "high",
+  brightness: 80,
+  input: "input1",
+  inputs: [
+    { id: "input1", name: "Media player", type: "appletv", status: "linked" },
+    { id: "input2", name: "HDMI 2", type: "generic", status: "unplugged" },
+    { id: "input3", name: "Game console", type: "playstation", status: "plugged" },
+    { id: "input4", name: "PC", type: "desktop", status: "plugged" },
+  ],
+  area: "ent-tv",
+  areas: [
+    { id: "ent-desk", name: "Desk", active: false, lights: ["light.desk_lamp"] },
+    { id: "ent-tv", name: "TV area", active: false, lights: ["light.tv_strip", "light.play_left", "light.play_right"] },
+  ],
+  content: "3840 x 2160 @ 60000 - HDR10",
+  video_supported: true,
+  audio_supported: true,
+  connection: "connected",
+};
+// Colors the synced lights show per mode (what the picture would do).
+const SYNC_COLORS: Record<string, XY[]> = {
+  video: [[0.17, 0.12], [0.3, 0.14], [0.45, 0.2]],
+  music: [[0.55, 0.3], [0.5, 0.42], [0.45, 0.22]],
+  game: [[0.17, 0.5], [0.16, 0.25], [0.2, 0.12]],
 };
 
 const GAMUT_C: XY[] = [[0.6915, 0.3083], [0.17, 0.7], [0.1532, 0.0475]];
@@ -215,6 +263,17 @@ export function createHass({ language = "en", onChange }: { language?: string; o
 
   const push = (lights: Record<string, LightInfo>) => listeners.forEach((cb) => cb({ lights }));
 
+  let box: SyncBoxInfo = { ...SYNC_BOX, syncing: new URLSearchParams(location.search).get("sync") === "1" };
+  const syncListeners = new Set<(msg: unknown) => void>();
+  /** What the box does to its area's lights. */
+  const showSync = () => {
+    const area = box.areas?.find((a) => a.id === box.area);
+    if (!box.syncing || !area) return;
+    const colors = SYNC_COLORS[box.mode || "video"];
+    area.lights.forEach((id, i) => update(id, { on: true, xy: colors[i % colors.length], mirek: null, bri: 2 * (box.brightness ?? 80) }));
+  };
+  showSync();
+
   const hass: Hass = {
     language,
     locale: { language },
@@ -274,6 +333,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         sceneInfo[one] = { ...info, speed: d.speed !== undefined ? d.speed / 100 : info.speed, auto_dynamic: d.auto_dynamic ?? info.auto_dynamic };
         pushScenes([one]);
       }
+      if (domain === "hue_studio" && service === "set_sync") {
+        const { entity_id: _, ...change } = data as ServiceData & SyncChange;
+        box = { ...predictSync(box, change), areas: box.areas?.map((a) => ({ ...a, active: a.id === box.area && !!box.syncing })) };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 250);
+        showSync();
+      }
       if (domain === "hue_studio" && service === "apply_palette" && d.points) applyPalette(ids, { kind: "gradient", points: d.points });
       if (domain === "hue_studio" && service === "set_effect") {
         for (const id of ids) {
@@ -325,6 +390,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           setTimeout(() => send({ scenes: { ...sceneInfo } }), 40);
           return () => {
             sceneListeners.delete(send);
+          };
+        }
+        if (msg.type === "hue_studio/sync/subscribe") {
+          syncListeners.add(send);
+          setTimeout(() => send({ boxes: { box_tv: box } }), 45);
+          return () => {
+            syncListeners.delete(send);
           };
         }
         if (msg.type !== "hue_studio/lights/subscribe") throw new Error("unknown command");

@@ -42,12 +42,14 @@ export class GalleryView extends StudioView {
     const q = normalize(this.query);
 
     return html`<div class="page">
-        <div class="topbar">
-          ${this.room ? html`<button class="round back" aria-label=${t("common.back")} @click=${back}>${icon("back")}</button>` : nothing}
-          <div class="grow"></div>
-          <button class="round search" aria-label=${t("gallery.search_button")} @click=${toggleSearch}>${icon("search")}</button>
-        </div>
-        <h1 class="big">${t("gallery.title")}</h1>
+        ${this.head(
+          t("gallery.title"),
+          html`<button class="round search" aria-label=${t("gallery.search_button")} @click=${toggleSearch}>${icon("search")}</button>`,
+          {
+            menu: false,
+            start: this.room ? html`<button class="round back" aria-label=${t("common.back")} @click=${back}>${icon("back")}</button>` : nothing,
+          },
+        )}
         <input
           class=${classMap({ q: true, on: this.searching })}
           type="search"

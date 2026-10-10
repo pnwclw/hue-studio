@@ -14,7 +14,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
-from .const import SIGNAL_CONFIG_UPDATED
+from .const import SIGNAL_CONFIG_UPDATED, SIGNAL_ENTERTAINMENT_UPDATED
 from .lights import (
     HUE_DOMAIN,
     LIGHT_DOMAIN,
@@ -24,6 +24,7 @@ from .lights import (
 )
 from .options import async_frontend_config
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
+from .sync import async_sync_coordinators, sync_box_info
 
 
 @callback
@@ -32,6 +33,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe_lights)
     websocket_api.async_register_command(hass, ws_subscribe_config)
     websocket_api.async_register_command(hass, ws_subscribe_scenes)
+    websocket_api.async_register_command(hass, ws_subscribe_sync)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -165,3 +167,49 @@ def ws_subscribe_scenes(
     connection.subscriptions[msg["id"]] = unsubscribe
     connection.send_result(msg["id"])
     connection.send_message(websocket_api.event_message(msg["id"], {"scenes": sent}))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/sync/subscribe"})
+@callback
+def ws_subscribe_sync(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send the state of every Sync Box now and whenever it changes.
+
+    Event payload: {"boxes": {config entry id: info}}, always complete (a box is
+    small). Boxes set up later appear after the panel is reopened.
+    """
+    coordinators = async_sync_coordinators(hass)
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        boxes = {
+            entry_id: sync_box_info(hass, coordinator)
+            for entry_id, coordinator in coordinators.items()
+        }
+        if boxes == last.get("boxes"):
+            return
+        last["boxes"] = boxes
+        connection.send_message(
+            websocket_api.event_message(msg["id"], {"boxes": boxes})
+        )
+
+    unsubscribers: list[Callable[[], None]] = [
+        coordinator.async_add_listener(send) for coordinator in coordinators.values()
+    ]
+    # Area lights and streaming flags come from the bridge.
+    unsubscribers.append(
+        async_dispatcher_connect(hass, SIGNAL_ENTERTAINMENT_UPDATED, send)
+    )
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubscribers:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()

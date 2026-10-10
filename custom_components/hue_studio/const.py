@@ -25,3 +25,15 @@ GROUP_AUTO: Final = "auto"
 GROUP_ZONE: Final = "zone"
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
+
+# A config entry is either a Hue bridge (no `kind`, the original entry type) or a Hue
+# Play HDMI Sync Box paired directly with Hue Studio.
+CONF_KIND: Final = "kind"
+KIND_SYNC_BOX: Final = "sync_box"
+# Sync Box entry data (besides host): box id (certificate common name) and our
+# registration on the box.
+CONF_BOX_ID: Final = "box_id"
+CONF_REGISTRATION_ID: Final = "registration_id"
+
+# Bridge event: an entertainment area started or stopped streaming.
+SIGNAL_ENTERTAINMENT_UPDATED: Final = "hue_studio_entertainment_updated"

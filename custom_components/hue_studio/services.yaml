@@ -149,3 +149,46 @@ recall_scene:
           min: 1
           max: 100
           unit_of_measurement: "%"
+
+set_sync:
+  target:
+    entity:
+      integration: hue_studio
+  fields:
+    power:
+      selector:
+        boolean:
+    sync:
+      selector:
+        boolean:
+    mode:
+      selector:
+        select:
+          options:
+            - video
+            - music
+            - game
+          translation_key: sync_mode
+    intensity:
+      selector:
+        select:
+          options:
+            - subtle
+            - moderate
+            - high
+            - intense
+          translation_key: intensity
+    input:
+      example: input1
+      selector:
+        text:
+    entertainment_area:
+      example: TV area
+      selector:
+        text:
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"

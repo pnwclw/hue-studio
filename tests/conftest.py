@@ -4,6 +4,7 @@ from collections.abc import Generator
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from aiohue.v2.models.entertainment_configuration import EntertainmentStatus
 from aiohue.v2.models.feature import (
     ColorFeature,
     ColorFeatureBase,
@@ -196,6 +197,32 @@ SCENES = {
 }
 
 
+def make_entertainment(
+    resource_id: str, name: str, lights: list[str], *, active: bool = False
+) -> SimpleNamespace:
+    """A stand-in for aiohue's EntertainmentConfiguration."""
+    return SimpleNamespace(
+        id=resource_id,
+        id_v1=None,
+        metadata=SimpleNamespace(name=name),
+        status=EntertainmentStatus.ACTIVE if active else EntertainmentStatus.INACTIVE,
+        light_services=[
+            ResourceIdentifier(rid=rid, rtype=ResourceTypes.LIGHT) for rid in lights
+        ],
+    )
+
+
+# Entertainment areas of the mocked bridge; tests may replace the list contents.
+ENTERTAINMENT: list[SimpleNamespace] = []
+
+
+@pytest.fixture(autouse=True)
+def reset_entertainment() -> Generator[None]:
+    """Every test starts with one idle entertainment area (the strip)."""
+    ENTERTAINMENT[:] = [make_entertainment("ent-tv", "TV area", ["res-strip"])]
+    yield
+
+
 @pytest.fixture
 def mock_bridge() -> Generator[MagicMock]:
     """Patch aiohue's HueBridgeV2 used by Hue Studio."""
@@ -212,6 +239,10 @@ def mock_bridge() -> Generator[MagicMock]:
         bridge.scenes.scene.update = AsyncMock()
         bridge.scenes.scene.recall = AsyncMock()
         bridge.scenes.scene.subscribe.return_value = MagicMock()
+        bridge.config = MagicMock()
+        configs = bridge.config.entertainment_configuration
+        configs.__iter__.side_effect = lambda: iter(ENTERTAINMENT)
+        configs.subscribe.return_value = MagicMock()
         yield bridge_cls
 
 

@@ -41,7 +41,11 @@ def async_bridges(hass: HomeAssistant) -> dict[str, HueBridgeV2]:
     entries: list[HueStudioConfigEntry] = hass.config_entries.async_loaded_entries(
         DOMAIN
     )
-    return {e.data[CONF_HUE_ENTRY_ID]: e.runtime_data.bridge for e in entries}
+    return {
+        e.data[CONF_HUE_ENTRY_ID]: e.runtime_data.bridge
+        for e in entries
+        if CONF_HUE_ENTRY_ID in e.data and e.runtime_data.bridge is not None
+    }
 
 
 @callback

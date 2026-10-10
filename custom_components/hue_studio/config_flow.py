@@ -1,22 +1,30 @@
 """Config flow for Hue Studio.
 
-A single step: pick one of the existing native `hue` config entries. Host and app
-key are read from that entry, so no second pairing with the bridge button is needed.
+A Hue bridge: pick one of the existing native `hue` config entries. Host and app key
+are read from that entry, so no second pairing with the bridge button is needed.
+
+A Hue Play HDMI Sync Box: found by zeroconf or entered by address, then paired by
+holding its button (Hue Studio gets a registration of its own on the box).
 """
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
 from homeassistant.config_entries import (
+    SOURCE_REAUTH,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
 )
+from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -25,12 +33,16 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
 )
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 import voluptuous as vol
 
 from .const import (
+    CONF_BOX_ID,
     CONF_GROUPS,
     CONF_HUE_ENTRY_ID,
+    CONF_KIND,
     CONF_MOTION,
+    CONF_REGISTRATION_ID,
     CONF_ROOMS,
     CONF_TEMPERATURE,
     DOMAIN,
@@ -38,12 +50,25 @@ from .const import (
     GROUP_ZONE,
     HUE_CONF_API_VERSION,
     HUE_DOMAIN,
+    KIND_SYNC_BOX,
 )
 from .options import async_hue_groups, async_light_areas
+from .syncbox import (
+    SyncBox,
+    SyncBoxError,
+    SyncBoxNotLinked,
+    async_get_device,
+    async_ssl_context,
+)
 
 CONF_GROUP = "group"
 CONF_TARGET = "target"
 CONF_ROOM = "room"
+
+APP_NAME = "Hue Studio"
+# How long to wait for the button on the Sync Box to be held.
+LINK_TIMEOUT = 60
+LINK_RETRY = 1
 
 
 class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -57,7 +82,27 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
         """Room mapping and sensors."""
         return HueStudioOptionsFlow()
 
+    def __init__(self) -> None:
+        """Sync Box being paired: host, id and name."""
+        self._host = ""
+        self._box_id = ""
+        self._box_name = ""
+        self._link_task: asyncio.Task[tuple[str, str]] | None = None
+        self._credentials: tuple[str, str] | None = None
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(cls, config_entry: ConfigEntry) -> bool:
+        """Only bridges have options (room mapping and sensors)."""
+        return config_entry.data.get(CONF_KIND) != KIND_SYNC_BOX
+
     async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """What to add: a Hue bridge or a Sync Box."""
+        return self.async_show_menu(step_id="user", menu_options=["bridge", "sync_box"])
+
+    async def async_step_bridge(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Let the user choose a Hue bridge configured by the native integration."""
@@ -94,7 +139,7 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
             for entry_id, entry in available.items()
         ]
         return self.async_show_form(
-            step_id="user",
+            step_id="bridge",
             data_schema=vol.Schema(
                 {
                     vol.Required(
@@ -102,6 +147,161 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): SelectSelector(SelectSelectorConfig(options=options))
                 }
             ),
+        )
+
+    # ---- Sync Box ----
+
+    async def async_step_sync_box(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Address of the Sync Box."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            host = user_input[CONF_HOST].strip()
+            try:
+                device = await async_get_device(
+                    async_get_clientsession(self.hass), host
+                )
+            except SyncBoxError:
+                errors["base"] = "cannot_connect"
+            else:
+                return await self._async_found_box(
+                    host, str(device["uniqueId"]), str(device.get("name") or "")
+                )
+        return self.async_show_form(
+            step_id="sync_box",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema({vol.Required(CONF_HOST): str}), user_input
+            ),
+            errors=errors,
+        )
+
+    async def async_step_zeroconf(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult:
+        """A Sync Box announced itself on the network."""
+        box_id = discovery_info.properties.get("uniqueid")
+        if not box_id:
+            return self.async_abort(reason="not_sync_box")
+        return await self._async_found_box(
+            discovery_info.host,
+            str(box_id),
+            str(discovery_info.properties.get("name") or ""),
+            confirm=True,
+        )
+
+    async def _async_found_box(
+        self, host: str, box_id: str, name: str, *, confirm: bool = False
+    ) -> ConfigFlowResult:
+        await self.async_set_unique_id(box_id.upper())
+        # A known box that moved to another address: just follow it.
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        self._host, self._box_id = host, box_id.upper()
+        self._box_name = name or "Sync Box"
+        self.context["title_placeholders"] = {CONF_NAME: self._box_name}
+        if confirm:
+            return await self.async_step_sync_box_confirm()
+        return await self.async_step_sync_box_link()
+
+    async def async_step_sync_box_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Discovered: ask before pairing (pairing waits for the button)."""
+        if user_input is not None:
+            return await self.async_step_sync_box_link()
+        return self.async_show_form(
+            step_id="sync_box_confirm",
+            description_placeholders={CONF_NAME: self._box_name},
+            last_step=False,
+        )
+
+    async def async_step_sync_box_link(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Wait until the button on the box has been held."""
+        if self._link_task is None:
+            self._link_task = self.hass.async_create_task(self._async_register())
+        if not self._link_task.done():
+            return self.async_show_progress(
+                step_id="sync_box_link",
+                progress_action="press_button",
+                progress_task=self._link_task,
+                description_placeholders={CONF_NAME: self._box_name},
+            )
+        task, self._link_task = self._link_task, None
+        try:
+            self._credentials = task.result()
+        except TimeoutError, SyncBoxError:
+            return self.async_show_progress_done(next_step_id="sync_box_retry")
+        return self.async_show_progress_done(next_step_id="sync_box_finish")
+
+    async def _async_register(self) -> tuple[str, str]:
+        box = SyncBox(
+            async_get_clientsession(self.hass),
+            await async_ssl_context(self.hass),
+            self._host,
+            self._box_id,
+        )
+        instance = self.hass.config.location_name or "Home Assistant"
+        async with asyncio.timeout(LINK_TIMEOUT):
+            while True:
+                try:
+                    return await box.register(APP_NAME, instance)
+                except SyncBoxNotLinked:
+                    await asyncio.sleep(LINK_RETRY)
+
+    async def async_step_sync_box_retry(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """The button was not held in time (or the box went away): try again."""
+        if user_input is not None:
+            return await self.async_step_sync_box_link()
+        return self.async_show_form(
+            step_id="sync_box_retry",
+            description_placeholders={CONF_NAME: self._box_name},
+            errors={"base": "link_timeout"},
+            last_step=False,
+        )
+
+    async def async_step_sync_box_finish(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Store the box with our registration."""
+        assert self._credentials is not None
+        registration_id, token = self._credentials
+        data = {
+            CONF_KIND: KIND_SYNC_BOX,
+            CONF_HOST: self._host,
+            CONF_BOX_ID: self._box_id,
+            CONF_ACCESS_TOKEN: token,
+            CONF_REGISTRATION_ID: registration_id,
+        }
+        if self.source == SOURCE_REAUTH:
+            return self.async_update_reload_and_abort(
+                self._get_reauth_entry(), data_updates=data
+            )
+        return self.async_create_entry(title=self._box_name, data=data)
+
+    async def async_step_reauth(
+        self, entry_data: Mapping[str, Any]
+    ) -> ConfigFlowResult:
+        """The box no longer accepts our token (e.g. it was reset): pair again."""
+        entry = self._get_reauth_entry()
+        self._host = entry_data[CONF_HOST]
+        self._box_id = entry_data[CONF_BOX_ID]
+        self._box_name = entry.title
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Explain, then wait for the button."""
+        if user_input is not None:
+            return await self.async_step_sync_box_link()
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            description_placeholders={CONF_NAME: self._box_name},
+            last_step=False,
         )
 
 

@@ -2,18 +2,57 @@
   "config": {
     "step": {
       "user": {
+        "title": "Add to Hue Studio",
+        "menu_options": {
+          "bridge": "Hue bridge (from the Philips Hue integration)",
+          "sync_box": "Hue Play HDMI Sync Box"
+        }
+      },
+      "bridge": {
         "title": "Choose a Hue bridge",
         "description": "Hue Studio reuses the connection of the Philips Hue integration, so no extra pairing is needed.",
         "data": {
           "hue_entry_id": "Hue bridge"
         }
+      },
+      "sync_box": {
+        "title": "Hue Play HDMI Sync Box",
+        "description": "Enter the address of the Sync Box. You will then hold its button to pair it with Hue Studio.",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "IP address or host name of the Sync Box in your network."
+        }
+      },
+      "sync_box_confirm": {
+        "title": "{name}",
+        "description": "Pair {name} with Hue Studio? Next, you will hold the button on the box."
+      },
+      "sync_box_retry": {
+        "title": "{name}",
+        "description": "Make sure the box is on, then try again and hold its button until the LED blinks green."
+      },
+      "reauth_confirm": {
+        "title": "{name}",
+        "description": "{name} no longer accepts Hue Studio (it may have been reset). Pair it again by holding its button."
       }
     },
     "abort": {
-      "already_configured": "All Hue bridges are already set up in Hue Studio.",
+      "already_configured": "This is already set up in Hue Studio.",
       "bridge_not_found": "The selected Hue bridge is no longer available.",
-      "no_bridges": "No Philips Hue bridge with API v2 is configured. Set up the Philips Hue integration first."
-    }
+      "no_bridges": "No Philips Hue bridge with API v2 is configured. Set up the Philips Hue integration first.",
+      "not_sync_box": "This device is not a Sync Box.",
+      "reauth_successful": "The Sync Box is paired again."
+    },
+    "progress": {
+      "press_button": "Hold the button on {name} for about 3 seconds, until the LED blinks green."
+    },
+    "error": {
+      "cannot_connect": "No Sync Box answered at this address.",
+      "link_timeout": "The button was not held in time, or the box did not answer."
+    },
+    "flow_title": "{name}"
   },
   "exceptions": {
     "hue_entry_missing": {
@@ -51,6 +90,30 @@
     },
     "scene_not_resettable": {
       "message": "{entity_id} has no palette to reset it from."
+    },
+    "sync_box_auth_failed": {
+      "message": "The Sync Box rejected Hue Studio. Pair it again."
+    },
+    "sync_box_unreachable": {
+      "message": "Cannot connect to the Sync Box at {host}."
+    },
+    "sync_box_command_failed": {
+      "message": "{name} did not accept the command."
+    },
+    "not_sync_box": {
+      "message": "{entity_id} does not belong to a Sync Box in Hue Studio."
+    },
+    "no_sync_box": {
+      "message": "No Sync Box selected."
+    },
+    "unknown_input": {
+      "message": "Unknown HDMI input: {input}."
+    },
+    "unknown_area": {
+      "message": "Unknown entertainment area: {area}."
+    },
+    "lights_syncing": {
+      "message": "{entity_id} are syncing with an entertainment area right now."
     }
   },
   "services": {
@@ -165,6 +228,40 @@
           "description": "Brightness in percent instead of the scene's own."
         }
       }
+    },
+    "set_sync": {
+      "name": "Set Sync Box",
+      "description": "Changes a Hue Play HDMI Sync Box in one command: power, light sync, mode, intensity, HDMI input, entertainment area and brightness.",
+      "fields": {
+        "power": {
+          "name": "Power",
+          "description": "On: HDMI passes through; off: power save."
+        },
+        "sync": {
+          "name": "Light sync",
+          "description": "Start or stop syncing the lights."
+        },
+        "mode": {
+          "name": "Sync mode",
+          "description": "Video, music or game; picking a mode starts syncing in it."
+        },
+        "intensity": {
+          "name": "Intensity",
+          "description": "How strongly the lights react."
+        },
+        "input": {
+          "name": "HDMI input",
+          "description": "input1-input4 or the name you gave the input."
+        },
+        "entertainment_area": {
+          "name": "Entertainment area",
+          "description": "Name or id of the entertainment area to sync."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Sync brightness in percent."
+        }
+      }
     }
   },
   "selector": {
@@ -195,6 +292,21 @@
         "cosmos": "Cosmos",
         "sunbeam": "Sunbeam",
         "enchant": "Enchant"
+      }
+    },
+    "sync_mode": {
+      "options": {
+        "video": "Video",
+        "music": "Music",
+        "game": "Game"
+      }
+    },
+    "intensity": {
+      "options": {
+        "subtle": "Subtle",
+        "moderate": "Moderate",
+        "high": "High",
+        "intense": "Intense"
       }
     }
   },
@@ -240,6 +352,118 @@
     },
     "abort": {
       "no_groups": "No Hue rooms, zones or areas with Hue lights were found."
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "light_sync": {
+        "name": "Light sync"
+      }
+    },
+    "select": {
+      "sync_mode": {
+        "name": "Sync mode",
+        "state": {
+          "video": "Video",
+          "music": "Music",
+          "game": "Game"
+        }
+      },
+      "intensity": {
+        "name": "Intensity",
+        "state": {
+          "subtle": "Subtle",
+          "moderate": "Moderate",
+          "high": "High",
+          "intense": "Intense"
+        }
+      },
+      "hdmi_input": {
+        "name": "HDMI input"
+      },
+      "entertainment_area": {
+        "name": "Entertainment area"
+      },
+      "led_indicator": {
+        "name": "LED indicator",
+        "state": {
+          "off": "Off",
+          "normal": "Normal",
+          "dimmed": "Dimmed"
+        }
+      }
+    },
+    "number": {
+      "brightness": {
+        "name": "Brightness"
+      }
+    },
+    "sensor": {
+      "hdmi1_status": {
+        "name": "HDMI1 status",
+        "state": {
+          "unplugged": "Unplugged",
+          "plugged": "Plugged in",
+          "linked": "Linked",
+          "unknown": "Unknown"
+        }
+      },
+      "hdmi2_status": {
+        "name": "HDMI2 status",
+        "state": {
+          "unplugged": "Unplugged",
+          "plugged": "Plugged in",
+          "linked": "Linked",
+          "unknown": "Unknown"
+        }
+      },
+      "hdmi3_status": {
+        "name": "HDMI3 status",
+        "state": {
+          "unplugged": "Unplugged",
+          "plugged": "Plugged in",
+          "linked": "Linked",
+          "unknown": "Unknown"
+        }
+      },
+      "hdmi4_status": {
+        "name": "HDMI4 status",
+        "state": {
+          "unplugged": "Unplugged",
+          "plugged": "Plugged in",
+          "linked": "Linked",
+          "unknown": "Unknown"
+        }
+      },
+      "content_info": {
+        "name": "Content info"
+      },
+      "bridge_connection": {
+        "name": "Bridge connection",
+        "state": {
+          "uninitialized": "Not set up",
+          "disconnected": "Disconnected",
+          "connecting": "Connecting",
+          "unauthorized": "Unauthorized",
+          "connected": "Connected",
+          "invalidgroup": "Invalid entertainment area",
+          "streaming": "Streaming",
+          "busy": "Busy"
+        }
+      },
+      "wifi_quality": {
+        "name": "Wi-Fi quality",
+        "state": {
+          "not_connected": "Not connected",
+          "weak": "Weak",
+          "fair": "Fair",
+          "good": "Good",
+          "excellent": "Excellent"
+        }
+      }
     }
   }
 }

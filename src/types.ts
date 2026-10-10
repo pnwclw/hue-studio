@@ -133,3 +133,63 @@ export interface Gallery {
   categories: { id: string; name: string }[];
   scenes: GalleryScene[];
 }
+
+/** One HDMI input of a Sync Box. */
+export interface SyncInput {
+  id: string;
+  name: string;
+  type?: string | null;
+  status?: "unplugged" | "plugged" | "linked" | "unknown" | string | null;
+}
+
+/** An entertainment area the box can sync, with its Hue light entities. */
+export interface SyncArea {
+  id: string;
+  name: string;
+  /** Streaming right now. */
+  active: boolean;
+  lights: string[];
+}
+
+export type SyncMode = "video" | "music" | "game";
+export type SyncIntensity = "subtle" | "moderate" | "high" | "intense";
+
+/** A Hue Play HDMI Sync Box (hue_studio/sync/subscribe). */
+export interface SyncBoxInfo {
+  available: boolean;
+  /** Its light sync switch: the target of `hue_studio.set_sync`. */
+  entity_id: string | null;
+  name: string | null;
+  model?: string;
+  power?: boolean;
+  syncing?: boolean;
+  /** The current mode, or the last one while not syncing. */
+  mode?: SyncMode;
+  intensity?: SyncIntensity | null;
+  /** 1-100. */
+  brightness?: number;
+  input?: string | null;
+  inputs?: SyncInput[];
+  area?: string | null;
+  areas?: SyncArea[];
+  /** e.g. "3840 x 2160 @ 60000 - HDR10". */
+  content?: string | null;
+  video_supported?: boolean;
+  audio_supported?: boolean;
+  connection?: string | null;
+}
+
+export interface SyncMessage {
+  boxes: Record<string, SyncBoxInfo>;
+}
+
+/** Data of `hue_studio.set_sync`. */
+export interface SyncChange {
+  power?: boolean;
+  sync?: boolean;
+  mode?: SyncMode;
+  intensity?: SyncIntensity;
+  input?: string;
+  entertainment_area?: string;
+  brightness?: number;
+}

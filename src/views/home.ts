@@ -7,6 +7,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { groupSlider, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
 import { allGroups, type Group, groupState } from "../model.ts";
+import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -21,14 +22,10 @@ export class HomeView extends StudioView {
       list.length ? html`<h2 class="label">${title}</h2><div class="cards">${list.map((g) => this.card(g))}</div>` : nothing;
 
     return html`<div class="page">
-      <div class="topbar">
-        <button class="round menu" ?hidden=${!ctx.narrow} aria-label=${t("panel.menu")} @click=${() => ctx.toggleSidebar()}>
-          ${icon("menu")}
-        </button>
-        <div class="grow"></div>
-        ${groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing}
-      </div>
-      <h1 class="big">${ctx.hass.config?.location_name || t("home.title")}</h1>
+      ${this.head(
+        ctx.hass.config?.location_name || t("home.title"),
+        groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing,
+      )}
       ${section(t("home.rooms"), home.rooms)} ${section(t("home.zones"), home.zones)}
       ${groups.length ? nothing : html`<p class="empty">${t("home.empty")}</p>`}
     </div>`;
@@ -46,7 +43,10 @@ export class HomeView extends StudioView {
     >
       <div class="row">
         <ha-icon icon=${g.icon}></ha-icon>
-        <div class="text"><div class="name">${g.name}</div>${metaOf(state)}</div>
+        <div class="text">
+          <div class="name">${g.name}</div>
+          ${syncingIn(ctx.boxes, g).length ? html`<div class="meta sync-meta">${icon("sync")}${t("sync.syncing")}</div>` : metaOf(state)}
+        </div>
         ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
       </div>
       ${groupSlider(ctx, g, state, t("common.brightness"))}

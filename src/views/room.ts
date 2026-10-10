@@ -9,7 +9,8 @@ import { paletteArt, paletteColors } from "../color.ts";
 import { groupSlider, lightTile, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
 import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, groupState, type Scene } from "../model.ts";
-import type { SceneInfo } from "../types.ts";
+import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
+import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -53,13 +54,49 @@ export class RoomView extends StudioView {
           <div class="badges">${adaptiveFor(ctx.hass, g).map((al) => this.adaptiveBadge(al))}</div>
         </div>
       </div>
+      ${this.syncCards(g)}
       ${g.scenes.length
         ? html`<h2 class="label">${t("room.scenes")}</h2>
-            <div class="grid">${g.scenes.map((s) => this.scene(g, s))}</div>`
+            ${this.syncNote(g)}
+            <div class=${classMap({ grid: true, locked: syncingIn(ctx.boxes, g).length > 0 })}>${g.scenes.map((s) => this.scene(g, s))}</div>`
         : nothing}
       <h2 class="label">${t("room.lights")}</h2>
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
     </div>`;
+  }
+
+  /** Sync Boxes whose entertainment area has lights of this room: status, start/stop. */
+  private syncCards(g: Group) {
+    const boxes = boxesForGroup(this.ctx.boxes, g);
+    if (!boxes.length) return nothing;
+    return html`<div class="sync-cards">${boxes.map(([id, box]) => this.syncCard(id, box))}</div>`;
+  }
+
+  private syncCard(id: string, box: SyncBoxInfo) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const input = currentInput(box);
+    const line = [t(statusKey(box)), box.power && box.mode ? t(`sync.mode_${box.mode}`) : "", box.power ? input?.name : ""].filter(Boolean).join(" · ");
+    return html`<div
+      class=${classMap({ "sync-card": true, syncing: !!box.syncing, [`m-${box.mode}`]: true })}
+      role="button"
+      tabindex="0"
+      aria-label=${t("sync.open")}
+      @click=${() => ctx.go(`/sync?box=${encodeURIComponent(id)}`)}
+    >
+      <div class="glow"></div>
+      <div class="tv">${icon("sync")}</div>
+      <div class="text"><div class="name">${box.name || "Sync Box"}</div><div class="status">${line}</div></div>
+      ${toggle(!!box.syncing, box.syncing ? t("sync.stop") : t("sync.start"), () => ctx.setSync(id, { sync: !box.syncing }))}
+    </div>`;
+  }
+
+  /** While a box drives the room's lights, scenes would be overwritten at once. */
+  private syncNote(g: Group) {
+    const { ctx } = this;
+    if (!syncingIn(ctx.boxes, g).length) return nothing;
+    const name = boxesForGroup(ctx.boxes, g).find(([, b]) => b.syncing)?.[1].name || "Sync Box";
+    return html`<p class="sync-note">${icon("sync")}<span>${ctx.t("sync.room_note", { name })}</span></p>`;
   }
 
   /** Adaptive Lighting badge: toggle the switch, or hand manual lights back to it. */
@@ -101,6 +138,8 @@ export class RoomView extends StudioView {
     const surface = surfaceOf({ on: active, colors });
     const room = encodeURIComponent(g.key);
     const apply = async () => {
+      // The Sync Box would overwrite the scene right away.
+      if (syncingIn(ctx.boxes, g).length) return;
       if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);
     };
     const play = async (e: Event) => {

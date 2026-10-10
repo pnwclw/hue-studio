@@ -76,12 +76,17 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void): Tem
   </div>`;
 }
 
-/** Brightness slider wired to a group: throttled while dragging, exact value on release. */
+/**
+ * Brightness slider wired to a group: throttled while dragging, exact value on release.
+ * Inert while the group is off or unavailable (the toggle turns it on), so a stray touch
+ * never switches a room on.
+ */
 export const groupSlider = (ctx: StudioContext, group: Group, state: GroupState, label: string): TemplateResult => {
   const send = brightnessSender(ctx, group);
   return html`<hue-studio-slider
     .value=${state.brightness}
     .label=${label}
+    .disabled=${!state.on || !state.available}
     @value-input=${(e: CustomEvent<number>) => send(e.detail)}
     @value-change=${(e: CustomEvent<number>) => {
       send(e.detail);
@@ -90,10 +95,20 @@ export const groupSlider = (ctx: StudioContext, group: Group, state: GroupState,
   ></hue-studio-slider>`;
 };
 
+/** Finger travel (px) that tells a horizontal drag from a vertical scroll. */
+const SLOP = 8;
+/** A touch shorter than this without travel is a tap that sets the value. */
+const TAP_MS = 350;
+
 /**
  * Horizontal slider (brightness 1-100 by default, or any integer range). Fires
  * `value-input` while dragging and `value-change` on release; ignores `value` from
  * outside while the user drags it.
+ *
+ * Touch: the page keeps vertical scrolling (`touch-action: pan-y`) and the slider waits
+ * for the finger to move sideways before it takes over, so scrolling across a card never
+ * changes a value. A short tap still sets the value. `disabled` makes it inert: events
+ * pass through to the card below.
  */
 @customElement("hue-studio-slider")
 export class StudioSlider extends LightElement {
@@ -101,8 +116,11 @@ export class StudioSlider extends LightElement {
   @property({ type: Number }) accessor min = 1;
   @property({ type: Number }) accessor max = 100;
   @property() accessor label = "";
+  @property({ type: Boolean, reflect: true }) accessor disabled = false;
   private dragging = false;
   private shown = 0;
+  /** A touch that has not yet shown whether it is a drag, a tap or a scroll. */
+  private pending: { id: number; x: number; y: number; t: number } | null = null;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -110,21 +128,22 @@ export class StudioSlider extends LightElement {
     this.setAttribute("role", "slider");
     this.addEventListener("pointerdown", this.onDown);
     this.addEventListener("pointermove", this.onMove);
-    this.addEventListener("pointerup", this.onEnd);
-    this.addEventListener("pointercancel", this.onEnd);
-    this.addEventListener("click", stop);
+    this.addEventListener("pointerup", this.onUp);
+    this.addEventListener("pointercancel", this.onCancel);
+    this.addEventListener("click", this.onClick);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.removeEventListener("pointerdown", this.onDown);
     this.removeEventListener("pointermove", this.onMove);
-    this.removeEventListener("pointerup", this.onEnd);
-    this.removeEventListener("pointercancel", this.onEnd);
-    this.removeEventListener("click", stop);
+    this.removeEventListener("pointerup", this.onUp);
+    this.removeEventListener("pointercancel", this.onCancel);
+    this.removeEventListener("click", this.onClick);
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
+    if (changed.has("disabled") && this.disabled) this.reset();
     if (changed.has("value") && !this.dragging) this.shown = this.value;
   }
 
@@ -134,6 +153,7 @@ export class StudioSlider extends LightElement {
     this.setAttribute("aria-valuemax", String(this.max));
     this.setAttribute("aria-label", this.label);
     this.setAttribute("aria-valuenow", String(this.shown));
+    this.setAttribute("aria-disabled", String(this.disabled));
     return html`<div class="fill"></div><div class="knob"></div>`;
   }
 
@@ -149,27 +169,68 @@ export class StudioSlider extends LightElement {
     this.dispatchEvent(new CustomEvent(event, { detail: v, bubbles: true }));
   }
 
-  private onDown = (e: PointerEvent): void => {
-    e.stopPropagation();
-    this.setPointerCapture(e.pointerId);
+  private startDrag(e: PointerEvent): void {
+    this.pending = null;
+    try {
+      this.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone (released between events): drag without capture.
+    }
     this.dragging = true;
     this.classList.add("dragging");
     this.show(this.valueAt(e), "value-input");
+  }
+
+  private reset(): void {
+    this.pending = null;
+    if (!this.dragging) return;
+    this.dragging = false;
+    this.classList.remove("dragging");
+    this.shown = this.value;
+    this.requestUpdate();
+  }
+
+  private onDown = (e: PointerEvent): void => {
+    if (this.disabled || !e.isPrimary) return;
+    e.stopPropagation();
+    if (e.pointerType === "mouse") this.startDrag(e);
+    else this.pending = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
   };
 
   private onMove = (e: PointerEvent): void => {
-    if (this.dragging) this.show(this.valueAt(e), "value-input");
+    if (this.dragging) {
+      this.show(this.valueAt(e), "value-input");
+      return;
+    }
+    const p = this.pending;
+    if (!p || p.id !== e.pointerId) return;
+    const dx = Math.abs(e.clientX - p.x);
+    const dy = Math.abs(e.clientY - p.y);
+    if (dx > SLOP && dx > dy) this.startDrag(e);
+    else if (dy > SLOP) this.pending = null; // a scroll: the browser takes it
   };
 
-  private onEnd = (e: PointerEvent): void => {
+  private onUp = (e: PointerEvent): void => {
+    const p = this.pending;
+    if (p?.id === e.pointerId) {
+      this.pending = null;
+      if (e.timeStamp - p.t < TAP_MS) this.show(this.valueAt(e), "value-change");
+      return;
+    }
     if (!this.dragging) return;
     this.dragging = false;
     this.classList.remove("dragging");
     this.show(this.valueAt(e), "value-change");
   };
-}
 
-const stop = (e: Event): void => e.stopPropagation();
+  /** The browser took the touch over (it scrolls): drop it, restore the real value. */
+  private onCancel = (): void => this.reset();
+
+  /** Taps on the slider are ours, not the card's; an inert slider lets them through. */
+  private onClick = (e: Event): void => {
+    if (!this.disabled) e.stopPropagation();
+  };
+}
 
 declare global {
   interface HTMLElementTagNameMap {

@@ -1,10 +1,11 @@
 """Services: what the native `hue` integration cannot do.
 
-Palettes, gradients, effects with their parameters, and editing scenes.
+Palettes, gradients, effects with their parameters, editing scenes, and the Sync Box.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from aiohttp import ClientError
@@ -32,12 +33,12 @@ from aiohue.v2.models.scene import SceneMetadataPut, ScenePut
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
 from .adaptive import async_mark_manual
-from .const import DOMAIN
+from .const import CONF_KIND, DOMAIN, KIND_SYNC_BOX
 from .gallery import async_get_gallery_scene
 from .lights import NOT_EFFECTS, HueLight, async_resolve_lights, supported_effects
 from .scenes import (
@@ -50,6 +51,19 @@ from .scenes import (
     palette_actions,
     scene_lights,
 )
+from .sync import (
+    INPUTS,
+    INTENSITIES,
+    MODE_PASSTHROUGH,
+    MODE_POWERSAVE,
+    SYNC_MODES,
+    SyncBoxCoordinator,
+    async_streaming_lights,
+    hue_target,
+    pct_to_api,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 SERVICE_APPLY_PALETTE = "apply_palette"
 SERVICE_SET_GRADIENT = "set_gradient"
@@ -57,6 +71,7 @@ SERVICE_SET_EFFECT = "set_effect"
 SERVICE_SAVE_SCENE = "save_scene"
 SERVICE_RESET_SCENE = "reset_scene"
 SERVICE_RECALL_SCENE = "recall_scene"
+SERVICE_SET_SYNC = "set_sync"
 
 ATTR_GALLERY_SCENE = "gallery_scene"
 ATTR_POINTS = "points"
@@ -71,6 +86,11 @@ ATTR_AUTO_DYNAMIC = "auto_dynamic"
 ATTR_SHUFFLE = "shuffle"
 ATTR_RECALL = "recall"
 ATTR_DYNAMIC = "dynamic"
+ATTR_POWER = "power"
+ATTR_SYNC = "sync"
+ATTR_INTENSITY = "intensity"
+ATTR_INPUT = "input"
+ATTR_AREA = "entertainment_area"
 
 XY_POINT = vol.All(
     vol.ExactSequence([vol.Coerce(float), vol.Coerce(float)]),
@@ -135,6 +155,31 @@ RECALL_SCENE_SCHEMA = cv.make_entity_service_schema(
         vol.Required(ATTR_DYNAMIC): cv.boolean,
         vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
     }
+)
+
+SET_SYNC_SCHEMA = vol.All(
+    cv.make_entity_service_schema(
+        {
+            vol.Optional(ATTR_POWER): cv.boolean,
+            vol.Optional(ATTR_SYNC): cv.boolean,
+            vol.Optional(ATTR_MODE): vol.In(SYNC_MODES),
+            vol.Optional(ATTR_INTENSITY): vol.In(INTENSITIES),
+            # input1-4 or the name given to the input.
+            vol.Optional(ATTR_INPUT): cv.string,
+            # Id or name of an entertainment area.
+            vol.Optional(ATTR_AREA): cv.string,
+            vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+        }
+    ),
+    cv.has_at_least_one_key(
+        ATTR_POWER,
+        ATTR_SYNC,
+        ATTR_MODE,
+        ATTR_INTENSITY,
+        ATTR_INPUT,
+        ATTR_AREA,
+        ATTR_BRIGHTNESS,
+    ),
 )
 
 
@@ -235,6 +280,14 @@ def async_setup_services(hass: HomeAssistant) -> None:
             await _async_update_scene(scene, ScenePut(recall=recall))
             await async_mark_manual(hass, light_entity_ids(hass, scene_lights(scene)))
 
+    async def set_sync(call: ServiceCall) -> None:
+        """Change a Sync Box in one command (power, sync, mode, input, …)."""
+        for coordinator in await _async_target_boxes(hass, call):
+            await coordinator.async_execute(_sync_changes(coordinator, call.data))
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_SYNC, set_sync, schema=SET_SYNC_SCHEMA
+    )
     hass.services.async_register(
         DOMAIN, SERVICE_RECALL_SCENE, recall_scene, schema=RECALL_SCENE_SCHEMA
     )
@@ -258,7 +311,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
 async def _async_target_lights(
     hass: HomeAssistant, call: ServiceCall
 ) -> list[HueLight]:
-    """Resolve the service target; explicitly listed entities keep their order."""
+    """Resolve the service target; explicitly listed entities keep their order.
+
+    Lights that an entertainment area streams to right now (Sync Box, PC or TV sync)
+    are left alone: the stream would overwrite the command anyway.
+    """
     found = await async_extract_entity_ids(call, expand_group=False)
     explicit = [e for e in _explicit_ids(call) if e in found]
     ordered = explicit + sorted(found.difference(explicit))
@@ -266,7 +323,98 @@ async def _async_target_lights(
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="no_lights"
         )
-    return async_resolve_lights(hass, ordered)
+    lights = async_resolve_lights(hass, ordered)
+    if streaming := async_streaming_lights(hass):
+        skipped = [light.entity_id for light in lights if light.entity_id in streaming]
+        if skipped:
+            _LOGGER.debug("Skipping lights that are syncing: %s", skipped)
+            lights = [light for light in lights if light.entity_id not in streaming]
+            if not lights:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN,
+                    translation_key="lights_syncing",
+                    translation_placeholders={"entity_id": ", ".join(skipped)},
+                )
+    return lights
+
+
+async def _async_target_boxes(
+    hass: HomeAssistant, call: ServiceCall
+) -> list[SyncBoxCoordinator]:
+    """Sync Boxes owning any of the targeted entities."""
+    registry = er.async_get(hass)
+    boxes: dict[str, SyncBoxCoordinator] = {}
+    for entity_id in sorted(await async_extract_entity_ids(call)):
+        entry_id = (entry := registry.async_get(entity_id)) and entry.config_entry_id
+        config_entry = hass.config_entries.async_get_entry(entry_id or "")
+        if (
+            config_entry is None
+            or config_entry.domain != DOMAIN
+            or config_entry.data.get(CONF_KIND) != KIND_SYNC_BOX
+            or getattr(config_entry, "runtime_data", None) is None
+            or config_entry.runtime_data.sync is None
+        ):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="not_sync_box",
+                translation_placeholders={"entity_id": entity_id},
+            )
+        boxes[config_entry.entry_id] = config_entry.runtime_data.sync
+    if not boxes:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="no_sync_box"
+        )
+    return list(boxes.values())
+
+
+def _sync_changes(
+    coordinator: SyncBoxCoordinator, data: dict[str, Any]
+) -> dict[str, Any]:
+    """One `/execution` update for a set_sync call."""
+    if data.get(ATTR_POWER) is False:
+        return {"mode": MODE_POWERSAVE}
+    state = coordinator.state
+    changes: dict[str, Any] = {}
+    if (mode := data.get(ATTR_MODE)) is not None and data.get(ATTR_SYNC) is not False:
+        changes["mode"] = mode
+    elif (sync := data.get(ATTR_SYNC)) is not None:
+        changes["syncActive"] = sync
+    elif data.get(ATTR_POWER) and not state.power:
+        changes["mode"] = MODE_PASSTHROUGH
+    if (intensity := data.get(ATTR_INTENSITY)) is not None:
+        changes.update(coordinator.intensity_changes(intensity, mode))
+    if (source := data.get(ATTR_INPUT)) is not None:
+        changes["hdmiSource"] = _input_id(coordinator, source)
+    if (area := data.get(ATTR_AREA)) is not None:
+        changes["hueTarget"] = hue_target(_area_id(coordinator, area))
+    if (brightness := data.get(ATTR_BRIGHTNESS)) is not None:
+        changes["brightness"] = pct_to_api(brightness)
+    return changes
+
+
+def _input_id(coordinator: SyncBoxCoordinator, value: str) -> str:
+    hdmi = coordinator.data.get("hdmi") or {}
+    for key in INPUTS:
+        port = hdmi.get(key)
+        if isinstance(port, dict) and value in (key, port.get("name")):
+            return key
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="unknown_input",
+        translation_placeholders={"input": value},
+    )
+
+
+def _area_id(coordinator: SyncBoxCoordinator, value: str) -> str:
+    groups = (coordinator.data.get("hue") or {}).get("groups") or {}
+    for group_id, group in groups.items():
+        if value in (group_id, group.get("name")):
+            return group_id
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="unknown_area",
+        translation_placeholders={"area": value},
+    )
 
 
 async def _async_target_scenes(
