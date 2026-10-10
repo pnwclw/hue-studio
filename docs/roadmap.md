@@ -112,6 +112,15 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 4. Verify on a real bridge: actual coordinate values, whether CLIP v2 accepts position
    writes, and whether any SpatialAware resources appear in the API.
 
+### R. Rooms and zones, HA-first (design: `rooms-and-scenes.md`)
+
+1. Comparison of areas and Hue rooms -> alignment plan (pure, tested).
+2. `align_rooms` (with `dry_run`), `update_zone`, `delete_zone`; completing scenes after
+   lights move.
+3. Panel: "Rooms and zones" screen (alignment preview, zone editor), mismatch notes
+   (light moved in the Hue app), "No room" section.
+4. Optional automatic alignment when areas change.
+
 ### D. Phase 4 — auto light (the main difference from the Hue app)
 
 - Phases, seasons, weather, holidays and offsets in Python, replacing template sensors and
@@ -131,7 +140,7 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ## Order
 
-A -> B1–B2 -> D -> C -> rest of B -> E.
+A -> B1–B2 -> R -> D -> C -> rest of B -> E.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
