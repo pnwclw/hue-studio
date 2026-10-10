@@ -10,6 +10,7 @@ from aiohue.v2.models.light import Light
 from aiohue.v2.models.scene import Scene
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
@@ -23,6 +24,7 @@ from .lights import (
     light_info,
 )
 from .options import async_frontend_config
+from .rooms import async_rooms_payload, async_set_light_area, async_track_rooms
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import async_sync_boxes
 
@@ -34,6 +36,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe_config)
     websocket_api.async_register_command(hass, ws_subscribe_scenes)
     websocket_api.async_register_command(hass, ws_subscribe_sync)
+    websocket_api.async_register_command(hass, ws_subscribe_rooms)
+    websocket_api.async_register_command(hass, ws_set_light_area)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -208,3 +212,61 @@ def ws_subscribe_sync(
     connection.subscriptions[msg["id"]] = unsubscribe
     connection.send_result(msg["id"])
     send()
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/rooms/subscribe"})
+@callback
+def ws_subscribe_rooms(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send the room alignment plan (nothing is changed) now and whenever it changes.
+
+    Event payload (always complete), entity ids throughout:
+        {"changed": bool,
+         "rooms": [{"area", "name", "create", "rename", "current_name",
+                    "group": room entity | None, "lights": [...]}],
+         "moves": [{"lights", "area", "from": room name | None, "from_group",
+                    "from_area": area whose room the lights are in now | None}],
+         "empty": [{"name", "group", "scenes": count}],
+         "scenes": [{"entity_id", "name", "group_name", "lost", "missing"}],
+         "conflicts": [light entity ids],
+         "hue_rooms": {light entity id: its Hue room's name}}
+    """
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        payload = async_rooms_payload(hass)
+        if payload == last.get("payload"):
+            return
+        last["payload"] = payload
+        connection.send_message(websocket_api.event_message(msg["id"], payload))
+
+    connection.subscriptions[msg["id"]] = async_track_rooms(hass, send)
+    connection.send_result(msg["id"])
+    send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/lights/set_area",
+        vol.Required("entity_id"): str,
+        vol.Required("area_id"): vol.Any(str, None),
+    }
+)
+@callback
+def ws_set_light_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Put a Hue light into an HA area (its device, like HA's "Assign area")."""
+    try:
+        async_set_light_area(hass, msg["entity_id"], msg["area_id"])
+    except ServiceValidationError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])

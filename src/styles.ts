@@ -18,7 +18,7 @@ export const CSS = `
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; }
-  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-effects,
+  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-effects,
   hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
@@ -386,6 +386,40 @@ export const CSS = `
   .grid.locked .scene { opacity: 0.45; cursor: default; }
   .grid.locked .scene:active { transform: none; }
   .sync-meta svg { width: 14px; height: 14px; }
+
+  /* rooms and zones */
+  .notice { display: flex; align-items: center; gap: 10px; width: 100%; margin: 14px 0 0; padding: 12px 14px; border: none;
+            border-radius: var(--radius); cursor: pointer; text-align: left; font-size: 14px; line-height: 1.35;
+            background: rgba(10, 98, 255, 0.16); }
+  .notice svg { flex: none; color: #6c9dff; }
+  .notice .grow { flex: 1; min-width: 0; }
+  .notice .go { flex: none; font-weight: 600; color: #6c9dff; }
+  .notice:active { transform: scale(0.99); }
+  .lead { margin: 0 2px 10px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+  .lead.small { margin-top: 12px; font-size: 13px; }
+  .text-link { display: inline; margin-left: 4px; padding: 0; border: none; background: none; cursor: pointer; color: #6c9dff; font-size: inherit; }
+  .rows + .rows { margin-top: 10px; }
+  .rows .item ha-icon { color: var(--text-2); }
+  .rows button.item { width: 100%; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .rows button.item:active { background: rgba(255, 255, 255, 0.04); }
+  .rows .item .chevron { --mdc-icon-size: 20px; }
+  .rows.plan .item, .rows.conflicts .item { font-size: 15px; }
+  .rows.conflicts ha-icon { color: #ffb340; }
+  .select { flex: none; max-width: 46%; height: 34px; padding: 0 10px; border: none; border-radius: 10px; font: inherit; font-size: 14px;
+            color: inherit; background: rgba(120, 120, 128, 0.28); }
+  .rooms-page .center { margin-top: 18px; }
+  .sheet .box.zone-editor { width: min(100%, 440px); }
+  .zone-editor h2.label { margin: 18px 16px 8px; }
+  .zone-editor .rows { border-radius: 0; background: #333336; }
+  .check { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; box-sizing: border-box;
+           border: 2px solid rgba(235, 235, 245, 0.3); border-radius: 50%; transition: background 0.2s, border 0.2s; }
+  .check svg { width: 16px; height: 16px; opacity: 0; }
+  .on > .check { border-color: var(--accent); background: var(--accent); }
+  .on > .check svg { opacity: 1; }
+  .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
+  .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
+  .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .mismatch .pill { text-transform: none; letter-spacing: 0; font-size: 13px; }
 
   .toast { position: absolute; left: 50%; bottom: 76px; z-index: 20; max-width: calc(100% - 48px); padding: 10px 16px; border-radius: 12px;
            background: rgba(60, 60, 64, 0.96); font-size: 14px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none;

@@ -167,6 +167,12 @@
     },
     "one_bridge": {
       "message": "Wszystkie światła muszą być na tym samym mostku Hue."
+    },
+    "not_hue_zone": {
+      "message": "{entity_id} nie jest strefą Hue (pokoje Hue podążają za obszarami)."
+    },
+    "room_change_failed": {
+      "message": "Nie udało się zmienić pokoju Hue {name}: mostek odrzucił zmianę lub jest nieosiągalny."
     }
   },
   "services": {
@@ -443,6 +449,42 @@
           "description": "Zastąp obszary, które już mają ustawienia automatycznego światła."
         }
       }
+    },
+    "align_rooms": {
+      "name": "Wyrównaj pokoje z obszarami",
+      "description": "Dopasowuje pokoje Hue na mostku do obszarów Home Assistant: każdy obszar ze światłami Hue dostaje pokój Hue o swojej nazwie z dokładnie tymi światłami. Zwraca plan; z celem przenoszone są tylko wskazane światła.",
+      "fields": {
+        "dry_run": {
+          "name": "Próba",
+          "description": "Tylko zwróć plan, niczego nie zmieniaj."
+        },
+        "complete_scenes": {
+          "name": "Uzupełnij sceny",
+          "description": "Daj scenom pokoju ustawienia dla świateł, które do niego dołączyły: z palety sceny, a bez niej skopiowane z sąsiedniego światła."
+        },
+        "delete_empty_rooms": {
+          "name": "Usuń puste pokoje",
+          "description": "Usuń pokoje Hue, które zostały bez świateł i których nie używa żaden obszar. Ich sceny zostaną usunięte razem z nimi."
+        }
+      }
+    },
+    "update_zone": {
+      "name": "Zmień strefę",
+      "description": "Zmienia nazwę strefy Hue lub jej światła.",
+      "fields": {
+        "name": {
+          "name": "Nazwa",
+          "description": "Nowa nazwa strefy."
+        },
+        "lights": {
+          "name": "Światła",
+          "description": "Wszystkie światła strefy (zastępują obecne)."
+        }
+      }
+    },
+    "delete_zone": {
+      "name": "Usuń strefę",
+      "description": "Usuwa strefy Hue z mostka razem z ich scenami."
     }
   },
   "selector": {
@@ -510,6 +552,7 @@
         "menu_options": {
           "groups": "Pokoje i strefy Hue → obszary HA",
           "room_select": "Czujniki w pokojach",
+          "alignment": "Pokoje podążają za obszarami",
           "save": "Zapisz"
         }
       },
@@ -530,6 +573,13 @@
         "data": {
           "motion": "Czujniki ruchu",
           "temperature": "Czujniki temperatury"
+        }
+      },
+      "alignment": {
+        "title": "Pokoje podążają za obszarami",
+        "description": "Hue Studio może utrzymywać pokoje Hue na mostku zgodne z obszarami Home Assistant (ekran „Pokoje i strefy” w panelu pokazuje, co by się zmieniło). Gdy ta opcja jest włączona, każda zmiana obszaru lub obszaru światła Hue trafia od razu na mostek. Puste pokoje Hue nigdy nie są usuwane automatycznie.",
+        "data": {
+          "auto_align": "Wyrównuj automatycznie, gdy zmieniają się obszary"
         }
       }
     },

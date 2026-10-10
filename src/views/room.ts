@@ -11,6 +11,7 @@ import { paletteArt, paletteColors } from "../color.ts";
 import { groupSlider, lightTile, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
 import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, groupState, type Scene } from "../model.ts";
+import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
@@ -72,6 +73,7 @@ export class RoomView extends StudioView {
         </button>
       </div>
       <h2 class="label">${t("room.lights")}</h2>
+      ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
     </div>
     ${this.adding ? this.newSheet(g) : nothing}`;
@@ -245,6 +247,25 @@ export class RoomView extends StudioView {
             <button class="round mini edit" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
           </div>`
         : nothing}
+    </div>`;
+  }
+
+  /**
+   * A light that sits in another area's Hue room (moved in the Hue app): accept that in
+   * HA (the light's area changes) or move it back on the bridge.
+   */
+  private mismatch(m: Mismatch) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const area = ctx.hass.areas?.[m.hueArea]?.name || m.hueArea;
+    const accept = () => ctx.setArea(m.light, m.hueArea);
+    const restore = () => ctx.call("hue_studio", "align_rooms", { entity_id: m.light }, { optimistic: false });
+    return html`<div class="mismatch">
+      <p>${t("mismatch.note", { light: friendlyName(ctx.hass, m.light), room: m.hueRoom })}</p>
+      <div class="buttons">
+        <button class="pill" @click=${accept}>${t("mismatch.accept", { area })}</button>
+        <button class="pill" @click=${restore}>${t("mismatch.restore")}</button>
+      </div>
     </div>`;
   }
 

@@ -113,6 +113,8 @@ def make_light(
     effects = [EffectStatus.NO_EFFECT, EffectStatus.CANDLE, EffectStatus.FIRE]
     return SimpleNamespace(
         id=resource_id,
+        # The device owning the light: `dev-<resource id>`.
+        owner=ResourceIdentifier(rid=f"dev-{resource_id}", rtype=ResourceTypes.DEVICE),
         on=OnFeature(on=True),
         dimming=DimmingFeature(brightness=50.0),
         metadata=LightMetaData(archetype="hue_lightstrip", name=resource_id),

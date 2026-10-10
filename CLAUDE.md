@@ -181,9 +181,11 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
   scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
-  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, save_scene, reset_scene, recall_scene,
-                                set_sync
-  websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
+  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
+                                align_rooms, save_scene, reset_scene, recall_scene, set_sync
+  websocket.py                  hue_studio/lights|scenes|config|sync|rooms/subscribe, hue_studio/lights/set_area
+  alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
+  rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,
                                 import of the legacy lights.json
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
@@ -191,7 +193,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
   config_flow.py                setup (menu: pick a `hue` entry; Sync Box: pair or use `huesyncbox`) + options: Hue room/zone -> HA area,
-                                motion/temperature sensors per room (Roborock-style menu)
+                                motion/temperature sensors per room, rooms follow areas (Roborock-style menu)
   options.py                    option helpers; unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
   panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
@@ -204,7 +206,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
-  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync — one Lit element per screen
+  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, rooms (rooms and zones) — one Lit element per screen
+  rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`

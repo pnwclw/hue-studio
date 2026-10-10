@@ -1,7 +1,8 @@
 # Rooms, zones and scenes: HA-first with the bridge
 
 How Hue Studio keeps Home Assistant and the Hue bridge (and so the Hue app) consistent.
-Status: design, not implemented yet (see `roadmap.md`, section "Rooms and zones").
+Status: implemented (`alignment.py`, `rooms.py`, the panel's "Rooms and zones" screen);
+see `roadmap.md`, section "Rooms and zones", for what is left.
 
 ## Two models
 
@@ -55,6 +56,20 @@ those lights. Lights without an area keep their Hue room.
   hold scenes.
 - Bridge limits apply: room changes are `room` PUTs, sent sequentially.
 
+How the plan is made (`alignment.py`, pure and unit-tested):
+
+- A Hue room holds **devices**, not lights (CLIP v2): a light moves with its device. A
+  device whose lights lie in different areas is a conflict, listed and left alone. Rooms
+  keep their other devices (sensors, switches).
+- Each area takes one existing room, greedily by how many of its devices the room holds
+  already (so most scenes keep their lights), then by equal name; otherwise a room is
+  created (archetype guessed from the area icon). An area's room is renamed to the
+  area's name.
+- Applying: devices leave their rooms first (a device can be in one room only), then new
+  rooms are created with their devices and existing ones get theirs.
+- With a target (e.g. "Move back in Hue" for one light), only those lights move: no
+  renames, no deletions.
+
 ### Zones
 
 Created and edited in the panel (pick lights, name), written to the bridge at once
@@ -105,11 +120,17 @@ wants to treat as an area's command target, or a setup where alignment is off.
 
 ## Work
 
-1. Pure comparison module: areas <-> Hue rooms -> plan (rooms to create/rename, moves,
-   empty rooms, affected scenes). Unit tests.
-2. Services: `align_rooms` (with `dry_run`), `create_zone` (done), `update_zone`,
-   `delete_zone`; scene completion after moves.
-3. Panel: "Rooms and zones" screen (alignment preview and apply, zone editor), mismatch
-   notes in rooms, "No room" section.
-4. Option: align automatically when areas change.
-5. On a real bridge: dry run first, apply only after review.
+1. ~~Pure comparison module~~ — `alignment.py`, `tests/test_alignment.py`.
+2. ~~Services~~ — `align_rooms` (with `dry_run`, a target, `complete_scenes`,
+   `delete_empty_rooms`), `create_zone`, `update_zone`, `delete_zone`; WebSocket
+   `hue_studio/rooms/subscribe` (the plan, pushed on every change) and
+   `hue_studio/lights/set_area`.
+3. ~~Panel~~ — "Rooms and zones" screen, mismatch notes in rooms, "No room" on the home
+   screen and the rooms screen.
+4. ~~Option~~ — "Rooms follow areas" (`auto_align`) in the options: HA area changes only;
+   empty rooms are never deleted automatically.
+5. On a real bridge: dry run first, apply only after review. Still to verify there: that
+   the bridge accepts room PUTs in this order, drops moved lights from the old room's
+   scenes by itself, and accepts scene actions for lights right after they joined.
+6. Later: when a room is split, move its scenes to a zone over the same lights instead of
+   letting them lose lights.

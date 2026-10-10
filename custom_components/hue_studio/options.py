@@ -18,6 +18,7 @@ from homeassistant.helpers import (
 )
 
 from .const import (
+    CONF_AUTO_ALIGN,
     CONF_GROUPS,
     CONF_MOTION,
     CONF_ROOMS,
@@ -100,7 +101,8 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
     """Hue group unique id -> the area it becomes the room of automatically.
 
     Same rule as the panel (`buildHome` in model.ts): in area registry order, an area
-    takes the first unused group whose lights are exactly the Hue lights in the area.
+    takes the first unused group whose lights are exactly the Hue lights in the area,
+    Hue rooms before zones (after alignment a room always matches its area).
     """
     light_areas = _async_hue_light_areas(hass)
     members: dict[str, set[str]] = {}
@@ -108,6 +110,7 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
         state = hass.states.get(group.entity_id)
         ids = (state.attributes.get(ATTR_ENTITY_ID) or []) if state else []
         members[group.unique_id] = {i for i in ids if i in light_areas}
+    rooms_first = sorted(groups, key=lambda g: g.hue_type != "room")
     auto: dict[str, str] = {}
     for area in ar.async_get(hass).async_list_areas():
         in_area = {i for i, a in light_areas.items() if a == area.id}
@@ -116,7 +119,7 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
         match = next(
             (
                 g.unique_id
-                for g in groups
+                for g in rooms_first
                 if g.unique_id not in auto and members[g.unique_id] == in_area
             ),
             None,
@@ -163,4 +166,11 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
         for key, value in options[CONF_ROOMS].items()
         if (frontend_key := room_key(key)) is not None
     }
-    return {CONF_GROUPS: groups, CONF_ROOMS: rooms}
+    return {
+        CONF_GROUPS: groups,
+        CONF_ROOMS: rooms,
+        CONF_AUTO_ALIGN: any(
+            entry.options.get(CONF_AUTO_ALIGN, False)
+            for entry in hass.config_entries.async_entries(DOMAIN)
+        ),
+    }

@@ -10,6 +10,7 @@ import type {
   LightInfo,
   LightsMessage,
   Palette,
+  RoomsPlan,
   SceneInfo,
   ServiceData,
   SyncBoxInfo,
@@ -37,6 +38,13 @@ const LIGHTS: Record<string, [string, string, Sim]> = {
   kitchen_bulb: ["Kitchen bulb", "kitchen", { on: true, mirek: 370, bri: 200 }],
   string_lights: ["String lights", "bedroom", {}],
   globe_lights: ["Globe lights", "balcony", { on: true, xy: [0.2, 0.25], bri: 160 }],
+};
+
+// ?drift=1: rooms that drifted apart. A lamp that is in the office in HA but was moved to
+// the balcony room in the Hue app (a mismatch), and one added in the Hue app without an area.
+const DRIFT: Record<string, [string, string, Sim]> = {
+  reading_lamp: ["Reading lamp", "office", {}],
+  hall_spot: ["Hall spot", "", {}],
 };
 
 const GROUPS: Record<string, [string, string, string[]]> = {
@@ -75,6 +83,8 @@ const ARCHETYPES: Record<string, string> = {
   kitchen_bulb: "classic_bulb",
   string_lights: "string_light",
   globe_lights: "string_globe",
+  reading_lamp: "table_shade",
+  hall_spot: "single_spot",
 };
 
 const EFFECTS = ["candle", "fire", "prism", "sparkle", "opal", "glisten", "underwater", "cosmos", "sunbeam", "enchant"];
@@ -126,6 +136,10 @@ const SYNC_COLORS: Record<string, XY[]> = {
 const GAMUT_C: XY[] = [[0.6915, 0.3083], [0.17, 0.7], [0.1532, 0.0475]];
 
 export function createHass({ language = "en", onChange }: { language?: string; onChange: (hass: Hass) => void }): Hass {
+  if (new URLSearchParams(location.search).get("drift") === "1" && !LIGHTS.hall_spot) {
+    Object.assign(LIGHTS, DRIFT);
+    GROUPS.balcony[2].push(...Object.keys(DRIFT));
+  }
   const states: Record<string, HassState & { _s?: Sim }> = {};
   const entities: NonNullable<Hass["entities"]> = {};
   const devices: NonNullable<Hass["devices"]> = {};
@@ -152,7 +166,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
 
   for (const [id, [, area, s]] of Object.entries(LIGHTS)) {
-    devices[`dev_${id}`] = { area_id: area };
+    devices[`dev_${id}`] = { area_id: area || null };
     entities[`light.${id}`] = { platform: "hue", device_id: `dev_${id}` };
     setLight(id, s);
   }
@@ -193,6 +207,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   }
 
   const refreshGroups = () => {
+    for (const id of Object.keys(states)) {
+      if (states[id].attributes.is_hue_group && !GROUPS[id.replace("light.", "")]) {
+        delete states[id];
+        delete entities[id];
+      }
+    }
     for (const [id, [name, type, members]] of Object.entries(GROUPS)) {
       const ids = members.map((m) => `light.${m}`);
       const lit = ids.filter((m) => states[m].state === "on");
@@ -275,6 +295,70 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
   showSync();
 
+  const roomListeners = new Set<(msg: unknown) => void>();
+  /** A small copy of the backend's alignment plan (alignment.py), one light per device. */
+  const planRooms = (): RoomsPlan => {
+    const ids = Object.keys(LIGHTS);
+    const areaOf = (l: string) => devices[`dev_${l}`].area_id || null;
+    const hueRooms = Object.entries(GROUPS).filter(([, g]) => g[1] === "room");
+    const roomOf = (l: string) => hueRooms.find(([, g]) => g[2].includes(l))?.[0] ?? null;
+    const areas = Object.keys(AREAS).filter((a) => ids.some((l) => areaOf(l) === a));
+    const candidates = areas.flatMap((a, ai) =>
+      hueRooms.map(([r, g]) => ({ a, r, ai, n: ids.filter((l) => areaOf(l) === a && roomOf(l) === r).length, same: g[0] === AREAS[a].name })),
+    ).filter((c) => c.n || c.same).sort((x, y) => y.n - x.n || Number(y.same) - Number(x.same) || x.ai - y.ai);
+    const assigned: Record<string, string> = {};
+    for (const c of candidates) if (!assigned[c.a] && !Object.values(assigned).includes(c.r)) assigned[c.a] = c.r;
+    const areaOfRoom = (r: string | null) => Object.keys(assigned).find((a) => assigned[a] === r) ?? null;
+    const moves = ids
+      .filter((l) => areaOf(l) && roomOf(l) !== (assigned[areaOf(l)!] ?? "new"))
+      .map((l) => ({ lights: [`light.${l}`], area: areaOf(l)!, from: roomOf(l) ? GROUPS[roomOf(l)!][0] : null, from_group: roomOf(l) ? `light.${roomOf(l)}` : null, from_area: areaOfRoom(roomOf(l)) }));
+    const rooms = areas.map((a) => ({
+      area: a,
+      name: AREAS[a].name,
+      create: !assigned[a],
+      rename: !!assigned[a] && GROUPS[assigned[a]][0] !== AREAS[a].name,
+      current_name: assigned[a] ? GROUPS[assigned[a]][0] : null,
+      group: assigned[a] ? `light.${assigned[a]}` : null,
+      lights: ids.filter((l) => areaOf(l) === a).map((l) => `light.${l}`),
+    }));
+    const leaving = new Set(moves.flatMap((m) => m.lights.map((x) => x.replace("light.", ""))));
+    const empty = hueRooms
+      .filter(([r, g]) => !areaOfRoom(r) && g[2].every((l) => leaving.has(l) || !areaOf(l)) && g[2].some((l) => leaving.has(l)))
+      .map(([r, g]) => ({ name: g[0], group: `light.${r}`, scenes: (SCENES[r] || []).length }));
+    const scenes = Object.entries(SCENES).flatMap(([group, list]) =>
+      list.map((name) => ({ name, group, lost: moves.filter((m) => m.from_group === `light.${group}`).flatMap((m) => m.lights) }))
+        .filter((x) => x.lost.length)
+        .map((x) => ({ entity_id: null, name: x.name, group_name: GROUPS[x.group][0], lost: x.lost, missing: [] })),
+    );
+    return {
+      changed: moves.length > 0 || rooms.some((r) => r.create || r.rename),
+      rooms,
+      moves,
+      empty,
+      scenes,
+      conflicts: [],
+      hue_rooms: Object.fromEntries(ids.filter(roomOf).map((l) => [`light.${l}`, GROUPS[roomOf(l)!][0]])),
+    };
+  };
+  const pushRooms = () => setTimeout(() => roomListeners.forEach((cb) => cb(planRooms())), 120);
+  /** What align_rooms does: move lights into their areas' rooms (made or renamed as needed). */
+  const alignRooms = (only: string[] | null, deleteEmpty: boolean) => {
+    const plan = planRooms();
+    for (const move of plan.moves) {
+      const light = move.lights[0].replace("light.", "");
+      if (only && !only.includes(move.lights[0])) continue;
+      for (const g of Object.values(GROUPS)) if (g[1] === "room") g[2] = g[2].filter((l) => l !== light);
+      const target = plan.rooms.find((r) => r.area === move.area)!;
+      const key = target.group?.replace("light.", "") ?? move.area;
+      GROUPS[key] ??= [target.name, "room", []];
+      GROUPS[key][2].push(light);
+    }
+    if (!only) {
+      for (const r of plan.rooms) if (r.rename && r.group) GROUPS[r.group.replace("light.", "")][0] = r.name;
+      if (deleteEmpty) for (const e of plan.empty) delete GROUPS[e.group!.replace("light.", "")];
+    }
+  };
+
   const hass: Hass = {
     language,
     locale: { language },
@@ -289,7 +373,6 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         xy_color?: XY;
         color_temp_kelvin?: number;
         gallery_scene?: string;
-        lights: string[];
         manual_control?: boolean;
         points: XY[];
         dynamic?: boolean;
@@ -300,6 +383,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         effect?: string;
         mirek?: number;
         brightness?: number;
+        lights?: string[];
       };
       const one = String(data.entity_id);
       console.info("callService", domain, service, JSON.stringify(data));
@@ -348,6 +432,16 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         const id = d.name!.toLowerCase().replace(/[^a-z]+/g, "_");
         GROUPS[id] = [d.name!, "zone", ids.map((l) => l.replace("light.", ""))];
       }
+      if (domain === "hue_studio" && service === "update_zone") {
+        const zone = GROUPS[one.replace("light.", "")];
+        if (d.name) zone[0] = d.name;
+        if (d.lights) zone[2] = d.lights.map((l) => l.replace("light.", ""));
+      }
+      if (domain === "hue_studio" && service === "delete_zone") delete GROUPS[one.replace("light.", "")];
+      if (domain === "hue_studio" && service === "align_rooms") {
+        alignRooms(data.entity_id ? [data.entity_id].flat() : null, !!(data as { delete_empty_rooms?: boolean }).delete_empty_rooms);
+        pushRooms();
+      }
       if (domain === "hue_studio" && service === "save_scene") {
         const info = sceneInfo[one];
         if (d.name) states[one] = { ...states[one], attributes: { ...states[one].attributes, name: d.name } };
@@ -376,7 +470,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (domain === "adaptive_lighting" && service === "set_manual_control") {
         const al = states[one];
         const manual = new Set<string>(al.attributes.manual_control);
-        d.lights.forEach((l) => (d.manual_control ? manual.add(l) : manual.delete(l)));
+        (d.lights ?? []).forEach((l) => (d.manual_control ? manual.add(l) : manual.delete(l)));
         states[one] = { ...al, attributes: { ...al.attributes, manual_control: [...manual] } };
       }
       if (domain === "switch") {
@@ -399,9 +493,24 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       refreshGroups();
       onChange({ ...hass, states: { ...states } });
     },
+    async callWS<T>(msg: { type: string } & Record<string, unknown>): Promise<T> {
+      console.info("callWS", JSON.stringify(msg));
+      if (msg.type !== "hue_studio/lights/set_area") throw new Error("unknown command");
+      devices[`dev_${String(msg.entity_id).replace("light.", "")}`].area_id = (msg.area_id as string | null) ?? null;
+      pushRooms();
+      onChange({ ...hass, states: { ...states }, devices: { ...devices } });
+      return null as T;
+    },
     connection: {
       async subscribeMessage<T>(cb: (msg: T) => void, msg: { type: string }) {
         const send = cb as unknown as (m: unknown) => void;
+        if (msg.type === "hue_studio/rooms/subscribe") {
+          roomListeners.add(send);
+          setTimeout(() => send(planRooms()), 35);
+          return () => {
+            roomListeners.delete(send);
+          };
+        }
         if (msg.type === "hue_studio/config/subscribe") {
           setTimeout(() => send({ groups: {}, rooms: {} }), 30);
           return () => {};

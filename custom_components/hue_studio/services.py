@@ -1,7 +1,7 @@
 """Services: what the native `hue` integration cannot do.
 
 Palettes, gradients, effects with their parameters, creating and editing scenes, and
-the Sync Box.
+the Sync Box; Hue rooms aligned with HA areas, zones.
 """
 
 from __future__ import annotations
@@ -33,6 +33,7 @@ from aiohue.v2.models.feature import (
     RecallFeature,
 )
 from aiohue.v2.models.light import LightPut
+from aiohue.v2.models.resource import ResourceTypes
 from aiohue.v2.models.scene import SceneMetadataPut, ScenePut
 from aiohuesyncbox import ExecutionMode, HdmiSource
 from homeassistant.const import ATTR_ENTITY_ID
@@ -69,8 +70,10 @@ from .lights import (
     async_resolve_lights,
     supported_effects,
 )
+from .rooms import async_align
 from .scenes import (
     SCENE_DOMAIN,
+    HueGroup,
     HueScene,
     async_resolve_group,
     async_resolve_scenes,
@@ -107,6 +110,9 @@ SERVICE_SAVE_SCENE = "save_scene"
 SERVICE_RESET_SCENE = "reset_scene"
 SERVICE_RECALL_SCENE = "recall_scene"
 SERVICE_SET_SYNC = "set_sync"
+SERVICE_ALIGN_ROOMS = "align_rooms"
+SERVICE_UPDATE_ZONE = "update_zone"
+SERVICE_DELETE_ZONE = "delete_zone"
 
 ATTR_GALLERY_SCENE = "gallery_scene"
 ATTR_PALETTE = "palette"
@@ -128,6 +134,10 @@ ATTR_SYNC = "sync"
 ATTR_INTENSITY = "intensity"
 ATTR_INPUT = "input"
 ATTR_AREA = "entertainment_area"
+ATTR_DRY_RUN = "dry_run"
+ATTR_COMPLETE_SCENES = "complete_scenes"
+ATTR_DELETE_EMPTY_ROOMS = "delete_empty_rooms"
+ATTR_LIGHTS = "lights"
 
 XY_POINT = vol.All(
     vol.ExactSequence([vol.Coerce(float), vol.Coerce(float)]),
@@ -217,6 +227,28 @@ DELETE_SCENE_SCHEMA = cv.make_entity_service_schema({})
 CREATE_ZONE_SCHEMA = cv.make_entity_service_schema(
     {vol.Required(ATTR_NAME): SCENE_NAME}
 )
+
+# Without a target: every Hue light; with one: only moves of the targeted lights.
+ALIGN_ROOMS_SCHEMA = vol.Schema(
+    {
+        **cv.ENTITY_SERVICE_FIELDS,
+        vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
+        vol.Optional(ATTR_COMPLETE_SCENES, default=True): cv.boolean,
+        vol.Optional(ATTR_DELETE_EMPTY_ROOMS, default=False): cv.boolean,
+    }
+)
+
+UPDATE_ZONE_SCHEMA = vol.All(
+    cv.make_entity_service_schema(
+        {
+            vol.Optional(ATTR_NAME): SCENE_NAME,
+            vol.Optional(ATTR_LIGHTS): vol.All(cv.entity_ids, vol.Length(min=1)),
+        }
+    ),
+    cv.has_at_least_one_key(ATTR_NAME, ATTR_LIGHTS),
+)
+
+DELETE_ZONE_SCHEMA = cv.make_entity_service_schema({})
 
 SAVE_SCENE_SCHEMA = cv.make_entity_service_schema(
     {
@@ -402,6 +434,57 @@ def async_setup_services(hass: HomeAssistant) -> None:
             ) from err
         return {"zone_id": created[0]["rid"] if created else None}
 
+    async def update_zone(call: ServiceCall) -> None:
+        """Rename a Hue zone or give it other lights (rooms are aligned instead)."""
+        found = await async_extract_entity_ids(call, expand_group=False)
+        if len(found) != 1:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="one_group"
+            )
+        zone = _resolve_zone(hass, found.pop())
+        body: dict[str, Any] = {}
+        if ATTR_NAME in call.data:
+            body["metadata"] = {"name": call.data[ATTR_NAME]}
+        if ATTR_LIGHTS in call.data:
+            lights = async_resolve_lights(hass, call.data[ATTR_LIGHTS])
+            if any(light.bridge is not zone.bridge for light in lights):
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN, translation_key="one_bridge"
+                )
+            body["children"] = [
+                {"rid": light.resource.id, "rtype": "light"} for light in lights
+            ]
+        await _async_zone_request(
+            zone, "put", f"clip/v2/resource/zone/{zone.group.rid}", body
+        )
+
+    async def delete_zone(call: ServiceCall) -> None:
+        """Delete Hue zones (with their scenes) from the bridge."""
+        found = await async_extract_entity_ids(call, expand_group=False)
+        zones = [_resolve_zone(hass, entity_id) for entity_id in sorted(found)]
+        if not zones:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="one_group"
+            )
+        for zone in zones:
+            await _async_zone_request(
+                zone, "delete", f"clip/v2/resource/zone/{zone.group.rid}", None
+            )
+
+    async def align_rooms(call: ServiceCall) -> ServiceResponse:
+        """Bring the bridge's rooms in line with the HA areas (or show the plan)."""
+        only: set[str] | None = None
+        if set(call.data) & set(cv.ENTITY_SERVICE_FIELDS):
+            lights = await _async_target_lights(hass, call, skip_streaming=False)
+            only = {light.entity_id for light in lights}
+        return await async_align(
+            hass,
+            only=only,
+            dry_run=call.data[ATTR_DRY_RUN],
+            complete_scenes=call.data[ATTR_COMPLETE_SCENES],
+            delete_empty=call.data[ATTR_DELETE_EMPTY_ROOMS],
+        )
+
     async def save_scene(call: ServiceCall) -> None:
         """Store what the scene's lights show now (plus name/speed/auto-play)."""
         for scene in await _async_target_scenes(hass, call):
@@ -489,6 +572,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
+        DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ALIGN_ROOMS,
+        align_rooms,
+        schema=ALIGN_ROOMS_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
         DOMAIN, SERVICE_SAVE_SCENE, save_scene, schema=SAVE_SCENE_SCHEMA
     )
     hass.services.async_register(
@@ -540,6 +636,34 @@ async def _async_target_lights(
                     translation_placeholders={"entity_id": ", ".join(skipped)},
                 )
     return lights
+
+
+def _resolve_zone(hass: HomeAssistant, entity_id: str) -> HueGroup:
+    """The Hue zone behind a grouped light entity (a Hue room is an error)."""
+    group = async_resolve_group(hass, entity_id)
+    if group.group.rtype != ResourceTypes.ZONE:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="not_hue_zone",
+            translation_placeholders={"entity_id": entity_id},
+        )
+    return group
+
+
+async def _async_zone_request(
+    zone: HueGroup, method: str, path: str, body: dict[str, Any] | None
+) -> None:
+    try:
+        if body is None:
+            await zone.bridge.request(method, path)
+        else:
+            await zone.bridge.request(method, path, json=body)
+    except (AiohueException, ClientError, TimeoutError) as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"entity_id": zone.entity_id},
+        ) from err
 
 
 async def _async_target_boxes(

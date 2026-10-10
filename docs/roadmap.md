@@ -38,9 +38,13 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 - Panel: home, room, color wheel, gallery, effects (categories and 1–12 speed as in the Hue
   app), scene editor.
 - Services: `apply_palette`, `set_gradient`, `set_effect`, `create_scene`,
-  `delete_scene`, `create_zone`, `save_scene`, `reset_scene`, `recall_scene`.
+  `delete_scene`, `create_zone`, `update_zone`, `delete_zone`, `align_rooms`,
+  `save_scene`, `reset_scene`, `recall_scene`.
 - WebSocket: `hue_studio/config/subscribe`, `hue_studio/lights/subscribe`,
-  `hue_studio/scenes/subscribe`.
+  `hue_studio/scenes/subscribe`, `hue_studio/rooms/subscribe`,
+  `hue_studio/lights/set_area`.
+- Rooms follow HA areas: alignment plan, "Rooms and zones" screen, zone editor,
+  mismatch notes, "No room", optional automatic alignment.
 - More-info override with fallback, Adaptive Lighting marking, room/zone mapping options.
 - Hue Play HDMI Sync Box: own pairing and entities (compatible with the HACS Sync Box
   integration), `set_sync`, `hue_studio/sync/subscribe`, a Sync tab, a Sync card in
@@ -114,12 +118,16 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ### R. Rooms and zones, HA-first (design: `rooms-and-scenes.md`)
 
-1. Comparison of areas and Hue rooms -> alignment plan (pure, tested).
-2. `align_rooms` (with `dry_run`), `update_zone`, `delete_zone`; completing scenes after
-   lights move.
-3. Panel: "Rooms and zones" screen (alignment preview, zone editor), mismatch notes
-   (light moved in the Hue app), "No room" section.
-4. Optional automatic alignment when areas change.
+1. ~~Comparison of areas and Hue rooms -> alignment plan~~ — done: `alignment.py` (pure,
+   tested); rooms hold devices, areas take rooms by overlap, then name.
+2. ~~`align_rooms`, `update_zone`, `delete_zone`, completing scenes~~ — done, plus
+   `hue_studio/rooms/subscribe` and `hue_studio/lights/set_area`.
+3. ~~Panel~~ — done: "Rooms and zones" screen (alignment preview and apply, zone
+   editor), mismatch notes in rooms, "No room" section. Still to do: screenshots on a
+   live HA.
+4. ~~Optional automatic alignment~~ — done: "Rooms follow areas" option.
+5. On the live bridge: dry run, review, then apply (see `rooms-and-scenes.md`, Work 5).
+6. Later: a split room's scenes moved to a zone over the same lights.
 
 ### D. Phase 4 — auto light (the main difference from the Hue app)
 

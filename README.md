@@ -18,7 +18,8 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 > lights, a gamut-aware color wheel with one pin per gradient point, light effects
 > (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
 > dynamic speed, auto-play, reset, dynamic playback), the scene gallery with
-> "set once", and the Hue Play HDMI Sync Box (a Sync tab, its own entities and
+> "set once", Hue rooms that follow your HA areas (a "Rooms and zones" screen with
+> a zone editor), and the Hue Play HDMI Sync Box (a Sync tab, its own entities and
 > service). See the roadmap below.
 
 ## Services
@@ -31,6 +32,9 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. |
 | `hue_studio.delete_scene` | Delete Hue scenes from the bridge. |
 | `hue_studio.create_zone` | Create a Hue zone of the targeted lights (e.g. an area's Hue lights), so the area gets scenes of its own. Returns the new `zone_id`. |
+| `hue_studio.update_zone` | Rename a Hue zone (`name`) or give it other `lights`. |
+| `hue_studio.delete_zone` | Delete Hue zones (with their scenes) from the bridge. |
+| `hue_studio.align_rooms` | Bring the Hue rooms on the bridge in line with your HA areas: each area with Hue lights gets a Hue room of its name with exactly those lights (created, renamed or refilled as needed). `dry_run` only returns the plan; `complete_scenes` (default on) gives a room's scenes settings for lights that joined it; `delete_empty_rooms` removes rooms left without lights. With a target, only the targeted lights are moved. Returns the plan. |
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
 | `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
@@ -42,6 +46,18 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
+
+## Rooms and zones
+
+Home Assistant areas decide which room a light is in; the Hue bridge (and so the Hue
+app) follows. The panel's **Rooms and zones** screen (the floor plan button on the home
+screen) shows how the Hue rooms differ from your areas — rooms to create or rename,
+lights to move, scenes that lose or gain lights — and aligns them on confirmation. A
+light moved in the Hue app shows up in its room with "move in Home Assistant" or "move
+back in Hue"; Hue lights without an area are listed under "No room" with an area
+picker. Zones (any lights from any rooms) are created and edited on the same screen.
+With "Rooms follow areas" turned on in the integration options, every area change is
+written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-and-scenes.md).
 
 ## Hue Play HDMI Sync Box
 

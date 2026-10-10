@@ -8,6 +8,7 @@ HACS `huesyncbox` integration (its entities and service, nothing of our own).
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 import logging
 
@@ -23,6 +24,7 @@ from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
     ConfigEntryNotReady,
+    HomeAssistantError,
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -30,6 +32,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .auto_light import async_setup_auto_light
 from .const import (
+    CONF_AUTO_ALIGN,
     CONF_BOX_ID,
     CONF_HUE_ENTRY_ID,
     CONF_KIND,
@@ -44,6 +47,7 @@ from .const import (
     SYNC_BOX_INTEGRATION,
 )
 from .panel import async_register_panel, async_unregister_panel
+from .rooms import async_align, async_track_areas
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
 from .sync_link import SyncBoxLink
@@ -139,8 +143,36 @@ async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) 
         bridge.config.entertainment_configuration.subscribe(on_entertainment)
     )
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    entry.async_on_unload(_async_track_auto_align(hass, entry))
     await async_register_panel(hass)
     return True
+
+
+@callback
+def _async_track_auto_align(
+    hass: HomeAssistant, entry: HueStudioConfigEntry
+) -> Callable[[], None]:
+    """With the option on, align the bridge's rooms when HA areas change.
+
+    Only HA changes trigger it: a light moved in the Hue app is a mismatch the panel
+    shows, not something to undo behind the user's back. Empty rooms are never
+    deleted automatically.
+    """
+
+    async def align() -> None:
+        if not entry.options.get(CONF_AUTO_ALIGN):
+            return
+        try:
+            await async_align(hass, hue_entry_id=entry.data[CONF_HUE_ENTRY_ID])
+        except HomeAssistantError as err:
+            _LOGGER.warning("Automatic room alignment failed: %s", err)
+
+    @callback
+    def on_change() -> None:
+        if entry.options.get(CONF_AUTO_ALIGN):
+            entry.async_create_background_task(hass, align(), "hue_studio_auto_align")
+
+    return async_track_areas(hass, on_change)
 
 
 def _sync_box_api(entry: ConfigEntry) -> HueSyncBox:

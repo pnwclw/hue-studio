@@ -8,6 +8,7 @@
 //   /room/<key>/scene/<scene>  scene editor
 //   /gallery?room=<key>        scene gallery
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
+//   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -24,6 +25,7 @@ import "./views/color.ts";
 import "./views/gallery.ts";
 import "./views/home.ts";
 import "./views/room.ts";
+import "./views/rooms.ts";
 import "./views/scene.ts";
 import "./views/sync.ts";
 
@@ -33,7 +35,8 @@ type Route =
   | { name: "color"; key: string; light: string | null; back: string | null }
   | { name: "scene"; key: string; scene: string }
   | { name: "gallery"; room: string | null }
-  | { name: "sync"; box: string | null };
+  | { name: "sync"; box: string | null }
+  | { name: "rooms" };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -47,6 +50,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
+  if (parts[0] === "rooms") return { name: "rooms" };
   return { name: "home" };
 }
 
@@ -128,6 +132,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":
         return html`<hue-studio-sync-view .ctx=${ctx} .rev=${rev} .box=${route.box}></hue-studio-sync-view>`;
+      case "rooms":
+        return html`<hue-studio-rooms-view .ctx=${ctx} .rev=${rev}></hue-studio-rooms-view>`;
       case "gallery":
         return html`<hue-studio-gallery-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-gallery-view>`;
       default:

@@ -55,10 +55,10 @@ export interface AdaptiveSwitch {
   lights: string[];
 }
 
-const isHueLight = (hass: HassData, id: string): boolean =>
+export const isHueLight = (hass: HassData, id: string): boolean =>
   hass.entities?.[id]?.platform === "hue" && id.startsWith("light.") && !hass.states[id]?.attributes.is_hue_group;
 
-const isHueGroup = (hass: HassData, id: string): boolean =>
+export const isHueGroup = (hass: HassData, id: string): boolean =>
   hass.entities?.[id]?.platform === "hue" && id.startsWith("light.") && !!hass.states[id]?.attributes.is_hue_group;
 
 /** Area of an entity: its own, else its device's. */
@@ -74,7 +74,7 @@ const unique = (list: string[]): string[] => [...new Set(list)];
 export const friendlyName = (hass: HassData, id: string): string => hass.states[id]?.attributes.friendly_name || id;
 
 /** Hue scenes of a Hue group, by the group name the native integration stores on scenes. */
-function scenesOf(hass: HassData, groupId: string): Scene[] {
+export function scenesOf(hass: HassData, groupId: string): Scene[] {
   const name = friendlyName(hass, groupId);
   return Object.keys(hass.states)
     .filter((id) => id.startsWith("scene.") && hass.entities?.[id]?.platform === "hue")
@@ -105,7 +105,11 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
   const mapping = config.groups || {};
   const roomSensors = config.rooms || {};
   const lights = Object.keys(hass.states).filter((id) => isHueLight(hass, id));
-  const groups = Object.keys(hass.states).filter((id) => isHueGroup(hass, id));
+  // Hue rooms before zones: after alignment a room always matches its area exactly.
+  const isRoom = (g: string): number => (hass.states[g].attributes.hue_type === "room" ? 0 : 1);
+  const groups = Object.keys(hass.states)
+    .filter((id) => isHueGroup(hass, id))
+    .sort((a, b) => isRoom(a) - isRoom(b));
   const members = (g: string): string[] => (hass.states[g].attributes.entity_id || []).filter((id: string) => lights.includes(id));
   const sensorsFor = (key: string, areaId: string | null): RoomSensors => ({ ...defaultSensors(hass, areaId), ...roomSensors[key] });
 

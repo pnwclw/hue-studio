@@ -340,3 +340,45 @@ import_legacy:
       default: false
       selector:
         boolean:
+
+align_rooms:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    dry_run:
+      default: false
+      selector:
+        boolean:
+    complete_scenes:
+      default: true
+      selector:
+        boolean:
+    delete_empty_rooms:
+      default: false
+      selector:
+        boolean:
+
+update_zone:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    name:
+      example: TV area
+      selector:
+        text:
+    lights:
+      selector:
+        entity:
+          integration: hue
+          domain: light
+          multiple: true
+
+delete_zone:
+  target:
+    entity:
+      integration: hue
+      domain: light

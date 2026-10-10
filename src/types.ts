@@ -47,6 +47,8 @@ export interface HassData {
 export interface Hass extends HassData {
   connection?: HassConnection;
   callService(domain: string, service: string, data?: ServiceData): Promise<unknown>;
+  /** One WebSocket command (HA's frontend API). */
+  callWS?<T>(msg: { type: string } & Record<string, unknown>): Promise<T>;
 }
 
 /** Bridge info of one light (hue_studio/lights/subscribe). */
@@ -113,6 +115,56 @@ export interface StudioConfig {
   groups: Record<string, string>;
   /** Room key -> sensors overriding the defaults. */
   rooms: Record<string, Partial<RoomSensors>>;
+  /** Hue rooms follow area changes automatically (an option of the integration). */
+  auto_align?: boolean;
+}
+
+/** The Hue room of an area after alignment (hue_studio/rooms/subscribe). */
+export interface RoomTarget {
+  area: string;
+  /** The room's name after alignment (the area's). */
+  name: string;
+  create: boolean;
+  rename: boolean;
+  current_name: string | null;
+  /** The existing room's grouped light entity. */
+  group: string | null;
+  lights: string[];
+}
+
+/** Lights (of one device) going to the room of an area. */
+export interface RoomMove {
+  lights: string[];
+  area: string;
+  /** Name of the Hue room they are in now, or null. */
+  from: string | null;
+  from_group: string | null;
+  /** Area whose room they are in now: a mismatch, e.g. moved in the Hue app. */
+  from_area: string | null;
+}
+
+export interface SceneChange {
+  entity_id: string | null;
+  name: string;
+  group_name: string | null;
+  /** Lights the scene loses (they leave its room). */
+  lost: string[];
+  /** Lights joining its room that the scene has no setting for. */
+  missing: string[];
+}
+
+/** How the bridge's rooms would change to match the HA areas. */
+export interface RoomsPlan {
+  changed: boolean;
+  rooms: RoomTarget[];
+  moves: RoomMove[];
+  /** Rooms left without lights, given to no area. */
+  empty: { name: string; group: string | null; scenes: number }[];
+  scenes: SceneChange[];
+  /** Lights of one device in different areas (left alone). */
+  conflicts: string[];
+  /** Light entity id -> its Hue room's name. */
+  hue_rooms: Record<string, string>;
 }
 
 /** A palette or gallery scene. */

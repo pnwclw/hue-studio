@@ -23,6 +23,8 @@ CONF_MOTION: Final = "motion"
 CONF_TEMPERATURE: Final = "temperature"
 GROUP_AUTO: Final = "auto"
 GROUP_ZONE: Final = "zone"
+# Options: align the bridge's rooms with the HA areas whenever areas change.
+CONF_AUTO_ALIGN: Final = "auto_align"
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
 

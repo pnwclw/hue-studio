@@ -13,6 +13,7 @@ import type {
   Hass,
   LightInfo,
   LightsMessage,
+  RoomsPlan,
   SceneInfo,
   ScenesMessage,
   ServiceData,
@@ -49,6 +50,10 @@ export class StudioContext {
   /** Unsaved edits of the scene editor; they survive a trip to the color wheel. */
   sceneDraft: SceneDraft | null = null;
   config: StudioConfig = { groups: {}, rooms: {} };
+  /** How the bridge's rooms differ from the HA areas (null until known). */
+  rooms: RoomsPlan | null = null;
+  /** The backend could not send the plan (older version, or no bridge). */
+  roomsUnavailable = false;
   /** Sync Boxes by config entry id, with pending predictions applied. */
   boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
@@ -116,7 +121,7 @@ export class StudioContext {
   private subscribe(hass: Hass): void {
     const conn = hass.connection;
     if (!conn) return;
-    const sub = <T>(type: string, onEvent: (msg: T) => void) =>
+    const sub = <T>(type: string, onEvent: (msg: T) => void, onError?: () => void) =>
       this.unsubs.push(
         conn
           .subscribeMessage<T>((msg) => {
@@ -127,6 +132,8 @@ export class StudioContext {
           // The UI works without our backend parts (no gamut clipping, no mapping).
           .catch((err) => {
             console.warn(`hue_studio: ${type} unavailable`, err);
+            onError?.();
+            this.onChange();
             return () => {};
           }),
       );
@@ -138,6 +145,13 @@ export class StudioContext {
     sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
       this.rawBoxes = msg.boxes;
     });
+    sub<RoomsPlan>(
+      "hue_studio/rooms/subscribe",
+      (msg) => {
+        this.rooms = msg;
+      },
+      () => (this.roomsUnavailable = true),
+    );
   }
 
   dispose(): void {
@@ -219,6 +233,18 @@ export class StudioContext {
       this.onChange();
     }
     return ok;
+  }
+
+  /** Put a Hue light into an HA area (null: no area). Resolves to true on success. */
+  async setArea(light: string, area: string | null): Promise<boolean> {
+    if (!this.raw?.callWS) return false;
+    try {
+      await this.raw.callWS({ type: "hue_studio/lights/set_area", entity_id: light, area_id: area });
+      return true;
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
   }
 
   /** Scenes change lights behind HA's back: tell Adaptive Lighting they are manual now. */

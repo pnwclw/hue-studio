@@ -167,6 +167,12 @@
     },
     "one_bridge": {
       "message": "All lights must be on the same Hue bridge."
+    },
+    "not_hue_zone": {
+      "message": "{entity_id} is not a Hue zone (Hue rooms follow the areas)."
+    },
+    "room_change_failed": {
+      "message": "Could not change the Hue room {name}: the bridge refused the change or is unreachable."
     }
   },
   "services": {
@@ -443,6 +449,42 @@
           "description": "Replace areas that already have auto light settings."
         }
       }
+    },
+    "align_rooms": {
+      "name": "Align rooms with areas",
+      "description": "Brings the Hue rooms on the bridge in line with the Home Assistant areas: every area with Hue lights gets a Hue room of its name with exactly those lights. Returns the plan; with a target, only the targeted lights are moved.",
+      "fields": {
+        "dry_run": {
+          "name": "Dry run",
+          "description": "Only return the plan, change nothing."
+        },
+        "complete_scenes": {
+          "name": "Complete scenes",
+          "description": "Give the scenes of a room actions for the lights that joined it: from the scene's palette, else copied from a neighboring light."
+        },
+        "delete_empty_rooms": {
+          "name": "Delete empty rooms",
+          "description": "Delete Hue rooms left without lights that no area uses. Their scenes are deleted with them."
+        }
+      }
+    },
+    "update_zone": {
+      "name": "Update zone",
+      "description": "Renames a Hue zone or gives it other lights.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "New name of the zone."
+        },
+        "lights": {
+          "name": "Lights",
+          "description": "All lights of the zone (replaces the current ones)."
+        }
+      }
+    },
+    "delete_zone": {
+      "name": "Delete zone",
+      "description": "Deletes Hue zones from the bridge, together with their scenes."
     }
   },
   "selector": {
@@ -510,6 +552,7 @@
         "menu_options": {
           "groups": "Hue rooms and zones → HA areas",
           "room_select": "Sensors in rooms",
+          "alignment": "Rooms follow areas",
           "save": "Save"
         }
       },
@@ -530,6 +573,13 @@
         "data": {
           "motion": "Motion sensors",
           "temperature": "Temperature sensors"
+        }
+      },
+      "alignment": {
+        "title": "Rooms follow areas",
+        "description": "Hue Studio can keep the Hue rooms on the bridge in line with the Home Assistant areas (the panel's \"Rooms and zones\" screen shows what would change). With this on, every change of an area, or of the area of a Hue light, is written to the bridge at once. Empty Hue rooms are never deleted automatically.",
+        "data": {
+          "auto_align": "Align automatically when areas change"
         }
       }
     },

@@ -37,7 +37,11 @@ async def test_options_flow_and_config_ws(
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "hue_studio/config/subscribe"})
     assert (await client.receive_json())["success"]
-    assert (await client.receive_json())["event"] == {"groups": {}, "rooms": {}}
+    assert (await client.receive_json())["event"] == {
+        "groups": {},
+        "rooms": {},
+        "auto_align": False,
+    }
 
     flow = hass.config_entries.options
     result = await flow.async_init(studio_entry.entry_id)
@@ -64,9 +68,18 @@ async def test_options_flow_and_config_ws(
     )
     assert result["type"] is FlowResultType.MENU
 
+    # Rooms follow areas automatically
+    result = await flow.async_configure(
+        result["flow_id"], {"next_step_id": "alignment"}
+    )
+    assert result["step_id"] == "alignment"
+    result = await flow.async_configure(result["flow_id"], {"auto_align": True})
+    assert result["type"] is FlowResultType.MENU
+
     result = await flow.async_configure(result["flow_id"], {"next_step_id": "save"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert studio_entry.options == {
+        "auto_align": True,
         "groups": {"grp-room": office.id},
         "rooms": {
             f"area.{office.id}": {
@@ -80,6 +93,7 @@ async def test_options_flow_and_config_ws(
     # Pushed to the panel with entity ids instead of unique ids.
     event = (await client.receive_json())["event"]
     assert event["groups"] == {group.entity_id: office.id}
+    assert event["auto_align"] is True
     assert event["rooms"][f"area.{office.id}"]["motion"] == [
         "binary_sensor.office_motion"
     ]

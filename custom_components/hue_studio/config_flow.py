@@ -30,6 +30,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     AreaSelector,
     AreaSelectorConfig,
+    BooleanSelector,
     EntitySelector,
     EntitySelectorConfig,
     SelectOptionDict,
@@ -41,6 +42,7 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 import voluptuous as vol
 
 from .const import (
+    CONF_AUTO_ALIGN,
     CONF_BOX_ID,
     CONF_GROUPS,
     CONF_HUE_ENTRY_ID,
@@ -421,7 +423,8 @@ class HueStudioOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Menu."""
         return self.async_show_menu(
-            step_id="init", menu_options=["groups", "room_select", "save"]
+            step_id="init",
+            menu_options=["groups", "room_select", "alignment", "save"],
         )
 
     async def async_step_save(
@@ -482,6 +485,27 @@ class HueStudioOptionsFlow(OptionsFlow):
             ] = AreaSelector(AreaSelectorConfig())
         return self.async_show_form(
             step_id="groups", data_schema=vol.Schema(fields), errors=errors
+        )
+
+    # ---- rooms follow areas ----
+
+    async def async_step_alignment(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Whether the bridge's rooms follow HA areas automatically."""
+        if user_input is not None:
+            self._opts[CONF_AUTO_ALIGN] = user_input[CONF_AUTO_ALIGN]
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="alignment",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_AUTO_ALIGN,
+                        default=self._opts.get(CONF_AUTO_ALIGN, False),
+                    ): BooleanSelector()
+                }
+            ),
         )
 
     # ---- sensors per room ----

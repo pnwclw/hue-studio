@@ -352,6 +352,94 @@ def palette_feature(
     )
 
 
+# ---------- complete: actions for lights that joined the scene's room ----------
+
+
+def completed_actions(
+    bridge: HueBridgeV2, scene: Scene, new_lights: Sequence[Light]
+) -> list[Action]:
+    """The scene's actions plus one for each new light; existing ones stay as they are.
+
+    A scene with a palette spreads it on over the new lights (as "Reset scene" would
+    for them); otherwise a new light copies a neighbor: the first light of the same
+    kind (gradient or not), else the first light, adapted to what it can show.
+    """
+    present = [
+        (action, bridge.lights.get(action.target.rid))
+        for action in scene.actions
+        if action.target.rtype == ResourceTypes.LIGHT
+    ]
+    new_actions: list[ActionAction | None] = [None] * len(new_lights)
+    if is_resettable(scene):
+        assert scene.palette is not None
+        spread = spread_palette(
+            scene.palette, [light for _, light in present] + list(new_lights)
+        )
+        new_actions = spread[len(present) :]
+    actions = list(scene.actions)
+    for light, new in zip(new_lights, new_actions, strict=True):
+        if new is None:
+            neighbor = _neighbor_action(present, light)
+            new = (
+                adapt_action(neighbor, light)
+                if neighbor is not None
+                else ActionAction(on=OnFeature(on=light.on.on))
+            )
+        actions.append(Action(target=_light_ref(light), action=new))
+    return actions
+
+
+def _neighbor_action(
+    present: list[tuple[Action, Light | None]], light: Light
+) -> ActionAction | None:
+    def gradient(other: Light | None) -> bool:
+        return bool(other and other.gradient and other.gradient.points_capable >= 2)
+
+    same = next(
+        (a for a, other in present if other and gradient(other) == gradient(light)),
+        None,
+    )
+    if same is not None:
+        return same.action
+    return present[0][0].action if present else None
+
+
+def adapt_action(action: ActionAction, light: Light) -> ActionAction:
+    """A copy of another light's action that this light can show."""
+    new = ActionAction(on=OnFeature(on=action.on.on))
+    if action.dimming is not None and light.dimming is not None:
+        new.dimming = DimmingFeatureBase(brightness=action.dimming.brightness)
+    effects = action.effects_v2
+    if effects is not None and effects.action.effect in supported_effects(light):
+        new.effects_v2 = effects
+        return new
+    if action.gradient is not None and action.gradient.points:
+        gradient = light.gradient
+        if gradient is not None and gradient.points_capable >= 2:
+            new.gradient = GradientFeatureBase(
+                points=action.gradient.points[: gradient.points_capable],
+                mode=action.gradient.mode
+                if action.gradient.mode in gradient.mode_values
+                else None,
+            )
+        elif light.color is not None:
+            new.color = _xy(action.gradient.points[0].color)
+    elif action.color is not None and light.color is not None:
+        new.color = _xy(action.color)
+    elif (
+        action.color_temperature is not None
+        and action.color_temperature.mirek
+        and light.color_temperature is not None
+    ):
+        schema = light.color_temperature.mirek_schema
+        mirek = min(
+            schema.mirek_maximum,
+            max(schema.mirek_minimum, action.color_temperature.mirek),
+        )
+        new.color_temperature = ColorTemperatureFeatureBase(mirek=mirek)
+    return new
+
+
 # ---------- create / delete scenes in a Hue room or zone ----------
 
 
