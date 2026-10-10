@@ -17,6 +17,14 @@
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
+        "description": "Sparuj urządzenie z Hue Studio albo korzystaj z niego przez integrację Sync Box, w której już jest. Jedno urządzenie działa tylko w jeden sposób.",
+        "menu_options": {
+          "sync_box_pair": "Sparuj bezpośrednio z Hue Studio",
+          "sync_box_integration": "Użyj integracji Sync Box"
+        }
+      },
+      "sync_box_pair": {
+        "title": "Hue Play HDMI Sync Box",
         "description": "Podaj adres Sync Box. Potem przytrzymasz jego przycisk, aby sparować go z Hue Studio.",
         "data": {
           "host": "Host"
@@ -24,6 +32,17 @@
         "data_description": {
           "host": "Adres IP lub nazwa hosta Sync Box w Twojej sieci."
         }
+      },
+      "sync_box_integration": {
+        "title": "Użyj integracji Sync Box",
+        "description": "Hue Studio korzysta z encji i usługi integracji Sync Box dla tego urządzenia: nic nie trzeba parować, a jej encje pozostają bez zmian.",
+        "data": {
+          "sync_entry_id": "Sync Box"
+        }
+      },
+      "sync_box_use_integration": {
+        "title": "{name}",
+        "description": "{name} jest już skonfigurowany w integracji Sync Box ({entry}). Hue Studio skorzysta z niego przez tę integrację, zamiast parować go drugi raz."
       },
       "sync_box_confirm": {
         "title": "{name}",
@@ -43,7 +62,8 @@
       "bridge_not_found": "Wybrany mostek Hue nie jest już dostępny.",
       "no_bridges": "Nie skonfigurowano mostka Philips Hue z API v2. Najpierw skonfiguruj integrację Philips Hue.",
       "not_sync_box": "To urządzenie nie jest Sync Box.",
-      "reauth_successful": "Sync Box został ponownie sparowany."
+      "reauth_successful": "Sync Box został ponownie sparowany.",
+      "sync_box_not_found": "Wybrany Sync Box nie jest już dostępny."
     },
     "progress": {
       "press_button": "Przytrzymaj przycisk na {name} przez ok. 3 sekundy, aż dioda zamiga na zielono."
@@ -114,6 +134,15 @@
     },
     "lights_syncing": {
       "message": "{entity_id} są teraz synchronizowane z obszarem rozrywki."
+    },
+    "sync_box_entry_missing": {
+      "message": "Wpis integracji Sync Box używany przez Hue Studio już nie istnieje. Usuń i dodaj ponownie urządzenie w Hue Studio."
+    },
+    "sync_box_entry_not_loaded": {
+      "message": "Integracja Sync Box ({name}) nie jest jeszcze załadowana."
+    },
+    "sync_box_integration_unavailable": {
+      "message": "Integracja Sync Box nie może teraz sterować {name}."
     }
   },
   "services": {

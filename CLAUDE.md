@@ -62,13 +62,19 @@ touching anything outside this repository.
      Hue light (`hass.entities[id].platform === "hue"`), open our own sheet, otherwise let
      the event through untouched;
    - **cards** for regular dashboards.
-4. **Hue Play HDMI Sync Box**: a second kind of config entry (`kind: sync_box`), paired
-   with the box's button (our own registration — never reuse another integration's
-   token: it revokes it when removed). Driven by `aiohuesyncbox` (our one requirement,
-   pinned; extend on its models/controllers, not raw JSON), polled; entertainment areas
-   are matched with the bridge to know which lights sync. Entity ids and option values
-   stay compatible with the HACS `huesyncbox` integration (which must not be installed
-   next to us: both pin aiohuesyncbox).
+4. **Hue Play HDMI Sync Box**, two kinds of config entries, keyed by the box id so one box
+   is only ever set up one way:
+   - `kind: sync_box` — paired with the box's button (our own registration — never reuse
+     another integration's token: it revokes it when removed). Driven by `aiohuesyncbox`
+     (extend on its models/controllers, not raw JSON), polled; own entities whose ids and
+     option values stay compatible with the HACS `huesyncbox` integration.
+   - `kind: sync_box_link` — the box stays with HACS `huesyncbox`; we use only its public
+     side (its entities by unique id `<key>_<box id>`, its `set_sync_state` service),
+     never its internals — the same rule as for `hue`. Areas are matched with the bridge
+     by name. A box that `huesyncbox` has is offered as a link instead of being paired.
+   Both feed the same `hue_studio/sync/subscribe` payload and `hue_studio.set_sync`, so
+   the panel does not know the difference; entertainment areas are matched with the
+   bridge to know which lights sync.
 5. Later (not in the first iteration): a global "Liquid Glass" footer instead of the
    sidebar, with the `/hue` panel as one of its tabs.
 
@@ -93,14 +99,15 @@ touching anything outside this repository.
   that depends on them lives in one module and is re-checked after every HA update.
 - **Keep the native integration healthy.** No `requirements` of our own that could pin
   aiohue to a version different from the one the native `hue` ships with; we rely on the
-  `hue` dependency to install it. The only requirement is `aiohuesyncbox` (pinned in
-  `manifest.json` and the dev group of `pyproject.toml`; bump both together).
+  `hue` dependency to install it. The only requirement is `aiohuesyncbox`, as a range in
+  `manifest.json` (`>=0.1.6,<0.2`) so it can share one copy with HACS `huesyncbox`,
+  which pins its own version; the dev group of `pyproject.toml` pins the version we test.
 
 ## Conventions
 
 - **Code style follows Home Assistant core:** `async`, full type hints,
   `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: pick an
-  existing `hue` entry, or pair a Sync Box). Ruff with HA-like settings (`pyproject.toml`).
+  existing `hue` entry, or add a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
 - **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
   1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
 - **Frontend: TypeScript + Lit, bundled with esbuild** (`npm run build`). We bundle our own
@@ -165,9 +172,10 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
+  sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
-  config_flow.py                setup (menu: pick a `hue` entry, or pair a Sync Box) + options: Hue room/zone -> HA area,
+  config_flow.py                setup (menu: pick a `hue` entry; Sync Box: pair or use `huesyncbox`) + options: Hue room/zone -> HA area,
                                 motion/temperature sensors per room (Roborock-style menu)
   options.py                    option helpers; unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands

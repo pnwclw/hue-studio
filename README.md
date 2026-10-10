@@ -38,26 +38,40 @@ streams to them (Sync Box, PC or TV sync): the stream would overwrite them anywa
 
 ## Hue Play HDMI Sync Box
 
-Hue Studio talks to the Sync Box directly (local API via
-[aiohuesyncbox](https://github.com/mvdwetering/aiohuesyncbox)) and pairs with its
-button, so it replaces a separate Sync Box integration (do not run both: they would
-require the library side by side):
+Two ways to use a Sync Box, chosen when you add it (one box is only ever set up one
+way):
 
-- **Entities**: power and light sync switches; sync mode, intensity, HDMI input,
-  entertainment area and LED selects; brightness; HDMI port, content, bridge
-  connection and Wi-Fi sensors. Entity ids and option values match the popular HACS
-  Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
-  with your input names, …), so automations keep working after switching over:
-  remove the old integration first, then add the box to Hue Studio.
+1. **Pair directly** — Hue Studio talks to the box itself (local API via
+   [aiohuesyncbox](https://github.com/mvdwetering/aiohuesyncbox)) and pairs with its
+   button. It brings its own entities: power and light sync switches; sync mode,
+   intensity, HDMI input, entertainment area and LED selects; brightness; HDMI port,
+   content, bridge connection and Wi-Fi sensors. Entity ids and option values match the
+   HACS Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
+   with your input names, …), so automations keep working when you switch over: remove
+   the old integration first, then add the box to Hue Studio.
+2. **Use the Sync Box integration** — keep the box in the HACS
+   [Hue Sync Box integration](https://github.com/mvdwetering/huesyncbox) and let Hue
+   Studio use it: nothing to pair and no entities of Hue Studio's own; it reads that
+   integration's entities and controls the box with its `huesyncbox.set_sync_state`
+   service. Entertainment areas are matched with the bridge by name, so renaming one in
+   the Hue app only takes effect once the integration picks it up. When the integration
+   already has a box you discover or try to pair, Hue Studio offers this mode instead.
+
+Either way you get:
+
 - **Panel**: a Sync tab like in the Hue app, a Sync card in rooms whose lights the box
   syncs, and no scenes on those lights while it syncs.
+- **`hue_studio.set_sync`**: one service for both modes (target any entity of the box).
 - **Bridge link**: the box's entertainment areas are matched with the bridge, so Hue
-  Studio knows which lights are synced; when streaming starts or stops the bridge
-  pushes it and the box state refreshes at once (otherwise it is polled every 3 s).
+  Studio knows which lights are synced, and when streaming starts or stops the bridge
+  pushes it at once.
+
+Both Hue Studio and the Sync Box integration require aiohuesyncbox; Hue Studio accepts
+any 0.1.x release from 0.1.6 on, so the two share one copy.
 
 Add it under **Settings → Devices & services → Add integration → Hue Studio → Hue
-Play HDMI Sync Box** (or accept the discovered device), then hold the button on the box
-for about 3 seconds.
+Play HDMI Sync Box** (or accept the discovered device). Pairing directly asks you to hold
+the button on the box for about 3 seconds.
 
 ## Requirements
 

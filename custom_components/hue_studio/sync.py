@@ -13,10 +13,13 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import timedelta
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from aiohue.v2.models.entertainment_configuration import EntertainmentStatus
+from aiohue.v2.models.entertainment_configuration import (
+    EntertainmentConfiguration,
+    EntertainmentStatus,
+)
 from aiohuesyncbox import (
     AiohuesyncboxException,
     ExecutionMode,
@@ -29,7 +32,7 @@ from aiohuesyncbox import (
     Unauthorized,
     VideoMode,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -40,6 +43,7 @@ from .const import (
     DOMAIN,
     HUE_DOMAIN,
     KIND_SYNC_BOX,
+    KIND_SYNC_BOX_LINK,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
 from .lights import LIGHT_DOMAIN, async_bridges
@@ -202,6 +206,10 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         """Interpreted state."""
         return SyncState.of(self.api)
 
+    def panel_info(self) -> dict[str, Any]:
+        """The payload of hue_studio/sync/subscribe for this box."""
+        return sync_box_info(self.hass, self)
+
     async def async_command(self, command: Awaitable[None]) -> None:
         """Run a command of the library on the box, then read the state back."""
         try:
@@ -240,15 +248,27 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         return {"video": VideoMode(intensity=level, background_lighting=lighting)}
 
 
+class SyncBoxSource(Protocol):
+    """A Sync Box as the panel and `set_sync` see it, however it is connected."""
+
+    def async_add_listener(self, update_callback: CALLBACK_TYPE) -> CALLBACK_TYPE:
+        """Call `update_callback` whenever the box state may have changed."""
+
+    def panel_info(self) -> dict[str, Any]:
+        """The payload of hue_studio/sync/subscribe for this box."""
+
+
 @callback
-def async_sync_coordinators(hass: HomeAssistant) -> dict[str, SyncBoxCoordinator]:
-    """Coordinators of loaded Sync Box entries, by entry id."""
-    return {
-        entry.entry_id: entry.runtime_data.sync
-        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
-        if entry.data.get(CONF_KIND) == KIND_SYNC_BOX
-        and entry.runtime_data.sync is not None
-    }
+def async_sync_boxes(hass: HomeAssistant) -> dict[str, SyncBoxSource]:
+    """Loaded Sync Boxes (paired directly or used through huesyncbox), by entry id."""
+    boxes: dict[str, SyncBoxSource] = {}
+    for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        data = entry.runtime_data
+        if entry.data.get(CONF_KIND) == KIND_SYNC_BOX and data.sync is not None:
+            boxes[entry.entry_id] = data.sync
+        elif entry.data.get(CONF_KIND) == KIND_SYNC_BOX_LINK and data.link is not None:
+            boxes[entry.entry_id] = data.link
+    return boxes
 
 
 @callback
@@ -267,23 +287,43 @@ def async_track_entertainment(
 
 
 @callback
-def async_area_lights(hass: HomeAssistant, group_id: str) -> list[str]:
-    """Hue light entities of an entertainment area, from the bridge."""
-    registry = er.async_get(hass)
+def async_entertainment_area(
+    hass: HomeAssistant, *, area_id: str | None = None, name: str | None = None
+) -> EntertainmentConfiguration | None:
+    """The bridge's entertainment configuration with this id (or v1 id) or name."""
     for bridge in async_bridges(hass).values():
         for config in bridge.config.entertainment_configuration:
-            if group_id not in (config.id, (config.id_v1 or "").split("/")[-1]):
-                continue
-            return [
-                entity_id
-                for service in config.light_services or []
-                if (
-                    entity_id := registry.async_get_entity_id(
-                        LIGHT_DOMAIN, HUE_DOMAIN, service.rid
-                    )
-                )
-            ]
-    return []
+            ids = (config.id, (config.id_v1 or "").split("/")[-1])
+            if area_id is not None and area_id in ids:
+                return config
+            if name is not None and config.metadata.name == name:
+                return config
+    return None
+
+
+@callback
+def async_config_lights(
+    hass: HomeAssistant, config: EntertainmentConfiguration | None
+) -> list[str]:
+    """Hue light entities of an entertainment configuration."""
+    if config is None:
+        return []
+    registry = er.async_get(hass)
+    return [
+        entity_id
+        for service in config.light_services or []
+        if (
+            entity_id := registry.async_get_entity_id(
+                LIGHT_DOMAIN, HUE_DOMAIN, service.rid
+            )
+        )
+    ]
+
+
+@callback
+def async_area_lights(hass: HomeAssistant, group_id: str) -> list[str]:
+    """Hue light entities of an entertainment area, from the bridge."""
+    return async_config_lights(hass, async_entertainment_area(hass, area_id=group_id))
 
 
 @callback

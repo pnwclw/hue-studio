@@ -17,6 +17,14 @@
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
+        "description": "Pair the box with Hue Studio, or use it through the Sync Box integration that already has it. One box is used one way only.",
+        "menu_options": {
+          "sync_box_pair": "Pair directly with Hue Studio",
+          "sync_box_integration": "Use the Sync Box integration"
+        }
+      },
+      "sync_box_pair": {
+        "title": "Hue Play HDMI Sync Box",
         "description": "Enter the address of the Sync Box. You will then hold its button to pair it with Hue Studio.",
         "data": {
           "host": "Host"
@@ -24,6 +32,17 @@
         "data_description": {
           "host": "IP address or host name of the Sync Box in your network."
         }
+      },
+      "sync_box_integration": {
+        "title": "Use the Sync Box integration",
+        "description": "Hue Studio uses the entities and service of the Sync Box integration for this box: nothing to pair, and its entities stay as they are.",
+        "data": {
+          "sync_entry_id": "Sync Box"
+        }
+      },
+      "sync_box_use_integration": {
+        "title": "{name}",
+        "description": "{name} is already set up in the Sync Box integration ({entry}). Hue Studio will use it through that integration instead of pairing it a second time."
       },
       "sync_box_confirm": {
         "title": "{name}",
@@ -43,7 +62,8 @@
       "bridge_not_found": "The selected Hue bridge is no longer available.",
       "no_bridges": "No Philips Hue bridge with API v2 is configured. Set up the Philips Hue integration first.",
       "not_sync_box": "This device is not a Sync Box.",
-      "reauth_successful": "The Sync Box is paired again."
+      "reauth_successful": "The Sync Box is paired again.",
+      "sync_box_not_found": "The selected Sync Box is no longer available."
     },
     "progress": {
       "press_button": "Hold the button on {name} for about 3 seconds, until the LED blinks green."
@@ -114,6 +134,15 @@
     },
     "lights_syncing": {
       "message": "{entity_id} are syncing with an entertainment area right now."
+    },
+    "sync_box_entry_missing": {
+      "message": "The Sync Box integration entry used by Hue Studio no longer exists. Remove and re-add the box in Hue Studio."
+    },
+    "sync_box_entry_not_loaded": {
+      "message": "The Sync Box integration ({name}) is not loaded yet."
+    },
+    "sync_box_integration_unavailable": {
+      "message": "The Sync Box integration cannot control {name} right now."
     }
   },
   "services": {

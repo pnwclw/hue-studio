@@ -39,7 +39,13 @@ from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
 from .adaptive import async_mark_manual
-from .const import CONF_KIND, DOMAIN, KIND_SYNC_BOX
+from .const import (
+    CONF_KIND,
+    CONF_SYNC_ENTRY_ID,
+    DOMAIN,
+    KIND_SYNC_BOX,
+    KIND_SYNC_BOX_LINK,
+)
 from .gallery import async_get_gallery_scene
 from .lights import NOT_EFFECTS, HueLight, async_resolve_lights, supported_effects
 from .scenes import (
@@ -61,6 +67,7 @@ from .sync import (
     inputs,
     pct_to_api,
 )
+from .sync_link import SyncBoxLink
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -281,8 +288,11 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
     async def set_sync(call: ServiceCall) -> None:
         """Change a Sync Box in one command (power, sync, mode, input, …)."""
-        for coordinator in await _async_target_boxes(hass, call):
-            await coordinator.async_set_state(**_sync_changes(coordinator, call.data))
+        for box in await _async_target_boxes(hass, call):
+            if isinstance(box, SyncBoxLink):
+                await box.async_set_sync(dict(call.data))
+            else:
+                await box.async_set_state(**_sync_changes(box, call.data))
 
     hass.services.async_register(
         DOMAIN, SERVICE_SET_SYNC, set_sync, schema=SET_SYNC_SCHEMA
@@ -339,13 +349,26 @@ async def _async_target_lights(
 
 async def _async_target_boxes(
     hass: HomeAssistant, call: ServiceCall
-) -> list[SyncBoxCoordinator]:
-    """Sync Boxes owning any of the targeted entities."""
+) -> list[SyncBoxCoordinator | SyncBoxLink]:
+    """Sync Boxes owning any of the targeted entities.
+
+    An entity of a box paired directly is ours; one of the `huesyncbox` integration
+    counts when a Hue Studio entry uses that box.
+    """
     registry = er.async_get(hass)
-    boxes: dict[str, SyncBoxCoordinator] = {}
+    links = {
+        entry.data[CONF_SYNC_ENTRY_ID]: entry.runtime_data.link
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        if entry.data.get(CONF_KIND) == KIND_SYNC_BOX_LINK
+        and entry.runtime_data.link is not None
+    }
+    boxes: dict[str, SyncBoxCoordinator | SyncBoxLink] = {}
     for entity_id in sorted(await async_extract_entity_ids(call)):
         entry_id = (entry := registry.async_get(entity_id)) and entry.config_entry_id
         config_entry = hass.config_entries.async_get_entry(entry_id or "")
+        if config_entry is not None and config_entry.entry_id in links:
+            boxes[config_entry.entry_id] = links[config_entry.entry_id]
+            continue
         if (
             config_entry is None
             or config_entry.domain != DOMAIN

@@ -228,7 +228,7 @@ async def test_pair_by_address(hass: HomeAssistant, register: FakeBox) -> None:
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"next_step_id": "sync_box"}
     )
-    assert result["step_id"] == "sync_box"
+    assert result["step_id"] == "sync_box_pair"
     with patch(
         "custom_components.hue_studio.config_flow.async_get_box_id",
         return_value=(BOX_ID, "Living room box"),

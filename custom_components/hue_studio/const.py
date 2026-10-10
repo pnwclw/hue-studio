@@ -37,3 +37,9 @@ CONF_REGISTRATION_ID: Final = "registration_id"
 
 # Bridge event: an entertainment area started or stopped streaming.
 SIGNAL_ENTERTAINMENT_UPDATED: Final = "hue_studio_entertainment_updated"
+
+# A Sync Box used through the HACS `huesyncbox` integration instead of being paired
+# directly: no entities or connection of our own, its entities and service are used.
+KIND_SYNC_BOX_LINK: Final = "sync_box_link"
+CONF_SYNC_ENTRY_ID: Final = "sync_entry_id"
+SYNC_BOX_INTEGRATION: Final = "huesyncbox"

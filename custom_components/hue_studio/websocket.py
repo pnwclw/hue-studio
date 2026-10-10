@@ -24,7 +24,7 @@ from .lights import (
 )
 from .options import async_frontend_config
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
-from .sync import async_sync_coordinators, sync_box_info
+from .sync import async_sync_boxes
 
 
 @callback
@@ -181,24 +181,19 @@ def ws_subscribe_sync(
     Event payload: {"boxes": {config entry id: info}}, always complete (a box is
     small). Boxes set up later appear after the panel is reopened.
     """
-    coordinators = async_sync_coordinators(hass)
+    boxes = async_sync_boxes(hass)
     last: dict[str, Any] = {}
 
     @callback
     def send() -> None:
-        boxes = {
-            entry_id: sync_box_info(hass, coordinator)
-            for entry_id, coordinator in coordinators.items()
-        }
-        if boxes == last.get("boxes"):
+        info = {entry_id: box.panel_info() for entry_id, box in boxes.items()}
+        if info == last.get("boxes"):
             return
-        last["boxes"] = boxes
-        connection.send_message(
-            websocket_api.event_message(msg["id"], {"boxes": boxes})
-        )
+        last["boxes"] = info
+        connection.send_message(websocket_api.event_message(msg["id"], {"boxes": info}))
 
     unsubscribers: list[Callable[[], None]] = [
-        coordinator.async_add_listener(send) for coordinator in coordinators.values()
+        box.async_add_listener(send) for box in boxes.values()
     ]
     # Area lights and streaming flags come from the bridge.
     unsubscribers.append(

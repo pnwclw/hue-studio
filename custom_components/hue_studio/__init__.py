@@ -1,7 +1,8 @@
 """Hue Studio: Hue-app-style light control on top of the native Hue integration.
 
-Two kinds of config entries: a Hue bridge (borrowed from the native `hue` entry) and a
-Hue Play HDMI Sync Box (paired directly, with entities of its own).
+Kinds of config entries: a Hue bridge (borrowed from the native `hue` entry) and a Hue
+Play HDMI Sync Box — paired directly (with entities of its own), or used through the
+HACS `huesyncbox` integration (its entities and service, nothing of our own).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from aiohue import HueBridgeV2, LinkButtonNotPressed, Unauthorized
 from aiohue.errors import BridgeBusy
 from aiohue.v2.controllers.events import EventType
 from aiohuesyncbox import HueSyncBox, RequestError, Unauthorized as SyncBoxUnauthorized
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
@@ -32,15 +33,19 @@ from .const import (
     CONF_HUE_ENTRY_ID,
     CONF_KIND,
     CONF_REGISTRATION_ID,
+    CONF_SYNC_ENTRY_ID,
     DOMAIN,
     HUE_CONF_API_KEY,
     KIND_SYNC_BOX,
+    KIND_SYNC_BOX_LINK,
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
+    SYNC_BOX_INTEGRATION,
 )
 from .panel import async_register_panel, async_unregister_panel
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
+from .sync_link import SyncBoxLink
 from .websocket import async_setup_websocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,14 +68,20 @@ class HueStudioData:
 
     bridge: HueBridgeV2 | None = None
     sync: SyncBoxCoordinator | None = None
+    link: SyncBoxLink | None = None
 
 
 type HueStudioConfigEntry = ConfigEntry[HueStudioData]
 
 
 def is_sync_box(entry: ConfigEntry) -> bool:
-    """Whether the entry is a Sync Box (else a Hue bridge)."""
+    """Whether the entry is a Sync Box paired directly."""
     return entry.data.get(CONF_KIND) == KIND_SYNC_BOX
+
+
+def is_bridge(entry: ConfigEntry) -> bool:
+    """Whether the entry is a Hue bridge (the original kind, without `kind`)."""
+    return CONF_KIND not in entry.data
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -84,6 +95,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) ->
     """Set up a bridge or a Sync Box."""
     if is_sync_box(entry):
         return await _async_setup_sync_box(hass, entry)
+    if entry.data.get(CONF_KIND) == KIND_SYNC_BOX_LINK:
+        return await _async_setup_sync_box_link(hass, entry)
     return await _async_setup_bridge(hass, entry)
 
 
@@ -164,6 +177,26 @@ async def _async_setup_sync_box(
     return True
 
 
+async def _async_setup_sync_box_link(
+    hass: HomeAssistant, entry: HueStudioConfigEntry
+) -> bool:
+    """Use a box of the `huesyncbox` integration (its entry must be loaded)."""
+    sync_entry = hass.config_entries.async_get_entry(entry.data[CONF_SYNC_ENTRY_ID])
+    if sync_entry is None or sync_entry.domain != SYNC_BOX_INTEGRATION:
+        raise ConfigEntryError(
+            translation_domain=DOMAIN, translation_key="sync_box_entry_missing"
+        )
+    if sync_entry.state is not ConfigEntryState.LOADED:
+        # Set up later than us, or failing itself: try again later.
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="sync_box_entry_not_loaded",
+            translation_placeholders={"name": sync_entry.title},
+        )
+    entry.runtime_data = HueStudioData(link=SyncBoxLink(hass, sync_entry))
+    return True
+
+
 async def _async_options_updated(
     hass: HomeAssistant, entry: HueStudioConfigEntry
 ) -> None:
@@ -180,10 +213,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -
         return await hass.config_entries.async_unload_platforms(
             entry, SYNC_BOX_PLATFORMS
         )
+    if not is_bridge(entry):
+        return True
     if (bridge := entry.runtime_data.bridge) is not None:
         await bridge.close()
     if not any(
-        other.entry_id != entry.entry_id and not is_sync_box(other)
+        other.entry_id != entry.entry_id and is_bridge(other)
         for other in hass.config_entries.async_loaded_entries(DOMAIN)
     ):
         async_unregister_panel(hass)

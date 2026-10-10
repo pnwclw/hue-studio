@@ -4,7 +4,9 @@ A Hue bridge: pick one of the existing native `hue` config entries. Host and app
 are read from that entry, so no second pairing with the bridge button is needed.
 
 A Hue Play HDMI Sync Box: found by zeroconf or entered by address, then paired by
-holding its button (Hue Studio gets a registration of its own on the box).
+holding its button (Hue Studio gets a registration of its own on the box) — or, when
+the HACS `huesyncbox` integration has the box, used through that integration. One box
+is only ever set up one way: both kinds of entries are keyed by the box id.
 """
 
 from __future__ import annotations
@@ -45,6 +47,7 @@ from .const import (
     CONF_MOTION,
     CONF_REGISTRATION_ID,
     CONF_ROOMS,
+    CONF_SYNC_ENTRY_ID,
     CONF_TEMPERATURE,
     DOMAIN,
     GROUP_AUTO,
@@ -52,9 +55,11 @@ from .const import (
     HUE_CONF_API_VERSION,
     HUE_DOMAIN,
     KIND_SYNC_BOX,
+    KIND_SYNC_BOX_LINK,
 )
 from .options import async_hue_groups, async_light_areas
 from .sync import SyncBoxNotFound, async_get_box_id
+from .sync_link import async_sync_box_entries, async_sync_box_entry_for
 
 CONF_GROUP = "group"
 CONF_TARGET = "target"
@@ -84,12 +89,13 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
         self._box_name = ""
         self._link_task: asyncio.Task[tuple[str, str]] | None = None
         self._credentials: tuple[str, str] | None = None
+        self._sync_entry: ConfigEntry | None = None
 
     @classmethod
     @callback
     def async_supports_options_flow(cls, config_entry: ConfigEntry) -> bool:
         """Only bridges have options (room mapping and sensors)."""
-        return config_entry.data.get(CONF_KIND) != KIND_SYNC_BOX
+        return CONF_KIND not in config_entry.data
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -149,6 +155,76 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_sync_box(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Pair directly, or use a box the Sync Box integration already has."""
+        if not async_sync_box_entries(self.hass):
+            return await self.async_step_sync_box_pair()
+        return self.async_show_menu(
+            step_id="sync_box",
+            menu_options=["sync_box_pair", "sync_box_integration"],
+        )
+
+    async def async_step_sync_box_integration(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pick a box of the `huesyncbox` integration; nothing to pair."""
+        configured = {uid.upper() for uid in self._async_current_ids() if uid}
+        available = {
+            entry.entry_id: entry
+            for entry in async_sync_box_entries(self.hass)
+            if (entry.unique_id or "").upper() not in configured
+        }
+        if not available:
+            return self.async_abort(reason="already_configured")
+        if user_input is not None:
+            self._sync_entry = available.get(user_input[CONF_SYNC_ENTRY_ID])
+            if self._sync_entry is None:
+                return self.async_abort(reason="sync_box_not_found")
+            return await self._async_create_link()
+        options = [
+            SelectOptionDict(value=entry_id, label=entry.title)
+            for entry_id, entry in available.items()
+        ]
+        return self.async_show_form(
+            step_id="sync_box_integration",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SYNC_ENTRY_ID, default=options[0]["value"]
+                    ): SelectSelector(SelectSelectorConfig(options=options))
+                }
+            ),
+        )
+
+    async def async_step_sync_box_use_integration(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """The box being paired already belongs to the Sync Box integration."""
+        assert self._sync_entry is not None
+        if user_input is not None:
+            return await self._async_create_link()
+        return self.async_show_form(
+            step_id="sync_box_use_integration",
+            description_placeholders={
+                CONF_NAME: self._box_name,
+                "entry": self._sync_entry.title,
+            },
+        )
+
+    async def _async_create_link(self) -> ConfigFlowResult:
+        assert self._sync_entry is not None
+        await self.async_set_unique_id((self._sync_entry.unique_id or "").upper())
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title=self._sync_entry.title,
+            data={
+                CONF_KIND: KIND_SYNC_BOX_LINK,
+                CONF_SYNC_ENTRY_ID: self._sync_entry.entry_id,
+            },
+        )
+
+    async def async_step_sync_box_pair(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Address of the Sync Box."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -162,7 +238,7 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 return await self._async_found_box(host, box_id, name)
         return self.async_show_form(
-            step_id="sync_box",
+            step_id="sync_box_pair",
             data_schema=self.add_suggested_values_to_schema(
                 vol.Schema({vol.Required(CONF_HOST): str}), user_input
             ),
@@ -187,11 +263,26 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
         self, host: str, box_id: str, name: str, *, confirm: bool = False
     ) -> ConfigFlowResult:
         await self.async_set_unique_id(box_id.upper())
+        existing = next(
+            (
+                entry
+                for entry in self._async_current_entries(include_ignore=False)
+                if entry.unique_id == box_id.upper()
+            ),
+            None,
+        )
+        if existing is not None and existing.data.get(CONF_KIND) == KIND_SYNC_BOX_LINK:
+            # Used through the Sync Box integration: that one follows the address.
+            return self.async_abort(reason="already_configured")
         # A known box that moved to another address: just follow it.
         self._abort_if_unique_id_configured(updates={CONF_HOST: host})
         self._host, self._box_id = host, box_id.upper()
         self._box_name = name or "Sync Box"
         self.context["title_placeholders"] = {CONF_NAME: self._box_name}
+        # The Sync Box integration has this box: use it instead of pairing again.
+        if (sync_entry := async_sync_box_entry_for(self.hass, box_id)) is not None:
+            self._sync_entry = sync_entry
+            return await self.async_step_sync_box_use_integration()
         if confirm:
             return await self.async_step_sync_box_confirm()
         return await self.async_step_sync_box_link()
