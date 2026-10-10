@@ -18,6 +18,7 @@ dev = [
     # scripts/build_gallery.py
     "pillow",
     "ruff>=0.13",
+    "aiohuesyncbox==0.1.6",
 ]
 
 [tool.uv]

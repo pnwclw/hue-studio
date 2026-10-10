@@ -14,12 +14,16 @@ from aiohttp import ClientError
 from aiohue import HueBridgeV2, LinkButtonNotPressed, Unauthorized
 from aiohue.errors import BridgeBusy
 from aiohue.v2.controllers.events import EventType
+from aiohuesyncbox import HueSyncBox, RequestError, Unauthorized as SyncBoxUnauthorized
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryError,
+    ConfigEntryNotReady,
+)
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
@@ -37,7 +41,6 @@ from .const import (
 from .panel import async_register_panel, async_unregister_panel
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
-from .syncbox import SyncBox, SyncBoxError, async_ssl_context
 from .websocket import async_setup_websocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,20 +128,37 @@ async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) 
     return True
 
 
+def _sync_box_api(entry: ConfigEntry) -> HueSyncBox:
+    """aiohuesyncbox client for a Sync Box entry (it owns its HTTPS session)."""
+    return HueSyncBox(
+        entry.data[CONF_HOST],
+        entry.data[CONF_BOX_ID],
+        access_token=entry.data[CONF_ACCESS_TOKEN],
+    )
+
+
 async def _async_setup_sync_box(
     hass: HomeAssistant, entry: HueStudioConfigEntry
 ) -> bool:
-    """Start polling the box and add its entities."""
-    box = SyncBox(
-        async_get_clientsession(hass),
-        await async_ssl_context(hass),
-        entry.data[CONF_HOST],
-        entry.data[CONF_BOX_ID],
-        entry.data[CONF_ACCESS_TOKEN],
-    )
-    coordinator = SyncBoxCoordinator(hass, entry, box)
-    await coordinator.async_config_entry_first_refresh()
+    """Read the box once, start polling it and add its entities."""
+    api = _sync_box_api(entry)
+    try:
+        await api.initialize()
+    except SyncBoxUnauthorized as err:
+        await api.close()
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN, translation_key="sync_box_auth_failed"
+        ) from err
+    except RequestError as err:
+        await api.close()
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN,
+            translation_key="sync_box_unreachable",
+            translation_placeholders={"host": entry.data[CONF_HOST]},
+        ) from err
+    coordinator = SyncBoxCoordinator(hass, entry, api)
     entry.runtime_data = HueStudioData(sync=coordinator)
+    entry.async_on_unload(api.close)
     async_track_entertainment(hass, coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, SYNC_BOX_PLATFORMS)
     return True
@@ -174,14 +194,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -
     """Removing a Sync Box also removes our registration on it (best effort)."""
     if not is_sync_box(entry) or CONF_REGISTRATION_ID not in entry.data:
         return
-    box = SyncBox(
-        async_get_clientsession(hass),
-        await async_ssl_context(hass),
-        entry.data[CONF_HOST],
-        entry.data[CONF_BOX_ID],
-        entry.data[CONF_ACCESS_TOKEN],
-    )
     try:
-        await box.unregister(entry.data[CONF_REGISTRATION_ID])
-    except SyncBoxError as err:
+        async with _sync_box_api(entry) as api:
+            await api.unregister(entry.data[CONF_REGISTRATION_ID])
+    except (RequestError, SyncBoxUnauthorized) as err:
         _LOGGER.info("Could not remove the registration from the Sync Box: %s", err)

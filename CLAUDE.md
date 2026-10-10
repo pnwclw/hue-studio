@@ -62,7 +62,14 @@ touching anything outside this repository.
      Hue light (`hass.entities[id].platform === "hue"`), open our own sheet, otherwise let
      the event through untouched;
    - **cards** for regular dashboards.
-4. Later (not in the first iteration): a global "Liquid Glass" footer instead of the
+4. **Hue Play HDMI Sync Box**: a second kind of config entry (`kind: sync_box`), paired
+   with the box's button (our own registration — never reuse another integration's
+   token: it revokes it when removed). Driven by `aiohuesyncbox` (our one requirement,
+   pinned; extend on its models/controllers, not raw JSON), polled; entertainment areas
+   are matched with the bridge to know which lights sync. Entity ids and option values
+   stay compatible with the HACS `huesyncbox` integration (which must not be installed
+   next to us: both pin aiohuesyncbox).
+5. Later (not in the first iteration): a global "Liquid Glass" footer instead of the
    sidebar, with the `/hue` panel as one of its tabs.
 
 ## Rules that must not be broken
@@ -86,13 +93,14 @@ touching anything outside this repository.
   that depends on them lives in one module and is re-checked after every HA update.
 - **Keep the native integration healthy.** No `requirements` of our own that could pin
   aiohue to a version different from the one the native `hue` ships with; we rely on the
-  `hue` dependency to install it.
+  `hue` dependency to install it. The only requirement is `aiohuesyncbox` (pinned in
+  `manifest.json` and the dev group of `pyproject.toml`; bump both together).
 
 ## Conventions
 
 - **Code style follows Home Assistant core:** `async`, full type hints,
-  `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (one step: pick an
-  existing `hue` entry). Ruff with HA-like settings (`pyproject.toml`).
+  `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: pick an
+  existing `hue` entry, or pair a Sync Box). Ruff with HA-like settings (`pyproject.toml`).
 - **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
   1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
 - **Frontend: TypeScript + Lit, bundled with esbuild** (`npm run build`). We bundle our own
@@ -128,8 +136,8 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
             "names": {gallery id: name}, "excluded": [ids], "offsets": {phase: %}}}}
 ```
 
-- `sync` — an entertainment-sync switch (e.g. Hue Sync Box); while it is on, scenes are not
-  applied to those lights.
+- `sync` — legacy: an entertainment-sync switch. Hue Studio no longer needs it: lights
+  that an entertainment area streams to are known from the bridge.
 - Gradient modes: `interpolated_palette`, `random_pixelated`, and others from CLIP v2.
 - A palette reference in `apply` is a palette id, `gallery:<scene id>` or `b64:<json>`.
 - The scene gallery is built from [Hypfer/hass-scene_presets](https://github.com/Hypfer/hass-scene_presets)
@@ -153,9 +161,13 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
   scenes.py                     HA scene entity <-> bridge scene: info, save (capture lights), reset (palette)
-  services.py, services.yaml    apply_palette, set_gradient, set_effect, save_scene, reset_scene, recall_scene
-  websocket.py                  hue_studio/lights|scenes|config/subscribe
-  config_flow.py                setup (pick a `hue` entry) + options: Hue room/zone -> HA area,
+  services.py, services.yaml    apply_palette, set_gradient, set_effect, save_scene, reset_scene, recall_scene,
+                                set_sync
+  websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
+  sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
+  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
+  brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
+  config_flow.py                setup (menu: pick a `hue` entry, or pair a Sync Box) + options: Hue room/zone -> HA area,
                                 motion/temperature sensors per room (Roborock-style menu)
   options.py                    option helpers; unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
@@ -169,7 +181,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
-  views/                        home, room, color (wheel), effects, scene (editor), gallery — one Lit element per screen
+  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync — one Lit element per screen
+  sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
   color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
@@ -179,6 +192,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing)
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
+scripts/build_icon.py           renders brand/ (icon, logo, dark variants)
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
                                 simulated services), no HA needed
 tests/                          pytest + pytest-homeassistant-custom-component

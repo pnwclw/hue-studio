@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from aiohuesyncbox import ExecutionMode
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HueStudioConfigEntry
 from .entity import SyncBoxEntity
-from .sync import MODE_PASSTHROUGH, MODE_POWERSAVE
 
 PARALLEL_UPDATES = 1
 
@@ -31,6 +32,8 @@ async def async_setup_entry(
 class PowerSwitch(SyncBoxEntity, SwitchEntity):
     """On = HDMI passes through (or syncs); off = power save."""
 
+    _platform_domain = Platform.SWITCH
+
     @property
     def is_on(self) -> bool:
         """Whether the box is out of power save."""
@@ -38,15 +41,17 @@ class PowerSwitch(SyncBoxEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Wake up into passthrough (sync stays off until asked)."""
-        await self.coordinator.async_execute({"mode": MODE_PASSTHROUGH})
+        await self.coordinator.async_set_state(mode=ExecutionMode.PASSTHROUGH)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Power save."""
-        await self.coordinator.async_execute({"mode": MODE_POWERSAVE})
+        await self.coordinator.async_set_state(mode=ExecutionMode.POWERSAVE)
 
 
 class SyncSwitch(SyncBoxEntity, SwitchEntity):
     """Light sync in the last used mode."""
+
+    _platform_domain = Platform.SWITCH
 
     @property
     def is_on(self) -> bool:
@@ -55,8 +60,8 @@ class SyncSwitch(SyncBoxEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Start syncing (wakes the box up if needed)."""
-        await self.coordinator.async_execute({"syncActive": True})
+        await self.coordinator.async_set_state(sync_active=True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Stop syncing; the picture keeps passing through."""
-        await self.coordinator.async_execute({"syncActive": False})
+        await self.coordinator.async_set_state(sync_active=False)

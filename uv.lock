@@ -219,6 +219,19 @@ wheels = [
 ]
 
 [[package]]
+name = "aiohuesyncbox"
+version = "0.1.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "mashumaro" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/be/54/ca2d78c038bdc7f360c6317ae59717342daabcd9186b6ba279aa904bc019/aiohuesyncbox-0.1.6.tar.gz", hash = "sha256:6e1d25bde2c7fdb7eb5e9c385e64b096e5234103fedbf5982f1f5e8e0b067835", size = 27733, upload-time = "2026-09-19T22:38:08.364Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/e9/1a01ad2c3fce9793f521eb0cc2280d28b4f8c556fb010dc96edc14d0a46c/aiohuesyncbox-0.1.6-py3-none-any.whl", hash = "sha256:5c1c0e65899071c5cb6835f520636f938cfcd68dc4e6d3fc0fecc13948203928", size = 29925, upload-time = "2026-09-19T22:38:07.179Z" },
+]
+
+[[package]]
 name = "aiooui"
 version = "0.1.11"
 source = { registry = "https://pypi.org/simple" }
@@ -1342,6 +1355,7 @@ source = { virtual = "." }
 [package.dev-dependencies]
 dev = [
     { name = "aiohue" },
+    { name = "aiohuesyncbox" },
     { name = "home-assistant-frontend" },
     { name = "pillow" },
     { name = "pytest-homeassistant-custom-component" },
@@ -1353,6 +1367,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aiohue", specifier = "==4.9.0" },
+    { name = "aiohuesyncbox", specifier = "==0.1.6" },
     { name = "home-assistant-frontend", specifier = "==20260930.2" },
     { name = "pillow" },
     { name = "pytest-homeassistant-custom-component", specifier = "==0.13.371" },

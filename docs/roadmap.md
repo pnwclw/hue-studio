@@ -30,7 +30,8 @@ adds value.
 - Entertainment areas with manually placed lights (x, y, z in -1..1, up to 10 lights).
 
 **Out of scope for us** (Home Assistant's job or hardware-bound): MotionAware, automations /
-lighting schedules, the AI assistant, Sync, Sports Live, doorbell, bridge backup.
+lighting schedules, the AI assistant, Sports Live, doorbell, bridge backup. Sync is in
+scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ## Already in Hue Studio
 
@@ -41,6 +42,9 @@ lighting schedules, the AI assistant, Sync, Sports Live, doorbell, bridge backup
 - WebSocket: `hue_studio/config/subscribe`, `hue_studio/lights/subscribe`,
   `hue_studio/scenes/subscribe`.
 - More-info override with fallback, Adaptive Lighting marking, room/zone mapping options.
+- Hue Play HDMI Sync Box: own pairing and entities (compatible with the HACS Sync Box
+  integration), `set_sync`, `hue_studio/sync/subscribe`, a Sync tab, a Sync card in
+  rooms, scenes locked while syncing; services skip lights that are streaming.
 
 ## To do
 
@@ -50,7 +54,8 @@ lighting schedules, the AI assistant, Sync, Sports Live, doorbell, bridge backup
    human-readable and diffable) and services `capture`, `palette_save`, `palette_delete`.
 2. Import of scenes from the bridge; `gallery:<id>` and `b64:<json>` palette references in
    `apply_palette`.
-3. Honour `sync`: no scenes applied to lights whose entertainment-sync switch is on.
+3. ~~Honour `sync`~~ — done without configuration: lights streaming from an
+   entertainment area are known from the bridge. The legacy `sync` room key can go.
 4. Switch the legacy cards and automations over to Hue Studio services and remove the
    legacy scripts (phase 1 done criterion).
 
