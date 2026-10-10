@@ -164,6 +164,9 @@
     },
     "bad_palette": {
       "message": "Paleta nie jest poprawnym JSON-em w base64 z punktami albo bielą (mirek)."
+    },
+    "one_bridge": {
+      "message": "Wszystkie światła muszą być na tym samym mostku Hue."
     }
   },
   "services": {
@@ -274,6 +277,16 @@
     "delete_scene": {
       "name": "Usuń scenę",
       "description": "Usuwa sceny Hue z mostka (a więc także z aplikacji Hue)."
+    },
+    "create_zone": {
+      "name": "Utwórz strefę",
+      "description": "Tworzy strefę Hue z wybranych świateł (np. wszystkich świateł Hue obszaru), aby obszar miał własne sceny. Zwraca zone_id nowej strefy.",
+      "fields": {
+        "name": {
+          "name": "Nazwa",
+          "description": "Nazwa strefy."
+        }
+      }
     },
     "save_scene": {
       "name": "Zapisz scenę",

@@ -164,6 +164,9 @@
     },
     "bad_palette": {
       "message": "The palette is not valid base64 JSON with points or a white (mirek)."
+    },
+    "one_bridge": {
+      "message": "All lights must be on the same Hue bridge."
     }
   },
   "services": {
@@ -274,6 +277,16 @@
     "delete_scene": {
       "name": "Delete scene",
       "description": "Deletes Hue scenes from the bridge (and so from the Hue app)."
+    },
+    "create_zone": {
+      "name": "Create zone",
+      "description": "Creates a Hue zone of the targeted lights (for example all Hue lights of an area), so the area gets scenes of its own. Returns the new zone_id.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the zone."
+        }
+      }
     },
     "save_scene": {
       "name": "Save scene",

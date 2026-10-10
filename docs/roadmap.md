@@ -38,7 +38,7 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 - Panel: home, room, color wheel, gallery, effects (categories and 1–12 speed as in the Hue
   app), scene editor.
 - Services: `apply_palette`, `set_gradient`, `set_effect`, `create_scene`,
-  `delete_scene`, `save_scene`, `reset_scene`, `recall_scene`.
+  `delete_scene`, `create_zone`, `save_scene`, `reset_scene`, `recall_scene`.
 - WebSocket: `hue_studio/config/subscribe`, `hue_studio/lights/subscribe`,
   `hue_studio/scenes/subscribe`.
 - More-info override with fallback, Adaptive Lighting marking, room/zone mapping options.
@@ -89,8 +89,12 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ### B. Catch up with the Hue app in the panel
 
-1. Palettes screen: list, create from current state, delete.
-2. Shuffle colors for scenes and palettes.
+1. ~~Palettes~~ — done as room scenes on the bridge: "New scene" in a room (what the
+   lights show now), "Save as scene" in the gallery sheet (with the picture), "Delete
+   scene" in the scene editor; a room without a Hue room/zone is offered a new zone
+   (`create_zone`) or the settings.
+2. ~~Shuffle colors~~ — done: on the active scene tile (palette spread anew and kept,
+   like the Hue app) and live in the scene editor.
 3. White mode on the wheel for single lights and groups (verify both).
 4. Gradient mode picker (`interpolated_palette`, `random_pixelated`, …).
 5. Natural Light — built as a subset of auto light (day phases -> color temperature).

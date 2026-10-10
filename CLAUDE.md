@@ -181,7 +181,7 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
   scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
-  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, save_scene, reset_scene, recall_scene,
+  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, save_scene, reset_scene, recall_scene,
                                 set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
   auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,

@@ -208,25 +208,25 @@ export function createHass({ language = "en", onChange }: { language?: string; o
 
   const sceneInfo: Record<string, SceneInfo> = {};
   const sceneListeners = new Set<(msg: unknown) => void>();
-  for (const [group, names] of Object.entries(SCENES)) {
-    for (const name of names) {
-      const id = `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
-      states[id] = { entity_id: id, state: "unknown", attributes: { group_name: GROUPS[group][0], name, friendly_name: `${GROUPS[group][0]} ${name}` } };
-      entities[id] = { platform: "hue" };
-      const { palette = [], mirek } = SCENE_PALETTES[name] ?? {};
-      sceneInfo[id] = {
-        active: id === "scene.office_ocean_dawn" ? "static" : "inactive",
-        dynamic: palette.length > 1,
-        resettable: true,
-        speed: 0.6,
-        auto_dynamic: false,
-        palette,
-        mirek: mirek ? [mirek] : [],
-        lights: GROUPS[group][2].map((m) => `light.${m}`),
-        image: null,
-      };
-    }
-  }
+  /** A bridge scene of a Hue group, as the native integration and our WS API show it. */
+  const addScene = (group: string, name: string, { palette = [], mirek }: { palette?: XY[]; mirek?: number } = {}): string => {
+    const id = `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
+    states[id] = { entity_id: id, state: "unknown", attributes: { group_name: GROUPS[group][0], name, friendly_name: `${GROUPS[group][0]} ${name}` } };
+    entities[id] = { platform: "hue" };
+    sceneInfo[id] = {
+      active: id === "scene.office_ocean_dawn" ? "static" : "inactive",
+      dynamic: palette.length > 1,
+      resettable: palette.length > 0 || !!mirek,
+      speed: 0.6,
+      auto_dynamic: false,
+      palette,
+      mirek: mirek ? [mirek] : [],
+      lights: GROUPS[group][2].map((m) => `light.${m}`),
+      image: null,
+    };
+    return id;
+  };
+  for (const [group, names] of Object.entries(SCENES)) for (const name of names) addScene(group, name, SCENE_PALETTES[name]);
   const pushScenes = (ids: string[]) => sceneListeners.forEach((cb) => cb({ scenes: Object.fromEntries(ids.map((id) => [id, sceneInfo[id]])) }));
   /** Mark a scene active (and the other scenes of its group inactive). */
   const activate = (scene: string, active: string) => {
@@ -327,6 +327,26 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (domain === "hue_studio" && service === "reset_scene") {
         showScene(one, d.shuffle);
         activate(one, "static");
+      }
+      if (domain === "hue_studio" && service === "create_scene") {
+        const group = one.replace("light.", "");
+        const groupName = GROUPS[group][0];
+        if (Object.values(states).some((s) => s.attributes.group_name === groupName && s.attributes.name?.toLowerCase() === d.name!.toLowerCase())) {
+          throw new Error(`There already is a scene named ${d.name} in this room or zone`);
+        }
+        const scene = gallery?.scenes.find((s) => s.id === d.gallery_scene);
+        const now = GROUPS[group][2].map((m) => states[`light.${m}`]._s as Sim).filter((l) => l?.on && l.xy).map((l) => l.xy!);
+        const created = addScene(group, d.name!, scene ? (scene.kind === "white" ? { mirek: scene.mirek } : { palette: scene.points }) : { palette: now });
+        pushScenes([created]);
+      }
+      if (domain === "hue_studio" && service === "delete_scene") {
+        delete states[one];
+        delete entities[one];
+        delete sceneInfo[one];
+      }
+      if (domain === "hue_studio" && service === "create_zone") {
+        const id = d.name!.toLowerCase().replace(/[^a-z]+/g, "_");
+        GROUPS[id] = [d.name!, "zone", ids.map((l) => l.replace("light.", ""))];
       }
       if (domain === "hue_studio" && service === "save_scene") {
         const info = sceneInfo[one];

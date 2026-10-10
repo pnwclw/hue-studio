@@ -1,7 +1,8 @@
 // Scene editor, like the Hue app's "Edit scene": the scene is shown on its lights, which
 // are adjusted live (brightness here, colors on the wheel); "Save" stores what they show
 // now plus the name, dynamic speed and auto-play. "Colors" shuffles the palette over the
-// lights, "Reset scene" rebuilds the scene from its palette.
+// lights, "Reset scene" rebuilds the scene from its palette, "Delete scene" removes it from
+// the bridge (and so from the Hue app).
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -30,8 +31,10 @@ export class SceneView extends StudioView {
 
   @state() private accessor editingName = false;
   @state() private accessor confirmReset = false;
+  @state() private accessor confirmDelete = false;
   private started = false;
   private resetTimer?: ReturnType<typeof setTimeout>;
+  private deleteTimer?: ReturnType<typeof setTimeout>;
 
   private get name(): string {
     const st = this.ctx.hass.states[this.scene];
@@ -66,6 +69,7 @@ export class SceneView extends StudioView {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this.resetTimer);
+    clearTimeout(this.deleteTimer);
   }
 
   protected override render() {
@@ -169,13 +173,16 @@ export class SceneView extends StudioView {
         )}
       </div>
 
-      ${info?.resettable
-        ? html`<div class="center">
-            <button class=${classMap({ pill: true, reset: true, confirm: this.confirmReset })} @click=${() => this.reset()}>
+      <div class="center stack">
+        ${info?.resettable
+          ? html`<button class=${classMap({ pill: true, reset: true, confirm: this.confirmReset })} @click=${() => this.reset()}>
               ${this.confirmReset ? t("scene.reset_confirm") : t("scene.reset")}
-            </button>
-          </div>`
-        : nothing}
+            </button>`
+          : nothing}
+        <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmDelete })} @click=${() => this.deleteScene()}>
+          ${this.confirmDelete ? t("scene.delete_confirm") : t("scene.delete")}
+        </button>
+      </div>
     </div>`;
   }
 
@@ -200,6 +207,24 @@ export class SceneView extends StudioView {
     clearTimeout(this.resetTimer);
     if (await this.ctx.call("hue_studio", "reset_scene", { entity_id: this.scene }, { optimistic: false })) {
       this.ctx.toast(this.ctx.t("scene.reset_done"));
+    }
+  }
+
+  private async deleteScene(): Promise<void> {
+    if (!this.confirmDelete) {
+      this.confirmDelete = true;
+      clearTimeout(this.deleteTimer);
+      this.deleteTimer = setTimeout(() => (this.confirmDelete = false), RESET_CONFIRM_MS);
+      return;
+    }
+    this.confirmDelete = false;
+    clearTimeout(this.deleteTimer);
+    const { ctx } = this;
+    const name = this.name;
+    if (await ctx.call("hue_studio", "delete_scene", { entity_id: this.scene }, { optimistic: false })) {
+      ctx.sceneDraft = null;
+      ctx.toast(ctx.t("scene.deleted", { name }));
+      ctx.go(`/room/${encodeURIComponent(this.key)}`);
     }
   }
 

@@ -1,7 +1,9 @@
-// Room: header with toggle, brightness and Adaptive Lighting; the room's Hue scenes; its lights.
+// Room: header with toggle, brightness and Adaptive Lighting; the room's Hue scenes (plus
+// "New scene": what the lights show now, saved as a scene of the room's Hue room/zone on
+// the bridge, so the Hue app has it too); its lights.
 
 import { html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
@@ -19,6 +21,11 @@ const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 @customElement("hue-studio-room-view")
 export class RoomView extends StudioView {
   @property() accessor key = "";
+
+  /** The "New scene" sheet is open. */
+  @state() private accessor adding = false;
+  @state() private accessor newName = "";
+  @state() private accessor busy = false;
 
   protected override render() {
     const { ctx } = this;
@@ -55,13 +62,78 @@ export class RoomView extends StudioView {
         </div>
       </div>
       ${this.syncCards(g)}
-      ${g.scenes.length
-        ? html`<h2 class="label">${t("room.scenes")}</h2>
-            ${this.syncNote(g)}
-            <div class=${classMap({ grid: true, locked: syncingIn(ctx.boxes, g).length > 0 })}>${g.scenes.map((s) => this.scene(g, s))}</div>`
-        : nothing}
+      <h2 class="label">${t("room.scenes")}</h2>
+      ${this.syncNote(g)}
+      <div class=${classMap({ grid: true, locked: syncingIn(ctx.boxes, g).length > 0 })}>
+        ${g.scenes.map((s) => this.scene(g, s))}
+        <button class="scene add-scene" @click=${() => this.openNew()}>
+          <div class="dot">${icon("plus")}</div>
+          <div class="name">${t("room.new_scene")}</div>
+        </button>
+      </div>
       <h2 class="label">${t("room.lights")}</h2>
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
+    </div>
+    ${this.adding ? this.newSheet(g) : nothing}`;
+  }
+
+  private openNew(): void {
+    this.newName = "";
+    this.adding = true;
+    this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet input")?.focus());
+  }
+
+  /**
+   * "New scene": a name, saved from what the lights show now. Scenes live in a Hue room or
+   * zone; a room (HA area) without one is offered a zone of its lights on the bridge.
+   */
+  private newSheet(g: Group) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const close = () => (this.adding = false);
+    const name = this.newName.trim();
+    const save = async () => {
+      if (!g.group || !name || this.busy) return;
+      this.busy = true;
+      const ok = await ctx.call("hue_studio", "create_scene", { entity_id: g.group, name }, { optimistic: false });
+      this.busy = false;
+      if (ok) {
+        close();
+        ctx.toast(t("room.scene_created", { name }));
+      }
+    };
+    const createZone = async () => {
+      if (this.busy) return;
+      this.busy = true;
+      const ok = await ctx.call("hue_studio", "create_zone", { entity_id: g.lights, name: g.name }, { optimistic: false });
+      this.busy = false;
+      if (ok) ctx.toast(t("room.zone_created", { name: g.name }));
+    };
+    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form" role="dialog" aria-label=${t("room.new_scene")}>
+        <div class="sheet-bar"><div class="grow">${t("room.new_scene")}</div>
+          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+        </div>
+        ${g.group
+          ? html`<div class="form-body">
+                <input
+                  class="field"
+                  maxlength="32"
+                  placeholder=${t("room.new_scene_name")}
+                  aria-label=${t("room.new_scene_name")}
+                  .value=${this.newName}
+                  @input=${(e: InputEvent) => (this.newName = (e.target as HTMLInputElement).value)}
+                  @keydown=${(e: KeyboardEvent) => e.key === "Enter" && save()}
+                />
+                <p class="hint">${t("room.new_scene_hint", { room: friendlyName(ctx.hass, g.group) })}</p>
+              </div>
+              <div class="actions"><button class="pill apply" ?disabled=${!name || this.busy} @click=${save}>${t("scene.save")}</button></div>`
+          : html`<div class="form-body"><p class="hint">${t("room.no_group", { room: g.name })}</p></div>
+              <div class="actions">
+                <button class="pill apply" ?disabled=${this.busy} @click=${createZone}>${t("room.create_zone")}</button>
+                <button class="pill" @click=${() => ctx.openSettings()}>${t("room.mapping")}</button>
+              </div>`}
+      </div>
     </div>`;
   }
 
@@ -150,6 +222,12 @@ export class RoomView extends StudioView {
       e.stopPropagation();
       ctx.go(`/room/${room}/scene/${encodeURIComponent(s.entity_id)}`);
     };
+    // Like the Hue app's "Shuffle colors": the palette spread over the lights anew, kept.
+    const shuffle = async (e: Event) => {
+      e.stopPropagation();
+      const data = { entity_id: s.entity_id, shuffle: true, recall: true };
+      if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
+    };
     return html`<div class=${classMap({ scene: true, ...surface.classes, active })} style=${styleMap(surface.style)} role="button" tabindex="0" @click=${apply}>
       <div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>
       <div class="name">${s.name}</div>
@@ -160,6 +238,9 @@ export class RoomView extends StudioView {
               ? html`<button class="round mini play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>
                   ${icon(playing ? "pause" : "play")}
                 </button>`
+              : nothing}
+            ${info.resettable && (info.palette.length > 1 || info.mirek.length > 1)
+              ? html`<button class="round mini shuffle" aria-label=${t("scene.shuffle_colors")} @click=${shuffle}>${icon("shuffle")}</button>`
               : nothing}
             <button class="round mini edit" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
           </div>`

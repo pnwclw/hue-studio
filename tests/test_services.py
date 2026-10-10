@@ -409,3 +409,21 @@ async def test_apply_palette_area_skips_other_lights(
         blocking=True,
     )
     assert list(_sent(hue_lights)) == ["res-bulb"]
+
+
+async def test_create_zone(hass: HomeAssistant, hue_room: MagicMock) -> None:
+    """A zone of the targeted lights is created on the bridge."""
+    hue_room.request.return_value = [{"rid": "res-zone", "rtype": "zone"}]
+    result = await hass.services.async_call(
+        DOMAIN,
+        "create_zone",
+        {"entity_id": ["light.bulb", "light.strip"], "name": "Kitchen"},
+        blocking=True,
+        return_response=True,
+    )
+    assert result == {"zone_id": "res-zone"}
+    method, path = hue_room.request.call_args.args
+    body = hue_room.request.call_args.kwargs["json"]
+    assert (method, path) == ("post", "clip/v2/resource/zone")
+    assert body["metadata"] == {"name": "Kitchen", "archetype": "other"}
+    assert [c["rid"] for c in body["children"]] == ["res-bulb", "res-strip"]

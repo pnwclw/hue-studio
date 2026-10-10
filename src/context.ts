@@ -152,6 +152,11 @@ export class StudioContext {
     navigate(`${PANEL_PATH}${path}`);
   }
 
+  /** HA's page of the integration (its options hold the room mapping). */
+  openSettings(): void {
+    navigate("/config/integrations/integration/hue_studio");
+  }
+
   /** A throttled command sender that survives re-renders (one per key). */
   sender<A extends unknown[]>(key: string, interval: number, fn: (...args: A) => void): Throttled<A> {
     let s = this.senders.get(key) as Throttled<A> | undefined;

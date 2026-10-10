@@ -1,4 +1,5 @@
-// Scene gallery: categories of tiles, search, a scene sheet that applies it to a room.
+// Scene gallery: categories of tiles, search, a scene sheet that applies it to a room or
+// saves it there as a scene (on the bridge, with the gallery picture, like the Hue app).
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -111,6 +112,14 @@ export class GalleryView extends StudioView {
       const ok = await ctx.call("hue_studio", "apply_palette", { entity_id: target.target, gallery_scene: scene.id });
       if (ok) ctx.toast(t("gallery.applied", { name: target.name }));
     };
+    const save = async () => {
+      close();
+      if (!target?.group) return;
+      const data = { entity_id: target.group, name: scene.name, gallery_scene: scene.id };
+      if (await ctx.call("hue_studio", "create_scene", data, { optimistic: false })) {
+        ctx.toast(t("gallery.saved", { name: target.name }));
+      }
+    };
     return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box" role="dialog" aria-label=${scene.name}>
         <div class="pic" style=${styleMap({ backgroundImage: `url('${thumbUrl(scene.id)}'), ${paletteArt(scene)}` })}>
@@ -120,6 +129,7 @@ export class GalleryView extends StudioView {
         <div class="dots">${paletteColors(scene).map((c) => html`<i style=${styleMap({ background: c })}></i>`)}</div>
         <div class="actions">
           <button class="pill apply" ?disabled=${!target} @click=${apply}>${t("gallery.set_once")}</button>
+          ${target?.group ? html`<button class="pill" @click=${save}>${t("gallery.save")}</button>` : nothing}
           ${target ? html`<div class="target">${t("gallery.target")}: ${target.name}</div>` : nothing}
         </div>
       </div>

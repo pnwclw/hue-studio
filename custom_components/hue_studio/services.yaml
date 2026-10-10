@@ -158,6 +158,18 @@ delete_scene:
       integration: hue
       domain: scene
 
+create_zone:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    name:
+      required: true
+      example: Kitchen
+      selector:
+        text:
+
 save_scene:
   target:
     entity:

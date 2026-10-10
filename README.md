@@ -30,6 +30,7 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
 | `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. |
 | `hue_studio.delete_scene` | Delete Hue scenes from the bridge. |
+| `hue_studio.create_zone` | Create a Hue zone of the targeted lights (e.g. an area's Hue lights), so the area gets scenes of its own. Returns the new `zone_id`. |
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
 | `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |

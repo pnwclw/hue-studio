@@ -254,6 +254,17 @@ export const CSS = `
   .center { display: flex; justify-content: center; margin-top: 28px; }
   .pill.reset { min-width: 180px; height: 40px; border-radius: 20px; text-transform: none; font-size: 15px; letter-spacing: 0; }
   .pill.reset.confirm { background: #c0392b; }
+  .center.stack { flex-direction: column; align-items: center; gap: 12px; }
+  .pill.reset.danger { color: #ff6b5e; }
+  .pill.reset.danger.confirm { color: #fff; }
+  .scene.add-scene { color: var(--text-2); background: transparent; box-shadow: inset 0 0 0 1.5px rgba(120, 120, 128, 0.45); }
+  .scene.add-scene .dot { display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, 0.28); box-shadow: none; }
+  .scene.add-scene .dot svg { width: 26px; height: 26px; fill: currentColor; }
+  .scene-actions .shuffle { margin-left: 6px; }
+  .sheet .form-body { padding: 16px 16px 0; }
+  .sheet .field { width: 100%; box-sizing: border-box; height: 44px; padding: 0 12px; border: none; border-radius: 12px; font: inherit;
+                  font-size: 17px; color: inherit; background: rgba(120, 120, 128, 0.24); outline: none; }
+  .sheet .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
   /* gallery */
   .q { display: block; width: 100%; height: 0; box-sizing: border-box; margin: 0; border: none; border-radius: 18px; padding: 0 16px;

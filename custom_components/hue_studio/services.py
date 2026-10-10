@@ -102,6 +102,7 @@ SERVICE_SET_GRADIENT = "set_gradient"
 SERVICE_SET_EFFECT = "set_effect"
 SERVICE_CREATE_SCENE = "create_scene"
 SERVICE_DELETE_SCENE = "delete_scene"
+SERVICE_CREATE_ZONE = "create_zone"
 SERVICE_SAVE_SCENE = "save_scene"
 SERVICE_RESET_SCENE = "reset_scene"
 SERVICE_RECALL_SCENE = "recall_scene"
@@ -212,6 +213,10 @@ CREATE_SCENE_SCHEMA = cv.make_entity_service_schema(
 )
 
 DELETE_SCENE_SCHEMA = cv.make_entity_service_schema({})
+
+CREATE_ZONE_SCHEMA = cv.make_entity_service_schema(
+    {vol.Required(ATTR_NAME): SCENE_NAME}
+)
 
 SAVE_SCENE_SCHEMA = cv.make_entity_service_schema(
     {
@@ -367,6 +372,36 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     translation_placeholders={"entity_id": scene.entity_id},
                 ) from err
 
+    async def create_zone(call: ServiceCall) -> ServiceResponse:
+        """Create a Hue zone of the targeted lights (e.g. all Hue lights of an area).
+
+        Scenes live in Hue rooms and zones; an area without one gets a zone, which then
+        matches the area automatically (same lights) and shows up in the Hue app.
+        """
+        lights = await _async_target_lights(hass, call, skip_streaming=False)
+        bridges = {id(light.bridge): light.bridge for light in lights}
+        if len(bridges) != 1:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="one_bridge"
+            )
+        bridge = lights[0].bridge
+        body = {
+            "type": "zone",
+            "metadata": {"name": call.data[ATTR_NAME], "archetype": "other"},
+            "children": [
+                {"rid": light.resource.id, "rtype": "light"} for light in lights
+            ],
+        }
+        try:
+            created = await bridge.request("post", "clip/v2/resource/zone", json=body)
+        except (AiohueException, ClientError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"entity_id": lights[0].entity_id},
+            ) from err
+        return {"zone_id": created[0]["rid"] if created else None}
+
     async def save_scene(call: ServiceCall) -> None:
         """Store what the scene's lights show now (plus name/speed/auto-play)."""
         for scene in await _async_target_scenes(hass, call):
@@ -447,6 +482,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
     )
     hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_ZONE,
+        create_zone,
+        schema=CREATE_ZONE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
         DOMAIN, SERVICE_SAVE_SCENE, save_scene, schema=SAVE_SCENE_SCHEMA
     )
     hass.services.async_register(
@@ -458,7 +500,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
 
 
 async def _async_target_lights(
-    hass: HomeAssistant, call: ServiceCall
+    hass: HomeAssistant, call: ServiceCall, *, skip_streaming: bool = True
 ) -> list[HueLight]:
     """Resolve the service target; explicitly listed entities keep their order.
 
@@ -486,7 +528,7 @@ async def _async_target_lights(
             translation_domain=DOMAIN, translation_key="no_lights"
         )
     lights = async_resolve_lights(hass, ordered)
-    if streaming := async_streaming_lights(hass):
+    if skip_streaming and (streaming := async_streaming_lights(hass)):
         skipped = [light.entity_id for light in lights if light.entity_id in streaming]
         if skipped:
             _LOGGER.debug("Skipping lights that are syncing: %s", skipped)
