@@ -136,12 +136,13 @@ presence or time-window logic in the integration, no blueprints). What matters a
 entities that dashboards (Lovelace, Mushroom, Bubble Card) and automations can use
 directly. Per HA area with auto light settings:
 
-1. Selection engine (pure, tested): phase of the day from the sun (with offsets, night
-   from a time), pool by season, weather and holidays, scene of the day (another one per
-   "next scene"), brightness (light sensor, sun elevation, fixed per phase, offsets).
-   Same results as the legacy templates on the same inputs.
-2. Entities, with translations, icons, device classes and an `entity_picture` where it
-   helps cards:
+1. ~~Selection engine~~ — done: `auto_select.py` (pure, tested). Matches the legacy
+   templates on a snapshot of the live inputs. Differences on purpose: a phase without
+   a pool behaves like the phase before it; the light day starts in the morning (no
+   scene change at midnight); the season entity must report winter/spring/summer/autumn
+   (else the month decides).
+2. ~~Entities~~ — done (`auto_entity.py`), with translations, icons, device classes and
+   an `entity_picture` where it helps cards:
    - **light control** (`select`: auto / manual / off): who controls the lights right
      now. Hue Studio sets `manual` when the lights change by anything but auto light
      and back to `auto` once the area's lights are all off; `off` disables auto light
@@ -149,8 +150,9 @@ directly. Per HA area with auto light settings:
    - phase (`sensor`, enum), scene of the day (`sensor`, the gallery picture as
      `entity_picture`), brightness (`sensor`, %), brightness offset of the current
      phase (`number`), next scene (`button`).
-3. Service `apply_auto_light` (area target, transition; does nothing while the area is
-   `manual` or `off` unless `force`), Adaptive Lighting marking.
+3. ~~Service `apply_auto_light`~~ — done (area, transition, `force`, `resume`; through
+   `apply_palette`, so Adaptive Lighting marking and streaming lights are handled).
+   Settings over WebSocket: `hue_studio/auto_light/settings`.
 4. Settings in the panel (Settings tab): phase boundaries, weather / light sensor /
    season source, pools, holidays, exclusions, offsets.
 5. Live switch-over: the legacy template sensors, helpers and the light config shim go;

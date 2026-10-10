@@ -382,3 +382,25 @@ delete_zone:
     entity:
       integration: hue
       domain: light
+
+apply_auto_light:
+  fields:
+    area:
+      required: true
+      selector:
+        area:
+          multiple: true
+    transition:
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: s
+    force:
+      default: false
+      selector:
+        boolean:
+    resume:
+      default: false
+      selector:
+        boolean:

@@ -63,7 +63,7 @@ class BridgeRooms:
 
 
 @callback
-def _light_area(entity: er.RegistryEntry, devices: dr.DeviceRegistry) -> str | None:
+def light_area(entity: er.RegistryEntry, devices: dr.DeviceRegistry) -> str | None:
     """Area of a light entity: its own, else its device's."""
     if entity.area_id is not None:
         return entity.area_id
@@ -132,7 +132,7 @@ def async_bridge_rooms(hass: HomeAssistant) -> list[BridgeRooms]:
                     alignment.Light(
                         light.resource.id,
                         light.resource.owner.rid,
-                        _light_area(entry, devices)
+                        light_area(entry, devices)
                         if (entry := entities.async_get(light.entity_id))
                         else None,
                     )

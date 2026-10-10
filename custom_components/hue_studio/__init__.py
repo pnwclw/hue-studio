@@ -30,6 +30,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
+from .auto_control import async_setup_auto_control
 from .auto_light import async_setup_auto_light
 from .const import (
     CONF_AUTO_ALIGN,
@@ -59,6 +60,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 CONNECT_TIMEOUT = 10
 
+# Auto light entities of the areas live on the (first) bridge entry.
+BRIDGE_PLATFORMS = [Platform.BUTTON, Platform.NUMBER, Platform.SELECT, Platform.SENSOR]
 SYNC_BOX_PLATFORMS = [
     Platform.NUMBER,
     Platform.SELECT,
@@ -94,6 +97,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
     async_setup_websocket(hass)
     await async_setup_auto_light(hass)
+    await async_setup_auto_control(hass)
     return True
 
 
@@ -145,6 +149,7 @@ async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     entry.async_on_unload(_async_track_auto_align(hass, entry))
     await async_register_panel(hass)
+    await hass.config_entries.async_forward_entry_setups(entry, BRIDGE_PLATFORMS)
     return True
 
 
@@ -249,6 +254,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -
         )
     if not is_bridge(entry):
         return True
+    if not await hass.config_entries.async_unload_platforms(entry, BRIDGE_PLATFORMS):
+        return False
     if (bridge := entry.runtime_data.bridge) is not None:
         await bridge.close()
     if not any(

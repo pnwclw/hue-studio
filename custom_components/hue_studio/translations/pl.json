@@ -173,6 +173,9 @@
     },
     "room_change_failed": {
       "message": "Nie udało się zmienić pokoju Hue {name}: mostek odrzucił zmianę lub jest nieosiągalny."
+    },
+    "no_auto_light": {
+      "message": "Obszar {area} nie ma ustawień automatycznego światła."
     }
   },
   "services": {
@@ -485,6 +488,28 @@
     "delete_zone": {
       "name": "Usuń strefę",
       "description": "Usuwa strefy Hue z mostka razem z ich scenami."
+    },
+    "apply_auto_light": {
+      "name": "Zastosuj automatyczne światło",
+      "description": "Pokazuje scenę dnia obszaru z automatyczną jasnością na jego światłach Hue. Nic nie robi, gdy ktoś steruje światłem ręcznie lub automatyczne światło jest wyłączone, chyba że wymuszono.",
+      "fields": {
+        "area": {
+          "name": "Obszar",
+          "description": "Obszary z ustawieniami automatycznego światła."
+        },
+        "transition": {
+          "name": "Przejście",
+          "description": "Czas przejścia do sceny w sekundach."
+        },
+        "force": {
+          "name": "Wymuś",
+          "description": "Zastosuj także przy sterowaniu ręcznym lub wyłączonym automatycznym świetle."
+        },
+        "resume": {
+          "name": "Wznów",
+          "description": "Najpierw oddaj ręcznie sterowane światła automatycznemu światłu (np. gdy ktoś wchodzi do pokoju)."
+        }
+      }
     }
   },
   "selector": {
@@ -630,11 +655,22 @@
           "normal": "Normalny",
           "dimmed": "Przyciemniony"
         }
+      },
+      "light_control": {
+        "name": "Sterowanie światłem",
+        "state": {
+          "auto": "Automatyczne światło",
+          "manual": "Ręcznie",
+          "off": "Wyłączone"
+        }
       }
     },
     "number": {
       "brightness": {
         "name": "Jasność"
+      },
+      "light_offset": {
+        "name": "Poprawka jasności"
       }
     },
     "sensor": {
@@ -699,7 +735,73 @@
           "good": "Dobra",
           "excellent": "Doskonała"
         }
+      },
+      "light_phase": {
+        "name": "Faza światła",
+        "state": {
+          "morning": "Rano",
+          "day": "Dzień",
+          "golden": "Złota godzina",
+          "evening": "Wieczór",
+          "night": "Noc"
+        }
+      },
+      "light_scene": {
+        "name": "Scena dnia",
+        "state_attributes": {
+          "scene_id": {
+            "name": "Id sceny"
+          },
+          "pool": {
+            "name": "Pula"
+          },
+          "pool_phase": {
+            "name": "Faza puli",
+            "state": {
+              "morning": "Rano",
+              "day": "Dzień",
+              "golden": "Złota godzina",
+              "evening": "Wieczór",
+              "night": "Noc"
+            }
+          },
+          "season": {
+            "name": "Pora roku",
+            "state": {
+              "winter": "Zima",
+              "spring": "Wiosna",
+              "summer": "Lato",
+              "autumn": "Jesień"
+            }
+          },
+          "mood": {
+            "name": "Pogoda",
+            "state": {
+              "clear": "Pogodnie",
+              "gloomy": "Pochmurno"
+            }
+          },
+          "holiday": {
+            "name": "Święto"
+          },
+          "step": {
+            "name": "Stopień dnia"
+          }
+        }
+      },
+      "light_brightness": {
+        "name": "Automatyczna jasność"
       }
+    },
+    "button": {
+      "next_light_scene": {
+        "name": "Inna scena"
+      }
+    }
+  },
+  "device": {
+    "auto_light": {
+      "name": "Automatyczne światło: {area}"
     }
   }
 }

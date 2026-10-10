@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HueStudioConfigEntry
+from .auto_entity import async_setup_auto_light_entities
 from .entity import SyncBoxEntity
 from .sync import INTENSITIES, SYNC_MODES, SyncBoxCoordinator, hue_target, inputs
 
@@ -106,6 +107,11 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add the selects of a Sync Box."""
+    if entry.runtime_data.bridge is not None:
+        async_setup_auto_light_entities(
+            hass, entry, async_add_entities, Platform.SELECT
+        )
+        return
     coordinator = entry.runtime_data.sync
     assert coordinator is not None
     async_add_entities(SyncBoxSelect(coordinator, d) for d in DESCRIPTIONS)

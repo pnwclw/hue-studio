@@ -188,9 +188,12 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   auto_light.py                 auto light settings per area in a Store: services, hue_studio/auto_light/subscribe,
                                 import of the legacy lights.json
+  auto_select.py                pure: phase, season, weather, pool, scene of the day, brightness; manual-change tolerance
+  auto_control.py               selections and who controls each area (auto/manual/off), apply_auto_light, settings WS
+  auto_entity.py, button.py     per-area auto light entities (phase, scene, brightness, control, offset, next scene)
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
-  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
+  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities (select/number/sensor: auto light too)
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
   config_flow.py                setup (menu: pick a `hue` entry; Sync Box: pair or use `huesyncbox`) + options: Hue room/zone -> HA area,
                                 motion/temperature sensors per room, rooms follow areas (Roborock-style menu)

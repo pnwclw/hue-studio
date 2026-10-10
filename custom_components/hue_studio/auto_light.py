@@ -2,13 +2,19 @@
 
 The bridge has no place for them, so they live in `helpers.storage.Store`
 (`.storage/hue_studio.auto_light`) and are read/written only through services and the
-WebSocket API. Picking a scene from them (phases, seasons, weather) is phase 4.
+WebSocket API. Picking a scene from them is `auto_select.py`, acting on it
+`auto_control.py`.
 
-Per area (the format of the legacy prototype's `rooms.<room>.auto`):
+Per area (the format of the legacy prototype's `rooms.<room>.auto`, plus settings):
     {"pools": {phase: {season | "all": {"clear": [gallery ids], "gloomy": [...]}}},
      "holidays": [{"from": "MM-DD", "to": "MM-DD", "phases": [...], "pool": [...]}],
-     "names": {gallery id: name}, "excluded": [gallery ids], "offsets": {phase: %}}
+     "names": {gallery id: name}, "excluded": [gallery ids], "offsets": {phase: %},
+     "settings": {"night_from": "HH:MM", "shifts": {phase: minutes},
+                  "weather" | "light_sensor" | "season": entity id,
+                  "brightness": {phase: %}, "gradient_mode": mode},
+     "control": "auto" | "off", "skip": {"date", "phase", "n"}}
 The "day" phase has four brightness steps: its pools are four lists instead of one.
+An area with settings here gets auto light entities (auto_control.py).
 """
 
 from __future__ import annotations
@@ -51,6 +57,12 @@ SEASONS = ("all", "winter", "spring", "summer", "autumn")
 MOODS = ("clear", "gloomy")
 DAY_STEPS = 4
 MAX_OFFSET = 60
+SHIFTS = ("morning", "day", "golden", "evening")
+MAX_SHIFT = 240
+CONTROL_AUTO = "auto"
+CONTROL_MANUAL = "manual"
+CONTROL_OFF = "off"
+CONTROLS = (CONTROL_AUTO, CONTROL_MANUAL, CONTROL_OFF)
 
 SERVICE_EXCLUDE = "auto_light_exclude"
 SERVICE_POOL = "auto_light_pool"
@@ -93,6 +105,30 @@ AREA_CONFIG = vol.Schema(
                 vol.Coerce(int), vol.Range(min=-MAX_OFFSET, max=MAX_OFFSET)
             )
         },
+        # How phases, season, weather and brightness are worked out (auto_select.py).
+        vol.Optional("settings", default=dict): vol.Schema(
+            {
+                vol.Optional("night_from"): cv.matches_regex(r"^\d\d:\d\d$"),
+                vol.Optional("shifts"): {
+                    vol.In(SHIFTS): vol.All(
+                        vol.Coerce(int), vol.Range(min=-MAX_SHIFT, max=MAX_SHIFT)
+                    )
+                },
+                vol.Optional("weather"): vol.Any(None, cv.entity_id),
+                vol.Optional("light_sensor"): vol.Any(None, cv.entity_id),
+                vol.Optional("season"): vol.Any(None, cv.entity_id),
+                vol.Optional("brightness"): {
+                    vol.In(PHASES): vol.All(vol.Coerce(int), vol.Range(min=1, max=100))
+                },
+                vol.Optional("gradient_mode"): vol.Any(None, cv.string),
+            }
+        ),
+        # "off": auto light is off for the area ("manual" is not stored).
+        vol.Optional("control", default=CONTROL_AUTO): vol.In(
+            [CONTROL_AUTO, CONTROL_OFF]
+        ),
+        # Presses of "next scene": {"date", "phase", "n"} (auto_select.select).
+        vol.Optional("skip", default=dict): dict,
     }
 )
 
@@ -111,7 +147,13 @@ class AutoLightStore:
     async def async_load(self) -> None:
         """Read the stored settings."""
         data = await self._store.async_load() or {}
-        self.areas = data.get("areas", {})
+        self.areas = {}
+        for area_id, config in (data.get("areas") or {}).items():
+            # Fills keys added since the data was written (settings, control, …).
+            try:
+                self.areas[area_id] = AREA_CONFIG(config)
+            except vol.Invalid as err:
+                _LOGGER.warning("Auto light of %s ignored: %s", area_id, err)
 
     def area(self, area_id: str) -> dict[str, Any]:
         """Settings of an area (empty settings for one without any yet)."""
@@ -122,6 +164,11 @@ class AutoLightStore:
         self.areas[area_id] = AREA_CONFIG(config)
         await self._store.async_save({"areas": self.areas})
         async_dispatcher_send(self.hass, SIGNAL_AUTO_LIGHT_UPDATED)
+
+
+def auto_light_store(hass: HomeAssistant) -> AutoLightStore:
+    """The store (loaded with the integration)."""
+    return hass.data[_DATA]
 
 
 async def async_setup_auto_light(hass: HomeAssistant) -> None:

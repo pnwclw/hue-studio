@@ -38,6 +38,7 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
 | `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
+| `hue_studio.apply_auto_light` | Show an area's auto light (scene of the day at its brightness) on its Hue lights, with an optional `transition`. Does nothing while the area is under manual control or auto light is off, unless `force`; `resume` hands manual control back first (e.g. when someone enters). |
 | `hue_studio.auto_light_pool` | Set the gallery scenes of one auto light pool of an area (`phase`, `season`, `step`: clear/gloomy, or 0-3 for the day). |
 | `hue_studio.auto_light_exclude` | Never (or again, `excluded: false`) pick a gallery scene in an area's auto light. |
 | `hue_studio.auto_light_offset` | Shift an area's brightness in one phase by `delta` percent (0 resets); returns the offset. |
@@ -46,6 +47,26 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
+
+## Auto light
+
+Hue Studio works out what each area with auto light settings should show — the phase
+of the day (from the sun), a scene of the day from pools by phase, season, weather and
+holidays, and a brightness — and gives every such area a device with entities for
+dashboards and automations:
+
+| Entity | |
+|---|---|
+| `select.<area>_light_control` | Who controls the lights: `auto`, `manual` (someone changed them by hand: a dashboard, the Hue app, a switch), `off`. Back to `auto` shows the auto scene at once. |
+| `sensor.<area>_light_phase` | morning, day, golden, evening, night |
+| `sensor.<area>_light_scene` | The scene of the day, with its gallery picture (Mushroom and Bubble Card show it) |
+| `sensor.<area>_light_brightness` | The brightness auto light shows now |
+| `number.<area>_light_offset` | Your brightness offset for the current phase |
+| `button.<area>_next_light_scene` | Another scene for the rest of the day |
+
+*When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
+example on presence, with `resume: true`, and again when the scene or brightness
+sensor changes).
 
 ## Rooms and zones
 

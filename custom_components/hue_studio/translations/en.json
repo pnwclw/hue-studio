@@ -173,6 +173,9 @@
     },
     "room_change_failed": {
       "message": "Could not change the Hue room {name}: the bridge refused the change or is unreachable."
+    },
+    "no_auto_light": {
+      "message": "The area {area} has no auto light settings."
     }
   },
   "services": {
@@ -485,6 +488,28 @@
     "delete_zone": {
       "name": "Delete zone",
       "description": "Deletes Hue zones from the bridge, together with their scenes."
+    },
+    "apply_auto_light": {
+      "name": "Apply auto light",
+      "description": "Shows the area's scene of the day at its auto brightness on the area's Hue lights. Does nothing while someone controls the lights by hand or auto light is off, unless forced.",
+      "fields": {
+        "area": {
+          "name": "Area",
+          "description": "Areas with auto light settings."
+        },
+        "transition": {
+          "name": "Transition",
+          "description": "Seconds to fade into the scene."
+        },
+        "force": {
+          "name": "Force",
+          "description": "Apply even while the lights are under manual control or auto light is off."
+        },
+        "resume": {
+          "name": "Resume",
+          "description": "Hand lights under manual control back to auto light first (e.g. when someone enters the room)."
+        }
+      }
     }
   },
   "selector": {
@@ -630,11 +655,22 @@
           "normal": "Normal",
           "dimmed": "Dimmed"
         }
+      },
+      "light_control": {
+        "name": "Light control",
+        "state": {
+          "auto": "Auto light",
+          "manual": "Manual",
+          "off": "Off"
+        }
       }
     },
     "number": {
       "brightness": {
         "name": "Brightness"
+      },
+      "light_offset": {
+        "name": "Brightness offset"
       }
     },
     "sensor": {
@@ -699,7 +735,73 @@
           "good": "Good",
           "excellent": "Excellent"
         }
+      },
+      "light_phase": {
+        "name": "Light phase",
+        "state": {
+          "morning": "Morning",
+          "day": "Day",
+          "golden": "Golden hour",
+          "evening": "Evening",
+          "night": "Night"
+        }
+      },
+      "light_scene": {
+        "name": "Scene of the day",
+        "state_attributes": {
+          "scene_id": {
+            "name": "Scene id"
+          },
+          "pool": {
+            "name": "Pool"
+          },
+          "pool_phase": {
+            "name": "Pool phase",
+            "state": {
+              "morning": "Morning",
+              "day": "Day",
+              "golden": "Golden hour",
+              "evening": "Evening",
+              "night": "Night"
+            }
+          },
+          "season": {
+            "name": "Season",
+            "state": {
+              "winter": "Winter",
+              "spring": "Spring",
+              "summer": "Summer",
+              "autumn": "Autumn"
+            }
+          },
+          "mood": {
+            "name": "Weather",
+            "state": {
+              "clear": "Clear",
+              "gloomy": "Gloomy"
+            }
+          },
+          "holiday": {
+            "name": "Holiday"
+          },
+          "step": {
+            "name": "Day step"
+          }
+        }
+      },
+      "light_brightness": {
+        "name": "Auto brightness"
       }
+    },
+    "button": {
+      "next_light_scene": {
+        "name": "Next scene"
+      }
+    }
+  },
+  "device": {
+    "auto_light": {
+      "name": "{area} auto light"
     }
   }
 }
