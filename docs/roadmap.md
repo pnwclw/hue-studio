@@ -81,8 +81,11 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
    bridge scenes now.
 6. ~~Honour `sync`~~ — done without configuration: lights streaming from an
    entertainment area are known from the bridge. The legacy `sync` room key can go.
-7. Switch the legacy cards and automations over to Hue Studio services and remove the
-   legacy scripts (phase 1 done criterion).
+7. ~~Switch the legacy setup over to Hue Studio~~ — done on the live system: its apply
+   and config scripts call Hue Studio services, auto light data is in the Store, the
+   legacy shell command and script are gone. One temporary shim stays outside the
+   repository (the legacy template sensors read pools through a command-line sensor fed
+   from the Store) until auto light runs in Hue Studio (D).
 
 ### B. Catch up with the Hue app in the panel
 
