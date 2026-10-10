@@ -1,0 +1,126 @@
+// The `/hue` panel: a Hue-app-like UI built on HA's own model (areas, entities, services).
+// HA sets `hass`, `narrow`, `route` and `panel` on this element.
+//
+// Routes (below the panel's /hue prefix):
+//   ""                         home: rooms and zones
+//   /room/<key>                room: scenes and lights
+//   /room/<key>/color?light=   color wheel
+//   /gallery?room=<key>        scene gallery
+
+import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
+import { keyed } from "lit/directives/keyed.js";
+
+import { PANEL_PATH, StudioContext } from "./context.ts";
+import { toggleSidebar } from "./ha-internals.ts";
+import { findGroup } from "./model.ts";
+import { CSS } from "./styles.ts";
+import type { Hass } from "./types.ts";
+import { icon, type IconName } from "./ui.ts";
+import "./views/color.ts";
+import "./views/gallery.ts";
+import "./views/home.ts";
+import "./views/room.ts";
+
+type Route =
+  | { name: "home" }
+  | { name: "room"; key: string }
+  | { name: "color"; key: string; light: string | null }
+  | { name: "gallery"; room: string | null };
+
+function parseRoute(path: string, search: string): Route {
+  const params = new URLSearchParams(search);
+  const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts[0] === "room" && parts[1] && parts[2] === "color") return { name: "color", key: parts[1], light: params.get("light") };
+  if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
+  if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
+  return { name: "home" };
+}
+
+@customElement("hue-studio-panel")
+export class HueStudioPanel extends LitElement {
+  static override styles = unsafeCSS(CSS);
+
+  @property({ attribute: false }) accessor hass: Hass | undefined;
+  @property({ type: Boolean }) accessor narrow = false;
+  @property({ attribute: false }) accessor route: { prefix?: string; path: string } | undefined;
+  /** Bumped whenever the context changed (WebSocket data, optimistic state, toasts). */
+  @state() private accessor rev = 0;
+
+  private ctx: StudioContext | null = null;
+  private lastRoute = "";
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.ctx ??= new StudioContext(() => this.rev++);
+    this.ctx.toggleSidebar = () => toggleSidebar(this);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.ctx?.dispose();
+    this.ctx = null;
+  }
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    if (!this.ctx) return;
+    if (this.hass && (changed.has("hass") || !this.ctx.ready)) {
+      this.ctx.setHass(this.hass);
+      // Views only see `ctx` (same object) and `rev`: a new `hass` is a new revision.
+      this.rev++;
+    }
+    this.ctx.narrow = this.narrow;
+  }
+
+  protected override render() {
+    const ctx = this.ctx;
+    if (!ctx?.ready) return nothing;
+    const route = parseRoute(this.route?.path ?? location.pathname.replace(PANEL_PATH, ""), location.search);
+    const tab = route.name === "gallery" && !route.room ? "gallery" : "home";
+    const tabs: [string, string, IconName, string][] = [
+      ["home", "", "home", ctx.t("nav.home")],
+      ["gallery", "/gallery", "explore", ctx.t("nav.gallery")],
+    ];
+    return html`
+      <main class=${route.name === "color" ? "colorview" : ""}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
+      <nav class="tabs" ?hidden=${route.name === "color"}>
+        ${tabs.map(
+          ([id, to, name, label]) => html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(to)}>${icon(name)}${label}</button>`,
+        )}
+      </nav>
+      <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>
+    `;
+  }
+
+  /** A fresh element per route (keyed), so no screen state leaks into the next one. */
+  private view(ctx: StudioContext, route: Route) {
+    const rev = this.rev;
+    switch (route.name) {
+      case "room":
+        return html`<hue-studio-room-view .ctx=${ctx} .rev=${rev} .key=${route.key}></hue-studio-room-view>`;
+      case "color":
+        return html`<hue-studio-color-view .ctx=${ctx} .rev=${rev} .group=${findGroup(ctx.home, route.key)} .focusLight=${route.light}></hue-studio-color-view>`;
+      case "gallery":
+        return html`<hue-studio-gallery-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-gallery-view>`;
+      default:
+        return html`<hue-studio-home-view .ctx=${ctx} .rev=${rev}></hue-studio-home-view>`;
+    }
+  }
+
+  protected override updated(): void {
+    // A new screen starts at the top; updates of the same screen keep the scroll position.
+    const key = `${this.route?.path ?? ""}${location.search}`;
+    if (key !== this.lastRoute) {
+      this.lastRoute = key;
+      const main = this.renderRoot.querySelector("main");
+      if (main) main.scrollTop = 0;
+    }
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "hue-studio-panel": HueStudioPanel;
+  }
+}

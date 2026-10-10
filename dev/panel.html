@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Dev harness: renders the panel outside Home Assistant with a fake `hass` (dev/fixture.js).
-  Serve the repository root (e.g. `python3 -m http.server 8765`) and open
-  http://localhost:8765/dev/panel.html?lang=en&path=/room/area.office
+  Dev harness: renders the panel outside Home Assistant with a fake `hass` (dev/fixture.ts).
+  Run `npm run watch` (builds the panel and dev/build/fixture.js), serve the repository root
+  (e.g. `python3 -m http.server 8765`) and open
+  http://localhost:8765/dev/panel.html?lang=en&path=/room/area.office  (&moreinfo=light.desk_lamp)
 -->
 <html>
 <head>
@@ -11,13 +12,22 @@
   <title>Hue Studio panel</title>
   <style>
     html, body { margin: 0; height: 100%; background: #111; }
-    hue-studio-panel { height: 100%; }
+    home-assistant { display: block; height: 100%; }
   </style>
 </head>
 <body>
   <script type="module">
+    // The real build output, exactly as Home Assistant loads it.
     import "../custom_components/hue_studio/frontend/hue-studio-panel.js";
-    import { createHass } from "./fixture.js";
+    import "../custom_components/hue_studio/frontend/hue-studio-more-info.js";
+    import { createHass } from "./build/fixture.js";
+
+    // Stand-in for HA's root element: holds `hass` and shows when the stock more-info would open.
+    customElements.define("home-assistant", class extends HTMLElement {
+      connectedCallback() {
+        this.addEventListener("hass-more-info", (e) => console.info("stock more-info:", e.detail.entityId));
+      }
+    });
 
     // <ha-icon> exists only inside HA; render MDI icons from the CDN here (dev only).
     customElements.define("ha-icon", class extends HTMLElement {
@@ -39,7 +49,11 @@
     const params = new URLSearchParams(location.search);
     const panel = document.createElement("hue-studio-panel");
     const narrow = () => window.matchMedia("(max-width: 870px)").matches;
-    const hass = createHass({ language: params.get("lang") || "en", onChange: (h) => { panel.hass = h; } });
+    const root = document.createElement("home-assistant");
+    const hass = createHass({ language: params.get("lang") || "en", onChange: (h) => { panel.hass = h; root.hass = h; } });
+    root.hass = hass;
+    // ?w=430 pins the layout width (headless Chrome windows can't be narrower than ~500px).
+    if (params.get("w")) root.style.width = `${params.get("w")}px`;
 
     panel.narrow = narrow();
     panel.route = { prefix: "/hue", path: params.get("path") || "" };
@@ -52,7 +66,14 @@
       panel.route = { prefix: "/hue", path: location.pathname.replace(/^\/hue/, "") };
     });
     panel.addEventListener("hass-toggle-menu", () => console.info("hass-toggle-menu"));
-    document.body.append(panel);
+    root.append(panel);
+    document.body.append(root);
+    // ?moreinfo=light.desk_lamp opens the more-info override like a dashboard card would.
+    if (params.get("moreinfo")) {
+      setTimeout(() => panel.dispatchEvent(new CustomEvent("hass-more-info", {
+        detail: { entityId: params.get("moreinfo") }, bubbles: true, composed: true,
+      })), 300);
+    }
   </script>
 </body>
 </html>

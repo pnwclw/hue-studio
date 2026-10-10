@@ -1,0 +1,48 @@
+name: Release
+
+# Publishing a GitHub release (tag vX.Y.Z-alpha.N) builds the frontend and attaches
+# hue_studio.zip, which HACS installs (`zip_release` in hacs.json). The built
+# JavaScript is not in git, so installing from the source tree would miss it.
+#
+# For now every release is an alpha: the version must be X.Y.Z-alpha.N and the
+# GitHub release must be marked as a pre-release (HACS shows it only with
+# "Show beta versions" enabled).
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    name: Build and attach hue_studio.zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches manifest.json and is an alpha pre-release
+        env:
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          version=$(jq -r .version custom_components/hue_studio/manifest.json)
+          test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != manifest v$version"; exit 1; }
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]] || { echo "$version is not X.Y.Z-alpha.N"; exit 1; }
+          test "$PRERELEASE" = "true" || { echo "mark the GitHub release as a pre-release"; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Zip the integration
+        run: |
+          cd custom_components/hue_studio
+          find . -name '__pycache__' -prune -exec rm -rf {} +
+          zip -r "$GITHUB_WORKSPACE/hue_studio.zip" . -x '*.map'
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" hue_studio.zip --clobber

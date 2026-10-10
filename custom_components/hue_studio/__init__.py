@@ -13,9 +13,15 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
-from .const import CONF_HUE_ENTRY_ID, DOMAIN, HUE_CONF_API_KEY
+from .const import (
+    CONF_HUE_ENTRY_ID,
+    DOMAIN,
+    HUE_CONF_API_KEY,
+    SIGNAL_CONFIG_UPDATED,
+)
 from .panel import async_register_panel, async_unregister_panel
 from .services import async_setup_services
 from .websocket import async_setup_websocket
@@ -69,8 +75,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) ->
         ) from err
 
     entry.runtime_data = HueStudioData(bridge=bridge)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await async_register_panel(hass)
     return True
+
+
+async def _async_options_updated(
+    hass: HomeAssistant, entry: HueStudioConfigEntry
+) -> None:
+    """Options changed: no reload needed, just tell open panels."""
+    async_dispatcher_send(hass, SIGNAL_CONFIG_UPDATED)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:

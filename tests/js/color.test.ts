@@ -11,13 +11,14 @@ import {
   wheelYToMirek,
   xyToRgb,
   xyToWheel,
-} from "../../custom_components/hue_studio/frontend/color.js";
+} from "../../src/color.ts";
+import type { XY } from "../../src/types.ts";
 
-const GAMUT_C = [[0.6915, 0.3083], [0.17, 0.7], [0.1532, 0.0475]];
-const near = (a, b, eps) => assert.ok(Math.abs(a - b) <= eps, `${a} !~ ${b}`);
+const GAMUT_C: XY[] = [[0.6915, 0.3083], [0.17, 0.7], [0.1532, 0.0475]];
+const near = (a: number, b: number, eps: number) => assert.ok(Math.abs(a - b) <= eps, `${a} !~ ${b}`);
 
 test("xy and rgb round-trip", () => {
-  for (const xy of [[0.5, 0.4], [0.3, 0.3], [0.2, 0.15], [0.4, 0.5]]) {
+  for (const xy of [[0.5, 0.4], [0.3, 0.3], [0.2, 0.15], [0.4, 0.5]] as XY[]) {
     const back = rgbToXy(...xyToRgb(...xy));
     near(back[0], xy[0], 0.01);
     near(back[1], xy[1], 0.01);
@@ -31,7 +32,7 @@ test("wheel center is white, edge at the red angle is red", () => {
 });
 
 test("wheel and xy round-trip", () => {
-  for (const p of [[0.3, -0.4], [-0.5, 0.2], [0.1, 0.7]]) {
+  for (const p of [[0.3, -0.4], [-0.5, 0.2], [0.1, 0.7]] as XY[]) {
     const back = xyToWheel(...wheelToXy(...p));
     near(back[0], p[0], 0.03);
     near(back[1], p[1], 0.03);

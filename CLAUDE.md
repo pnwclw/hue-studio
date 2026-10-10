@@ -43,8 +43,9 @@ touching anything outside this repository.
    - storage: a JSON/YAML file in the config directory or `helpers.storage.Store` — to be
      decided during the port. Requirement: the data stays human-readable and diffable, so
      it can be versioned in git together with the HA config.
-3. **Frontend** — registered by the integration itself via `frontend.add_extra_js_url`
-   (no manual Lovelace resources):
+3. **Frontend** — TypeScript + Lit in `src/`, bundled by esbuild into
+   `custom_components/hue_studio/frontend/`; registered by the integration itself via
+   `frontend.add_extra_js_url` (no manual Lovelace resources):
    - **panel** (`panel_custom`, `/hue`): a full-screen "Hue app" — rooms, color wheel with
      draggable light dots, gallery, palettes, auto-light settings. It copies the Hue app's
      look but is **built on HA's model**, read from the frontend `hass` object:
@@ -67,7 +68,13 @@ touching anything outside this repository.
 ## Rules that must not be broken
 
 - **Fallback.** If our JS fails to load or crashes, HA must show the stock more-info dialog.
-  Losing access to a light because of our code is unacceptable.
+  Losing access to a light because of our code is unacceptable. The override stops the
+  `hass-more-info` event only after our dialog was built; its "Details" button and any
+  event with `detail.view` go to HA's own dialog.
+- **Instant UI.** Every command shows its expected result immediately (`optimistic.ts`)
+  and falls back to the real state on error or after 5 s without confirmation.
+- **Adaptive Lighting.** Our services (and scene activation from the panel) mark the
+  affected lights as manually controlled, so Adaptive Lighting doesn't overwrite them.
 - **Only intercept what is ours** (Hue lights). Never touch `/config/...` pages.
 - **Bridge rate limits:** ~10 commands/s for `light`, ~1/s for `grouped_light`. Dragging on
   the wheel is throttled; several lights at once go through group commands or a single
@@ -88,11 +95,21 @@ touching anything outside this repository.
   existing `hue` entry). Ruff with HA-like settings (`pyproject.toml`).
 - **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
   1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
-- Frontend without a bundler if possible (ES modules). If Lit is needed, use the one that
-  already ships with the HA frontend instead of bundling our own.
+- **Frontend: TypeScript + Lit, bundled with esbuild** (`npm run build`). We bundle our own
+  Lit (never reach into HA's copy — that is internal API). Standard decorators on `accessor`
+  fields (`@property() accessor x`), `strict` TypeScript, `erasableSyntaxOnly` so the pure
+  modules run in Node without a build. Views and controls are light-DOM Lit elements
+  (`LightElement`) under one shadow root per panel/dialog, so the single stylesheet in
+  `styles.ts` applies. Views get `ctx` plus a `rev` counter that the owner bumps on every
+  change (new `hass`, WebSocket data, optimistic state). The built JS is git-ignored; it
+  ships in the release zip.
 - HACS compatibility is a hard requirement: `hacs.json` at the root, a single integration
   under `custom_components/hue_studio/`, `version` in `manifest.json` bumped with every
-  release, GitHub releases tagged `vX.Y.Z`. CI runs HACS validation and hassfest.
+  release, GitHub releases tagged `vX.Y.Z`. **For now every release is an alpha:** version
+  `X.Y.Z-alpha.N`, tag `vX.Y.Z-alpha.N`, GitHub release marked as a pre-release (the release
+  workflow refuses anything else). HACS installs `hue_studio.zip` from the release
+  (`zip_release`), built by `.github/workflows/release.yml` — the tag must match the
+  manifest version. CI runs HACS validation and hassfest.
 
 ## Data model
 
@@ -136,40 +153,56 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient info
   services.py, services.yaml    apply_palette, set_gradient
-  websocket.py                  hue_studio/lights/subscribe
+  websocket.py                  hue_studio/lights/subscribe, hue_studio/config/subscribe
+  config_flow.py                setup (pick a `hue` entry) + options: Hue room/zone -> HA area,
+                                motion/temperature sensors per room (Roborock-style menu)
+  options.py                    option helpers; unique ids -> entity ids for the frontend
+  adaptive.py                   Adaptive Lighting: mark lights manual after our commands
   panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
   gallery.py                    backend access to the bundled gallery
-  frontend/                     ES modules, no build step
-    hue-studio-panel.js         panel shell: routing, tab bar, WS subscription, view context
-    views/                      home, room, color (wheel), gallery — one class per screen
-    model.js                    pure: rooms/zones/scenes/state from `hass`
-    color.js                    pure color math (xy/RGB, wheel mapping, gamut clipping, mirek)
-    ui.js, styles.js            DOM helpers (toggle, slider, throttle) and the panel CSS
-    i18n.js                     UI strings (en is the source; same keys in every locale)
-    ha-internals.js             the only place that touches HA frontend internals
+  frontend/                     build output (git-ignored) + gallery/
     gallery/                    generated by scripts/build_gallery.py — do not edit by hand
-scripts/build_gallery.py — do not edit by hand
+src/                            frontend sources (TypeScript + Lit), bundled into frontend/
+  hue-studio-panel.ts           panel shell: routing, tab bar; owns the StudioContext
+  hue-studio-more-info.ts       more-info override (extra JS on every page) + Hue-style dialog
+  context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
+  optimistic.ts                 pure: predicted state of a service call until HA confirms it
+  controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
+  views/                        home, room, color (wheel), gallery — one Lit element per screen
+  model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
+  color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
+  types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
+  ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
+  i18n.ts                       UI strings (en is the source; same keys in every locale)
+  ha-internals.ts               the only place that touches HA frontend internals
+scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
-dev/panel.html, dev/fixture.js harness: the panel with a fake `hass` (neutral demo data,
+dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
                                 simulated services), no HA needed
 tests/                          pytest + pytest-homeassistant-custom-component
-tests/js/                       node:test for the pure frontend modules
+tests/js/                       node:test (TypeScript, run by Node directly) for the pure modules
+package.json, tsconfig.json     frontend toolchain (Lit, esbuild, TypeScript)
 hacs.json                       HACS metadata
 NOTICE                          third-party attribution (gallery, Apache-2.0)
-.github/workflows/              HACS validation, hassfest, ruff, pytest
+.github/workflows/              HACS validation, hassfest, ruff, pytest, frontend; release zip
 ```
 
 ## Tests
 
-- `uv sync`, then `uv run pytest`; lint with `uv run ruff check . && uv run ruff format --check .`.
+- `npm ci && npm run build` first (the panel test serves the built JS), then `uv sync`,
+  `uv run pytest`; lint with `uv run ruff check . && uv run ruff format --check .`.
 - `pytest-homeassistant-custom-component` is pinned to the minimum supported HA release
   (`hacs.json` → `homeassistant`); bump both together. The bridge is always mocked — CI has
   no real bridge.
 - Color math (xy ↔ RGB, gamut clipping, mirek) — pure functions with unit tests.
-- Frontend logic: `node --test tests/js/*.test.mjs` (model, color math, locale parity).
-- UI, fast loop: `dev/panel.html` (Claude: `preview_start` with `panel-harness` from
+- Frontend: `npm run typecheck` and `npm test` (model, color math, optimistic state, locale
+  parity).
+- UI, fast loop: `npm run watch`, then `dev/panel.html` (Claude: `preview_start` with `panel-harness` from
   `.claude/launch.json`, then `/dev/panel.html?lang=en|pl&path=/room/area.office`) at 430
-  and 1440. At 1440 the browser pane crops; use headless Chrome
-  (`--headless=new --window-size=1440,900 --virtual-time-budget=8000 --screenshot=…`,
-  a fresh `--user-data-dir` per run).
+  and 1440; `&moreinfo=light.desk_lamp` opens the dialog. The browser pane freezes CSS
+  transitions while hidden and crops at 1440, so take final shots with headless Chrome
+  (`--headless=new --window-size=1440,900 --virtual-time-budget=6000 --screenshot=…`,
+  a fresh `--user-data-dir` per run; for 430 use a 520px window plus `&w=430` and crop).
+- Custom panels get no height from HA: the panel sizes itself to the viewport (`100dvh`),
+  otherwise the page doesn't scroll and the tab bar ends up below the content.
 - UI, final check: screenshots (phone + desktop) on a live HA instance.

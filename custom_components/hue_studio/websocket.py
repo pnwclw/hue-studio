@@ -10,15 +10,47 @@ from aiohue.v2.models.light import Light
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
+from .const import SIGNAL_CONFIG_UPDATED
 from .lights import HUE_DOMAIN, LIGHT_DOMAIN, async_all_lights, light_info
+from .options import async_frontend_config
 
 
 @callback
 def async_setup_websocket(hass: HomeAssistant) -> None:
     """Register WebSocket commands."""
     websocket_api.async_register_command(hass, ws_subscribe_lights)
+    websocket_api.async_register_command(hass, ws_subscribe_config)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
+@callback
+def ws_subscribe_config(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send the room mapping and room sensors now and whenever options change.
+
+    Event payload:
+        {"groups": {group entity_id: "zone" | area_id},
+         "rooms": {"area.<id>" | "hue.<group entity_id>":
+                   {"motion": [entity_id], "temperature": [entity_id]}}}
+    """
+
+    @callback
+    def send() -> None:
+        connection.send_message(
+            websocket_api.event_message(msg["id"], async_frontend_config(hass))
+        )
+
+    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
+        hass, SIGNAL_CONFIG_UPDATED, send
+    )
+    connection.send_result(msg["id"])
+    send()
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/lights/subscribe"})

@@ -1,0 +1,66 @@
+// Home: rooms (HA areas) and zones (other Hue groups) as cards with toggle and brightness.
+
+import { html, nothing } from "lit";
+import { customElement } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
+
+import { groupSlider, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
+import { allGroups, type Group, groupState } from "../model.ts";
+import { icon, toggle } from "../ui.ts";
+import { StudioView } from "./base.ts";
+
+@customElement("hue-studio-home-view")
+export class HomeView extends StudioView {
+  protected override render() {
+    const { ctx } = this;
+    const { t, home } = ctx;
+    const groups = allGroups(home);
+    const anyOn = groups.some((g) => groupState(ctx.hass, g).on);
+    const section = (title: string, list: Group[]) =>
+      list.length ? html`<h2 class="label">${title}</h2><div class="cards">${list.map((g) => this.card(g))}</div>` : nothing;
+
+    return html`<div class="page">
+      <div class="topbar">
+        <button class="round menu" ?hidden=${!ctx.narrow} aria-label=${t("panel.menu")} @click=${() => ctx.toggleSidebar()}>
+          ${icon("menu")}
+        </button>
+        <div class="grow"></div>
+        ${groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing}
+      </div>
+      <h1 class="big">${ctx.hass.config?.location_name || t("home.title")}</h1>
+      ${section(t("home.rooms"), home.rooms)} ${section(t("home.zones"), home.zones)}
+      ${groups.length ? nothing : html`<p class="empty">${t("home.empty")}</p>`}
+    </div>`;
+  }
+
+  private card(g: Group) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const state = groupState(ctx.hass, g, ctx.lightInfo);
+    const surface = surfaceOf(state);
+    return html`<div
+      class=${classMap({ card: true, ...surface.classes })}
+      style=${styleMap(surface.style)}
+      @click=${() => ctx.go(`/room/${encodeURIComponent(g.key)}`)}
+    >
+      <div class="row">
+        <ha-icon icon=${g.icon}></ha-icon>
+        <div class="text"><div class="name">${g.name}</div>${metaOf(state)}</div>
+        ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
+      </div>
+      ${groupSlider(ctx, g, state, t("common.brightness"))}
+    </div>`;
+  }
+
+  private toggleAll(anyOn: boolean): void {
+    const targets = [...new Set(allGroups(this.ctx.home).flatMap((g) => g.target))];
+    this.ctx.call("light", anyOn ? "turn_off" : "turn_on", { entity_id: targets });
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "hue-studio-home-view": HomeView;
+  }
+}

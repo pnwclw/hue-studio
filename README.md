@@ -58,15 +58,23 @@ Assistant.
 ## Development
 
 ```bash
+npm ci && npm run build    # frontend: src/ (TypeScript + Lit) -> custom_components/hue_studio/frontend/
 uv sync
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Frontend unit tests: `node --test tests/js/*.test.mjs`.
+The frontend is written in TypeScript with [Lit](https://lit.dev) and bundled by esbuild;
+the built JavaScript is not committed. `npm run typecheck` and `npm test` (node:test on the
+pure modules) check it; `npm run watch` rebuilds on change.
 
-Preview the panel without Home Assistant (fake demo data): `python3 -m http.server 8765` in
-the repository root, then open <http://localhost:8765/dev/panel.html?lang=en>.
+Preview the panel without Home Assistant (fake demo data): run `npm run watch` and
+`python3 -m http.server 8765` in the repository root, then open
+<http://localhost:8765/dev/panel.html?lang=en>.
+
+Releases: publishing a GitHub release `vX.Y.Z-alpha.N` (matching `version` in
+`manifest.json`, marked as a pre-release) builds the frontend and attaches `hue_studio.zip`,
+which HACS installs. Everything is alpha for now: enable "Show beta versions" in HACS.
 
 Rebuild the bundled scene gallery: `uv run python scripts/build_gallery.py`.
 

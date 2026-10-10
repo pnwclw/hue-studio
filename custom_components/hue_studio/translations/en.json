@@ -91,6 +91,56 @@
         "random_pixelated": "Random pixels",
         "segmented_palette": "Segments"
       }
+    },
+    "group_target": {
+      "options": {
+        "auto": "Automatic",
+        "zone": "Zone (no area)"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hue Studio settings",
+        "menu_options": {
+          "group_select": "Hue rooms and zones → HA areas",
+          "room_select": "Sensors in rooms",
+          "save": "Save"
+        }
+      },
+      "group_select": {
+        "title": "Hue rooms and zones",
+        "description": "Pick a Hue room or zone to choose which Home Assistant area it belongs to.",
+        "data": {
+          "group": "Hue room or zone"
+        }
+      },
+      "group_target": {
+        "title": "{group}",
+        "description": "Automatic: the Hue group becomes the room of the area with exactly the same lights, otherwise it is shown as a zone. Pick an area to merge it with that room, or Zone to always show it as a zone.",
+        "data": {
+          "target": "Belongs to"
+        }
+      },
+      "room_select": {
+        "title": "Sensors in rooms",
+        "description": "Pick a room to attach motion and temperature sensors to it.",
+        "data": {
+          "room": "Room"
+        }
+      },
+      "room_sensors": {
+        "title": "{room}",
+        "description": "Motion sensors show presence on the room card. Temperature sensors are averaged into the room temperature; a Hue motion sensor's own thermometer can be combined with the room's thermostat.",
+        "data": {
+          "motion": "Motion sensors",
+          "temperature": "Temperature sensors"
+        }
+      }
+    },
+    "abort": {
+      "no_groups": "No Hue rooms, zones or areas with Hue lights were found."
     }
   }
 }

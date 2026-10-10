@@ -19,3 +19,10 @@ config/
 .DS_Store
 .idea/workspace.xml
 .idea/shelf/
+
+# Frontend: dependencies and build output (built from src/ by `npm run build`)
+node_modules/
+custom_components/hue_studio/frontend/*.js
+custom_components/hue_studio/frontend/*.js.map
+custom_components/hue_studio/frontend/*.LEGAL.txt
+dev/build/

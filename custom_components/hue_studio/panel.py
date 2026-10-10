@@ -18,7 +18,10 @@ PANEL_COMPONENT = "hue-studio-panel"
 PANEL_ICON = "mdi:lightbulb-group"
 PANEL_TITLE = "Hue"
 
+MORE_INFO_MODULE = "hue-studio-more-info.js"
+
 _STATIC_REGISTERED = f"{DOMAIN}_static_registered"
+_EXTRA_JS = f"{DOMAIN}_extra_js"
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
@@ -33,6 +36,10 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     if PANEL_URL_PATH in hass.data.get(frontend.DATA_PANELS, {}):
         return
     integration = await async_get_integration(hass, DOMAIN)
+    # Loaded on every HA page: opens our dialog instead of more-info for Hue lights.
+    # If it fails to load or throws, HA's own more-info dialog opens as usual.
+    hass.data[_EXTRA_JS] = f"{STATIC_URL}/{MORE_INFO_MODULE}?v={integration.version}"
+    frontend.add_extra_js_url(hass, hass.data[_EXTRA_JS])
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=PANEL_URL_PATH,
@@ -45,5 +52,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
 
 
 def async_unregister_panel(hass: HomeAssistant) -> None:
-    """Remove the panel from the sidebar."""
+    """Remove the panel from the sidebar and the more-info override."""
     frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
+    if url := hass.data.pop(_EXTRA_JS, None):
+        frontend.remove_extra_js_url(hass, url)

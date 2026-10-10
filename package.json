@@ -1,0 +1,24 @@
+{
+  "name": "hue-studio-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Frontend of the Hue Studio Home Assistant integration (panel and more-info dialog).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build-frontend.mjs",
+    "watch": "node scripts/build-frontend.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/js/*.test.ts"
+  },
+  "dependencies": {
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

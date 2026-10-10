@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildHome, groupState } from "../../custom_components/hue_studio/frontend/model.js";
+import { buildHome, groupState } from "../../src/model.ts";
+import type { HassData, XY } from "../../src/types.ts";
 
-const light = (state, attrs = {}) => ({ state, attributes: { friendly_name: "x", ...attrs } });
+const light = (state: string, attrs = {}) => ({ state, attributes: { friendly_name: "x", ...attrs } });
 
 // Office: area with an exact Hue room. Living room: area whose Hue room also spans the
 // kitchen, plus a Hue zone inside it. Kitchen: area without its own Hue group.
-const hass = {
+const hass: HassData = {
   areas: {
     office: { name: "Office", icon: "mdi:chair-rolling" },
     living_room: { name: "Living room" },
@@ -74,4 +75,59 @@ test("group state averages lit lights", () => {
   assert.equal(state.on, true);
   assert.equal(state.brightness, 100);
   assert.equal(state.colors.length, 1);
+});
+
+import { adaptiveFor } from "../../src/model.ts";
+import { resample } from "../../src/color.ts";
+
+test("options map a Hue group onto an area and mark another as a zone", () => {
+  const { rooms, zones } = buildHome(hass, { groups: { "light.downstairs": "kitchen", "light.office": "zone" } });
+  const kitchen = rooms.find((r) => r.key === "area.kitchen")!;
+  assert.equal(kitchen.group, "light.downstairs");
+  assert.deepEqual(kitchen.scenes, []);
+  // The area keeps its own light and gains the group's; mixed sets go to the lights.
+  assert.ok(kitchen.lights.includes("light.kitchen_bulb") && kitchen.lights.includes("light.candle"));
+  assert.deepEqual(kitchen.target, ["light.downstairs"]);
+  assert.equal(rooms.find((r) => r.key === "area.office")?.group, null);
+  assert.ok(zones.some((z) => z.key === "hue.light.office"));
+});
+
+test("room sensors: defaults from the area, overridable by options", () => {
+  const h = structuredClone(hass) as Required<HassData>;
+  h.entities["binary_sensor.office_motion"] = { platform: "hue", device_id: "d_desk" };
+  h.states["binary_sensor.office_motion"] = { state: "on", attributes: { device_class: "motion" } };
+  h.areas.office.temperature_entity_id = "sensor.t1";
+  h.states["sensor.t1"] = { state: "21.0", attributes: {} };
+  h.states["sensor.t2"] = { state: "23.0", attributes: {} };
+
+  let office = buildHome(h).rooms[0];
+  assert.deepEqual(office.sensors, { motion: ["binary_sensor.office_motion"], temperature: ["sensor.t1"] });
+  assert.equal(groupState(h, office).motion, true);
+  assert.equal(groupState(h, office).temperature, 21);
+
+  office = buildHome(h, { rooms: { "area.office": { motion: [], temperature: ["sensor.t1", "sensor.t2"] } } }).rooms[0];
+  assert.equal(groupState(h, office).temperature, 22);
+  assert.equal(groupState(h, office).motion, false);
+});
+
+test("adaptive lighting switches covering a room", () => {
+  const h = structuredClone(hass) as Required<HassData>;
+  h.entities["switch.al"] = { platform: "adaptive_lighting" };
+  h.states["switch.al"] = {
+    state: "on",
+    attributes: { configuration: { lights: ["light.office", "light.other"] }, manual_control: ["light.office"] },
+  };
+  const office = buildHome(h).rooms[0];
+  assert.deepEqual(adaptiveFor(h, office), [{ switch: "switch.al", on: true, manual: ["light.office"], lights: ["light.office"] }]);
+});
+
+test("gradient points resample when merging and splitting", () => {
+  const pts: XY[] = [[0.6, 0.35], [0.2, 0.3], [0.4, 0.4]];
+  assert.deepEqual(resample(pts, 1), [[0.6, 0.35]]);
+  assert.equal(resample(pts, 5).length, 5);
+  assert.deepEqual(resample(pts, 5)[0], [0.6, 0.35]);
+  assert.deepEqual(resample(pts, 5)[4], [0.4, 0.4]);
+  const split = resample([[0.5, 0.4]], 3);
+  assert.equal(split.length, 3);
+  assert.notDeepEqual(split[0], split[2]);
 });

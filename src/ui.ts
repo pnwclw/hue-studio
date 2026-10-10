@@ -1,9 +1,9 @@
-// Small DOM helpers shared by the views.
+// Small UI building blocks shared by the views: icons, the toggle, throttling.
 
-export const esc = (s) =>
-  String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+import { html, LitElement, svg, type TemplateResult } from "lit";
 
-export const normalize = (s) => String(s).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
+export const normalize = (s: string): string =>
+  String(s).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
 
 // Material Design Icons paths for the panel chrome (area icons use <ha-icon>).
 export const ICONS = {
@@ -36,29 +36,43 @@ export const ICONS = {
     "A6,6 0 0,1 12,18M20,8.69V4H15.31L12,0.69L8.69,4H4V8.69L0.69,12L4,15.31V20H8.69L12,23.31L15.31,20H20V15.31L23.31,12L20,8.69Z",
 };
 
-export const svg = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"></path></svg>`;
+export type IconName = keyof typeof ICONS;
 
-export const toggleHtml = (on, label, extra = "") =>
-  `<button class="toggle${on ? " on" : ""}" role="switch" aria-checked="${on}" aria-label="${esc(label)}" ${extra}><span></span></button>`;
+export const icon = (name: IconName): TemplateResult =>
+  html`<svg viewBox="0 0 24 24" aria-hidden="true">${svg`<path d=${ICONS[name]}></path>`}</svg>`;
 
-export function setToggle(el, on) {
-  el.classList.toggle("on", on);
-  el.setAttribute("aria-checked", String(on));
+/** On/off switch; the click does not reach the card or tile around it. */
+export const toggle = (on: boolean, label: string, onToggle: () => void): TemplateResult =>
+  html`<button
+    class="toggle ${on ? "on" : ""}"
+    role="switch"
+    aria-checked=${on}
+    aria-label=${label}
+    @click=${(e: Event) => {
+      e.stopPropagation();
+      onToggle();
+    }}
+  ><span></span></button>`;
+
+export interface Throttled<A extends unknown[]> {
+  (...args: A): void;
+  /** Deliver a pending call now. */
+  flush(): void;
 }
 
 /** Call fn at most every `ms`, always delivering the last call (trailing edge). */
-export function throttle(fn, ms) {
+export function throttle<A extends unknown[]>(fn: (...args: A) => void, ms: number): Throttled<A> {
   let last = 0;
-  let timer = null;
-  let pending = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending: A | null = null;
   const run = () => {
     last = Date.now();
     timer = null;
     const args = pending;
     pending = null;
-    fn(...args);
+    if (args) fn(...args);
   };
-  const throttled = (...args) => {
+  const throttled = (...args: A) => {
     pending = args;
     const wait = ms - (Date.now() - last);
     if (wait <= 0) run();
@@ -74,57 +88,16 @@ export function throttle(fn, ms) {
 }
 
 /**
- * Horizontal brightness slider: `<div class="slider"><div class="fill"></div><div class="knob"></div></div>`.
- * Calls onInput(value 1-100) while dragging and onChange(value) on release.
+ * Lit element that renders into itself instead of a shadow root, so the stylesheet of the
+ * panel (or dialog) it lives in applies. All views and controls are built on it.
  */
-export function attachSlider(el, { onInput, onChange }) {
-  const valueAt = (e) => {
-    const r = el.getBoundingClientRect();
-    return Math.max(1, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
-  };
-  el.addEventListener("pointerdown", (e) => {
-    e.stopPropagation();
-    el.setPointerCapture(e.pointerId);
-    el.dataset.dragging = "1";
-    const v = valueAt(e);
-    setSlider(el, v);
-    onInput?.(v);
-  });
-  el.addEventListener("pointermove", (e) => {
-    if (!el.dataset.dragging) return;
-    const v = valueAt(e);
-    setSlider(el, v);
-    onInput?.(v);
-  });
-  const end = (e) => {
-    if (!el.dataset.dragging) return;
-    delete el.dataset.dragging;
-    onChange?.(valueAt(e));
-  };
-  el.addEventListener("pointerup", end);
-  el.addEventListener("pointercancel", end);
-  el.addEventListener("click", (e) => e.stopPropagation());
-}
-
-/** Update a slider unless the user is dragging it. */
-export function setSlider(el, value, force = false) {
-  if (el.dataset.dragging && !force) return;
-  el.style.setProperty("--value", `${value}%`);
-}
-
-export const sliderHtml = (value, label) =>
-  `<div class="slider" role="slider" aria-label="${esc(label)}" aria-valuemin="1" aria-valuemax="100" style="--value:${value}%"><div class="fill"></div><div class="knob"></div></div>`;
-
-/** Show a short message at the bottom of `root`. */
-export function toast(root, text) {
-  let el = root.querySelector(".toast");
-  if (!el) {
-    el = document.createElement("div");
-    el.className = "toast";
-    root.append(el);
+export class LightElement extends LitElement {
+  protected override createRenderRoot(): HTMLElement {
+    return this;
   }
-  el.textContent = text;
-  el.classList.add("on");
-  clearTimeout(el._timer);
-  el._timer = setTimeout(() => el.classList.remove("on"), 3200);
+
+  /** Render now instead of in the next microtask (used where a failure must be caught). */
+  renderNow(): void {
+    this.performUpdate();
+  }
 }

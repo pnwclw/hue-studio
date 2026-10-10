@@ -25,6 +25,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.service import async_extract_entity_ids
 import voluptuous as vol
 
+from .adaptive import async_mark_manual
 from .const import DOMAIN
 from .gallery import async_get_gallery_scene
 from .lights import HueLight, async_resolve_lights
@@ -81,6 +82,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # aiohue additionally caps concurrent requests and retries on 429.
         for index, light in enumerate(lights):
             await _async_update(light, _palette_put(light, palette, index, brightness))
+        await async_mark_manual(hass, _touched(call, lights))
 
     async def set_gradient(call: ServiceCall) -> None:
         lights = await _async_target_lights(hass, call)
@@ -96,6 +98,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             put = _base_put(call.data.get(ATTR_BRIGHTNESS))
             put.gradient = _gradient(light, points, call.data.get(ATTR_MODE))
             await _async_update(light, put)
+        await async_mark_manual(hass, _touched(call, lights))
 
     hass.services.async_register(
         DOMAIN, SERVICE_APPLY_PALETTE, apply_palette, schema=APPLY_PALETTE_SCHEMA
@@ -110,7 +113,7 @@ async def _async_target_lights(
 ) -> list[HueLight]:
     """Resolve the service target; explicitly listed entities keep their order."""
     found = await async_extract_entity_ids(call, expand_group=False)
-    explicit = [e for e in call.data.get(ATTR_ENTITY_ID, []) if e in found]
+    explicit = [e for e in _explicit_ids(call) if e in found]
     ordered = explicit + sorted(found.difference(explicit))
     if not ordered:
         raise ServiceValidationError(
@@ -133,6 +136,17 @@ async def _async_palette(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     if ATTR_MIREK in data:
         return {"kind": "white", "mirek": data[ATTR_MIREK]}
     return {"kind": "gradient", "points": data[ATTR_POINTS]}
+
+
+def _touched(call: ServiceCall, lights: list[HueLight]) -> list[str]:
+    """Lights we changed plus the groups the caller named (AL may list either)."""
+    return [light.entity_id for light in lights] + _explicit_ids(call)
+
+
+def _explicit_ids(call: ServiceCall) -> list[str]:
+    """Entity ids listed in the call (not "all", not area/device targets)."""
+    ids = call.data.get(ATTR_ENTITY_ID, [])
+    return [] if isinstance(ids, str) else list(ids)
 
 
 def _base_put(brightness: float | None) -> LightPut:

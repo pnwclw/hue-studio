@@ -25,16 +25,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # The panel test fetches the built frontend.
+      - run: npm ci && npm run build
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --locked
       - run: uv run pytest
 
-  js:
-    name: JS tests
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node --test tests/js/*.test.mjs
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "panel-harness",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1"],
-      "port": 8765
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-8765}\" --bind 127.0.0.1"],
+      "port": 8765,
+      "autoPort": true
     }
   ]
 }
