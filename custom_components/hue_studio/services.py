@@ -13,7 +13,6 @@ from typing import Any
 
 from aiohttp import ClientError
 from aiohue.errors import AiohueException
-from aiohue.util import dataclass_to_dict
 from aiohue.v2.models.feature import (
     ColorFeatureBase,
     ColorFeaturePut,
@@ -83,6 +82,7 @@ from .scenes import (
     palette_actions,
     palette_feature,
     scene_lights,
+    scene_post_json,
 )
 from .sync import (
     INTENSITIES,
@@ -343,7 +343,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             created = await group.bridge.request(
                 "post",
                 "clip/v2/resource/scene",
-                json=dataclass_to_dict(post, skip_none=True),
+                json=scene_post_json(post),
             )
         except (AiohueException, ClientError, TimeoutError) as err:
             raise HomeAssistantError(

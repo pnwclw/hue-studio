@@ -15,6 +15,7 @@ import random
 from typing import Any
 
 from aiohue import HueBridgeV2
+from aiohue.util import dataclass_to_dict
 from aiohue.v2.models.feature import (
     ColorFeatureBase,
     ColorPoint,
@@ -432,6 +433,18 @@ def new_scene(
         actions=actions,
         palette=palette,
     )
+
+
+def scene_post_json(post: ScenePost) -> dict[str, Any]:
+    """The POST body of a new scene.
+
+    aiohue's palette model always carries (empty) `effects` and `effects_v2`, and the
+    bridge rejects a palette with both ("mutually exclusive"): send only effects_v2.
+    """
+    body = dataclass_to_dict(post, skip_none=True)
+    if (palette := body.get("palette")) is not None:
+        palette.pop("effects", None)
+    return body
 
 
 def _light_ref(light: Light) -> ResourceIdentifier:

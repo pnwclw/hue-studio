@@ -293,6 +293,8 @@ async def test_create_scene_from_gallery(
     assert body["group"] == {"rid": "res-room", "rtype": "room"}
     assert [a["target"]["rid"] for a in body["actions"]] == ["res-strip", "res-bulb"]
     assert len(body["palette"]["color"]) == 1
+    # The bridge rejects a palette with both effects and effects_v2.
+    assert "effects" not in body["palette"]
     assert body["palette"]["dimming"] == [{"brightness": 35}]
     assert "color" in body["actions"][1]["action"]
 
