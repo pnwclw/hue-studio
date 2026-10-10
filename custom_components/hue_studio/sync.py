@@ -1,19 +1,34 @@
 """Hue Play HDMI Sync Box: state polling, commands and the link to the bridge.
 
-The box has no event stream, so its state is polled; whenever an entertainment area
-starts or stops streaming the bridge pushes that over its event stream and the boxes
-are refreshed at once. Entertainment areas of the box are matched with the bridge's
-entertainment configurations, which tells which Hue lights are being synced.
+The box is driven through aiohuesyncbox (its models and controllers). It has no event
+stream, so its state is polled; whenever an entertainment area starts or stops
+streaming the bridge pushes that over its event stream and the boxes are refreshed at
+once. Entertainment areas of the box are matched with the bridge's entertainment
+configurations, which tells which Hue lights are being synced.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Any
 
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from aiohue.v2.models.entertainment_configuration import EntertainmentStatus
+from aiohuesyncbox import (
+    AiohuesyncboxException,
+    ExecutionMode,
+    GameMode,
+    HueSyncBox,
+    Input,
+    Intensity,
+    MusicMode,
+    SyncMode,
+    Unauthorized,
+    VideoMode,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -28,7 +43,6 @@ from .const import (
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
 from .lights import LIGHT_DOMAIN, async_bridges
-from .syncbox import SyncBox, SyncBoxAuthError, SyncBoxError
 
 if TYPE_CHECKING:
     from . import HueStudioConfigEntry
@@ -37,18 +51,44 @@ _LOGGER = logging.getLogger(__name__)
 
 POLL_INTERVAL = timedelta(seconds=3)
 
-SYNC_MODES = ["video", "music", "game"]
-INTENSITIES = ["subtle", "moderate", "high", "intense"]
+SYNC_MODES = [SyncMode.VIDEO.value, SyncMode.MUSIC.value, SyncMode.GAME.value]
+INTENSITIES = [
+    Intensity.SUBTLE.value,
+    Intensity.MODERATE.value,
+    Intensity.HIGH.value,
+    Intensity.INTENSE.value,
+]
 INPUTS = ["input1", "input2", "input3", "input4"]
-# ledMode values of the API, by option.
-LED_MODES = {"off": 0, "normal": 1, "dimmed": 2}
-MODE_POWERSAVE = "powersave"
-MODE_PASSTHROUGH = "passthrough"
 
 MODELS = {
     "HSB1": "Hue Play HDMI Sync Box",
     "HSB2": "Hue Play HDMI Sync Box 8K",
 }
+
+
+class SyncBoxNotFound(Exception):
+    """No Sync Box answered at the address."""
+
+
+async def async_get_box_id(session: ClientSession, host: str) -> tuple[str, str]:
+    """(box id, name) from the box's public device info, before pairing.
+
+    The id is the name its certificate is issued to; aiohuesyncbox needs it to verify
+    the connection, so this one unauthenticated request is not verified. Every later
+    one is.
+    """
+    try:
+        async with session.get(
+            f"https://{host}/api/v1/device",
+            ssl=False,
+            timeout=ClientTimeout(total=10),
+        ) as resp:
+            data = await resp.json(content_type=None)
+    except (ClientError, TimeoutError, ValueError) as err:
+        raise SyncBoxNotFound(host) from err
+    if not isinstance(data, dict) or not data.get("uniqueId"):
+        raise SyncBoxNotFound(host)
+    return str(data["uniqueId"]).upper(), str(data.get("name") or "")
 
 
 def pct_to_api(value: float) -> int:
@@ -73,6 +113,14 @@ def hue_target(group_id: str) -> str:
     return f"groups/{group_id}" if group_id.isdigit() else group_id
 
 
+def inputs(api: HueSyncBox) -> dict[str, Input]:
+    """HDMI inputs the box has, by API id (input1-4)."""
+    if api.hdmi is None:
+        return {}
+    ports = {key: getattr(api.hdmi, key) for key in INPUTS}
+    return {key: port for key, port in ports.items() if port is not None}
+
+
 @dataclass(frozen=True, slots=True)
 class SyncState:
     """The parts of the box state that entities and the panel read."""
@@ -86,78 +134,79 @@ class SyncState:
     area: str | None
 
     @classmethod
-    def of(cls, data: dict[str, Any]) -> SyncState:
-        """Interpret `execution` of a full state."""
-        execution = data["execution"]
-        current = execution.get("mode", MODE_POWERSAVE)
-        mode = current if current in SYNC_MODES else execution.get("lastSyncMode")
+    def of(cls, api: HueSyncBox) -> SyncState:
+        """Interpret the execution state."""
+        execution = api.execution
+        current = execution.mode.value
+        mode = current if current in SYNC_MODES else execution.last_sync_mode.value
         if mode not in SYNC_MODES:
-            mode = "video"
+            mode = SyncMode.VIDEO.value
+        intensity = getattr(execution, mode).intensity.value
         return cls(
-            power=current != MODE_POWERSAVE,
-            syncing=bool(execution.get("syncActive", current in SYNC_MODES)),
+            power=execution.mode != ExecutionMode.POWERSAVE,
+            syncing=execution.sync_active,
             mode=mode,
-            intensity=(execution.get(mode) or {}).get("intensity"),
-            brightness=api_to_pct(execution.get("brightness", 100)),
-            input=execution.get("hdmiSource"),
-            area=area_id(execution.get("hueTarget")),
+            intensity=intensity if intensity in INTENSITIES else None,
+            brightness=api_to_pct(execution.brightness),
+            input=execution.hdmi_source.value if execution.hdmi_source else None,
+            area=area_id(execution.hue_target),
         )
 
 
-class SyncBoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Polls one Sync Box and sends commands to it."""
+class SyncBoxCoordinator(DataUpdateCoordinator[None]):
+    """Polls one Sync Box (its state lives in `api`) and sends commands to it."""
 
     config_entry: HueStudioConfigEntry
 
     def __init__(
-        self, hass: HomeAssistant, entry: HueStudioConfigEntry, box: SyncBox
+        self, hass: HomeAssistant, entry: HueStudioConfigEntry, api: HueSyncBox
     ) -> None:
         """Poll every few seconds; the bridge triggers extra refreshes."""
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{DOMAIN} sync box {box.box_id}",
+            name=f"{DOMAIN} sync box",
             update_interval=POLL_INTERVAL,
+            # The state is the `api` object itself, updated in place.
+            always_update=True,
         )
-        self.box = box
+        self.api = api
 
-    async def _async_update_data(self) -> dict[str, Any]:
+    async def _async_update_data(self) -> None:
         try:
-            return await self.box.state()
-        except SyncBoxAuthError as err:
+            await self.api.refresh_data()
+        except Unauthorized as err:
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="sync_box_auth_failed"
             ) from err
-        except SyncBoxError as err:
+        except AiohuesyncboxException as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="sync_box_unreachable",
-                translation_placeholders={"host": self.box.host},
+                translation_placeholders={"host": self.config_entry.data["host"]},
             ) from err
 
     @property
-    def state(self) -> SyncState:
-        """Interpreted state (only valid after a successful refresh)."""
-        return SyncState.of(self.data)
+    def box_id(self) -> str:
+        """Id of the box (certificate name, 12 hex digits)."""
+        return self.api.device.unique_id
 
     @property
     def box_name(self) -> str:
         """The box's own name."""
-        return str(self.data["device"].get("name") or "Sync Box")
+        return self.api.device.name or "Sync Box"
 
-    async def async_execute(self, changes: dict[str, Any]) -> None:
-        """Change execution and read the result back."""
-        await self._async_command(self.box.execution, changes)
+    @property
+    def state(self) -> SyncState:
+        """Interpreted state."""
+        return SyncState.of(self.api)
 
-    async def async_set_device(self, changes: dict[str, Any]) -> None:
-        """Change device settings and read the result back."""
-        await self._async_command(self.box.device, changes)
-
-    async def _async_command(self, send: Any, changes: dict[str, Any]) -> None:
+    async def async_command(self, command: Awaitable[None]) -> None:
+        """Run a command of the library on the box, then read the state back."""
         try:
-            await send(changes)
-        except SyncBoxError as err:
+            await command
+        except AiohuesyncboxException as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="sync_box_command_failed",
@@ -165,18 +214,30 @@ class SyncBoxCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ) from err
         await self.async_refresh()
 
+    async def async_set_state(self, **changes: Any) -> None:
+        """`execution.set_state` of aiohuesyncbox with these keyword arguments."""
+        await self.async_command(self.api.execution.set_state(**changes))
+
     def intensity_changes(
         self, intensity: str, mode: str | None = None
     ) -> dict[str, Any]:
-        """Execution changes setting the intensity of `mode` (default: the current one).
+        """set_state arguments giving `mode` (default: the current one) an intensity.
 
-        `{"intensity": …}` only applies while syncing, so the mode's own settings are
+        `intensity=` alone only applies while syncing, so the mode's own settings are
         sent instead; the API expects them complete.
         """
         mode = mode or self.state.mode
-        settings = dict(self.data["execution"].get(mode) or {})
-        settings["intensity"] = intensity
-        return {mode: settings}
+        execution = self.api.execution
+        level = Intensity(intensity)
+        if mode == SyncMode.MUSIC:
+            return {
+                "music": MusicMode(intensity=level, palette=execution.music.palette)
+            }
+        if mode == SyncMode.GAME:
+            lighting = execution.game.background_lighting
+            return {"game": GameMode(intensity=level, background_lighting=lighting)}
+        lighting = execution.video.background_lighting
+        return {"video": VideoMode(intensity=level, background_lighting=lighting)}
 
 
 @callback
@@ -251,19 +312,19 @@ def sync_box_info(
 ) -> dict[str, Any]:
     """What the panel shows of one box (hue_studio/sync/subscribe)."""
     registry = er.async_get(hass)
-    box_id = coordinator.box.box_id
-    entity_id = registry.async_get_entity_id("switch", DOMAIN, f"{box_id}_light_sync")
-    if not coordinator.last_update_success or coordinator.data is None:
+    entity_id = registry.async_get_entity_id(
+        "switch", DOMAIN, f"{coordinator.box_id}_light_sync"
+    )
+    if not coordinator.last_update_success:
         return {"available": False, "entity_id": entity_id, "name": None}
-    data = coordinator.data
+    api = coordinator.api
     state = coordinator.state
-    hdmi = data.get("hdmi") or {}
-    groups: dict[str, Any] = (data.get("hue") or {}).get("groups") or {}
+    hdmi = api.hdmi
     return {
         "available": True,
         "entity_id": entity_id,
         "name": coordinator.box_name,
-        "model": MODELS.get(data["device"].get("deviceType"), "Sync Box"),
+        "model": MODELS.get(api.device.device_type, "Sync Box"),
         "power": state.power,
         "syncing": state.syncing,
         "mode": state.mode,
@@ -273,28 +334,27 @@ def sync_box_info(
         "inputs": [
             {
                 "id": key,
-                "name": hdmi[key].get("name") or key,
-                "type": hdmi[key].get("type"),
-                "status": hdmi[key].get("status"),
+                "name": port.name or key,
+                "type": port.type.value,
+                "status": port.status.value,
             }
-            for key in INPUTS
-            if isinstance(hdmi.get(key), dict)
+            for key, port in inputs(api).items()
         ],
         "area": state.area,
         "areas": sorted(
             (
                 {
-                    "id": group_id,
-                    "name": group.get("name") or group_id,
-                    "active": bool(group.get("active")),
-                    "lights": async_area_lights(hass, group_id),
+                    "id": group.id,
+                    "name": group.name or group.id,
+                    "active": group.active,
+                    "lights": async_area_lights(hass, group.id),
                 }
-                for group_id, group in groups.items()
+                for group in api.hue.groups
             ),
             key=lambda a: a["name"].casefold(),
         ),
-        "content": hdmi.get("contentSpecs") or None,
-        "video_supported": bool(hdmi.get("videoSyncSupported", True)),
-        "audio_supported": bool(hdmi.get("audioSyncSupported", True)),
-        "connection": (data.get("hue") or {}).get("connectionState"),
+        "content": (hdmi.content_specs or None) if hdmi else None,
+        "video_supported": hdmi.video_sync_supported if hdmi else True,
+        "audio_supported": hdmi.audio_sync_supported if hdmi else True,
+        "connection": api.hue.connection_state.value,
     }

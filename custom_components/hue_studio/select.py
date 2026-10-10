@@ -9,23 +9,19 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from aiohuesyncbox import ExecutionMode, HdmiSource, LedMode
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HueStudioConfigEntry
 from .entity import SyncBoxEntity
-from .sync import (
-    INPUTS,
-    INTENSITIES,
-    LED_MODES,
-    SYNC_MODES,
-    SyncBoxCoordinator,
-    hue_target,
-)
+from .sync import INTENSITIES, SYNC_MODES, SyncBoxCoordinator, hue_target, inputs
 
 PARALLEL_UPDATES = 1
+
+LED_MODES = {"off": LedMode.OFF, "normal": LedMode.REGULAR, "dimmed": LedMode.DIMMED}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,18 +35,12 @@ class SyncBoxSelectDescription(SelectEntityDescription):
 
 def _inputs(c: SyncBoxCoordinator) -> dict[str, str]:
     """Input name -> API id."""
-    hdmi = c.data.get("hdmi") or {}
-    return {
-        hdmi[key].get("name") or key: key
-        for key in INPUTS
-        if isinstance(hdmi.get(key), dict)
-    }
+    return {port.name or key: key for key, port in inputs(c.api).items()}
 
 
 def _areas(c: SyncBoxCoordinator) -> dict[str, str]:
     """Entertainment area name -> id."""
-    groups = (c.data.get("hue") or {}).get("groups") or {}
-    return {group.get("name") or gid: gid for gid, group in groups.items()}
+    return {group.name or group.id: group.id for group in c.api.hue.groups}
 
 
 def _name_of(mapping: dict[str, str], value: str | None) -> str | None:
@@ -58,19 +48,19 @@ def _name_of(mapping: dict[str, str], value: str | None) -> str | None:
 
 
 async def _select_input(c: SyncBoxCoordinator, option: str) -> None:
-    await c.async_execute({"hdmiSource": _inputs(c)[option]})
+    await c.async_set_state(hdmi_source=HdmiSource(_inputs(c)[option]))
 
 
 async def _select_area(c: SyncBoxCoordinator, option: str) -> None:
-    await c.async_execute({"hueTarget": hue_target(_areas(c)[option])})
+    await c.async_set_state(hue_target=hue_target(_areas(c)[option]))
 
 
 async def _select_led(c: SyncBoxCoordinator, option: str) -> None:
-    await c.async_set_device({"ledMode": LED_MODES[option]})
+    await c.async_command(c.api.device.set_led_mode(LED_MODES[option]))
 
 
 def _led(c: SyncBoxCoordinator) -> str | None:
-    mode = c.data["device"].get("ledMode")
+    mode = c.api.device.led_mode
     return next((name for name, value in LED_MODES.items() if value == mode), None)
 
 
@@ -80,13 +70,13 @@ DESCRIPTIONS = (
         options_fn=lambda c: SYNC_MODES,
         current_fn=lambda c: c.state.mode,
         # Like the Sync Box app: picking a mode starts syncing in it.
-        select_fn=lambda c, option: c.async_execute({"mode": option}),
+        select_fn=lambda c, option: c.async_set_state(mode=ExecutionMode(option)),
     ),
     SyncBoxSelectDescription(
         key="intensity",
         options_fn=lambda c: INTENSITIES,
         current_fn=lambda c: c.state.intensity,
-        select_fn=lambda c, option: c.async_execute(c.intensity_changes(option)),
+        select_fn=lambda c, option: c.async_set_state(**c.intensity_changes(option)),
     ),
     SyncBoxSelectDescription(
         key="hdmi_input",
@@ -123,6 +113,8 @@ async def async_setup_entry(
 
 class SyncBoxSelect(SyncBoxEntity, SelectEntity):
     """A select backed by the box state."""
+
+    _platform_domain = Platform.SELECT
 
     entity_description: SyncBoxSelectDescription
 

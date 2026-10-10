@@ -1,154 +1,136 @@
-"""Render the Hue Studio icon into custom_components/hue_studio/brand/.
+"""Render the Hue Studio brand images into custom_components/hue_studio/brand/.
 
-The icon is the panel's own color wheel: hue around the circle, white towards the
-center, with three light pins joined by a gradient line, as the wheel shows a gradient
-light. Home Assistant (2026.3+) shows a custom integration's `brand/` images in the
-integrations list instead of the brands CDN.
+A plain text logo: "Hue Studio" set in Inter (SIL Open Font License), no artwork. It
+deliberately imitates nothing of Philips Hue's own logo or lettering. Home Assistant
+(2026.3+) shows a custom integration's `brand/` images instead of the brands CDN:
+
+- icon: square, the name in two lines ("Hue" over "Studio");
+- logo: the name in one line, trimmed to the text;
+- dark_*: the same in light text for dark themes.
+
+The font is downloaded once into the user cache directory.
 
     uv run python scripts/build_icon.py
 """
 
 from __future__ import annotations
 
-import colorsys
 from pathlib import Path
+import urllib.request
 
-import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 BRAND = Path(__file__).parent.parent / "custom_components" / "hue_studio" / "brand"
+FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf"
+FONT_CACHE = Path.home() / ".cache" / "hue_studio" / "Inter.ttf"
 SUPERSAMPLE = 4
-# Size of the canvas in units of the final image; everything below is in these units.
-UNIT = 512
 
-WHEEL_RADIUS = 0.47
-# Pins: (angle in degrees, distance from the center as a share of the wheel radius).
-PINS = [(32.0, 0.66), (300.0, 0.74), (196.0, 0.56)]
-PIN_RADIUS = 0.082
-PIN_RING = 0.022
-LINE_WIDTH = 0.014
+LIGHT_TEXT = (28, 28, 30, 255)
+DARK_TEXT = (255, 255, 255, 255)
+# "Hue" bold, "Studio" lighter: the name reads as one word pair without any decoration.
+WEIGHT_HUE = 800
+WEIGHT_STUDIO = 400
+TRACKING = -0.02  # letter spacing, as a share of the font size
 
 
-# Angle around the wheel (0-1, clockwise from the top) -> hue in degrees. Warm colors
-# get more room and green less, closer to the Hue app's wheel than a plain HSV circle.
-HUE_STOPS = (
-    (0.0, 0.14, 0.26, 0.40, 0.55, 0.70, 0.85, 1.0),
-    (0.0, 28.0, 52.0, 115.0, 190.0, 232.0, 288.0, 360.0),
-)
-MAX_SATURATION = 0.9
+def font_path() -> Path:
+    """Inter, downloaded on first use."""
+    if not FONT_CACHE.exists():
+        FONT_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(FONT_URL) as response:
+            FONT_CACHE.write_bytes(response.read())
+    return FONT_CACHE
 
 
-def hue_at(turn: np.ndarray | float) -> np.ndarray:
-    """Hue (0-1) at a position around the wheel (0-1)."""
-    return np.interp(np.asarray(turn) % 1.0, *HUE_STOPS) / 360.0
+def font(size: float, weight: int) -> ImageFont.FreeTypeFont:
+    face = ImageFont.truetype(str(font_path()), round(size))
+    face.set_variation_by_axes([32, weight])  # optical size (display), weight
+    return face
 
 
-def saturation_at(dist: np.ndarray | float) -> np.ndarray:
-    """White in the middle, rising towards the rim."""
-    return np.clip(np.asarray(dist), 0, 1) ** 0.75 * MAX_SATURATION
+def draw_word(
+    draw: ImageDraw.ImageDraw,
+    xy: tuple[float, float],
+    text: str,
+    face: ImageFont.FreeTypeFont,
+    color: tuple[int, ...],
+) -> float:
+    """Draw `text` with tracking from `xy` (left, baseline); return the end x."""
+    x, y = xy
+    track = TRACKING * face.size
+    for char in text:
+        draw.text((x, y), char, font=face, fill=color, anchor="ls")
+        x += face.getlength(char) + track
+    return x - track
 
 
-def wheel_rgb(angle: np.ndarray, dist: np.ndarray) -> np.ndarray:
-    """RGB 0-1 of the wheel: hue by angle, saturation rising from a white center."""
-    hue = hue_at(angle / (2 * np.pi))
-    sat = saturation_at(dist)
-    # Vectorized HSV -> RGB with V = 1.
-    i = np.floor(hue * 6).astype(int) % 6
-    f = hue * 6 - np.floor(hue * 6)
-    p = 1 - sat
-    q = 1 - sat * f
-    t = 1 - sat * (1 - f)
-    one = np.ones_like(hue)
-    r = np.choose(i, [one, q, p, p, t, one])
-    g = np.choose(i, [t, one, one, q, p, p])
-    b = np.choose(i, [p, p, t, one, one, q])
-    # A slight darkening at the rim gives the disc some depth.
-    shade = 1 - 0.1 * np.clip(dist, 0, 1) ** 8
-    return np.stack([r, g, b], axis=-1) * shade[..., None]
+def word_width(text: str, face: ImageFont.FreeTypeFont) -> float:
+    return sum(face.getlength(c) for c in text) + TRACKING * face.size * (len(text) - 1)
 
 
-def pin_color(angle_deg: float, dist: float) -> tuple[int, int, int]:
-    """The wheel's color under a pin."""
-    rgb = colorsys.hsv_to_rgb(
-        float(hue_at(angle_deg / 360)), float(saturation_at(dist)), 1.0
-    )
-    return tuple(round(c * 255) for c in rgb)  # type: ignore[return-value]
+def trim(image: Image.Image, pad: int) -> Image.Image:
+    """Crop to the text, keeping `pad` px of transparent margin."""
+    left, top, right, bottom = image.getchannel("A").getbbox()
+    return image.crop((left - pad, top - pad, right + pad, bottom + pad))
 
 
-def render(size: int) -> Image.Image:
-    """The icon at `size` px (square, transparent background)."""
+def render_icon(size: int, color: tuple[int, ...]) -> Image.Image:
+    """Square: "Hue" over "Studio", both centered and as wide as the canvas allows."""
     big = size * SUPERSAMPLE
-    s = big / UNIT  # pixels per unit
-    center = big / 2
-    radius = WHEEL_RADIUS * UNIT * s
-
-    # Wheel: angle 0 at the top, clockwise (like the panel's wheel).
-    ys, xs = np.mgrid[0:big, 0:big].astype(np.float64) + 0.5
-    dx, dy = xs - center, ys - center
-    dist = np.hypot(dx, dy) / radius
-    angle = np.arctan2(dx, -dy)
-    rgb = wheel_rgb(angle, dist)
-    alpha = (dist <= 1.0).astype(np.float64)
-    wheel = Image.fromarray(
-        np.dstack([rgb * 255, alpha * 255]).round().astype(np.uint8), "RGBA"
+    image = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    width = big * 0.86
+    # Both lines fill the same width; "Studio" is the longer word, so it sets the size.
+    studio_size = big * width / word_width("Studio", font(big, WEIGHT_STUDIO))
+    hue_size = big * width / word_width("Hue", font(big, WEIGHT_HUE)) * 0.62
+    hue, studio = font(hue_size, WEIGHT_HUE), font(studio_size, WEIGHT_STUDIO)
+    hue_cap = hue.getbbox("H", anchor="ls")[1] * -1
+    studio_cap = studio.getbbox("S", anchor="ls")[1] * -1
+    gap = big * 0.06
+    top = (big - (hue_cap + gap + studio_cap)) / 2
+    hue_x = (big - word_width("Hue", hue)) / 2
+    draw_word(draw, (hue_x, top + hue_cap), "Hue", hue, color)
+    draw_word(
+        draw,
+        ((big - word_width("Studio", studio)) / 2, top + hue_cap + gap + studio_cap),
+        "Studio",
+        studio,
+        color,
     )
-
-    def point(angle_deg: float, share: float) -> tuple[float, float]:
-        a = np.radians(angle_deg)
-        return (
-            center + np.sin(a) * share * radius,
-            center - np.cos(a) * share * radius,
-        )
-
-    points = [point(a, d) for a, d in PINS]
-    pin_r = PIN_RADIUS * UNIT * s
-    ring = PIN_RING * UNIT * s
-
-    # Soft shadow under the pins and the line.
-    shadow = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    offset = 0.012 * UNIT * s
-    for x, y in points:
-        sd.ellipse(
-            (
-                x - pin_r - ring,
-                y - pin_r - ring + offset,
-                x + pin_r + ring,
-                y + pin_r + ring + offset,
-            ),
-            fill=(0, 0, 0, 110),
-        )
-    shadow = shadow.filter(ImageFilter.GaussianBlur(0.02 * UNIT * s))
-
-    overlay = Image.new("RGBA", (big, big), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    od.line(
-        points,
-        fill=(255, 255, 255, 235),
-        width=round(LINE_WIDTH * UNIT * s),
-        joint="curve",
-    )
-    for (x, y), (a, d) in zip(points, PINS, strict=True):
-        od.ellipse(
-            (x - pin_r - ring, y - pin_r - ring, x + pin_r + ring, y + pin_r + ring),
-            fill=(255, 255, 255, 255),
-        )
-        od.ellipse(
-            (x - pin_r, y - pin_r, x + pin_r, y + pin_r), fill=(*pin_color(a, d), 255)
-        )
-
-    image = Image.alpha_composite(wheel, shadow)
-    # Shadows only on the wheel, not outside it.
-    image.putalpha(wheel.getchannel("A"))
-    image = Image.alpha_composite(image, overlay)
     return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def render_logo(height: int, color: tuple[int, ...]) -> Image.Image:
+    """One line, trimmed to the text with a small margin; `height` px tall."""
+    size = 400 * SUPERSAMPLE
+    hue, studio = font(size, WEIGHT_HUE), font(size, WEIGHT_STUDIO)
+    space = hue.getlength(" ") * 0.9
+    width = word_width("Hue", hue) + space + word_width("Studio", studio)
+    image = Image.new("RGBA", (round(width + size), size * 2), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    end = draw_word(draw, (size / 2, size * 1.3), "Hue", hue, color)
+    draw_word(draw, (end + space, size * 1.3), "Studio", studio, color)
+    image = trim(image, round(size * 0.12))
+    return image.resize(
+        (round(image.width * height / image.height), height), Image.Resampling.LANCZOS
+    )
 
 
 def main() -> None:
     BRAND.mkdir(parents=True, exist_ok=True)
-    for name, size in (("icon.png", 256), ("icon@2x.png", 512)):
-        render(size).save(BRAND / name, optimize=True)
-        print(f"{BRAND / name}")
+    images = {
+        "icon.png": render_icon(256, LIGHT_TEXT),
+        "icon@2x.png": render_icon(512, LIGHT_TEXT),
+        "dark_icon.png": render_icon(256, DARK_TEXT),
+        "dark_icon@2x.png": render_icon(512, DARK_TEXT),
+        "logo.png": render_logo(128, LIGHT_TEXT),
+        "logo@2x.png": render_logo(256, LIGHT_TEXT),
+        "dark_logo.png": render_logo(128, DARK_TEXT),
+        "dark_logo@2x.png": render_logo(256, DARK_TEXT),
+    }
+    for name, image in images.items():
+        image.save(BRAND / name, optimize=True)
+        print(BRAND / name)
 
 
 if __name__ == "__main__":

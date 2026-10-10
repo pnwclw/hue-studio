@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from aiohuesyncbox import HueSyncBox, InvalidState, RequestError
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     ConfigEntry,
@@ -53,13 +54,7 @@ from .const import (
     KIND_SYNC_BOX,
 )
 from .options import async_hue_groups, async_light_areas
-from .syncbox import (
-    SyncBox,
-    SyncBoxError,
-    SyncBoxNotLinked,
-    async_get_device,
-    async_ssl_context,
-)
+from .sync import SyncBoxNotFound, async_get_box_id
 
 CONF_GROUP = "group"
 CONF_TARGET = "target"
@@ -159,15 +154,13 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             host = user_input[CONF_HOST].strip()
             try:
-                device = await async_get_device(
+                box_id, name = await async_get_box_id(
                     async_get_clientsession(self.hass), host
                 )
-            except SyncBoxError:
+            except SyncBoxNotFound:
                 errors["base"] = "cannot_connect"
             else:
-                return await self._async_found_box(
-                    host, str(device["uniqueId"]), str(device.get("name") or "")
-                )
+                return await self._async_found_box(host, box_id, name)
         return self.async_show_form(
             step_id="sync_box",
             data_schema=self.add_suggested_values_to_schema(
@@ -231,24 +224,27 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
         task, self._link_task = self._link_task, None
         try:
             self._credentials = task.result()
-        except TimeoutError, SyncBoxError:
+        except TimeoutError, RequestError:
             return self.async_show_progress_done(next_step_id="sync_box_retry")
         return self.async_show_progress_done(next_step_id="sync_box_finish")
 
     async def _async_register(self) -> tuple[str, str]:
-        box = SyncBox(
-            async_get_clientsession(self.hass),
-            await async_ssl_context(self.hass),
-            self._host,
-            self._box_id,
-        )
+        """(registration id, token) once the button on the box has been held."""
         instance = self.hass.config.location_name or "Home Assistant"
-        async with asyncio.timeout(LINK_TIMEOUT):
+        async with (
+            HueSyncBox(self._host, self._box_id) as api,
+            asyncio.timeout(LINK_TIMEOUT),
+        ):
             while True:
                 try:
-                    return await box.register(APP_NAME, instance)
-                except SyncBoxNotLinked:
+                    credentials = await api.register(APP_NAME, instance)
+                except InvalidState:
+                    # The box refuses until its button has been held.
                     await asyncio.sleep(LINK_RETRY)
+                    continue
+                if credentials is not None:
+                    return credentials.registration_id, credentials.access_token
+                await asyncio.sleep(LINK_RETRY)
 
     async def async_step_sync_box_retry(
         self, user_input: dict[str, Any] | None = None

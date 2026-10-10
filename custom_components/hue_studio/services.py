@@ -30,6 +30,7 @@ from aiohue.v2.models.feature import (
 )
 from aiohue.v2.models.light import LightPut
 from aiohue.v2.models.scene import SceneMetadataPut, ScenePut
+from aiohuesyncbox import ExecutionMode, HdmiSource
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -52,14 +53,12 @@ from .scenes import (
     scene_lights,
 )
 from .sync import (
-    INPUTS,
     INTENSITIES,
-    MODE_PASSTHROUGH,
-    MODE_POWERSAVE,
     SYNC_MODES,
     SyncBoxCoordinator,
     async_streaming_lights,
     hue_target,
+    inputs,
     pct_to_api,
 )
 
@@ -283,7 +282,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     async def set_sync(call: ServiceCall) -> None:
         """Change a Sync Box in one command (power, sync, mode, input, …)."""
         for coordinator in await _async_target_boxes(hass, call):
-            await coordinator.async_execute(_sync_changes(coordinator, call.data))
+            await coordinator.async_set_state(**_sync_changes(coordinator, call.data))
 
     hass.services.async_register(
         DOMAIN, SERVICE_SET_SYNC, set_sync, schema=SET_SYNC_SCHEMA
@@ -370,33 +369,31 @@ async def _async_target_boxes(
 def _sync_changes(
     coordinator: SyncBoxCoordinator, data: dict[str, Any]
 ) -> dict[str, Any]:
-    """One `/execution` update for a set_sync call."""
+    """`execution.set_state` arguments for a set_sync call (one command)."""
     if data.get(ATTR_POWER) is False:
-        return {"mode": MODE_POWERSAVE}
+        return {"mode": ExecutionMode.POWERSAVE}
     state = coordinator.state
     changes: dict[str, Any] = {}
     if (mode := data.get(ATTR_MODE)) is not None and data.get(ATTR_SYNC) is not False:
-        changes["mode"] = mode
+        changes["mode"] = ExecutionMode(mode)
     elif (sync := data.get(ATTR_SYNC)) is not None:
-        changes["syncActive"] = sync
+        changes["sync_active"] = sync
     elif data.get(ATTR_POWER) and not state.power:
-        changes["mode"] = MODE_PASSTHROUGH
+        changes["mode"] = ExecutionMode.PASSTHROUGH
     if (intensity := data.get(ATTR_INTENSITY)) is not None:
         changes.update(coordinator.intensity_changes(intensity, mode))
     if (source := data.get(ATTR_INPUT)) is not None:
-        changes["hdmiSource"] = _input_id(coordinator, source)
+        changes["hdmi_source"] = HdmiSource(_input_id(coordinator, source))
     if (area := data.get(ATTR_AREA)) is not None:
-        changes["hueTarget"] = hue_target(_area_id(coordinator, area))
+        changes["hue_target"] = hue_target(_area_id(coordinator, area))
     if (brightness := data.get(ATTR_BRIGHTNESS)) is not None:
         changes["brightness"] = pct_to_api(brightness)
     return changes
 
 
 def _input_id(coordinator: SyncBoxCoordinator, value: str) -> str:
-    hdmi = coordinator.data.get("hdmi") or {}
-    for key in INPUTS:
-        port = hdmi.get(key)
-        if isinstance(port, dict) and value in (key, port.get("name")):
+    for key, port in inputs(coordinator.api).items():
+        if value in (key, port.name):
             return key
     raise ServiceValidationError(
         translation_domain=DOMAIN,
@@ -406,10 +403,9 @@ def _input_id(coordinator: SyncBoxCoordinator, value: str) -> str:
 
 
 def _area_id(coordinator: SyncBoxCoordinator, value: str) -> str:
-    groups = (coordinator.data.get("hue") or {}).get("groups") or {}
-    for group_id, group in groups.items():
-        if value in (group_id, group.get("name")):
-            return group_id
+    for group in coordinator.api.hue.groups:
+        if value in (group.id, group.name):
+            return group.id
     raise ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key="unknown_area",

@@ -10,6 +10,3 @@ custom_components/hue_studio/frontend/gallery/
   https://www.apache.org/licenses/LICENSE-2.0
   Changes: converted to gallery.json, pictures cropped to 16:9 and resized to 480x270
   (scripts/build_gallery.py). The source commit is recorded in gallery.json.
-
-The Sync Box root certificate in custom_components/hue_studio/syncbox.py is the one
-published with aiohuesyncbox (https://github.com/mvdwetering/aiohuesyncbox, Apache-2.0).

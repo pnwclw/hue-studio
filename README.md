@@ -17,8 +17,9 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 > `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes and
 > lights, a gamut-aware color wheel with one pin per gradient point, light effects
 > (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
-> dynamic speed, auto-play, reset, dynamic playback) and the scene gallery with
-> "set once". See the roadmap below.
+> dynamic speed, auto-play, reset, dynamic playback), the scene gallery with
+> "set once", and the Hue Play HDMI Sync Box (a Sync tab, its own entities and
+> service). See the roadmap below.
 
 ## Services
 
@@ -30,6 +31,33 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
 | `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
+| `hue_studio.set_sync` | Change a Sync Box in one command: `power`, `sync`, `mode` (video/music/game), `intensity`, `input` (id or name), `entertainment_area` (id or name), `brightness`. |
+
+Palette, gradient and effect services leave lights alone while an entertainment area
+streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
+
+## Hue Play HDMI Sync Box
+
+Hue Studio talks to the Sync Box directly (local API via
+[aiohuesyncbox](https://github.com/mvdwetering/aiohuesyncbox)) and pairs with its
+button, so it replaces a separate Sync Box integration (do not run both: they would
+require the library side by side):
+
+- **Entities**: power and light sync switches; sync mode, intensity, HDMI input,
+  entertainment area and LED selects; brightness; HDMI port, content, bridge
+  connection and Wi-Fi sensors. Entity ids and option values match the popular HACS
+  Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
+  with your input names, …), so automations keep working after switching over:
+  remove the old integration first, then add the box to Hue Studio.
+- **Panel**: a Sync tab like in the Hue app, a Sync card in rooms whose lights the box
+  syncs, and no scenes on those lights while it syncs.
+- **Bridge link**: the box's entertainment areas are matched with the bridge, so Hue
+  Studio knows which lights are synced; when streaming starts or stops the bridge
+  pushes it and the box state refreshes at once (otherwise it is polled every 3 s).
+
+Add it under **Settings → Devices & services → Add integration → Hue Studio → Hue
+Play HDMI Sync Box** (or accept the discovered device), then hold the button on the box
+for about 3 seconds.
 
 ## Requirements
 
@@ -43,8 +71,8 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/pnwclw/hue-studio`,
    category **Integration**.
 2. Install **Hue Studio** and restart Home Assistant.
-3. **Settings → Devices & services → Add integration → Hue Studio**, then pick your Hue
-   bridge.
+3. **Settings → Devices & services → Add integration → Hue Studio → Hue bridge**, then
+   pick your Hue bridge.
 
 ### Manual
 
@@ -82,7 +110,9 @@ Releases: publishing a GitHub release `vX.Y.Z-alpha.N` (matching `version` in
 `manifest.json`, marked as a pre-release) builds the frontend and attaches `hue_studio.zip`,
 which HACS installs. Everything is alpha for now: enable "Show beta versions" in HACS.
 
-Rebuild the bundled scene gallery: `uv run python scripts/build_gallery.py`.
+Rebuild the bundled scene gallery: `uv run python scripts/build_gallery.py`; the icon
+and logo (`custom_components/hue_studio/brand/`, shown by Home Assistant 2026.3+):
+`uv run python scripts/build_icon.py`.
 
 ## License
 

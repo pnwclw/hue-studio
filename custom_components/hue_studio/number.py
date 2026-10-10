@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from homeassistant.components.number import NumberEntity
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -28,6 +28,8 @@ async def async_setup_entry(
 class BrightnessNumber(SyncBoxEntity, NumberEntity):
     """Sync brightness, 1-100 % (the box's 0-200, where 100 follows the source)."""
 
+    _platform_domain = Platform.NUMBER
+
     _attr_native_min_value = 1
     _attr_native_max_value = 100
     _attr_native_step = 1
@@ -40,4 +42,4 @@ class BrightnessNumber(SyncBoxEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the brightness."""
-        await self.coordinator.async_execute({"brightness": pct_to_api(value)})
+        await self.coordinator.async_set_state(brightness=pct_to_api(value))
