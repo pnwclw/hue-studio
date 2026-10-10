@@ -143,6 +143,15 @@
     },
     "sync_box_integration_unavailable": {
       "message": "Integracja Sync Box nie może teraz sterować {name}."
+    },
+    "not_hue_group": {
+      "message": "{entity_id} nie jest pomieszczeniem ani strefą Hue na mostku połączonym z Hue Studio."
+    },
+    "one_group": {
+      "message": "Wybierz dokładnie jedno pomieszczenie lub strefę Hue."
+    },
+    "scene_name_taken": {
+      "message": "W tym pomieszczeniu lub strefie jest już scena o nazwie {name}."
     }
   },
   "services": {
@@ -211,6 +220,36 @@
           "description": "Jasność w procentach."
         }
       }
+    },
+    "create_scene": {
+      "name": "Utwórz scenę",
+      "description": "Tworzy scenę w pomieszczeniu lub strefie Hue, widoczną w aplikacji Hue. Z kolorów sceny z galerii lub palety (rozłożonych na światła i zapisanych do odtwarzania dynamicznego i mieszania), w przeciwnym razie z tego, co światła pokazują teraz.",
+      "fields": {
+        "name": {
+          "name": "Nazwa",
+          "description": "Nazwa nowej sceny (unikalna w pomieszczeniu lub strefie)."
+        },
+        "gallery_scene": {
+          "name": "Scena z galerii",
+          "description": "Identyfikator sceny z galerii; używane są jej kolory i obraz."
+        },
+        "points": {
+          "name": "Kolory",
+          "description": "Kolory palety jako punkty CIE xy."
+        },
+        "mirek": {
+          "name": "Temperatura barwowa",
+          "description": "Biała paleta, w miredach."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Jasność palety w procentach."
+        }
+      }
+    },
+    "delete_scene": {
+      "name": "Usuń scenę",
+      "description": "Usuwa sceny Hue z mostka (a więc także z aplikacji Hue)."
     },
     "save_scene": {
       "name": "Zapisz scenę",
@@ -302,12 +341,6 @@
         "segmented_palette": "Segmenty"
       }
     },
-    "group_target": {
-      "options": {
-        "auto": "Automatycznie",
-        "zone": "Strefa (bez obszaru)"
-      }
-    },
     "effect": {
       "options": {
         "no_effect": "Bez efektu",
@@ -344,24 +377,14 @@
       "init": {
         "title": "Ustawienia Hue Studio",
         "menu_options": {
-          "group_select": "Pokoje i strefy Hue → obszary HA",
+          "groups": "Pokoje i strefy Hue → obszary HA",
           "room_select": "Czujniki w pokojach",
           "save": "Zapisz"
         }
       },
-      "group_select": {
-        "title": "Pokoje i strefy Hue",
-        "description": "Wybierz pokój lub strefę Hue, aby wskazać, do którego obszaru Home Assistant należy.",
-        "data": {
-          "group": "Pokój lub strefa Hue"
-        }
-      },
-      "group_target": {
-        "title": "{group}",
-        "description": "Automatycznie: grupa Hue staje się pokojem obszaru z dokładnie tymi samymi światłami, w przeciwnym razie jest pokazywana jako strefa. Wybierz obszar, aby połączyć ją z tym pokojem, albo Strefa, aby zawsze była strefą.",
-        "data": {
-          "target": "Należy do"
-        }
+      "groups": {
+        "title": "Pokoje i strefy Hue → obszary HA",
+        "description": "Po lewej każdy pokój lub strefa Hue, po prawej obszar Home Assistant, do którego należy. Wypełniane automatycznie, gdy obszar ma dokładnie te same światła; zostaw wiersz pusty, aby pokazać grupę jako strefę. Mostek nie jest zmieniany."
       },
       "room_select": {
         "title": "Czujniki w pokojach",
@@ -378,6 +401,9 @@
           "temperature": "Czujniki temperatury"
         }
       }
+    },
+    "error": {
+      "area_taken": "Inny pokój lub strefa Hue już należy do tego obszaru."
     },
     "abort": {
       "no_groups": "Nie znaleziono pokoi ani stref Hue ani obszarów ze światłami Hue."

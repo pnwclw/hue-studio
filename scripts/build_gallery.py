@@ -8,11 +8,19 @@ gallery.json:
   source: {repo, commit}
   categories: [{"id": "dreamy", "name": "Dreamy"}]
   scenes: [{"id": "ocean_dawn", "name": "Ocean dawn", "category": "dreamy",
-            "brightness": 84, "kind": "gradient", "points": [[x, y], ...]}
+            "brightness": 84, "kind": "gradient", "points": [[x, y], ...],
+            "public_image": "<uuid>"}
            | {..., "kind": "white", "mirek": 370}]
+
+`public_image` is the id of the scene's picture in the Hue app (CLIP v2
+`scene.metadata.image`, a `public_image` resource; the same on every bridge). Upstream
+does not have it: it comes from `hue_public_images.json` (Hue app scene name -> id),
+read off real bridges. Scenes created from the gallery carry it, so the Hue app shows
+their picture, and bridge scenes are matched to gallery pictures by it.
 
 Usage: uv run python scripts/build_gallery.py [path to a clone]
 Without a path the upstream repository is shallow-cloned into a temporary directory.
+`--images` only refreshes `public_image` in the existing gallery.json.
 """
 
 from __future__ import annotations
@@ -39,6 +47,7 @@ OUT = (
 # The upstream author's own presets, not part of the Hue app gallery.
 SKIP_CATEGORIES = {"Misc Additions"}
 THUMB_SIZE = (480, 270)
+PUBLIC_IMAGES = Path(__file__).resolve().parent / "hue_public_images.json"
 
 
 def slug(name: str, taken: set[str]) -> str:
@@ -75,6 +84,26 @@ def thumbnail(src: Path, dst: Path) -> None:
     im.crop(box).resize(THUMB_SIZE, Image.Resampling.LANCZOS).save(
         dst, quality=78, optimize=True, progressive=True
     )
+
+
+def add_public_images(scenes: list[dict[str, Any]]) -> int:
+    """Set `public_image` on scenes whose Hue app picture id is known; return count."""
+    known = {
+        name.casefold(): rid
+        for name, rid in json.loads(PUBLIC_IMAGES.read_text()).items()
+    }
+    count = 0
+    for scene in scenes:
+        scene.pop("public_image", None)
+        if (rid := known.get(scene["name"].casefold())) is not None:
+            scene["public_image"] = rid
+            count += 1
+    return count
+
+
+def write(gallery: dict[str, Any]) -> None:
+    """Write gallery.json."""
+    (OUT / "gallery.json").write_text(json.dumps(gallery, indent=1) + "\n")
 
 
 def build(src: Path) -> None:
@@ -125,17 +154,28 @@ def build(src: Path) -> None:
         thumbnail(base / "assets" / preset["img"], thumbs / f"{scene_id}.jpg")
         scenes.append(scene)
 
-    gallery = {
-        "source": {"repo": REPO, "commit": commit},
-        "categories": categories,
-        "scenes": scenes,
-    }
-    (OUT / "gallery.json").write_text(json.dumps(gallery, indent=1) + "\n")
-    print(f"{len(scenes)} scenes in {len(categories)} categories -> {OUT}")
+    images = add_public_images(scenes)
+    write(
+        {
+            "source": {"repo": REPO, "commit": commit},
+            "categories": categories,
+            "scenes": scenes,
+        }
+    )
+    print(
+        f"{len(scenes)} scenes in {len(categories)} categories "
+        f"({images} with a Hue app picture id) -> {OUT}"
+    )
 
 
 def main() -> None:
     """Entry point."""
+    if sys.argv[1:] == ["--images"]:
+        gallery = json.loads((OUT / "gallery.json").read_text())
+        images = add_public_images(gallery["scenes"])
+        write(gallery)
+        print(f"{images} scenes with a Hue app picture id")
+        return
     if len(sys.argv) > 1:
         build(Path(sys.argv[1]))
         return

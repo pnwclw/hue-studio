@@ -143,6 +143,15 @@
     },
     "sync_box_integration_unavailable": {
       "message": "The Sync Box integration cannot control {name} right now."
+    },
+    "not_hue_group": {
+      "message": "{entity_id} is not a Hue room or zone on a bridge connected to Hue Studio."
+    },
+    "one_group": {
+      "message": "Select exactly one Hue room or zone."
+    },
+    "scene_name_taken": {
+      "message": "There already is a scene named {name} in this room or zone."
     }
   },
   "services": {
@@ -211,6 +220,36 @@
           "description": "Brightness in percent."
         }
       }
+    },
+    "create_scene": {
+      "name": "Create scene",
+      "description": "Creates a scene in a Hue room or zone, visible in the Hue app. From a gallery scene or palette (spread over the lights and stored for dynamic play and shuffle), otherwise from what the lights show now.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Name of the new scene (unique in the room or zone)."
+        },
+        "gallery_scene": {
+          "name": "Gallery scene",
+          "description": "Id of a gallery scene; its colors and picture are used."
+        },
+        "points": {
+          "name": "Colors",
+          "description": "Palette colors as CIE xy points."
+        },
+        "mirek": {
+          "name": "Color temperature",
+          "description": "A white palette, in mired."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "Brightness of the palette in percent."
+        }
+      }
+    },
+    "delete_scene": {
+      "name": "Delete scene",
+      "description": "Deletes Hue scenes from the bridge (and so from the Hue app)."
     },
     "save_scene": {
       "name": "Save scene",
@@ -302,12 +341,6 @@
         "segmented_palette": "Segments"
       }
     },
-    "group_target": {
-      "options": {
-        "auto": "Automatic",
-        "zone": "Zone (no area)"
-      }
-    },
     "effect": {
       "options": {
         "no_effect": "No effect",
@@ -344,24 +377,14 @@
       "init": {
         "title": "Hue Studio settings",
         "menu_options": {
-          "group_select": "Hue rooms and zones → HA areas",
+          "groups": "Hue rooms and zones → HA areas",
           "room_select": "Sensors in rooms",
           "save": "Save"
         }
       },
-      "group_select": {
-        "title": "Hue rooms and zones",
-        "description": "Pick a Hue room or zone to choose which Home Assistant area it belongs to.",
-        "data": {
-          "group": "Hue room or zone"
-        }
-      },
-      "group_target": {
-        "title": "{group}",
-        "description": "Automatic: the Hue group becomes the room of the area with exactly the same lights, otherwise it is shown as a zone. Pick an area to merge it with that room, or Zone to always show it as a zone.",
-        "data": {
-          "target": "Belongs to"
-        }
+      "groups": {
+        "title": "Hue rooms and zones → HA areas",
+        "description": "Each Hue room or zone on the left, the Home Assistant area it belongs to on the right. Filled in automatically when an area has exactly the same lights; leave a row empty to show the group as a zone. The bridge itself is not changed."
       },
       "room_select": {
         "title": "Sensors in rooms",
@@ -378,6 +401,9 @@
           "temperature": "Temperature sensors"
         }
       }
+    },
+    "error": {
+      "area_taken": "Another Hue room or zone already belongs to this area."
     },
     "abort": {
       "no_groups": "No Hue rooms, zones or areas with Hue lights were found."

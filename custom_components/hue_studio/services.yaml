@@ -99,6 +99,45 @@ set_effect:
           max: 100
           unit_of_measurement: "%"
 
+create_scene:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    name:
+      required: true
+      example: Evening
+      selector:
+        text:
+    gallery_scene:
+      example: ocean_dawn
+      selector:
+        text:
+    points:
+      example: "[[0.561, 0.4042], [0.4596, 0.4105]]"
+      selector:
+        object:
+    mirek:
+      example: 346
+      selector:
+        number:
+          min: 153
+          max: 500
+          unit_of_measurement: mired
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+delete_scene:
+  target:
+    entity:
+      integration: hue
+      domain: scene
+
 save_scene:
   target:
     entity:

@@ -1,13 +1,18 @@
 """Tests for Hue Studio services."""
 
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 from aiohue.errors import AiohueException
+from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 import pytest
 
 from custom_components.hue_studio.const import DOMAIN
+
+from .conftest import LIGHTS, SCENES
 
 
 def _sent(bridge: MagicMock) -> dict[str, object]:
@@ -239,3 +244,97 @@ async def test_recall_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
         )
         put = hue_lights.scenes.scene.update.call_args.args[1]
         assert put.recall.action.value == expected
+
+
+@pytest.fixture
+def hue_room(hass: HomeAssistant, hue_lights: MagicMock) -> MagicMock:
+    """Make `light.room` a Hue room on the bridge (grouped light owned by a room)."""
+    hue_entry = hass.config_entries.async_entries("hue")[0]
+    hass.states.async_remove("light.room")
+    er.async_get(hass).async_get_or_create(
+        "light",
+        "hue",
+        "res-grouped",
+        config_entry=hue_entry,
+        suggested_object_id="room",
+    )
+    owner = ResourceIdentifier(rid="res-room", rtype=ResourceTypes.ROOM)
+    hue_lights.groups.grouped_light.get.side_effect = {
+        "res-grouped": SimpleNamespace(owner=owner)
+    }.get
+    hue_lights.groups.room.get_lights.side_effect = lambda rid: [
+        LIGHTS["res-strip"],
+        LIGHTS["res-bulb"],
+    ]
+    hue_lights.scenes.scene.__iter__.side_effect = lambda: iter(SCENES.values())
+    hue_lights.request = AsyncMock(return_value=[{"rid": "res-new", "rtype": "scene"}])
+    return hue_lights
+
+
+async def test_create_scene_from_gallery(
+    hass: HomeAssistant, hue_room: MagicMock
+) -> None:
+    """A gallery scene becomes a bridge scene with its palette spread over lights."""
+    result = await hass.services.async_call(
+        DOMAIN,
+        "create_scene",
+        {"entity_id": "light.room", "name": "Ocean", "gallery_scene": "rest"},
+        blocking=True,
+        return_response=True,
+    )
+    assert result == {"scene_id": "res-new"}
+    method, path = hue_room.request.call_args.args
+    body = hue_room.request.call_args.kwargs["json"]
+    assert (method, path) == ("post", "clip/v2/resource/scene")
+    assert body["metadata"] == {"name": "Ocean"}
+    assert body["group"] == {"rid": "res-room", "rtype": "room"}
+    assert [a["target"]["rid"] for a in body["actions"]] == ["res-strip", "res-bulb"]
+    assert len(body["palette"]["color"]) == 1
+    assert body["palette"]["dimming"] == [{"brightness": 35}]
+    assert "color" in body["actions"][1]["action"]
+
+
+async def test_create_scene_captures_lights(
+    hass: HomeAssistant, hue_room: MagicMock
+) -> None:
+    """Without a palette, the scene stores what the lights show now."""
+    await hass.services.async_call(
+        DOMAIN,
+        "create_scene",
+        {"entity_id": "light.room", "name": "Now"},
+        blocking=True,
+    )
+    body = hue_room.request.call_args.kwargs["json"]
+    assert "palette" not in body
+    assert len(body["actions"]) == 2
+
+
+async def test_create_scene_rejects(hass: HomeAssistant, hue_room: MagicMock) -> None:
+    """Taken names (any case) and lights that are no Hue room are rejected."""
+    with pytest.raises(ServiceValidationError) as taken:
+        await hass.services.async_call(
+            DOMAIN,
+            "create_scene",
+            {"entity_id": "light.room", "name": "sunset"},
+            blocking=True,
+        )
+    assert taken.value.translation_key == "scene_name_taken"
+    with pytest.raises(ServiceValidationError) as not_group:
+        await hass.services.async_call(
+            DOMAIN,
+            "create_scene",
+            {"entity_id": "light.bulb", "name": "New"},
+            blocking=True,
+        )
+    assert not_group.value.translation_key == "not_hue_group"
+    hue_room.request.assert_not_awaited()
+
+
+async def test_delete_scene(hass: HomeAssistant, hue_room: MagicMock) -> None:
+    """The scene is deleted on the bridge."""
+    await hass.services.async_call(
+        DOMAIN, "delete_scene", {"entity_id": "scene.sunset"}, blocking=True
+    )
+    hue_room.request.assert_awaited_once_with(
+        "delete", "clip/v2/resource/scene/res-scene"
+    )

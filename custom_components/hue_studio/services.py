@@ -1,6 +1,7 @@
 """Services: what the native `hue` integration cannot do.
 
-Palettes, gradients, effects with their parameters, editing scenes, and the Sync Box.
+Palettes, gradients, effects with their parameters, creating and editing scenes, and
+the Sync Box.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from typing import Any
 
 from aiohttp import ClientError
 from aiohue.errors import AiohueException
+from aiohue.util import dataclass_to_dict
 from aiohue.v2.models.feature import (
     ColorFeatureBase,
     ColorFeaturePut,
@@ -32,7 +34,13 @@ from aiohue.v2.models.light import LightPut
 from aiohue.v2.models.scene import SceneMetadataPut, ScenePut
 from aiohuesyncbox import ExecutionMode, HdmiSource
 from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+    callback,
+)
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.service import async_extract_entity_ids
@@ -51,11 +59,15 @@ from .lights import NOT_EFFECTS, HueLight, async_resolve_lights, supported_effec
 from .scenes import (
     SCENE_DOMAIN,
     HueScene,
+    async_resolve_group,
     async_resolve_scenes,
     captured_actions,
+    group_scene_names,
     is_resettable,
     light_entity_ids,
+    new_scene,
     palette_actions,
+    palette_feature,
     scene_lights,
 )
 from .sync import (
@@ -74,6 +86,8 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_APPLY_PALETTE = "apply_palette"
 SERVICE_SET_GRADIENT = "set_gradient"
 SERVICE_SET_EFFECT = "set_effect"
+SERVICE_CREATE_SCENE = "create_scene"
+SERVICE_DELETE_SCENE = "delete_scene"
 SERVICE_SAVE_SCENE = "save_scene"
 SERVICE_RESET_SCENE = "reset_scene"
 SERVICE_RECALL_SCENE = "recall_scene"
@@ -141,9 +155,25 @@ SET_EFFECT_SCHEMA = cv.make_entity_service_schema(
     }
 )
 
+SCENE_NAME = vol.All(cv.string, vol.Strip, vol.Length(min=1, max=32))
+
+CREATE_SCENE_SCHEMA = cv.make_entity_service_schema(
+    {
+        vol.Required(ATTR_NAME): SCENE_NAME,
+        vol.Exclusive(ATTR_GALLERY_SCENE, "palette"): cv.string,
+        vol.Exclusive(ATTR_POINTS, "palette"): vol.All(
+            [XY_POINT], vol.Length(min=1, max=9)
+        ),
+        vol.Exclusive(ATTR_MIREK, "palette"): MIREK,
+        vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+    }
+)
+
+DELETE_SCENE_SCHEMA = cv.make_entity_service_schema({})
+
 SAVE_SCENE_SCHEMA = cv.make_entity_service_schema(
     {
-        vol.Optional(ATTR_NAME): vol.All(cv.string, vol.Length(min=1, max=32)),
+        vol.Optional(ATTR_NAME): SCENE_NAME,
         vol.Optional(ATTR_SPEED): SPEED,
         vol.Optional(ATTR_AUTO_DYNAMIC): cv.boolean,
     }
@@ -237,6 +267,59 @@ def async_setup_services(hass: HomeAssistant) -> None:
             await _async_update(light, _effect_put(light, effect, call.data))
         await async_mark_manual(hass, _touched(call, lights))
 
+    async def create_scene(call: ServiceCall) -> ServiceResponse:
+        """Create a scene in a Hue room or zone, from a palette or the lights' state.
+
+        It lives on the bridge, so the Hue app shows it (with the gallery picture when
+        made from a gallery scene) and the native integration adds its entity.
+        """
+        found = await async_extract_entity_ids(call, expand_group=False)
+        if len(found) != 1:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="one_group"
+            )
+        group = async_resolve_group(hass, found.pop())
+        name = call.data[ATTR_NAME]
+        if name.casefold() in group_scene_names(group):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="scene_name_taken",
+                translation_placeholders={"name": name},
+            )
+        palette = image = None
+        if call.data.keys() & {ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK}:
+            source = await _async_palette(hass, call.data)
+            palette = palette_feature(source, call.data.get(ATTR_BRIGHTNESS))
+            image = source.get("public_image")
+        post = new_scene(group, name, palette, image)
+        try:
+            created = await group.bridge.request(
+                "post",
+                "clip/v2/resource/scene",
+                json=dataclass_to_dict(post, skip_none=True),
+            )
+        except (AiohueException, ClientError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"entity_id": group.entity_id},
+            ) from err
+        return {"scene_id": created[0]["rid"] if created else None}
+
+    async def delete_scene(call: ServiceCall) -> None:
+        """Delete scenes from the bridge (and so from the Hue app and HA)."""
+        for scene in await _async_target_scenes(hass, call):
+            try:
+                await scene.bridge.request(
+                    "delete", f"clip/v2/resource/scene/{scene.resource.id}"
+                )
+            except (AiohueException, ClientError, TimeoutError) as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="command_failed",
+                    translation_placeholders={"entity_id": scene.entity_id},
+                ) from err
+
     async def save_scene(call: ServiceCall) -> None:
         """Store what the scene's lights show now (plus name/speed/auto-play)."""
         for scene in await _async_target_scenes(hass, call):
@@ -305,6 +388,16 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SET_EFFECT, set_effect, schema=SET_EFFECT_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CREATE_SCENE,
+        create_scene,
+        schema=CREATE_SCENE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SAVE_SCENE, save_scene, schema=SAVE_SCENE_SCHEMA

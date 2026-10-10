@@ -91,7 +91,7 @@ export class SceneView extends StudioView {
       ? { ...room, key: `scene:${this.scene}`, lights, target: sameSet(lights, room.lights) ? room.target : lights }
       : room;
     const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const match = galleryMatch(ctx.gallery, this.name);
+    const match = galleryMatch(ctx.gallery, this.name, info?.image);
     const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
     const surface = surfaceOf({ on: true, colors: sceneColors(info) });
     const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}`;

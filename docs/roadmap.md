@@ -37,8 +37,8 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 - Panel: home, room, color wheel, gallery, effects (categories and 1–12 speed as in the Hue
   app), scene editor.
-- Services: `apply_palette`, `set_gradient`, `set_effect`, `save_scene`, `reset_scene`,
-  `recall_scene`.
+- Services: `apply_palette`, `set_gradient`, `set_effect`, `create_scene`,
+  `delete_scene`, `save_scene`, `reset_scene`, `recall_scene`.
 - WebSocket: `hue_studio/config/subscribe`, `hue_studio/lights/subscribe`,
   `hue_studio/scenes/subscribe`.
 - More-info override with fallback, Adaptive Lighting marking, room/zone mapping options.
@@ -54,13 +54,30 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ### A. Finish phase 1 (backend port) — highest priority
 
-1. Palette storage (decide: JSON/YAML file vs `helpers.storage.Store`; must stay
-   human-readable and diffable) and services `capture`, `palette_save`, `palette_delete`.
-2. Import of scenes from the bridge; `gallery:<id>` and `b64:<json>` palette references in
+1. ~~Storage~~ — decided, scenes done: room palettes are bridge scenes (CLIP v2 `palette` +
+   `metadata.image`), visible and editable in the Hue app; the rest (auto light, later
+   positions) in `helpers.storage.Store`, read/written via WS API and services only; no
+   YAML. Done: `create_scene` (from a gallery scene, points, a white or the lights'
+   current state; `public_image` from the gallery when it has one) and `delete_scene`.
+   The Store comes with its first data (A4, D). Still to do, in the panel (B1): saving
+   in an area without a Hue room/zone offers to assign one or create a zone on the
+   bridge.
+2. ~~Gallery picture ids~~ — done: `public_image` UUIDs (Hue app picture ids, read off a
+   bridge, `scripts/hue_public_images.json`) in the gallery data; the panel matches
+   bridge scenes to pictures by it, falling back to the name; scenes created from the
+   gallery get it as `metadata.image`. 27 of 142 known so far; add more as bridges show
+   them. Still to verify on the live bridge: that it accepts `metadata.image` on create.
+3. ~~Options: room mapping on one screen~~ — done, like HA's own vacuum segment -> area
+   mapping: one row per Hue room/zone with an area picker, prefilled with the automatic
+   match (same lights); an empty row is a zone; only deviations from the automatic
+   match are stored. Creating a zone on the bridge for an area without a Hue group
+   belongs to the panel (A1/B1). Still to do: screenshots on a live HA.
+4. `hue_studio.import_legacy`: move auto-light data from `lights.json` into the Store.
+5. Import of scenes from the bridge; `gallery:<id>` and `b64:<json>` palette references in
    `apply_palette`.
-3. ~~Honour `sync`~~ — done without configuration: lights streaming from an
+6. ~~Honour `sync`~~ — done without configuration: lights streaming from an
    entertainment area are known from the bridge. The legacy `sync` room key can go.
-4. Switch the legacy cards and automations over to Hue Studio services and remove the
+7. Switch the legacy cards and automations over to Hue Studio services and remove the
    legacy scripts (phase 1 done criterion).
 
 ### B. Catch up with the Hue app in the panel
@@ -77,7 +94,7 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 1. Read channel positions from `entertainment_configuration`
    (`hue_studio/positions/subscribe`).
 2. Position editor: top view plus height, draggable lights. Write back to the bridge for
-   lights in an entertainment area, store locally (same storage as palettes) for the rest.
+   lights in an entertainment area, store in the Store for the rest.
    Lock the editor while the entertainment area is streaming.
 3. Spatial palettes: distribute palette points along the room by light position;
    classic/spatial toggle as in the Hue app.
@@ -91,6 +108,9 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 - Manual mode, quiet hours, Adaptive Lighting interplay.
 
 ### E. Later
+
+- HA-first device setup: add Hue devices (lights, sensors, switches) through a wizard
+  of Hue Studio itself, assigning HA areas (and the matching Hue rooms) on the way.
 
 - Sync Box, direct pairing only: presets, IR codes, music palettes, background
   lighting (aiohuesyncbox already has them).

@@ -36,13 +36,20 @@ touching anything outside this repository.
      into the native integration's bridge object via `hass.data`: that is internal API and
      breaks on upgrades;
    - the bridge event stream (SSE) pushes state, no polling;
-   - **services with schemas** (`hue_studio.apply_palette`, `set_gradient`, `capture`,
-     `palette_save`, `palette_delete`, `set_effect`, …) — visible in the automation editor;
+   - **services with schemas** (`hue_studio.apply_palette`, `set_gradient`, `set_effect`,
+     `create_scene`, `delete_scene`, `save_scene`, …) — visible in the automation editor;
    - **WebSocket API** (`hue_studio/palettes`, `hue_studio/rooms`, `hue_studio/subscribe`,
      …) for the frontend;
-   - storage: a JSON/YAML file in the config directory or `helpers.storage.Store` — to be
-     decided during the port. Requirement: the data stays human-readable and diffable, so
-     it can be versioned in git together with the HA config.
+   - **where data lives — no divergence from the Hue app:** everything the Hue app can
+     show lives on the bridge. A palette saved in a room is a bridge scene with a CLIP v2
+     `palette` in that room's Hue room/zone (with the gallery's `public_image` id in
+     `metadata.image`), so the Hue app sees and edits it; changes from either side reach
+     the other through the bridge, there is no copy to sync. Only what the bridge can't
+     hold (auto-light pools, holidays, offsets, light positions outside entertainment
+     areas) goes to `helpers.storage.Store`;
+   - **GUI first, no YAML.** Every setting has a GUI path (panel or options flow) and is
+     read/written through the WS API and services, never by editing files. No YAML
+     configuration layer.
 3. **Frontend** — TypeScript + Lit in `src/`, bundled by esbuild into
    `custom_components/hue_studio/frontend/`; registered by the integration itself via
    `frontend.add_extra_js_url` (no manual Lovelace resources):
@@ -131,8 +138,9 @@ touching anything outside this repository.
 
 ## Data model
 
-Palettes, rooms and auto-light pools (format inherited from the legacy prototype; may be
-refined during the port):
+Legacy prototype format (`lights.json`), imported once into Hue Studio: room light lists
+are replaced by HA areas, palettes by bridge scenes, and `auto` goes to the Store keyed by
+area id:
 
 ```
 palettes: [{"id": "sunset", "name": "Sunset", "kind": "gradient", "points": [[x, y], ...2-5],
@@ -150,6 +158,8 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
   that an entertainment area streams to are known from the bridge.
 - Gradient modes: `interpolated_palette`, `random_pixelated`, and others from CLIP v2.
 - A palette reference in `apply` is a palette id, `gallery:<scene id>` or `b64:<json>`.
+- Gallery scenes carry the Hue `public_image` UUID of their picture; bridge scenes are
+  matched to gallery pictures by that id (`metadata.image`), not by name.
 - The scene gallery is built from [Hypfer/hass-scene_presets](https://github.com/Hypfer/hass-scene_presets)
   (Apache-2.0; 142 scenes, 480x270 thumbnails bundled, attribution in `NOTICE`).
 
@@ -170,8 +180,8 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 ```
 custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
-  scenes.py                     HA scene entity <-> bridge scene: info, save (capture lights), reset (palette)
-  services.py, services.yaml    apply_palette, set_gradient, set_effect, save_scene, reset_scene, recall_scene,
+  scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
+  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, save_scene, reset_scene, recall_scene,
                                 set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync/subscribe
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
@@ -203,6 +213,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing)
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
+scripts/hue_public_images.json  Hue app scene name -> picture id (`public_image`), from real bridges
 scripts/build_icon.py           renders brand/ (icon, logo, dark variants)
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
                                 simulated services), no HA needed

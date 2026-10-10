@@ -28,6 +28,8 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.apply_palette` | Apply a gallery scene (`gallery_scene`), up to 5 colors (`points`, CIE xy) or a white (`mirek`) to Hue lights, rooms or areas. Gradient lights get the whole palette, others one color each. |
 | `hue_studio.set_gradient` | Set 2-5 color points (and the mode) of Hue gradient lights. |
 | `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
+| `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. |
+| `hue_studio.delete_scene` | Delete Hue scenes from the bridge. |
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
 | `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
@@ -113,7 +115,7 @@ Assistant.
 ## Roadmap
 
 1. **Backend** — CLIP v2 client with event stream, services (`apply_palette`,
-   `set_gradient`, `capture`, palette management, effects) and a WebSocket API.
+   `set_gradient`, scenes created on the bridge, effects) and a WebSocket API.
 2. **`/hue` panel** — rooms, gamut-aware color wheel, scene gallery, palettes.
 3. **More-info override** for Hue lights, with a safe fallback to the stock dialog.
 4. **Auto light** — scene and brightness picked by time-of-day phase, season, weather and

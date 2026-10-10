@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import (
     area_registry as ar,
@@ -69,12 +70,11 @@ def async_hue_groups(
 
 
 @callback
-def async_light_areas(hass: HomeAssistant) -> list[ar.AreaEntry]:
-    """HA areas that contain at least one Hue light, in area registry order."""
-    entities = er.async_get(hass)
+def _async_hue_light_areas(hass: HomeAssistant) -> dict[str, str | None]:
+    """Every Hue light (not room/zone) entity id -> its area (entity, else device)."""
     devices = dr.async_get(hass)
-    used: set[str] = set()
-    for entry in entities.entities.values():
+    areas: dict[str, str | None] = {}
+    for entry in er.async_get(hass).entities.values():
         if entry.domain != LIGHT_DOMAIN or entry.platform != HUE_DOMAIN:
             continue
         state = hass.states.get(entry.entity_id)
@@ -84,9 +84,46 @@ def async_light_areas(hass: HomeAssistant) -> list[ar.AreaEntry]:
         if area_id is None and entry.device_id:
             device = devices.async_get(entry.device_id)
             area_id = device.area_id if device else None
-        if area_id:
-            used.add(area_id)
+        areas[entry.entity_id] = area_id
+    return areas
+
+
+@callback
+def async_light_areas(hass: HomeAssistant) -> list[ar.AreaEntry]:
+    """HA areas that contain at least one Hue light, in area registry order."""
+    used = set(_async_hue_light_areas(hass).values())
     return [area for area in ar.async_get(hass).async_list_areas() if area.id in used]
+
+
+@callback
+def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, str]:
+    """Hue group unique id -> the area it becomes the room of automatically.
+
+    Same rule as the panel (`buildHome` in model.ts): in area registry order, an area
+    takes the first unused group whose lights are exactly the Hue lights in the area.
+    """
+    light_areas = _async_hue_light_areas(hass)
+    members: dict[str, set[str]] = {}
+    for group in groups:
+        state = hass.states.get(group.entity_id)
+        ids = (state.attributes.get(ATTR_ENTITY_ID) or []) if state else []
+        members[group.unique_id] = {i for i in ids if i in light_areas}
+    auto: dict[str, str] = {}
+    for area in ar.async_get(hass).async_list_areas():
+        in_area = {i for i, a in light_areas.items() if a == area.id}
+        if not in_area:
+            continue
+        match = next(
+            (
+                g.unique_id
+                for g in groups
+                if g.unique_id not in auto and members[g.unique_id] == in_area
+            ),
+            None,
+        )
+        if match is not None:
+            auto[match] = area.id
+    return auto
 
 
 @callback

@@ -223,6 +223,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         palette,
         mirek: mirek ? [mirek] : [],
         lights: GROUPS[group][2].map((m) => `light.${m}`),
+        image: null,
       };
     }
   }

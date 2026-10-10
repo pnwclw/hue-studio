@@ -130,7 +130,7 @@ export class RoomView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const info = ctx.sceneInfo[s.entity_id];
-    const match = galleryMatch(ctx.gallery, s.name);
+    const match = galleryMatch(ctx.gallery, s.name, info?.image);
     const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
     const active = !!info && info.active !== "inactive";
     const playing = info?.active === "dynamic_palette";

@@ -44,13 +44,9 @@ async def test_options_flow_and_config_ws(
     assert result["type"] is FlowResultType.MENU
 
     # Hue room -> HA area
-    result = await flow.async_configure(
-        result["flow_id"], {"next_step_id": "group_select"}
-    )
-    assert result["step_id"] == "group_select"
-    result = await flow.async_configure(result["flow_id"], {"group": "grp-room"})
-    assert result["step_id"] == "group_target"
-    result = await flow.async_configure(result["flow_id"], {"target": office.id})
+    result = await flow.async_configure(result["flow_id"], {"next_step_id": "groups"})
+    assert result["step_id"] == "groups"
+    result = await flow.async_configure(result["flow_id"], {"Downstairs": office.id})
     assert result["type"] is FlowResultType.MENU
 
     # Sensors of the Office room
@@ -89,29 +85,72 @@ async def test_options_flow_and_config_ws(
     ]
 
 
-async def test_group_back_to_automatic(
+def _suggested(result: dict, field: str) -> str | None:
+    """The value a form field is prefilled with."""
+    for key in result["data_schema"].schema:
+        if key == field:
+            return (key.description or {}).get("suggested_value")
+    raise KeyError(field)
+
+
+async def _groups_step(hass: HomeAssistant, entry: MockConfigEntry) -> dict:
+    flow = hass.config_entries.options
+    result = await flow.async_init(entry.entry_id)
+    return await flow.async_configure(result["flow_id"], {"next_step_id": "groups"})
+
+
+async def _save(hass: HomeAssistant, result: dict) -> None:
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "save"}
+    )
+
+
+async def test_groups_prefilled_with_automatic_match(
     hass: HomeAssistant,
     hue_entry: MockConfigEntry,
     studio_entry: MockConfigEntry,
     hue_lights: MagicMock,
 ) -> None:
-    """Choosing "auto" removes the mapping."""
+    """Rows start at the area with the same lights; only deviations are stored."""
     registry = er.async_get(hass)
-    group = registry.async_get_or_create(
-        "light", HUE_DOMAIN, "grp-zone", config_entry=hue_entry
-    )
-    hass.states.async_set(group.entity_id, "off", {"is_hue_group": True})
-    hass.config_entries.async_update_entry(
-        studio_entry, options={"groups": {"grp-zone": "zone"}, "rooms": {}}
-    )
+    office = ar.async_get(hass).async_create("Office")
+    registry.async_update_entity("light.bulb", area_id=office.id)
+    for unique_id, name in (("grp-office", "Office"), ("grp-tv", "TV")):
+        group = registry.async_get_or_create(
+            "light", HUE_DOMAIN, unique_id, config_entry=hue_entry
+        )
+        hass.states.async_set(
+            group.entity_id,
+            "on",
+            {"is_hue_group": True, "friendly_name": name, "entity_id": ["light.bulb"]}
+            if unique_id == "grp-office"
+            else {"is_hue_group": True, "friendly_name": name},
+        )
     flow = hass.config_entries.options
-    result = await flow.async_init(studio_entry.entry_id)
+
+    # Accepting the prefilled rows stores nothing: the mapping stays automatic.
+    result = await _groups_step(hass, studio_entry)
+    assert _suggested(result, "Office") == office.id
+    assert _suggested(result, "TV") is None
+    result = await flow.async_configure(result["flow_id"], {"Office": office.id})
+    await _save(hass, result)
+    assert studio_entry.options["groups"] == {}
+
+    # Two groups for one area is an error.
+    result = await _groups_step(hass, studio_entry)
     result = await flow.async_configure(
-        result["flow_id"], {"next_step_id": "group_select"}
+        result["flow_id"], {"Office": office.id, "TV": office.id}
     )
-    result = await flow.async_configure(result["flow_id"], {"group": "grp-zone"})
-    result = await flow.async_configure(result["flow_id"], {"target": "auto"})
-    result = await flow.async_configure(result["flow_id"], {"next_step_id": "save"})
+    assert result["errors"] == {"TV": "area_taken"}
+
+    # Clearing an automatic match makes the group a zone; back again removes it.
+    result = await flow.async_configure(result["flow_id"], {})
+    await _save(hass, result)
+    assert studio_entry.options["groups"] == {"grp-office": "zone"}
+    result = await _groups_step(hass, studio_entry)
+    assert _suggested(result, "Office") is None
+    result = await flow.async_configure(result["flow_id"], {"Office": office.id})
+    await _save(hass, result)
     assert studio_entry.options["groups"] == {}
 
 

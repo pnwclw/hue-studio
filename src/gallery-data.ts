@@ -21,10 +21,21 @@ export const loadGallery = (): Promise<Gallery> =>
 
 export const thumbUrl = (id: string): string => new URL(`./gallery/thumb/${id}.jpg`, import.meta.url).href;
 
-/** Gallery scene with the same name as a bridge scene (e.g. "Read", "Ocean dawn"). */
-export function galleryMatch(gallery: Gallery | null, name: string | undefined): GalleryScene | null {
-  if (!name) return null;
+/**
+ * Gallery scene of a bridge scene: by the Hue app picture id (survives renaming), else
+ * by name (e.g. "Read", "Ocean dawn") for pictures whose id we do not know yet.
+ */
+export function galleryMatch(
+  gallery: Gallery | null,
+  name: string | undefined,
+  image?: string | null,
+): GalleryScene | null {
   if (!gallery) return null;
+  if (image) {
+    const byImage = gallery.scenes.find((s) => s.public_image === image);
+    if (byImage) return byImage;
+  }
+  if (!name) return null;
   const n = normalize(name);
   return gallery.scenes.find((s) => normalize(s.name) === n) || null;
 }

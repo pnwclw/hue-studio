@@ -26,9 +26,10 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, CONF_NAME
 from homeassistant.core import callback
-from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    AreaSelector,
+    AreaSelectorConfig,
     EntitySelector,
     EntitySelectorConfig,
     SelectOptionDict,
@@ -50,19 +51,21 @@ from .const import (
     CONF_SYNC_ENTRY_ID,
     CONF_TEMPERATURE,
     DOMAIN,
-    GROUP_AUTO,
     GROUP_ZONE,
     HUE_CONF_API_VERSION,
     HUE_DOMAIN,
     KIND_SYNC_BOX,
     KIND_SYNC_BOX_LINK,
 )
-from .options import async_hue_groups, async_light_areas
+from .options import (
+    HueGroup,
+    async_auto_areas,
+    async_hue_groups,
+    async_light_areas,
+)
 from .sync import SyncBoxNotFound, async_get_box_id
 from .sync_link import async_sync_box_entries, async_sync_box_entry_for
 
-CONF_GROUP = "group"
-CONF_TARGET = "target"
 CONF_ROOM = "room"
 
 APP_NAME = "Hue Studio"
@@ -395,8 +398,9 @@ class HueStudioConfigFlow(ConfigFlow, domain=DOMAIN):
 class HueStudioOptionsFlow(OptionsFlow):
     """Map Hue rooms/zones onto HA areas and attach sensors to rooms.
 
-    Works like a settings screen: a menu, a two-step editor for each part (pick the
-    item, then edit it), back to the menu; "Save" stores everything at once.
+    Works like a settings screen: a menu, an editor for each part (the room mapping on
+    one screen; sensors: pick the room, then edit it), back to the menu; "Save" stores
+    everything at once.
     """
 
     def __init__(self) -> None:
@@ -417,7 +421,7 @@ class HueStudioOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Menu."""
         return self.async_show_menu(
-            step_id="init", menu_options=["group_select", "room_select", "save"]
+            step_id="init", menu_options=["groups", "room_select", "save"]
         )
 
     async def async_step_save(
@@ -428,85 +432,56 @@ class HueStudioOptionsFlow(OptionsFlow):
 
     # ---- Hue room/zone -> HA area ----
 
-    async def async_step_group_select(
+    async def async_step_groups(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Pick a Hue room or zone."""
+        """One row per Hue room/zone with the area it belongs to.
+
+        Prefilled with the automatic match (the area with exactly the same lights), so
+        an existing setup only needs a look. An empty row shows the group as a zone.
+        Only deviations from the automatic match are stored, so the rest keeps
+        following changes of lights and areas.
+        """
         groups = async_hue_groups(self.hass, self.config_entry.data[CONF_HUE_ENTRY_ID])
         if not groups:
             return self.async_abort(reason="no_groups")
+        auto = async_auto_areas(self.hass, groups)
+        labels = _group_labels(groups)
+        stored = self._opts[CONF_GROUPS]
+        errors: dict[str, str] = {}
         if user_input is not None:
-            self._selected = user_input[CONF_GROUP]
-            return await self.async_step_group_target()
-        areas = {
-            area.id: area.name for area in ar.async_get(self.hass).async_list_areas()
-        }
-        options = [
-            SelectOptionDict(
-                value=g.unique_id,
-                label=_group_label(
-                    g.name, self._opts[CONF_GROUPS].get(g.unique_id), areas
-                ),
-            )
-            for g in groups
-        ]
+            chosen = {g.unique_id: user_input.get(labels[g.unique_id]) for g in groups}
+            seen: dict[str, str] = {}
+            for group in groups:
+                if (area := chosen[group.unique_id]) is None:
+                    continue
+                if area in seen:
+                    errors[labels[group.unique_id]] = "area_taken"
+                seen.setdefault(area, group.unique_id)
+            if not errors:
+                for group in groups:
+                    uid, area = group.unique_id, chosen[group.unique_id]
+                    if area == auto.get(uid):
+                        stored.pop(uid, None)
+                    elif area is None:
+                        stored[uid] = GROUP_ZONE
+                    else:
+                        stored[uid] = area
+                return await self.async_step_init()
+        fields: dict[Any, Any] = {}
+        for group in groups:
+            current = stored.get(group.unique_id, auto.get(group.unique_id))
+            if current == GROUP_ZONE:
+                current = None
+            if user_input is not None:
+                current = user_input.get(labels[group.unique_id])
+            fields[
+                vol.Optional(
+                    labels[group.unique_id], description={"suggested_value": current}
+                )
+            ] = AreaSelector(AreaSelectorConfig())
         return self.async_show_form(
-            step_id="group_select",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_GROUP): SelectSelector(
-                        SelectSelectorConfig(
-                            options=options, mode=SelectSelectorMode.LIST
-                        )
-                    )
-                }
-            ),
-        )
-
-    async def async_step_group_target(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Choose what a Hue room/zone is in HA: an area, a zone, or automatic."""
-        assert self._selected is not None
-        if user_input is not None:
-            target = user_input[CONF_TARGET]
-            groups = self._opts[CONF_GROUPS]
-            if target == GROUP_AUTO:
-                groups.pop(self._selected, None)
-            else:
-                groups[self._selected] = target
-            return await self.async_step_init()
-        name = next(
-            (
-                g.name
-                for g in async_hue_groups(self.hass)
-                if g.unique_id == self._selected
-            ),
-            self._selected,
-        )
-        options = [
-            SelectOptionDict(value=GROUP_AUTO, label=GROUP_AUTO),
-            SelectOptionDict(value=GROUP_ZONE, label=GROUP_ZONE),
-            *(
-                SelectOptionDict(value=area.id, label=area.name)
-                for area in ar.async_get(self.hass).async_list_areas()
-            ),
-        ]
-        current = self._opts[CONF_GROUPS].get(self._selected, GROUP_AUTO)
-        return self.async_show_form(
-            step_id="group_target",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_TARGET, default=current): SelectSelector(
-                        SelectSelectorConfig(
-                            options=options,
-                            mode=SelectSelectorMode.DROPDOWN,
-                            translation_key="group_target",
-                        )
-                    )
-                }
-            ),
-            description_placeholders={"group": name},
+            step_id="groups", data_schema=vol.Schema(fields), errors=errors
         )
 
     # ---- sensors per room ----
@@ -603,11 +578,17 @@ class HueStudioOptionsFlow(OptionsFlow):
         return group.name if group else ident
 
 
-def _group_label(name: str, target: str | None, areas: dict[str, str]) -> str:
-    """Group name plus its current mapping, e.g. `Downstairs → Kitchen`."""
-    if target in (None, GROUP_AUTO):
-        return name
-    return f"{name} → {areas.get(target, target)}"
+def _group_labels(groups: list[HueGroup]) -> dict[str, str]:
+    """Unique id -> form field label: the group name, numbered if names repeat."""
+    labels: dict[str, str] = {}
+    taken: set[str] = set()
+    for group in groups:
+        label, n = group.name, 2
+        while label.casefold() in taken:
+            label, n = f"{group.name} ({n})", n + 1
+        taken.add(label.casefold())
+        labels[group.unique_id] = label
+    return labels
 
 
 def _is_supported(entry: ConfigEntry) -> bool:

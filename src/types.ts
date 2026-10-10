@@ -94,6 +94,8 @@ export interface SceneInfo {
   mirek: number[];
   /** Light entity ids the scene sets. */
   lights: string[];
+  /** Id of the scene's picture in the Hue app (`public_image` of a gallery scene). */
+  image: string | null;
 }
 
 export interface ScenesMessage {
@@ -127,6 +129,8 @@ export interface GalleryScene extends Palette {
   id: string;
   name: string;
   category: string;
+  /** Id of the scene's picture in the Hue app, when known. */
+  public_image?: string;
 }
 
 export interface Gallery {
