@@ -138,6 +138,7 @@ ATTR_AREA = "entertainment_area"
 ATTR_DRY_RUN = "dry_run"
 ATTR_COMPLETE_SCENES = "complete_scenes"
 ATTR_DELETE_EMPTY_ROOMS = "delete_empty_rooms"
+ATTR_KEEP_SPLIT_SCENES = "keep_split_scenes"
 ATTR_LIGHTS = "lights"
 ATTR_LAYOUT = "layout"
 LAYOUTS = ("classic", "spatial")
@@ -240,6 +241,7 @@ ALIGN_ROOMS_SCHEMA = vol.Schema(
         vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
         vol.Optional(ATTR_COMPLETE_SCENES, default=True): cv.boolean,
         vol.Optional(ATTR_DELETE_EMPTY_ROOMS, default=False): cv.boolean,
+        vol.Optional(ATTR_KEEP_SPLIT_SCENES, default=False): cv.boolean,
     }
 )
 
@@ -496,6 +498,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
             dry_run=call.data[ATTR_DRY_RUN],
             complete_scenes=call.data[ATTR_COMPLETE_SCENES],
             delete_empty=call.data[ATTR_DELETE_EMPTY_ROOMS],
+            keep_split_scenes=call.data[ATTR_KEEP_SPLIT_SCENES],
         )
 
     async def save_scene(call: ServiceCall) -> None:

@@ -367,6 +367,10 @@ align_rooms:
       default: false
       selector:
         boolean:
+    keep_split_scenes:
+      default: false
+      selector:
+        boolean:
 
 update_zone:
   target:

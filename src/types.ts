@@ -156,6 +156,19 @@ export interface SceneChange {
   missing: string[];
 }
 
+/** A Hue room whose lights go to several areas, and the zone that can keep its scenes. */
+export interface RoomSplit {
+  /** Name of the zone over the room's lights (the room's, or its areas' joined). */
+  name: string;
+  /** The room's name now. */
+  from: string;
+  group: string | null;
+  /** The room's lights before alignment. */
+  lights: string[];
+  /** Its scenes that lose lights (entity ids): copied into the zone. */
+  scenes: string[];
+}
+
 /** How the bridge's rooms would change to match the HA areas. */
 export interface RoomsPlan {
   changed: boolean;
@@ -166,6 +179,8 @@ export interface RoomsPlan {
   scenes: SceneChange[];
   /** Lights of one device in different areas (left alone). */
   conflicts: string[];
+  /** Rooms split over several areas. */
+  splits: RoomSplit[];
   /** Light entity id -> its Hue room's name. */
   hue_rooms: Record<string, string>;
 }

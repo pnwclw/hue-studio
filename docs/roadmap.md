@@ -139,7 +139,9 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
    live HA.
 4. ~~Optional automatic alignment~~ — done: "Rooms follow areas" option.
 5. On the live bridge: dry run, review, then apply (see `rooms-and-scenes.md`, Work 5).
-6. Later: a split room's scenes moved to a zone over the same lights.
+6. ~~Keeping a split room's scenes~~ — done: `align_rooms` `keep_split_scenes` (and a
+   toggle on the rooms screen) copies the scenes that would lose lights into a new zone
+   over the room's original lights before the room is split.
 
 ### D. Phase 4 — auto light as building blocks (the main difference from the Hue app)
 

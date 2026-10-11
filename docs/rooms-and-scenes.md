@@ -109,8 +109,36 @@ lights:
 - **a light joins a room**: existing scenes have no action for it; offer "complete
   scenes": scenes with a palette are rebuilt from it (as "Reset scene"), others copy the
   state of a neighbouring light;
-- **a room is split** (one Hue room covering several areas): its scenes can be moved to a
-  new zone over the same lights, so nothing is lost.
+- **a room is split** (one Hue room whose lights end up in several rooms): its scenes
+  can be kept in a new zone over the same lights, so nothing is lost (below).
+
+### Keeping the scenes of a split room
+
+CLIP v2 scenes cannot change their room or zone, so "moving" them means copies.
+With `keep_split_scenes` (`align_rooms`; on the rooms screen "Keep scenes of split
+rooms", off by default), before any room changes:
+
+1. A zone is created with all lights the room has before alignment (the room's
+   archetype, so the Hue app shows the same icon).
+2. Every scene of the room that would lose lights is copied into it: same actions,
+   palette, name, picture, speed and auto-play. Scenes that keep all their lights are
+   not copied. The originals stay in the room (and lose the lights that leave), so the
+   Hue app shows both; delete either side by hand if you don't need it.
+3. Then the rooms are aligned as usual. If the zone or a copy cannot be created, the
+   call stops before any room is touched; a retry creates another zone.
+
+Which rooms count as split (`Plan.splits`): an existing room whose lights end up in more
+than one room after alignment — an area's room, or the room itself for lights that stay
+(no area, conflicts). Only full plans have splits; a targeted alignment ("Restore in
+Hue") never creates zones. A room that moves whole into another room is not split.
+
+Zone name: the room's own name, unless a room or zone after alignment has it (usually
+the area that took the room has the same name). Then the names of the areas its lights
+go to (plus the room's own name for lights staying in a room no area takes), in HA's
+area order, joined with " + " ("Living room + Kitchen"); longer than Hue's 32
+characters, the first area and how many more ("Living room +2"); still taken, a number
+is added ("Living room + Kitchen 2"). The name is made only of the user's own names, so
+it needs no translation.
 
 ## The options mapping (A3) after this
 
@@ -122,7 +150,7 @@ wants to treat as an area's command target, or a setup where alignment is off.
 
 1. ~~Pure comparison module~~ — `alignment.py`, `tests/test_alignment.py`.
 2. ~~Services~~ — `align_rooms` (with `dry_run`, a target, `complete_scenes`,
-   `delete_empty_rooms`), `create_zone`, `update_zone`, `delete_zone`; WebSocket
+   `delete_empty_rooms`, `keep_split_scenes`), `create_zone`, `update_zone`, `delete_zone`; WebSocket
    `hue_studio/rooms/subscribe` (the plan, pushed on every change) and
    `hue_studio/lights/set_area`.
 3. ~~Panel~~ — "Rooms and zones" screen, mismatch notes in rooms, "No room" on the home
@@ -132,5 +160,6 @@ wants to treat as an area's command target, or a setup where alignment is off.
 5. On a real bridge: dry run first, apply only after review. Still to verify there: that
    the bridge accepts room PUTs in this order, drops moved lights from the old room's
    scenes by itself, and accepts scene actions for lights right after they joined.
-6. Later: when a room is split, move its scenes to a zone over the same lights instead of
-   letting them lose lights.
+6. ~~Split rooms~~ — `align_rooms` `keep_split_scenes`: scenes of a split room are copied
+   into a new zone over its original lights first (above). Still to verify on a real
+   bridge: that a scene POST into a zone created a moment earlier is accepted.

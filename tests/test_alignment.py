@@ -7,6 +7,7 @@ from custom_components.hue_studio.alignment import (
     Room,
     Scene,
     SceneChange,
+    Split,
     archetype_for,
     compute_plan,
 )
@@ -52,6 +53,15 @@ def test_one_room_over_three_areas() -> None:
     assert plan.scenes == (SceneChange("s-relax", lost=("l-bulb", "l-garland")),)
     assert plan.empty == ()
     assert plan.changed
+    # "Living room" stays with the room: the zone is named after the areas.
+    assert plan.splits == (
+        Split(
+            "r-down",
+            "Living room + Kitchen + Bedroom",
+            ("l-bulb", "l-garland", "l-play", "l-strip"),
+            ("s-relax",),
+        ),
+    )
 
 
 def test_aligned_setup_changes_nothing() -> None:
@@ -187,6 +197,79 @@ def test_only_some_lights() -> None:
     (target,) = plan.rooms
     assert (target.room, target.devices) == ("r-kitchen", ("d-bulb",))
     assert not target.rename
+
+
+def test_split_room_keeps_its_name_in_a_zone() -> None:
+    """A split room renamed after its area leaves its name to the zone.
+
+    Only scenes that lose lights are copied; a room moving whole is not split.
+    """
+    lights = [
+        _light("strip", "living_room"),
+        _light("play", "living_room"),
+        _light("bulb", "kitchen"),
+        _light("lamp", "bedroom"),
+    ]
+    rooms = [
+        Room("r-down", "Downstairs", ("d-strip", "d-play", "d-bulb", "d-sensor")),
+        Room("r-up", "Upstairs", ("d-lamp",)),
+    ]
+    scenes = [
+        Scene("s-tv", "r-down", ("l-strip", "l-play")),
+        Scene("s-all", "r-down", ("l-strip", "l-bulb")),
+        Scene("s-up", "r-up", ("l-lamp",)),
+    ]
+    plan = compute_plan(AREAS, lights, rooms, scenes)
+    assert plan.splits == (
+        Split("r-down", "Downstairs", ("l-bulb", "l-play", "l-strip"), ("s-all",)),
+    )
+
+    # A zone has that name already: the areas' names, numbered when taken too.
+    plan = compute_plan(
+        AREAS,
+        lights,
+        rooms,
+        scenes,
+        zone_names=["downstairs", "Living room + Kitchen"],
+    )
+    assert plan.splits[0].name == "Living room + Kitchen 2"
+
+
+def test_split_zone_names() -> None:
+    """Too long for Hue: the first area and how many more; a room no area takes."""
+    areas = [
+        Area("a", "A rather long first area name"),
+        Area("b", "Second"),
+        Area("c", "Third"),
+    ]
+    lights = [_light("x", "a"), _light("y", "b"), _light("z", "c")]
+    rooms = [Room("r", "A rather long first area name", ("d-x", "d-y", "d-z"))]
+    (split,) = compute_plan(areas, lights, rooms, []).splits
+    assert split.name == "A rather long first area name +2"
+    assert len(split.name) <= 32
+    assert split.scenes == ()
+
+    # Lights without area stay in a room no area takes (it keeps its name).
+    lights = [
+        _light("loose", None),
+        _light("bulb", "kitchen"),
+        _light("lamp", "kitchen"),
+        _light("pan", "kitchen"),
+    ]
+    rooms = [
+        Room("r-kitchen", "Kitchen", ("d-lamp", "d-pan")),
+        Room("r-old", "Old", ("d-loose", "d-bulb")),
+    ]
+    (split,) = compute_plan(AREAS, lights, rooms, []).splits
+    assert (split.room, split.name) == ("r-old", "Kitchen + Old")
+
+
+def test_no_splits_for_targeted_moves() -> None:
+    """With `only` (e.g. "Restore in Hue"), no room is reported as split."""
+    lights = [_light("strip", "living_room"), _light("bulb", "kitchen")]
+    rooms = [Room("r-living", "Living room", ("d-strip", "d-bulb"))]
+    assert compute_plan(AREAS, lights, rooms, []).splits
+    assert compute_plan(AREAS, lights, rooms, [], only={"l-bulb"}).splits == ()
 
 
 def test_current_rooms_and_long_names() -> None:

@@ -17,8 +17,8 @@ from aiohttp import ClientError
 from aiohue import HueBridgeV2
 from aiohue.errors import AiohueException
 from aiohue.v2.controllers.events import EventType
-from aiohue.v2.models.resource import ResourceTypes
-from aiohue.v2.models.scene import ScenePut
+from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
+from aiohue.v2.models.scene import SceneMetadata, ScenePost, ScenePut
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import (
@@ -31,11 +31,13 @@ from homeassistant.helpers.debounce import Debouncer
 from . import alignment
 from .const import DOMAIN, HUE_DOMAIN
 from .lights import LIGHT_DOMAIN, async_all_lights, async_bridges
-from .scenes import SCENE_DOMAIN, completed_actions
+from .scenes import SCENE_DOMAIN, completed_actions, scene_post_json
 
 _LOGGER = logging.getLogger(__name__)
 
 ROOM_PATH = "clip/v2/resource/room"
+ZONE_PATH = "clip/v2/resource/zone"
+SCENE_PATH = "clip/v2/resource/scene"
 # Changes of areas, devices and entities settle before the plan is recomputed.
 TRACK_COOLDOWN = 1.0
 
@@ -54,11 +56,18 @@ class BridgeRooms:
     light_entities: dict[str, str]
     scene_entities: dict[str, str]
     room_entities: dict[str, str]
+    # Names of the bridge's zones (avoided when naming zones for split rooms).
+    zone_names: list[str]
 
     def plan(self, only: set[str] | None = None) -> alignment.Plan:
         """The alignment plan (cut down to some lights with `only`, light ids)."""
         return alignment.compute_plan(
-            self.areas, self.lights, self.rooms, self.scenes, only=only
+            self.areas,
+            self.lights,
+            self.rooms,
+            self.scenes,
+            only=only,
+            zone_names=self.zone_names,
         )
 
 
@@ -143,6 +152,7 @@ def async_bridge_rooms(hass: HomeAssistant) -> list[BridgeRooms]:
                 light_entities=light_entities,
                 scene_entities=scene_entities,
                 room_entities=room_entities,
+                zone_names=[zone.metadata.name for zone in bridge.groups.zone],
             )
         )
     return result
@@ -213,6 +223,19 @@ def plan_payload(side: BridgeRooms, plan: alignment.Plan) -> dict[str, Any]:
             for change in plan.scenes
         ],
         "conflicts": device_entities(plan.conflicts),
+        "splits": [
+            {
+                "name": split.name,
+                "from": room_name[split.room],
+                "group": side.room_entities.get(split.room),
+                "lights": entities(split.lights),
+                "scenes": [
+                    side.scene_entities.get(scene) or names.get(scene, scene)
+                    for scene in split.scenes
+                ],
+            }
+            for split in plan.splits
+        ],
         "hue_rooms": {
             entity_id: room_name[room_id]
             for device, room_id in plan.current.items()
@@ -229,6 +252,7 @@ def merge_payloads(payloads: list[dict[str, Any]]) -> dict[str, Any]:
         "empty": [],
         "scenes": [],
         "conflicts": [],
+        "splits": [],
         "hue_rooms": {},
     }
     for payload in payloads:
@@ -258,12 +282,15 @@ async def async_align(
     dry_run: bool = False,
     complete_scenes: bool = True,
     delete_empty: bool = False,
+    keep_split_scenes: bool = False,
     hue_entry_id: str | None = None,
 ) -> dict[str, Any]:
     """Compute the plan of each bridge and (unless `dry_run`) apply it.
 
-    `only` (light entity ids) restricts the plan to moving those lights. Returns the
-    payload of what was (or would be) done.
+    `only` (light entity ids) restricts the plan to moving those lights. With
+    `keep_split_scenes`, the scenes of a room that is split over several areas are
+    copied into a new zone over the room's lights first. Returns the payload of what
+    was (or would be) done.
     """
     payloads: list[dict[str, Any]] = []
     for side in async_bridge_rooms(hass):
@@ -277,7 +304,9 @@ async def async_align(
         plan = side.plan(ids)
         payloads.append(plan_payload(side, plan))
         if not dry_run:
-            await _async_apply(side, plan, complete_scenes, delete_empty)
+            await _async_apply(
+                side, plan, complete_scenes, delete_empty, keep_split_scenes
+            )
     return merge_payloads(payloads)
 
 
@@ -286,13 +315,17 @@ async def _async_apply(
     plan: alignment.Plan,
     complete_scenes: bool,
     delete_empty: bool,
+    keep_split_scenes: bool,
 ) -> None:
     """Write the plan to the bridge, one request at a time.
 
-    Devices leave their rooms first (a device can be in one room only), then new rooms
-    are created with their devices and existing ones get theirs (and their new names).
+    Scenes of split rooms are kept in zones first (while the rooms are still whole).
+    Then devices leave their rooms (a device can be in one room only), new rooms are
+    created with their devices and existing ones get theirs (and their new names).
     """
     bridge = side.bridge
+    if keep_split_scenes:
+        await _async_keep_split_scenes(bridge, plan)
     names = {room.id: room.name for room in side.rooms}
     children: dict[str, list[dict[str, str]]] = {
         room.id: [{"rid": c.rid, "rtype": c.rtype.value} for c in room.children]
@@ -352,6 +385,69 @@ async def _async_apply(
 
     if complete_scenes:
         await _async_complete_scenes(bridge, plan)
+
+
+async def _async_keep_split_scenes(bridge: HueBridgeV2, plan: alignment.Plan) -> None:
+    """Copy the scenes of split rooms into new zones over the rooms' lights.
+
+    Copies keep the actions, palette, name, picture, speed and auto-play; the room's
+    own scenes stay (and lose the lights that leave). A failure stops before any room
+    is changed, so no scene loses a light without its copy.
+    """
+    for split in plan.splits:
+        scenes = [s for rid in split.scenes if (s := bridge.scenes.scene.get(rid))]
+        if not scenes:
+            continue
+        room = bridge.groups.room.get(split.room)
+        created = await _async_split_request(
+            bridge,
+            split,
+            ZONE_PATH,
+            {
+                "type": "zone",
+                "metadata": {
+                    "name": split.name,
+                    "archetype": room.metadata.archetype.value
+                    if room is not None
+                    else "other",
+                },
+                "children": [
+                    {"rid": rid, "rtype": ResourceTypes.LIGHT.value}
+                    for rid in split.lights
+                ],
+            },
+        )
+        zone = ResourceIdentifier(rid=created[0]["rid"], rtype=ResourceTypes.ZONE)
+        for scene in scenes:
+            post = ScenePost(
+                metadata=SceneMetadata(
+                    name=scene.metadata.name, image=scene.metadata.image
+                ),
+                group=zone,
+                actions=scene.actions,
+                palette=scene.palette,
+                speed=scene.speed,
+                auto_dynamic=scene.auto_dynamic,
+            )
+            await _async_split_request(bridge, split, SCENE_PATH, scene_post_json(post))
+
+
+async def _async_split_request(
+    bridge: HueBridgeV2, split: alignment.Split, path: str, body: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """POST a zone or scene for a split room; the bridge's answer (created ids)."""
+    failed = HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="split_zone_failed",
+        translation_placeholders={"name": split.name},
+    )
+    try:
+        created = await bridge.request("post", path, json=body)
+    except (AiohueException, ClientError, TimeoutError) as err:
+        raise failed from err
+    if not created:
+        raise failed
+    return created
 
 
 async def _async_complete_scenes(bridge: HueBridgeV2, plan: alignment.Plan) -> None:

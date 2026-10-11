@@ -5,9 +5,10 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+from aiohue.errors import AiohueException
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import (
     area_registry as ar,
     device_registry as dr,
@@ -121,6 +122,16 @@ async def test_dry_run(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
         "light.bulb": "Living room",
     }
     assert plan["empty"] == [] and plan["conflicts"] == []
+    # The room is split (strip stays, bulb goes): its name stays with the room.
+    assert plan["splits"] == [
+        {
+            "name": "Living room + Kitchen",
+            "from": "Living room",
+            "group": "light.room",
+            "lights": ["light.bulb", "light.strip"],
+            "scenes": ["scene.sunset", "scene.plain"],
+        }
+    ]
 
 
 async def test_apply(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
@@ -139,6 +150,54 @@ async def test_apply(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
                 "children": [{"rid": "dev-res-bulb", "rtype": "device"}],
             },
         ),
+    ]
+
+
+async def test_keep_split_scenes(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
+    """A zone over the split room's lights gets copies of its scenes, rooms after."""
+    rooms_bridge.groups.room.get.side_effect = lambda rid: SimpleNamespace(
+        metadata=SimpleNamespace(archetype=SimpleNamespace(value="living_room"))
+    )
+    rooms_bridge.request = AsyncMock(
+        side_effect=lambda method, path, **_: [{"rid": f"new-{path.split('/')[-1]}"}]
+    )
+    await _align(hass, keep_split_scenes=True)
+    calls = [(c.args, c.kwargs.get("json")) for c in rooms_bridge.request.mock_calls]
+    assert [args for args, _ in calls] == [
+        ("post", "clip/v2/resource/zone"),
+        ("post", "clip/v2/resource/scene"),
+        ("post", "clip/v2/resource/scene"),
+        ("put", "clip/v2/resource/room/res-room"),
+        ("post", "clip/v2/resource/room"),
+    ]
+    assert calls[0][1] == {
+        "type": "zone",
+        "metadata": {"name": "Living room + Kitchen", "archetype": "living_room"},
+        "children": [
+            {"rid": "res-bulb", "rtype": "light"},
+            {"rid": "res-strip", "rtype": "light"},
+        ],
+    }
+    sunset = calls[1][1]
+    assert sunset["group"] == {"rid": "new-zone", "rtype": "zone"}
+    assert sunset["metadata"] == {"name": "Sunset"}
+    assert [a["target"]["rid"] for a in sunset["actions"]] == ["res-strip", "res-bulb"]
+    assert (sunset["speed"], sunset["auto_dynamic"]) == (0.5, False)
+    assert len(sunset["palette"]["color"]) == 3
+    assert "effects" not in sunset["palette"]
+    assert "palette" not in calls[2][1]
+
+
+async def test_keep_split_scenes_fails_first(
+    hass: HomeAssistant, rooms_bridge: MagicMock
+) -> None:
+    """When the zone cannot be made, no room is changed."""
+    rooms_bridge.request = AsyncMock(side_effect=AiohueException("nope"))
+    with pytest.raises(HomeAssistantError) as err:
+        await _align(hass, keep_split_scenes=True)
+    assert err.value.translation_key == "split_zone_failed"
+    assert [c.args for c in rooms_bridge.request.mock_calls] == [
+        ("post", "clip/v2/resource/zone")
     ]
 
 

@@ -171,6 +171,9 @@
     "not_hue_zone": {
       "message": "{entity_id} is not a Hue zone (Hue rooms follow the areas)."
     },
+    "split_zone_failed": {
+      "message": "Could not keep the scenes of a split room in the new Hue zone {name}: the bridge refused the change or is unreachable. No room was changed."
+    },
     "room_change_failed": {
       "message": "Could not change the Hue room {name}: the bridge refused the change or is unreachable."
     },
@@ -475,6 +478,10 @@
         "delete_empty_rooms": {
           "name": "Delete empty rooms",
           "description": "Delete Hue rooms left without lights that no area uses. Their scenes are deleted with them."
+        },
+        "keep_split_scenes": {
+          "name": "Keep scenes of split rooms",
+          "description": "When a Hue room's lights go to several areas, first copy its scenes that would lose lights into a new Hue zone over the room's lights (named after the room, or after the areas when that name stays with a room)."
         }
       }
     },

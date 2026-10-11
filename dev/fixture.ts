@@ -68,6 +68,7 @@ const SCENES: Record<string, string[]> = {
   office: ["Read", "Bright", "Dimmed", "Nature's colors", "Ocean dawn"],
   tv_area: ["Movie", "Read"],
   balcony: ["Galaxy", "Fairy lights"],
+  downstairs: ["Relax", "Ocean dawn"],
 };
 
 // Scene palettes as the bridge reports them: colors (dynamic-capable) or one white.
@@ -75,6 +76,7 @@ const SCENE_PALETTES: Record<string, { palette?: XY[]; mirek?: number }> = {
   Read: { mirek: 346 },
   Bright: { mirek: 233 },
   Dimmed: { mirek: 370 },
+  Relax: { mirek: 447 },
   "Nature's colors": { palette: [[0.3, 0.5], [0.45, 0.45], [0.55, 0.38], [0.22, 0.3]] },
   "Ocean dawn": { palette: [[0.17, 0.2], [0.3, 0.3], [0.5, 0.38]] },
   Movie: { palette: [[0.2, 0.1], [0.5, 0.25]] },
@@ -240,8 +242,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const sceneInfo: Record<string, SceneInfo> = {};
   const sceneListeners = new Set<(msg: unknown) => void>();
   /** A bridge scene of a Hue group, as the native integration and our WS API show it. */
+  const sceneId = (group: string, name: string) => `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
   const addScene = (group: string, name: string, { palette = [], mirek }: { palette?: XY[]; mirek?: number } = {}): string => {
-    const id = `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
+    const id = sceneId(group, name);
     states[id] = { entity_id: id, state: "unknown", attributes: { group_name: GROUPS[group][0], name, friendly_name: `${GROUPS[group][0]} ${name}` } };
     entities[id] = { platform: "hue" };
     sceneInfo[id] = {
@@ -418,6 +421,22 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         .filter((x) => x.lost.length)
         .map((x) => ({ entity_id: null, name: x.name, group_name: GROUPS[x.group][0], lost: x.lost, missing: [] })),
     );
+    // Rooms whose lights end up in several rooms; the zone is named as in alignment.py.
+    const taken = new Set([
+      ...rooms.map((r) => r.name),
+      ...hueRooms.filter(([r]) => !areaOfRoom(r)).map(([, g]) => g[0]),
+      ...Object.values(GROUPS).filter((g) => g[1] === "zone").map((g) => g[0]),
+    ].map((n) => n.toLowerCase()));
+    const splits = hueRooms.flatMap(([r, g]) => {
+      const ends = new Set(g[2].map((l) => moves.find((m) => m.lights[0] === `light.${l}`)?.area ?? areaOfRoom(r)));
+      if (ends.size < 2) return [];
+      const spread = Object.keys(AREAS).filter((a) => ends.has(a)).map((a) => AREAS[a].name);
+      if (ends.has(null)) spread.push(g[0]);
+      const name = taken.has(g[0].toLowerCase()) ? spread.join(" + ") : g[0];
+      taken.add(name.toLowerCase());
+      const lost = scenes.filter((x) => x.group_name === g[0]).map((x) => sceneId(r, x.name));
+      return [{ name, from: g[0], group: `light.${r}`, lights: g[2].map((l) => `light.${l}`).sort(), scenes: lost }];
+    });
     return {
       changed: moves.length > 0 || rooms.some((r) => r.create || r.rename),
       rooms,
@@ -425,13 +444,27 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       empty,
       scenes,
       conflicts: [],
+      splits,
       hue_rooms: Object.fromEntries(ids.filter(roomOf).map((l) => [`light.${l}`, GROUPS[roomOf(l)!][0]])),
     };
   };
   const pushRooms = () => setTimeout(() => roomListeners.forEach((cb) => cb(planRooms())), 120);
   /** What align_rooms does: move lights into their areas' rooms (made or renamed as needed). */
-  const alignRooms = (only: string[] | null, deleteEmpty: boolean) => {
+  const alignRooms = (only: string[] | null, deleteEmpty: boolean, keepSplit: boolean) => {
     const plan = planRooms();
+    // Copies of the split rooms' scenes go into zones over their lights, before anything moves.
+    if (!only && keepSplit) {
+      for (const split of plan.splits.filter((x) => x.scenes.length)) {
+        let id = split.name.toLowerCase().replace(/[^a-z]+/g, "_");
+        while (GROUPS[id]) id += "_zone";
+        GROUPS[id] = [split.name, "zone", split.lights.map((l) => l.replace("light.", ""))];
+        const room = split.group!.replace("light.", "");
+        for (const name of SCENES[room] || []) if (split.scenes.includes(sceneId(room, name))) {
+          (SCENES[id] ??= []).push(name);
+          addScene(id, name, SCENE_PALETTES[name]);
+        }
+      }
+    }
     for (const move of plan.moves) {
       const light = move.lights[0].replace("light.", "");
       if (only && !only.includes(move.lights[0])) continue;
@@ -442,7 +475,15 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       GROUPS[key][2].push(light);
     }
     if (!only) {
-      for (const r of plan.rooms) if (r.rename && r.group) GROUPS[r.group.replace("light.", "")][0] = r.name;
+      for (const r of plan.rooms.filter((x) => x.rename && x.group)) {
+        const key = r.group!.replace("light.", "");
+        GROUPS[key][0] = r.name;
+        // The native integration renames the group of the room's scenes too.
+        for (const name of SCENES[key] || []) {
+          const scene = states[sceneId(key, name)];
+          if (scene) scene.attributes = { ...scene.attributes, group_name: r.name, friendly_name: `${r.name} ${name}` };
+        }
+      }
       if (deleteEmpty) for (const e of plan.empty) delete GROUPS[e.group!.replace("light.", "")];
     }
   };
@@ -573,7 +614,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         pushAuto();
       }
       if (domain === "hue_studio" && service === "align_rooms") {
-        alignRooms(data.entity_id ? [data.entity_id].flat() : null, !!(data as { delete_empty_rooms?: boolean }).delete_empty_rooms);
+        const opts = data as { delete_empty_rooms?: boolean; keep_split_scenes?: boolean };
+        alignRooms(data.entity_id ? [data.entity_id].flat() : null, !!opts.delete_empty_rooms, !!opts.keep_split_scenes);
         pushRooms();
       }
       if (domain === "hue_studio" && service === "save_scene") {

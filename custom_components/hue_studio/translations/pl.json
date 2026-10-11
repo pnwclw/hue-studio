@@ -171,6 +171,9 @@
     "not_hue_zone": {
       "message": "{entity_id} nie jest strefą Hue (pokoje Hue podążają za obszarami)."
     },
+    "split_zone_failed": {
+      "message": "Nie udało się zachować scen dzielonego pokoju w nowej strefie Hue {name}: mostek odrzucił zmianę lub jest nieosiągalny. Żaden pokój nie został zmieniony."
+    },
     "room_change_failed": {
       "message": "Nie udało się zmienić pokoju Hue {name}: mostek odrzucił zmianę lub jest nieosiągalny."
     },
@@ -475,6 +478,10 @@
         "delete_empty_rooms": {
           "name": "Usuń puste pokoje",
           "description": "Usuń pokoje Hue, które zostały bez świateł i których nie używa żaden obszar. Ich sceny zostaną usunięte razem z nimi."
+        },
+        "keep_split_scenes": {
+          "name": "Zachowaj sceny dzielonych pokoi",
+          "description": "Gdy światła pokoju Hue trafiają do kilku obszarów, najpierw skopiuj jego sceny, które straciłyby światła, do nowej strefy Hue z jego światłami (nazwanej jak pokój albo jak obszary, gdy tę nazwę zachowuje pokój)."
         }
       }
     },

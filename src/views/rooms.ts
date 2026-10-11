@@ -65,6 +65,7 @@ export function noRoomRows(ctx: StudioContext): TemplateResult | typeof nothing 
 export class RoomsView extends StudioView {
   @state() private accessor completeScenes = true;
   @state() private accessor deleteEmpty = false;
+  @state() private accessor keepSplit = false;
   @state() private accessor busy = false;
   @state() private accessor draft: ZoneDraft | null = null;
 
@@ -116,6 +117,8 @@ export class RoomsView extends StudioView {
     }
     const area = (id: string) => areaName(ctx, id);
     const target = (id: string) => plan.rooms.find((r) => r.area === id)?.name || area(id);
+    // Split rooms whose scenes would lose lights: they can be kept in a zone.
+    const splits = (plan.splits || []).filter((s) => s.scenes.length);
     const items: TemplateResult[] = [
       ...plan.rooms
         .filter((r) => r.create)
@@ -132,6 +135,9 @@ export class RoomsView extends StudioView {
           ? [row("mdi:palette-outline", t(this.completeScenes ? "rooms.scene_gets" : "rooms.scene_misses", { scene: s.name, lights: names(ctx, s.missing) }))]
           : []),
       ]),
+      ...(this.keepSplit
+        ? splits.map((s) => row("mdi:texture-box", t("rooms.split_zone", { zone: s.name, room: s.from }), scenesCount(ctx, s.scenes.length)))
+        : []),
       ...plan.empty.map((e) =>
         row(this.deleteEmpty ? "mdi:delete-outline" : "mdi:home-off-outline", t("rooms.empty_room", { name: e.name }), t("rooms.empty_scenes", { count: e.scenes })),
       ),
@@ -140,8 +146,12 @@ export class RoomsView extends StudioView {
     return html`<p class="lead">${t("rooms.intro")}</p>
       <div class="rows plan">${items}</div>
       ${this.conflicts(plan)}
-      ${hasMissing || plan.empty.length
+      ${hasMissing || plan.empty.length || splits.length
         ? html`<div class="rows options">
+            ${splits.length
+              ? row("mdi:texture-box", t("rooms.keep_split"), t("rooms.keep_split_sub"),
+                  toggle(this.keepSplit, t("rooms.keep_split"), () => (this.keepSplit = !this.keepSplit)))
+              : nothing}
             ${hasMissing
               ? row("mdi:auto-fix", t("rooms.complete_scenes"), t("rooms.complete_scenes_sub"),
                   toggle(this.completeScenes, t("rooms.complete_scenes"), () => (this.completeScenes = !this.completeScenes)))
@@ -168,7 +178,7 @@ export class RoomsView extends StudioView {
     const { ctx } = this;
     if (this.busy) return;
     this.busy = true;
-    const data = { complete_scenes: this.completeScenes, delete_empty_rooms: this.deleteEmpty };
+    const data = { complete_scenes: this.completeScenes, delete_empty_rooms: this.deleteEmpty, keep_split_scenes: this.keepSplit };
     const ok = await ctx.call("hue_studio", "align_rooms", data, { optimistic: false });
     this.busy = false;
     if (ok) ctx.toast(ctx.t("rooms.aligned_done"));

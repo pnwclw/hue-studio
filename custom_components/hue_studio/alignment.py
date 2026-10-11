@@ -13,10 +13,13 @@ Rules (see docs/rooms-and-scenes.md):
   of their devices a room already has (so most scenes keep their lights), then by equal
   names; a room is used for one area at most.
 - A room left without lights and given to no area is offered for deletion only.
+- A room whose lights end up in more than one room is split: its scenes that lose
+  lights can be kept as copies in a new zone over the room's original lights.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 # Hue limits room and zone names to 32 characters.
@@ -108,6 +111,19 @@ class SceneChange:
 
 
 @dataclass(frozen=True, slots=True)
+class Split:
+    """A room whose lights end up in several rooms; a zone can keep it whole."""
+
+    room: str
+    # Name of the zone over the room's original lights (see `_zone_name`).
+    name: str
+    # The room's lights before alignment (sorted).
+    lights: tuple[str, ...]
+    # Its scenes that lose lights (in the bridge's order): copied into the zone.
+    scenes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class Plan:
     """Changes that bring a bridge's rooms in line with the HA areas."""
 
@@ -121,6 +137,8 @@ class Plan:
     conflicts: tuple[str, ...] = ()
     # The room each device with lights is in now (devices in no room are missing).
     current: dict[str, str] = field(default_factory=dict)
+    # Rooms split over several areas (full plans only).
+    splits: tuple[Split, ...] = ()
 
     @property
     def changed(self) -> bool:
@@ -135,13 +153,15 @@ def compute_plan(
     scenes: list[Scene],
     *,
     only: set[str] | None = None,
+    zone_names: Iterable[str] = (),
 ) -> Plan:
     """The alignment plan of one bridge.
 
     `areas` in HA's order (ties go to the earlier area). With `only` (light ids), the
     plan is cut down to moving those lights: rooms are assigned as in the full plan, but
     only rooms needed for those moves are created, nothing is renamed and no room is
-    offered for deletion.
+    offered for deletion or reported as split. `zone_names` (the bridge's zones) are
+    avoided when naming zones for split rooms.
     """
     room_of: dict[str, str] = {d: r.id for r in rooms for d in r.devices}
     by_device: dict[str, list[Light]] = {}
@@ -214,14 +234,103 @@ def compute_plan(
             if (had or not room.devices) and all(d in leaving for d in had):
                 empty.append(room.id)
 
+    changes = _scene_changes(moves, assigned, scenes)
+    splits: list[Split] = []
+    if only is None:
+        splits = _splits(
+            areas,
+            rooms,
+            scenes,
+            by_device,
+            moves,
+            targets,
+            room_area,
+            changes,
+            zone_names,
+        )
+
     return Plan(
         rooms=tuple(targets),
         moves=tuple(moves),
         empty=tuple(empty),
-        scenes=_scene_changes(moves, assigned, scenes),
+        scenes=changes,
         conflicts=tuple(sorted(conflicts)),
         current={d: room_of[d] for d in by_device if d in room_of},
+        splits=tuple(splits),
     )
+
+
+def _splits(
+    areas: list[Area],
+    rooms: list[Room],
+    scenes: list[Scene],
+    by_device: dict[str, list[Light]],
+    moves: list[Move],
+    targets: list[RoomTarget],
+    room_area: dict[str, str],
+    changes: tuple[SceneChange, ...],
+    zone_names: Iterable[str],
+) -> list[Split]:
+    """Rooms whose lights end up in more than one room."""
+    going = {m.device: m.area for m in moves}
+    lost = {change.scene for change in changes if change.lost}
+    # Names on the bridge after alignment: rooms of areas, rooms that keep their name,
+    # zones (and zones made for earlier splits).
+    taken = {t.name.casefold() for t in targets}
+    taken |= {r.name.strip().casefold() for r in rooms if r.id not in room_area}
+    taken |= {name.strip().casefold() for name in zone_names}
+    order = {area.id: i for i, area in enumerate(areas)}
+    names = {area.id: area.name.strip() or area.id for area in areas}
+    result: list[Split] = []
+    for room in rooms:
+        devices = [d for d in room.devices if d in by_device]
+        # Where the room's lights end up: the room of an area, or (None) this room
+        # when no area takes it.
+        ends = {going.get(d, room_area.get(room.id)) for d in devices}
+        if len(ends) < 2:
+            continue
+        spread = [names[a] for a in sorted(ends - {None}, key=order.__getitem__)]
+        if None in ends:
+            spread.append(room.name.strip())
+        name = _zone_name(room.name, spread, taken)
+        taken.add(name.casefold())
+        result.append(
+            Split(
+                room=room.id,
+                name=name,
+                lights=tuple(sorted(lt.id for d in devices for lt in by_device[d])),
+                scenes=tuple(
+                    s.id for s in scenes if s.group == room.id and s.id in lost
+                ),
+            )
+        )
+    return result
+
+
+def _zone_name(room: str, areas: list[str], taken: set[str]) -> str:
+    """Name of the zone that keeps a split room whole.
+
+    The room's own name, unless a room or zone after alignment has it (typically the
+    area that took the room is called the same). Then the names of the areas its lights
+    go to (and the room's, for lights staying in a room no area takes), joined with
+    " + " ("Living room + Kitchen"), or, longer than Hue allows, the
+    first of them and how many more ("Living room +2"). Still taken: a number is added
+    ("Living room + Kitchen 2"). No words of our own: the name is the user's language.
+    """
+    base = room.strip()[:NAME_MAX]
+    if base and base.casefold() not in taken:
+        return base
+    base = " + ".join(areas)
+    if len(base) > NAME_MAX and areas:
+        more = f" +{len(areas) - 1}"
+        base = areas[0][: NAME_MAX - len(more)].rstrip() + more
+    base = base or room.strip()[:NAME_MAX]
+    name, number = base, 2
+    while name.casefold() in taken:
+        suffix = f" {number}"
+        name = base[: NAME_MAX - len(suffix)].rstrip() + suffix
+        number += 1
+    return name
 
 
 def _assign_rooms(

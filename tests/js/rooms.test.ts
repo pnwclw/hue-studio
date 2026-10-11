@@ -43,6 +43,7 @@ const plan: RoomsPlan = {
   empty: [],
   scenes: [],
   conflicts: [],
+  splits: [],
   hue_rooms: {},
 };
 
