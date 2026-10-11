@@ -20,6 +20,7 @@ import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { whiteArt } from "./auto-light.ts";
 import { StudioView } from "./base.ts";
+import "./new-scene.ts";
 
 const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 
@@ -29,8 +30,6 @@ export class RoomView extends StudioView {
 
   /** The "New scene" sheet is open. */
   @state() private accessor adding = false;
-  @state() private accessor newName = "";
-  @state() private accessor busy = false;
 
   protected override render() {
     const { ctx } = this;
@@ -84,67 +83,13 @@ export class RoomView extends StudioView {
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
     </div></div>
-    ${this.adding ? this.newSheet(g) : nothing}`;
+    ${this.adding
+      ? html`<hue-studio-new-scene .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-new-scene>`
+      : nothing}`;
   }
 
   private openNew(): void {
-    this.newName = "";
     this.adding = true;
-    this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet input")?.focus());
-  }
-
-  /**
-   * "New scene": a name, saved from what the lights show now. Scenes live in a Hue room or
-   * zone; a room (HA area) without one is offered a zone of its lights on the bridge.
-   */
-  private newSheet(g: Group) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const close = () => (this.adding = false);
-    const name = this.newName.trim();
-    const save = async () => {
-      if (!g.group || !name || this.busy) return;
-      this.busy = true;
-      const ok = await ctx.call("hue_studio", "create_scene", { entity_id: g.group, name }, { optimistic: false });
-      this.busy = false;
-      if (ok) {
-        close();
-        ctx.toast(t("room.scene_created", { name }));
-      }
-    };
-    const createZone = async () => {
-      if (this.busy) return;
-      this.busy = true;
-      const ok = await ctx.call("hue_studio", "create_zone", { entity_id: g.lights, name: g.name }, { optimistic: false });
-      this.busy = false;
-      if (ok) ctx.toast(t("room.zone_created", { name: g.name }));
-    };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form" role="dialog" aria-label=${t("room.new_scene")}>
-        <div class="sheet-bar"><div class="grow">${t("room.new_scene")}</div>
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-        </div>
-        ${g.group
-          ? html`<div class="form-body">
-                <input
-                  class="field"
-                  maxlength="32"
-                  placeholder=${t("room.new_scene_name")}
-                  aria-label=${t("room.new_scene_name")}
-                  .value=${this.newName}
-                  @input=${(e: InputEvent) => (this.newName = (e.target as HTMLInputElement).value)}
-                  @keydown=${(e: KeyboardEvent) => e.key === "Enter" && save()}
-                />
-                <p class="hint">${t("room.new_scene_hint", { room: friendlyName(ctx.hass, g.group) })}</p>
-              </div>
-              <div class="actions"><button class="pill apply" ?disabled=${!name || this.busy} @click=${save}>${t("scene.save")}</button></div>`
-          : html`<div class="form-body"><p class="hint">${t("room.no_group", { room: g.name })}</p></div>
-              <div class="actions">
-                <button class="pill apply" ?disabled=${this.busy} @click=${createZone}>${t("room.create_zone")}</button>
-                <button class="pill" @click=${() => ctx.openSettings()}>${t("room.mapping")}</button>
-              </div>`}
-      </div>
-    </div>`;
   }
 
   /** Motion, temperature and light level of the room; a tap opens the sensor in HA. */

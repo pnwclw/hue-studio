@@ -7,7 +7,7 @@
 // effects.
 // Pins are clipped to each light's gamut; commands are throttled to the bridge limits.
 
-import { html, nothing, type PropertyValues, svg } from "lit";
+import { html, nothing, svg } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -27,15 +27,17 @@ import {
   wheelYToMirek,
   xyToWheel,
 } from "../color.ts";
-import { commandInterval, groupSlider, lightTile } from "../controls.ts";
+import { brightnessSender, commandInterval, lightTile } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
-import { leavePanel } from "../ha-internals.ts";
+import { leavePanel, openStockMoreInfo } from "../ha-internals.ts";
 import { type Group, groupState, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import type { StringKey } from "../i18n.ts";
-import { icon } from "../ui.ts";
+import { syncedLights, syncingIn } from "../sync.ts";
+import { icon, type IconName } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import "./effects.ts";
+import "./new-scene.ts";
 
 const COLOR_MODES = ["xy", "hs", "rgb", "rgbw", "rgbww"];
 const supportsColor = (s?: HassState) => !!s?.attributes.supported_color_modes?.some((m: string) => COLOR_MODES.includes(m));
@@ -51,7 +53,16 @@ const GRADIENT_MODES = ["interpolated_palette", "interpolated_palette_mirrored",
 const SENDER = "color:";
 
 const pct = (v: number) => `${((v + 1) / 2) * 100}%`;
-const LINK_ICON = svg`<svg viewBox="0 0 24 24"><circle cx="6" cy="10" r="3"/><circle cx="12" cy="10" r="3"/><circle cx="18" cy="10" r="3"/><rect x="4" y="16" width="16" height="2" rx="1"/></svg>`;
+const LINK_ICON = svg`<svg viewBox="0 0 24 24"><path d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>`;
+/** Finger travel (px) for the whole brightness range on the brightness button. */
+const BRIGHT_TRAVEL = 160;
+
+/** An entry of the "..." menu; `run` gets the picked light (or null: the whole group). */
+export interface MenuItem {
+  icon: IconName;
+  label: string;
+  run: (light: string | null) => void;
+}
 
 type Mode = "color" | "white" | "effects";
 
@@ -80,8 +91,12 @@ export class ColorView extends StudioView {
   @property() accessor backPath: string | null = null;
   /** Where "Done" leaves the panel for (a page outside it, e.g. the dashboard the dialog was on). */
   @property() accessor exitPath: string | null = null;
-  /** Inside the more-info dialog: no top bar, the body scrolls above a fixed dock. */
+  /** Inside the more-info dialog: the body scrolls between the bar and a fixed dock, the bar drags the sheet. */
   @property({ type: Boolean }) accessor embedded = false;
+  /** What "Done" does instead of going back (the dialog closes). */
+  @property({ attribute: false }) accessor done: (() => void) | null = null;
+  /** Entries of the "..." menu before "Details" (the dialog: open in Hue Studio). */
+  @property({ attribute: false }) accessor extraMenu: MenuItem[] = [];
 
   @state() private accessor mode: Mode | null = null;
   @state() private accessor merged = false;
@@ -94,12 +109,23 @@ export class ColorView extends StudioView {
   private whiteX = new Map<string, number>();
 
   @state() private accessor dragBrightness: number | null = null;
+  @state() private accessor menuOpen = false;
+  /** The "Save" sheet (a new scene from what the lights show now) is open. */
+  @state() private accessor saving = false;
+  private briDrag: { id: number; x: number; y: number; start: number } | null = null;
 
-  protected override updated(changed: PropertyValues): void {
-    // The dialog follows the selection (its head controls the selected light, or the room).
-    if (changed.has("selected")) {
-      this.dispatchEvent(new CustomEvent<string | null>("light-select", { detail: this.selected, bubbles: true, composed: true }));
-    }
+  /** Lights a Sync Box drives right now: shown, but not controllable. */
+  private get syncing(): string[] {
+    return this.group ? syncingIn(this.ctx.boxes, this.group) : [];
+  }
+
+  /** The group without the syncing lights (no group command then: it would reach them too). */
+  private get live(): Group | null {
+    const { group } = this;
+    const busy = this.syncing;
+    if (!group || !busy.length) return group;
+    const lights = group.lights.filter((id) => !busy.includes(id));
+    return { ...group, lights, target: lights, group: null };
   }
 
   protected override willUpdate(): void {
@@ -111,11 +137,11 @@ export class ColorView extends StudioView {
   }
 
   private get colorLights(): string[] {
-    return this.group?.lights.filter((id) => supportsColor(this.ctx.hass.states[id])) ?? [];
+    return this.live?.lights.filter((id) => supportsColor(this.ctx.hass.states[id])) ?? [];
   }
 
   private get whiteLights(): string[] {
-    return this.group?.lights.filter((id) => supportsWhite(this.ctx.hass.states[id])) ?? [];
+    return this.live?.lights.filter((id) => supportsWhite(this.ctx.hass.states[id])) ?? [];
   }
 
   private get currentMode(): Mode {
@@ -125,9 +151,9 @@ export class ColorView extends StudioView {
   /** What the focused (or first lit) light shows now. */
   private initialMode(): Mode {
     const { hass, lightInfo } = this.ctx;
-    const ids = this.focusLight ? [this.focusLight] : (this.group?.lights ?? []);
+    const ids = this.focusLight ? [this.focusLight] : (this.live?.lights ?? []);
     if (ids.some((id) => hass.states[id]?.state === "on" && lightInfo[id]?.effect)) return "effects";
-    const ref = (this.focusLight && hass.states[this.focusLight]) || this.group?.lights.map((id) => hass.states[id]).find((s) => s?.state === "on");
+    const ref = (this.focusLight && hass.states[this.focusLight]) || this.live?.lights.map((id) => hass.states[id]).find((s) => s?.state === "on");
     return !this.colorLights.length || ref?.attributes.color_mode === "color_temp" ? "white" : "color";
   }
 
@@ -200,54 +226,162 @@ export class ColorView extends StudioView {
     const { t } = ctx;
     this.className = this.embedded ? "colorbody" : "";
     if (!group) return html`<p class="empty">${t("room.not_found")}</p>`;
+    const live = this.live!;
+    const busy = this.syncing;
+    const idle = live.lights.length > 0;
 
     const mode = this.currentMode;
-    const several = group.lights.length > 1;
-    const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const back = () => (this.exitPath ? leavePanel(this.exitPath) : ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`));
-    const effects = availableEffects(group.lights, ctx.lightInfo).length > 0;
+    const done = this.done ?? (() => (this.exitPath ? leavePanel(this.exitPath) : ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`)));
+    const effects = idle && availableEffects(live.lights, ctx.lightInfo).length > 0;
+    // Brightness (and "Details") act on the picked light, else on the whole group.
+    const picked = this.selected && live.lights.includes(this.selected) ? this.selected : null;
+    const target = picked ? { ...live, key: `${live.key}:${picked}`, lights: [picked], target: [picked], group: null } : live;
 
-    const main = mode === "effects" ? this.effectsBody(group) : this.wheel(mode);
+    const bar = html`<div class=${classMap({ "cv-bar": true, grip: this.embedded })}>
+      <button class="round more" aria-label=${t("more.menu")} aria-haspopup="menu" aria-expanded=${this.menuOpen} @click=${() => (this.menuOpen = !this.menuOpen)}>
+        ${icon("dots")}
+      </button>
+      <button class="pill save" ?disabled=${!idle} @click=${() => (this.saving = true)}>${t("color.save")}</button>
+      <div class="grow"></div>
+      <button class="pill done" @click=${done}>${t("color.done")}</button>
+      ${this.menuOpen ? this.menu(picked) : nothing}
+    </div>`;
+
+    const main = !idle ? this.syncNote(busy, true) : mode === "effects" ? this.effectsBody(live) : this.wheel(mode);
     const content = html`
       ${this.embedded ? html`<div class="cv-scroll">${main}</div>` : main}
       <div class="dock">
-        ${mode === "color" ? this.gradientModes() : nothing}
-        <div class="controls">
-          <div class="modes">
-            ${this.colorLights.length ? this.modeButton("color", "m-color", t("color.mode_color")) : nothing}
-            ${this.whiteLights.length ? this.modeButton("white", "m-white", t("color.mode_white")) : nothing}
-            ${effects
-              ? html`<span class="sep"></span>${this.modeButton("effects", "m-effects", t("color.mode_effects"), icon("effects"))}`
-              : nothing}
-          </div>
-          ${several && mode !== "effects"
-            ? html`<button
-                class=${classMap({ link: true, on: this.merged })}
-                aria-label=${t("color.merge_lights")}
-                title=${t("color.merge_lights")}
-                @click=${() => (this.merged = !this.merged)}
-              >${LINK_ICON}</button>`
-            : nothing}
-          ${this.embedded
-            ? nothing
-            : html`<div
-            class=${classMap({ bright: true, off: !state.on })}
-            @value-input=${(e: CustomEvent<number>) => (this.dragBrightness = e.detail)}
-            @value-change=${() => (this.dragBrightness = null)}
-          >
-            <div class="value">${this.dragBrightness !== null ? `${this.dragBrightness}%` : state.on ? `${state.brightness}%` : ""}</div>
-            ${groupSlider(ctx, group, state, t("common.brightness"))}
-          </div>`}
-        </div>
-        ${several
-          ? html`<div class="light-row">${group.lights.map((id) =>
-              lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), id === this.selected),
-            )}</div>`
+        ${idle && mode === "color" ? this.gradientModes() : nothing}
+        ${idle
+          ? html`<div class="controls">
+              <div class="modes">
+                ${this.colorLights.length ? this.modeButton("color", "m-color", t("color.mode_color")) : nothing}
+                ${this.whiteLights.length ? this.modeButton("white", "m-white", t("color.mode_white")) : nothing}
+                ${effects
+                  ? html`<span class="sep"></span>${this.modeButton("effects", "m-effects", t("color.mode_effects"), icon("effects"))}`
+                  : nothing}
+              </div>
+              ${live.lights.length > 1 && mode !== "effects"
+                ? html`<button
+                    class=${classMap({ link: true, on: this.merged })}
+                    aria-label=${t("color.merge_lights")}
+                    title=${t("color.merge_lights")}
+                    @click=${() => (this.merged = !this.merged)}
+                  >${LINK_ICON}</button>`
+                : nothing}
+              ${this.brightness(target)}
+            </div>`
           : nothing}
+        ${idle && busy.length ? this.syncNote(busy, false) : nothing}
+        <div class="light-row">${group.lights.map((id) =>
+          lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), { selected: id === this.selected, busy: busy.includes(id) }),
+        )}</div>
       </div>
+      ${this.saving
+        ? html`<hue-studio-new-scene .ctx=${ctx} .rev=${this.rev} .group=${group} @close=${() => (this.saving = false)}></hue-studio-new-scene>`
+        : nothing}
     `;
-    if (this.embedded) return content;
-    return this.screen(this.subHead(group.name, back, html`<button class="pill done" @click=${back}>${t("color.done")}</button>`), content);
+    if (this.embedded) return html`${bar}${content}`;
+    return this.screen(bar, content);
+  }
+
+  /** The "..." menu: the owner's entries, then HA's own dialog of the picked light or the group. */
+  private menu(picked: string | null) {
+    const { ctx, group } = this;
+    const close = () => (this.menuOpen = false);
+    const details: MenuItem = {
+      icon: "cog",
+      label: ctx.t("more.settings"),
+      run: (light) => {
+        // The dialog closes first: HA's own one opens in its place.
+        if (this.embedded) this.done?.();
+        openStockMoreInfo(light ?? group?.group ?? group?.lights[0] ?? "");
+      },
+    };
+    return html`<div class="menu-scrim" @click=${close}></div>
+      <div class="menu" role="menu">
+        ${[...this.extraMenu, details].map(
+          (item) => html`<button role="menuitem" @click=${() => {
+            close();
+            item.run(picked);
+          }}>${icon(item.icon)}${item.label}</button>`,
+        )}
+      </div>`;
+  }
+
+  /** Lights a Sync Box drives: why they can't be changed here, and a way to stop it. */
+  private syncNote(busy: string[], all: boolean) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const box = Object.entries(ctx.boxes).find(([, b]) => syncedLights(b).some((id) => busy.includes(id)));
+    const name = box?.[1].name || t("sync.title");
+    const stop = () => box && ctx.setSync(box[0], { sync: false });
+    return html`<div class=${classMap({ "sync-note": true, all })}>
+      ${icon("sync")}
+      <p>${all ? t("color.sync_all", { name }) : t("color.sync_some", { count: busy.length, name })}</p>
+      ${box ? html`<button class="pill" @click=${stop}>${t("sync.stop")}</button>` : nothing}
+    </div>`;
+  }
+
+  /** The Hue app's brightness button: drag along it (up or right: brighter), the value above it. */
+  private brightness(target: Group) {
+    const { ctx } = this;
+    const state = groupState(ctx.hass, target, ctx.lightInfo);
+    const value = this.dragBrightness ?? state.brightness;
+    const inert = !state.on || !state.available;
+    const send = brightnessSender(ctx, target);
+    const set = (v: number) => {
+      this.dragBrightness = v;
+      send(v);
+    };
+    const down = (e: PointerEvent) => {
+      if (inert) return;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // A pointer that is already gone: no capture, the drag still works while over the button.
+      }
+      this.briDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: value };
+    };
+    const move = (e: PointerEvent) => {
+      const d = this.briDrag;
+      if (!d || d.id !== e.pointerId) return;
+      const delta = e.clientX - d.x - (e.clientY - d.y);
+      set(Math.min(100, Math.max(1, Math.round(d.start + (delta / BRIGHT_TRAVEL) * 100))));
+    };
+    const up = (e: PointerEvent) => {
+      if (this.briDrag?.id !== e.pointerId) return;
+      this.briDrag = null;
+      send.flush();
+      this.dragBrightness = null;
+    };
+    const key = (e: KeyboardEvent) => {
+      const step = { ArrowUp: 5, ArrowRight: 5, ArrowDown: -5, ArrowLeft: -5 }[e.key];
+      if (!step || inert) return;
+      e.preventDefault();
+      set(Math.min(100, Math.max(1, value + step)));
+      send.flush();
+      this.dragBrightness = null;
+    };
+    return html`<div class=${classMap({ bri: true, off: inert })}>
+      <div class="bri-value">${state.on ? `${value}%` : ""}</div>
+      <div
+        class="bri-pill"
+        role="slider"
+        tabindex=${inert ? -1 : 0}
+        aria-label=${ctx.t("common.brightness")}
+        aria-valuemin="1"
+        aria-valuemax="100"
+        aria-valuenow=${value}
+        aria-disabled=${inert ? "true" : "false"}
+        style=${styleMap({ "--level": `${state.on ? value : 0}%` })}
+        @pointerdown=${down}
+        @pointermove=${move}
+        @pointerup=${up}
+        @pointercancel=${up}
+        @keydown=${key}
+      >${icon("sun")}</div>
+    </div>`;
   }
 
   private wheel(mode: Mode) {
@@ -387,7 +521,8 @@ export class ColorView extends StudioView {
   }
 
   private drag(p: Pin, raw: XY): void {
-    const { ctx, group } = this;
+    const { ctx } = this;
+    const group = this.live;
     if (!group) return;
     const lights = p.id === ALL ? this.lights() : [p.id];
     const info = ctx.lightInfo[lights[0]];

@@ -230,7 +230,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                auto-light (per area, and the list), space (arrange a room or an entertainment area),
+                                auto-light (per area, and the list), new-scene (the "New scene" sheet), space (arrange a room or an entertainment area),
                                 experimental, devices, bridges (and MotionAware), entertainment, integration (options)
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
   space.ts                      pure: placed lights, top-view coordinate mapping

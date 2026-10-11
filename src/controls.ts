@@ -8,7 +8,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import type { StudioContext } from "./context.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
-import { LightElement, type Throttled, throttle, toggle } from "./ui.ts";
+import { icon, LightElement, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -65,14 +65,17 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
 }
 
 /** A light tile (room, scene editor, color view): icon, name, toggle; colored like the light. */
-export function lightTile(ctx: StudioContext, id: string, open: () => void, selected = false): TemplateResult {
+export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false } = {}): TemplateResult {
   const state = ctx.hass.states[id];
   const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !!state && state.state !== "unavailable" });
-  return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected })} style=${styleMap(surface.style)} @click=${open}>
+  // Busy: a Sync Box drives it; shown as such, nothing to tap.
+  return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })} style=${styleMap(surface.style)} @click=${busy ? null : open}>
     <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
     <div class="name">${friendlyName(ctx.hass, id)}</div>
-    ${toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
+    ${busy
+      ? html`<div class="busy-tag">${icon("sync")}${ctx.t("sync.syncing")}</div>`
+      : toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
   </div>`;
 }
 

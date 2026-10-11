@@ -7,17 +7,15 @@
 
 import { css, html, LitElement, nothing, unsafeCSS } from "lit";
 import { classMap } from "lit/directives/class-map.js";
-import { styleMap } from "lit/directives/style-map.js";
 
 import { StudioContext } from "./context.ts";
-import { groupSlider, surfaceOf, toggleGroup } from "./controls.ts";
-import { currentHass, openPanelFrom, openStockMoreInfo, watchHass } from "./ha-internals.ts";
-import { allGroups, friendlyName, type Group, groupOfEntity, groupState, type Home } from "./model.ts";
+import { currentHass, openPanelFrom, watchHass } from "./ha-internals.ts";
+import { allGroups, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
-import { icon, keepTouchInside, toggle } from "./ui.ts";
+import { keepTouchInside } from "./ui.ts";
 import "./views/color.ts";
-import type { ColorView } from "./views/color.ts";
+import type { ColorView, MenuItem } from "./views/color.ts";
 
 const DIALOG_CSS = css`
   /* A bottom sheet like HA's more-info on phones (slides up; drag the head down to close), centered on wide screens. */
@@ -29,14 +27,10 @@ const DIALOG_CSS = css`
          border-radius: 22px 22px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
          animation: sheet-in 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
   :host(.closing) .dlg { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1); }
-  .dlg-head { flex: none; padding: 0 16px 14px; border-radius: 22px 22px 0 0; }
   .grip { touch-action: none; cursor: grab; }
   .handle { width: 36px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.35); margin: 0 auto; }
-  .grip.handle-zone { padding: 8px 0 2px; margin: 0 -16px; }
-  .dlg-head .topbar { padding-top: 4px; gap: 8px; }
-  .dlg-head .title { flex: 1; min-width: 0; }
-  .dlg-head .title b { display: block; font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dlg-head .title small { font-size: 12px; opacity: 0.7; }
+  .handle-zone { flex: none; padding: 8px 0 0; }
+  .colorbody .cv-bar { flex: none; padding: 6px 16px 0; }
   hue-studio-color-view.colorbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .cv-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 0 16px; }
   .colorbody .wheel { width: min(76vw, 320px, 36dvh); }
@@ -45,19 +39,12 @@ const DIALOG_CSS = css`
   .colorbody .effects { display: block; padding-bottom: 8px; }
   .colorbody .dock { flex: none; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
   .colorbody .controls { margin: 0; }
-  /* The "..." menu: Hue Studio and HA's own dialog. */
-  .menu-scrim { position: absolute; inset: 0; z-index: 9; }
-  .menu { position: absolute; z-index: 10; top: 58px; right: 12px; min-width: 210px; padding: 6px; border-radius: 14px;
-          background: rgba(44, 44, 46, 0.96); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); transform-origin: top right; animation: menu-in 0.2s var(--spring); }
-  .menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px;
-                 background: none; color: var(--text); font-size: 16px; text-align: left; cursor: pointer; }
-  .menu button:active { background: rgba(255, 255, 255, 0.1); }
-  .menu svg { width: 20px; height: 20px; opacity: 0.85; }
+  /* Sheets opened inside (effect settings, a new scene) cover the whole screen, above the dialog. */
+  .sheet { position: fixed; z-index: 20; padding: max(16px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 16px
+           max(16px, var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
   @keyframes scrim-in { from { background-color: rgba(0, 0, 0, 0); } }
   @keyframes sheet-in { from { transform: translateY(100%); } }
   @keyframes pop-in { from { transform: translateY(16px) scale(0.96); opacity: 0; } }
-  @keyframes menu-in { from { transform: scale(0.85); opacity: 0; } }
   @media (min-width: 600px) {
     :host { align-items: center; }
     .dlg { border-radius: 22px; max-height: 90dvh; animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
@@ -108,9 +95,6 @@ class HueStudioLightDialog extends LitElement {
   /** Bumped on every change, so the color view re-renders too. */
   private rev = 0;
   private stopWatch?: () => void;
-  /** The light the head controls (picked on the wheel or in the cards); null: the whole group. */
-  private picked: string | null | undefined = undefined;
-  private menuOpen = false;
   /** Dragging the sheet down by its head (phones), like HA's bottom sheet. */
   private drag: { id: number; y: number; t: number; dy: number; v: number } | null = null;
 
@@ -160,69 +144,37 @@ class HueStudioLightDialog extends LitElement {
     const { ctx, entityId } = this;
     if (!ctx?.ready) return nothing;
     const { t } = ctx;
-    const { group, room, focus: first } = subjectOf(ctx.hass, ctx.home, entityId);
-    if (this.picked === undefined) this.picked = first;
-    const focus = this.picked && group.lights.includes(this.picked) ? this.picked : null;
-    // The head controls the picked light, or the whole group when none is picked.
-    const head = focus && group.lights.length > 1 ? lightGroup(ctx.hass, focus, group.key) : group;
-    const state = groupState(ctx.hass, head, ctx.lightInfo);
-    const surface = surfaceOf(state);
-    const sub = head !== group ? group.name : room && room.name !== group.name ? room.name : "";
-    const details = () => {
-      this.close();
-      openStockMoreInfo(focus ?? entityId);
-    };
-    const studio = () => {
-      this.close();
-      const light = focus ? `?light=${encodeURIComponent(focus)}` : "";
-      // "Done" in the panel brings the user back to this page, not to the panel's home.
-      openPanelFrom(`/hue/room/${encodeURIComponent(room!.key)}/color${light}`, location.pathname + location.search + location.hash);
-    };
-    const menu = (open: boolean) => {
-      this.menuOpen = open;
-      this.requestUpdate();
+    const { group, room, focus } = subjectOf(ctx.hass, ctx.home, entityId);
+    const studio: MenuItem = {
+      icon: "open",
+      label: t("more.open_studio"),
+      run: (light) => {
+        this.close();
+        const pick = light ? `?light=${encodeURIComponent(light)}` : "";
+        // "Done" in the panel brings the user back to this page, not to the panel's home.
+        openPanelFrom(`/hue/room/${encodeURIComponent(room!.key)}/color${pick}`, location.pathname + location.search + location.hash);
+      },
     };
 
-    return html`<div class="dlg" role="dialog" aria-label=${head.name}>
-        <div
-          class=${classMap({ "dlg-head": true, ...surface.classes })}
-          style=${styleMap(surface.style)}
-          @pointerdown=${this.onDragStart}
-          @pointermove=${this.onDragMove}
-          @pointerup=${this.onDragEnd}
-          @pointercancel=${this.onDragEnd}
-        >
-          <div class="grip handle-zone"><div class="handle"></div></div>
-          <div class="topbar grip">
-            <div class="title"><b>${head.name}</b>${sub ? html`<small>${sub}</small>` : nothing}</div>
-            ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, head))}
-            <button class="round more" aria-label=${t("more.menu")} aria-haspopup="menu" aria-expanded=${this.menuOpen} @click=${() => menu(!this.menuOpen)}>
-              ${icon("dots")}
-            </button>
-            <button class="round close" aria-label=${t("common.close")} @click=${() => this.close()}>${icon("close")}</button>
-          </div>
-          ${groupSlider(ctx, head, state, t("common.brightness"))}
-        </div>
+    return html`<div
+        class="dlg"
+        role="dialog"
+        aria-label=${group.name}
+        @pointerdown=${this.onDragStart}
+        @pointermove=${this.onDragMove}
+        @pointerup=${this.onDragEnd}
+        @pointercancel=${this.onDragEnd}
+      >
+        <div class="grip handle-zone"><div class="handle"></div></div>
         <hue-studio-color-view
           embedded
           .ctx=${ctx}
           .rev=${this.rev}
           .group=${group}
-          .focusLight=${first}
-          @light-select=${(e: CustomEvent<string | null>) => {
-            this.picked = e.detail;
-            this.requestUpdate();
-          }}
+          .focusLight=${focus}
+          .done=${() => this.close()}
+          .extraMenu=${room ? [studio] : []}
         ></hue-studio-color-view>
-        ${this.menuOpen
-          ? html`<div class="menu-scrim" @click=${() => menu(false)}></div>
-              <div class="menu" role="menu">
-                ${room
-                  ? html`<button role="menuitem" @click=${studio}>${icon("open")}${t("more.open_studio")}</button>`
-                  : nothing}
-                <button role="menuitem" @click=${details}>${icon("cog")}${t("more.settings")}</button>
-              </div>`
-          : nothing}
       </div>
       <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>`;
   }

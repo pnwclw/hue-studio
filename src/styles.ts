@@ -182,6 +182,49 @@ export const CSS = `
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
   .light-row .light { scroll-snap-align: start; }
+  .light.busy { cursor: default; }
+  .light.busy:active { transform: none; }
+  .busy-tag { display: flex; align-items: center; gap: 4px; height: 28px; font-size: 11px; font-weight: 600; opacity: 0.8; }
+  .busy-tag svg { width: 14px; height: 14px; }
+
+  /* The color screen's bar, like the Hue app: "...", Save; Done. Transparent over the screen's glow. */
+  .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .cv-bar { position: relative; display: flex; align-items: center; gap: 10px; min-height: 52px; }
+  .cv-bar .grow { flex: 1; min-width: 0; }
+  .cv-bar .round.more { width: 40px; height: 40px; }
+  .cv-bar .pill { height: 40px; padding: 0 18px; border-radius: 20px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px;
+                  background: rgba(120, 120, 128, 0.28); color: var(--text); }
+  .menu-scrim { position: fixed; inset: 0; z-index: 9; }
+  .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: 14px;
+          background: rgba(44, 44, 46, 0.97); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); transform-origin: top left; animation: menu-in 0.2s var(--spring); }
+  .menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px;
+                 background: none; color: var(--text); font-size: 16px; text-align: left; cursor: pointer; }
+  .menu button:active { background: rgba(255, 255, 255, 0.1); }
+  .menu svg { width: 20px; height: 20px; opacity: 0.85; }
+  @keyframes menu-in { from { transform: scale(0.85); opacity: 0; } }
+  /* Brightness: a button you drag along, its value above it (the Hue app's). */
+  .bri { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
+  .bri-value { min-height: 13px; font-size: 11px; letter-spacing: 1px; color: var(--text-2); }
+  .bri-pill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 76px; height: 50px;
+              border-radius: 25px; background: rgba(60, 60, 64, 0.7); touch-action: none; cursor: ew-resize; outline: none; }
+  .bri-pill::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--level); background: rgba(255, 255, 255, 0.16);
+                      transition: width 0.12s linear; }
+  .bri-pill svg { position: relative; width: 24px; height: 24px; }
+  .bri-pill:focus-visible { box-shadow: 0 0 0 2px #fff; }
+  .bri.off { opacity: 0.4; }
+  .bri.off .bri-pill { cursor: default; }
+  .controls:has(.bri) { align-items: flex-end; }
+  /* Lights a Sync Box drives: why they are locked, and a way to stop it. */
+  .sync-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 6px 0 2px; padding: 10px 12px;
+               border-radius: var(--radius); background: rgba(106, 91, 255, 0.18); font-size: 13px; line-height: 1.35; }
+  .sync-note p { flex: 1 1 calc(100% - 40px); margin: 0; }
+  .sync-note .pill { margin-left: auto; }
+  .sync-note > svg { flex: none; width: 22px; height: 22px; }
+  .sync-note.all { flex-direction: column; flex-wrap: nowrap; justify-content: center; margin: 24px 0; padding: 32px 20px; text-align: center; font-size: 15px; }
+  .sync-note.all > svg { width: 40px; height: 40px; }
+  .sync-note.all p { flex: none; }
+  .sync-note.all .pill { margin: 4px 0 0; }
 
   /* color wheel */
   .colorview { display: flex; flex-direction: column; }
