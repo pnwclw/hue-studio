@@ -220,6 +220,17 @@ directly. Per HA area with auto light settings:
   to the top while it is on.
 - Submission to the HACS default repository list.
 
+### F. Settings like the Hue app (2026-10-11)
+
+- ~~Settings tab~~ — In this home: Devices (all, by area, plus adding), Bridges, MotionAware
+  areas, Entertainment areas; Hue Studio: Rooms and zones, Auto light, Integration
+  settings (the options flow's settings in the panel), Experimental. Security comes later.
+- ~~Entertainment areas~~ — `entertainment.py`: list, create, change name/type/lights
+  (kept lights keep their places), arrange (the room arrange screen), delete; not while
+  streaming.
+- ~~Headers~~ — every screen has a fixed header and a body that scrolls (and bounces) on
+  its own; tabs have a large title, other screens a compact back + title bar.
+
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R

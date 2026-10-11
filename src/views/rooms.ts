@@ -74,13 +74,9 @@ export class RoomsView extends StudioView {
     const { t } = ctx;
     const zones = hueZones(ctx.hass);
     const loose = noRoomRows(ctx);
-    return html`<div class="page rooms-page">
-        <div class="topbar">
-          <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("/settings")}>${icon("back")}</button>
-          <div class="grow"></div>
-        </div>
-        <h1 class="big">${t("rooms.title")}</h1>
-        <h2 class="label">${t("rooms.bridge")}</h2>
+    return html`${this.screen(
+        this.subHead(t("rooms.title"), () => ctx.go("/settings")),
+        html`<h2 class="label">${t("rooms.bridge")}</h2>
         ${this.plan(ctx.rooms)}
         <h2 class="label">${t("rooms.zones")}</h2>
         <p class="lead">${t("rooms.zones_hint")}</p>
@@ -94,8 +90,9 @@ export class RoomsView extends StudioView {
           ? nothing
           : html`<h2 class="label">${t("home.no_room")}</h2>
               <p class="lead">${t("rooms.no_room_hint")}</p>
-              ${loose}`}
-      </div>
+              ${loose}`}`,
+        "rooms-page",
+      )}
       ${this.draft ? this.editor(this.draft) : nothing}`;
   }
 

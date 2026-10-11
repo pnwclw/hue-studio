@@ -37,18 +37,14 @@ export class RoomView extends StudioView {
     const { t } = ctx;
     const g = findGroup(ctx.home, this.key);
     if (!g) {
-      return html`<div class="page">
-        <div class="topbar">
-          <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("")}>${icon("back")}</button>
-        </div>
-        <p class="empty">${t("room.not_found")}</p>
-      </div>`;
+      return this.screen(this.subHead("", () => ctx.go("")), html`<p class="empty">${t("room.not_found")}</p>`);
     }
     const state = groupState(ctx.hass, g, ctx.lightInfo);
     const surface = surfaceOf(state);
     const room = encodeURIComponent(g.key);
 
-    return html`<div class="page">
+    // The room's colored header stays; scenes and lights scroll below it.
+    return html`<div class="screen-head hero-head">
       <div class=${classMap({ hero: true, ...surface.classes })} style=${styleMap(surface.style)}>
         <div class="inner">
           <div class="topbar">
@@ -66,6 +62,8 @@ export class RoomView extends StudioView {
           <div class="badges">${adaptiveFor(ctx.hass, g).map((al) => this.adaptiveBadge(al))}</div>
         </div>
       </div>
+    </div>
+    <div class="screen-body"><div class="page">
       ${this.sensors(g, state)}
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
@@ -85,7 +83,7 @@ export class RoomView extends StudioView {
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
-    </div>
+    </div></div>
     ${this.adding ? this.newSheet(g) : nothing}`;
   }
 

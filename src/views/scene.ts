@@ -82,10 +82,7 @@ export class SceneView extends StudioView {
       ctx.go(roomPath);
     };
     if (!room || !ctx.hass.states[this.scene]) {
-      return html`<div class="page">
-        <div class="topbar"><button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button></div>
-        <p class="empty">${t("scene.not_found")}</p>
-      </div>`;
+      return this.screen(this.subHead("", close), html`<p class="empty">${t("scene.not_found")}</p>`);
     }
 
     const info = ctx.sceneInfo[this.scene];
@@ -104,12 +101,12 @@ export class SceneView extends StudioView {
     const autoplay = draft.autoplay ?? !!info?.auto_dynamic;
     const word = t(`effects.speed_${speedWord(speed)}` as StringKey);
 
-    return html`<div class="page scene-edit">
-      <div class=${classMap({ topbar: true, ...surface.classes })} style=${styleMap(surface.style)}>
-        <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-        <div class="title">${t("scene.edit")}</div>
-        <button class="pill save" @click=${() => this.save()}>${t("scene.save")}</button>
-      </div>
+    const head = html`<div class="bar sub">
+      <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+      <div class="title">${t("scene.edit")}</div>
+      <button class="pill save" @click=${() => this.save()}>${t("scene.save")}</button>
+    </div>`;
+    return html`<div class="screen-head">${head}</div><div class="screen-body"><div class="page scene-edit">
       <div class=${classMap({ hero: true, ...surface.classes })} style=${styleMap(surface.style)}>
         <div class="inner">
           <div class="dot big" style=${styleMap({ background: dot })}></div>
@@ -183,7 +180,7 @@ export class SceneView extends StudioView {
           ${this.confirmDelete ? t("scene.delete_confirm") : t("scene.delete")}
         </button>
       </div>
-    </div>`;
+    </div></div>`;
   }
 
   /** Spread the palette over the lights in a new order (live; "Save" keeps it). */

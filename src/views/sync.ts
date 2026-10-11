@@ -67,20 +67,17 @@ export class SyncView extends StudioView {
     const ids = Object.keys(ctx.boxes);
     const id = this.box && ctx.boxes[this.box] ? this.box : ids[0];
     const box = id ? ctx.boxes[id] : undefined;
-    const head = this.head(
+    const head = this.tabHead(
       t("sync.title"),
       box?.available ? toggle(!!box.power, t("sync.power"), () => this.set(id, { power: !box.power })) : nothing,
     );
     if (!box) {
-      return html`<div class="page sync">
-        ${head}
-        <p class="empty">${this.box ? t("sync.not_found") : t("sync.none")}</p>
-      </div>`;
+      return this.screen(head, html`<p class="empty">${this.box ? t("sync.not_found") : t("sync.none")}</p>`, "sync");
     }
     const off = !box.available || !box.power;
-    return html`<div class="page sync">
-      ${head}
-      ${ids.length > 1
+    return html`${this.screen(
+        head,
+        html`${ids.length > 1
         ? html`<div class="chips boxes">
             ${ids.map(
               (other) => html`<button class=${classMap({ chip: true, on: other === id })} @click=${() => ctx.go(`/sync?box=${encodeURIComponent(other)}`)}>
@@ -143,8 +140,9 @@ export class SyncView extends StudioView {
           : nothing}
         ${hasFeature(box, "presets") ? this.presets(id, box) : nothing}
       </div>
-      ${hasFeature(box, "ir") ? this.remote(box) : nothing}
-    </div>
+      ${hasFeature(box, "ir") ? this.remote(box) : nothing}`,
+        "sync",
+      )}
     ${this.presetName !== null ? this.presetSheet(box) : nothing} ${this.ir ? this.irSheet(box, this.ir) : nothing}`;
   }
 

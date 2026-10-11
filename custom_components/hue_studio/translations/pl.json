@@ -203,6 +203,21 @@
     },
     "unknown_hue_device": {
       "message": "Brak urządzenia Hue {device} na mostkach Hue Studio."
+    },
+    "unknown_entertainment_area": {
+      "message": "Brak obszaru rozrywki {area} na mostkach."
+    },
+    "not_entertainment_light": {
+      "message": "{entity_id} nie może należeć do obszaru rozrywki."
+    },
+    "entertainment_failed": {
+      "message": "Mostek Hue nie przyjął zmiany {name}."
+    },
+    "unknown_motion_area": {
+      "message": "Brak obszaru MotionAware {area} na mostkach."
+    },
+    "area_taken": {
+      "message": "Inny pokój lub strefa Hue należy już do obszaru {area}."
     }
   },
   "services": {

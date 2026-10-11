@@ -19,12 +19,9 @@ export class ExperimentalView extends StudioView {
     const others = choosablePanels(panels).filter((p) => !chosen.includes(p.url_path));
     const save = (tabs: string[]) => ctx.setConfig({ footer_tabs: tabs });
     const full = chosen.length >= FOOTER_MAX_TABS;
-    return html`<div class="page settings-page">
-      <div class="topbar">
-        <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("/settings")}>${icon("back")}</button>
-      </div>
-      <h1 class="big">${t("exp.title")}</h1>
-      <p class="lead">${t("exp.intro")}</p>
+    return this.screen(
+      this.subHead(t("exp.title"), () => ctx.go("/settings")),
+      html`<p class="lead">${t("exp.intro")}</p>
       <div class="rows">
         <div class="item">
           <ha-icon icon="mdi:dock-bottom"></ha-icon>
@@ -67,8 +64,9 @@ export class ExperimentalView extends StudioView {
                 </button>`,
               )}
             </div>`
-        : nothing}
-    </div>`;
+        : nothing}`,
+      "settings-page",
+    );
   }
 }
 

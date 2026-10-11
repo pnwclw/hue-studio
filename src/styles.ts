@@ -23,7 +23,24 @@ export const CSS = `
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
 
-  main { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  /* The panel does not scroll; every screen has a fixed header and a body that scrolls on its own. */
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  main > * { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .screen-head { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; background: rgba(22, 22, 24, 0.82);
+                 -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.06); z-index: 3; }
+  .screen-head > * { max-width: 928px; margin-left: auto; margin-right: auto; }
+  .screen-head:empty { display: none; }
+  .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .screen-body > .page { padding-top: 10px; }
+  .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+  .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-head h1.big { margin: 2px 0 4px; }
+  .tab-head.wide { display: flex; align-items: center; gap: 12px; min-height: 52px; padding-top: 14px; }
+  .tab-head.wide h1.big { margin: 0; }
+  /* The room's colored header is its fixed header. */
+  .screen-head.hero-head { padding: 0; background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .screen-head.hero-head > * { max-width: none; }
+  .hero-head .hero { position: relative; margin: 0; }
   .page { container-type: inline-size; max-width: 960px; margin: 0 auto; padding: 0 16px 28px; box-sizing: border-box; }
   .topbar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding-top: max(6px, var(--safe-top)); }
   /* Bars stay put while the page scrolls under them. */
@@ -116,7 +133,7 @@ export const CSS = `
   nav.tabs.top button svg { width: 18px; height: 18px; }
   nav.tabs.top button.on { background: var(--surface); }
   main.under-footer { padding-bottom: var(--safe-bottom); }
-  main.under-footer .topbar { padding-top: 6px; }
+  main.under-footer .topbar, main.under-footer .screen-head { padding-top: 6px; }
 
   /* room */
   .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 22px 22px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }
@@ -390,6 +407,18 @@ export const CSS = `
   .device-card + .device-card { border-top: 1px solid rgba(255, 255, 255, 0.06); }
   .device-card > .item { width: 100%; }
   .device-form { padding: 0 14px 14px 50px; }
+  .chips.wrap { flex-wrap: wrap; overflow: visible; }
+  .sensor-kind { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
+  .sensor-kind ha-icon { --mdc-icon-size: 16px; }
+  .rows .item .check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text-2); display: flex; align-items: center; justify-content: center; flex: none; }
+  .rows .item .check.on { background: var(--accent); border-color: var(--accent); }
+  .rows .item .check svg { width: 14px; height: 14px; }
+  .dot-badge.live { background: #3ddc84; }
+  /* Phones: the area picker of a Hue room/zone gets a line of its own. */
+  @container (max-width: 560px) {
+    .group-row { flex-wrap: wrap; }
+    .group-row .select { flex: 1 1 100%; max-width: none; width: auto; margin-left: 38px; }
+  }
   .device-form .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
   .item.col .field { margin-top: 10px; }
   .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--radius);

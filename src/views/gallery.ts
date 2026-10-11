@@ -45,16 +45,12 @@ export class GalleryView extends StudioView {
     };
     const q = normalize(this.query);
 
-    return html`<div class="page">
-        ${this.head(
-          t("gallery.title"),
-          html`<button class="round search" aria-label=${t("gallery.search_button")} @click=${toggleSearch}>${icon("search")}</button>`,
-          {
-            menu: false,
-            start: this.room ? html`<button class="round back" aria-label=${t("common.back")} @click=${back}>${icon("back")}</button>` : nothing,
-          },
-        )}
-        <input
+    const search = html`<button class="round search" aria-label=${t("gallery.search_button")} @click=${toggleSearch}>${icon("search")}</button>`;
+    // Opened from a room: a screen of its own; else the Explore tab.
+    const head = this.room ? this.subHead(t("gallery.title"), back, search) : this.tabHead(t("gallery.title"), search);
+    return html`${this.screen(
+        head,
+        html`<input
           class=${classMap({ q: true, on: this.searching })}
           type="search"
           placeholder=${t("gallery.search")}
@@ -73,8 +69,8 @@ export class GalleryView extends StudioView {
               </div>`
           : nothing}
         ${ctx.gallery ? guard([ctx.gallery, q], () => this.body(ctx.gallery!, q)) : nothing}
-        ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}
-      </div>
+        ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`,
+      )}
       ${this.open ? this.sheet(this.open, target) : nothing}`;
   }
 

@@ -1,85 +1,51 @@
-// Settings (a tab of the panel): rooms and zones, how the Hue rooms follow the HA areas,
-// auto light per area, experimental features and the integration's own options page.
+// Settings (a tab of the panel), laid out like the Hue app's: the home (devices, bridges,
+// MotionAware and entertainment areas), then Hue Studio's own (rooms and zones, auto
+// light, integration settings, experimental). Every row opens a screen of its own.
 
-import { html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { html, nothing, type TemplateResult } from "lit";
+import { customElement } from "lit/decorators.js";
 
-import { hueZones, lightsWithoutArea, planHasNews } from "../rooms.ts";
-import { icon, toggle } from "../ui.ts";
-import { addAreaSheet, autoLightRows } from "./auto-light.ts";
+import { hueZones, planHasNews } from "../rooms.ts";
 import { StudioView } from "./base.ts";
 
 @customElement("hue-studio-settings-view")
 export class SettingsView extends StudioView {
-  /** The "add an area to auto light" sheet is open. */
-  @state() private accessor adding = false;
-
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
     const plan = ctx.rooms;
-    const zones = hueZones(ctx.hass).length;
-    const loose = lightsWithoutArea(ctx.hass).length;
+    const autoAreas = Object.keys(ctx.autoLight?.areas || {}).length;
+    const boxes = Object.keys(ctx.boxes).length;
+    const row = (glyph: string, title: string, to: string, sub = "", badge = false): TemplateResult =>
+      html`<button class="item" @click=${() => ctx.go(to)}>
+        <ha-icon icon=${glyph}></ha-icon>
+        <div class="grow">${title}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
+        ${badge ? html`<span class="dot-badge" aria-hidden="true"></span>` : nothing}
+        <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+      </button>`;
     const roomsSub = !plan
       ? t(ctx.roomsUnavailable ? "rooms.unavailable" : "rooms.loading")
       : planHasNews(plan)
         ? t("settings.rooms_differ")
-        : t("settings.rooms_match");
-    const autoAlign = !!ctx.config.auto_align;
-    return html`<div class="page settings-page">
-      ${this.head(t("settings.title"), nothing)}
-      <h2 class="label">${t("settings.rooms")}</h2>
-      <div class="rows">
-        <button class="item" @click=${() => ctx.go("/rooms")}>
-          <ha-icon icon="mdi:floor-plan"></ha-icon>
-          <div class="grow">
-            ${t("rooms.title")}
-            <div class="dim small">${roomsSub}</div>
-          </div>
-          ${planHasNews(plan) ? html`<span class="dot-badge" aria-hidden="true"></span>` : nothing}
-          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-        </button>
-        <button class="item" @click=${() => ctx.go("/settings/devices")}>
-          <ha-icon icon="mdi:plus-circle-outline"></ha-icon>
-          <div class="grow">${t("devices.title")}<div class="dim small">${t("devices.sub")}</div></div>
-          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-        </button>
-        <div class="item">
-          <ha-icon icon="mdi:sync"></ha-icon>
-          <div class="grow">
-            ${t("settings.auto_align")}
-            <div class="dim small">${t("settings.auto_align_sub")}</div>
-          </div>
-          ${toggle(autoAlign, t("settings.auto_align"), () => ctx.setConfig({ auto_align: !autoAlign }))}
+        : t("settings.rooms_zones", { zones: hueZones(ctx.hass).length });
+    return this.screen(
+      this.tabHead(t("settings.title")),
+      html`<h2 class="label">${t("settings.home")}</h2>
+        <div class="rows">
+          ${row("mdi:lightbulb-group-outline", t("settings.devices"), "/settings/devices", t("settings.devices_sub"))}
+          ${row("mdi:router-wireless", t("settings.bridges"), "/settings/bridges", boxes ? t("settings.bridges_sub", { boxes }) : "")}
+          ${row("mdi:motion-sensor", t("settings.motionaware"), "/settings/motionaware")}
+          ${row("mdi:television-ambient-light", t("settings.entertainment"), "/settings/entertainment")}
         </div>
-      </div>
-      <p class="lead small">
-        ${t("settings.counts", { zones, lights: loose })}
-      </p>
-      <h2 class="label">${t("settings.auto_light")}</h2>
-      <p class="lead">${t("settings.auto_light_hint")}</p>
-      ${autoLightRows(ctx, () => (this.adding = true))}
-      <h2 class="label">${t("settings.more")}</h2>
-      <div class="rows">
-        <button class="item" @click=${() => ctx.go("/settings/experimental")}>
-          <ha-icon icon="mdi:flask-outline"></ha-icon>
-          <div class="grow">
-            ${t("exp.title")}
-            <div class="dim small">${t(ctx.config.footer ? "exp.on" : "exp.sub")}</div>
-          </div>
-          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-        </button>
-        <button class="item" @click=${() => ctx.openSettings()}>
-          <ha-icon icon="mdi:cog-outline"></ha-icon>
-          <div class="grow">
-            ${t("settings.integration")}
-            <div class="dim small">${t("settings.integration_sub")}</div>
-          </div>
-          ${icon("open")}
-        </button>
-      </div>
-    </div>
-    ${this.adding ? addAreaSheet(ctx, () => (this.adding = false)) : nothing}`;
+        <h2 class="label">Hue Studio</h2>
+        <div class="rows">
+          ${row("mdi:floor-plan", t("rooms.title"), "/rooms", roomsSub, planHasNews(plan))}
+          ${row("mdi:lightbulb-auto-outline", t("settings.auto_light"), "/settings/auto", autoAreas ? t("settings.auto_areas", { count: autoAreas }) : "")}
+          ${row("mdi:cog-outline", t("settings.integration"), "/settings/integration", t("settings.integration_sub"))}
+          ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t(ctx.config.footer ? "exp.on" : "exp.sub"))}
+        </div>`,
+      "settings-page",
+    );
   }
 }
 

@@ -65,6 +65,41 @@ export interface HueDeviceInfo {
 /** Per bridge (native hue entry id); `searching` null: the bridge cannot search via its API. */
 export type DevicesMessage = Record<string, { name: string; searching: boolean | null; devices: HueDeviceInfo[] }>;
 
+/** Entertainment areas per bridge (hue_studio/entertainment/subscribe). */
+export type EntertainmentMessage = Record<string, { name: string; lights: string[]; areas: EntertainmentArea[] }>;
+
+export interface EntertainmentArea {
+  id: string;
+  name: string;
+  type: "screen" | "monitor" | "music" | "3dspace" | "other";
+  streaming: boolean;
+  /** Light entity id -> its points (x, y, z in -1..1). */
+  lights: Record<string, RoomPoint[]>;
+}
+
+/** Bridges and their MotionAware areas (hue_studio/bridges/subscribe). */
+export type BridgesMessage = Record<
+  string,
+  {
+    name: string;
+    host: string | null;
+    id: string;
+    model: string | null;
+    software: string | null;
+    /** null: no MotionAware on this bridge. */
+    motion_areas: MotionArea[] | null;
+  }
+>;
+
+export interface MotionArea {
+  id: string;
+  name: string;
+  group: string | null;
+  enabled: boolean;
+  health: string;
+  lights: { entity_id: string | null; health: string }[];
+}
+
 /** A sidebar panel (`hass.panels`). */
 export interface HassPanel {
   url_path: string;

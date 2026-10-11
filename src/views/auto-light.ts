@@ -147,18 +147,14 @@ export class AutoLightView extends StudioView {
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
-    const back = html`<div class="topbar">
-      <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("/settings")}>${icon("back")}</button>
-      <div class="grow"></div>
-    </div>`;
-    if (!ctx.autoLight) return html`<div class="page">${back}<p class="empty">${t("rooms.loading")}</p></div>`;
+    const back = this.subHead(areaName(ctx, this.area), () => ctx.go("/settings/auto"));
+    if (!ctx.autoLight) return this.screen(back, html`<p class="empty">${t("rooms.loading")}</p>`);
     const config = this.config;
-    if (!config) return html`<div class="page">${back}<p class="empty">${t("auto.not_found")}</p></div>`;
+    if (!config) return this.screen(back, html`<p class="empty">${t("auto.not_found")}</p>`);
     const natural = config.settings.style === "natural";
-    return html`<div class="page auto-page">
-        ${back}
-        <h1 class="big">${areaName(ctx, this.area)}</h1>
-        <p class="lead">${t(natural ? "auto.intro_natural" : "auto.intro")}</p>
+    return html`${this.screen(
+        back,
+        html`<p class="lead">${t(natural ? "auto.intro_natural" : "auto.intro")}</p>
         ${this.control()} ${this.styleChoice(natural)} ${this.today(config)}
         ${natural
           ? html`<h2 class="label">${t("auto.kelvin")}</h2>${this.kelvin(config.settings)}`
@@ -175,8 +171,9 @@ export class AutoLightView extends StudioView {
           <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmRemove })} @click=${() => this.removeArea()}>
             ${this.confirmRemove ? t("auto.remove_confirm") : t("auto.remove")}
           </button>
-        </div>
-      </div>
+        </div>`,
+        "auto-page",
+      )}
       ${this.holiday ? this.holidaySheet(this.holiday) : nothing} ${this.picker ? this.pickerSheet(this.picker) : nothing}`;
   }
 
@@ -583,5 +580,29 @@ const PHASE_ICONS: Record<Phase, string> = {
 declare global {
   interface HTMLElementTagNameMap {
     "hue-studio-auto-light-view": AutoLightView;
+  }
+}
+
+/** Settings → Auto light: the areas with auto light, and adding one. */
+@customElement("hue-studio-auto-list-view")
+export class AutoLightListView extends StudioView {
+  @state() private accessor adding = false;
+
+  protected override render() {
+    const { ctx } = this;
+    const { t } = ctx;
+    return html`${this.screen(
+      this.subHead(t("settings.auto_light"), () => ctx.go("/settings")),
+      html`<p class="lead">${t("settings.auto_light_hint")}</p>
+        ${autoLightRows(ctx, () => (this.adding = true))}`,
+      "settings-page",
+    )}
+    ${this.adding ? addAreaSheet(ctx, () => (this.adding = false)) : nothing}`;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "hue-studio-auto-list-view": AutoLightListView;
   }
 }

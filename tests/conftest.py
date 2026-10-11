@@ -4,7 +4,10 @@ from collections.abc import Generator
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from aiohue.v2.models.entertainment_configuration import EntertainmentStatus
+from aiohue.v2.models.entertainment_configuration import (
+    EntertainmentConfigurationType,
+    EntertainmentStatus,
+)
 from aiohue.v2.models.feature import (
     ColorFeature,
     ColorFeatureBase,
@@ -207,6 +210,7 @@ def make_entertainment(
         id=resource_id,
         id_v1=None,
         metadata=SimpleNamespace(name=name),
+        configuration_type=EntertainmentConfigurationType.SCREEN,
         status=EntertainmentStatus.ACTIVE if active else EntertainmentStatus.INACTIVE,
         light_services=[
             ResourceIdentifier(rid=rid, rtype=ResourceTypes.LIGHT) for rid in lights

@@ -12,7 +12,12 @@
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/auto/<area>      auto light of an area
 //   /settings/experimental     experimental features (the Liquid Glass footer)
-//   /settings/devices          add Hue devices: search, name, area, Hue room
+//   /settings/devices          Hue devices by area; add new ones (search, name, area, Hue room)
+//   /settings/bridges          bridges and Sync Boxes
+//   /settings/motionaware      MotionAware areas
+//   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
+//   /settings/auto             areas with auto light
+//   /settings/integration      the integration's options
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -27,7 +32,10 @@ import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
 import { icon, type IconName } from "./ui.ts";
 import "./views/auto-light.ts";
+import "./views/bridges.ts";
 import "./views/color.ts";
+import "./views/entertainment.ts";
+import "./views/integration.ts";
 import "./views/devices.ts";
 import "./views/experimental.ts";
 import "./views/gallery.ts";
@@ -51,6 +59,10 @@ type Route =
   | { name: "settings" }
   | { name: "experimental" }
   | { name: "devices" }
+  | { name: "bridges"; mode: "bridges" | "motion" }
+  | { name: "entertainment"; area: string | null; arrange: boolean }
+  | { name: "autolist" }
+  | { name: "integration" }
   | { name: "auto"; area: string };
 
 function parseRoute(path: string, search: string): Route {
@@ -70,6 +82,11 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "auto" && parts[2]) return { name: "auto", area: parts[2] };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
+  if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges" };
+  if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion" };
+  if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
+  if (parts[0] === "settings" && parts[1] === "auto" && !parts[2]) return { name: "autolist" };
+  if (parts[0] === "settings" && parts[1] === "integration") return { name: "integration" };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
 }
@@ -121,7 +138,12 @@ export class HueStudioPanel extends LitElement {
         ? "gallery"
         : route.name === "sync"
           ? "sync"
-          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental" || route.name === "devices"
+          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental" ||
+              route.name === "devices" ||
+              route.name === "bridges" ||
+              route.name === "entertainment" ||
+              route.name === "autolist" ||
+              route.name === "integration"
             ? "settings"
             : "home";
     const tabs: [string, string, IconName, string][] = [
@@ -168,6 +190,16 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-auto-light-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-auto-light-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
+      case "bridges":
+        return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode}></hue-studio-bridges-view>`;
+      case "entertainment":
+        return route.arrange && route.area
+          ? html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .entertainment=${route.area}></hue-studio-space-view>`
+          : html`<hue-studio-entertainment-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-entertainment-view>`;
+      case "autolist":
+        return html`<hue-studio-auto-list-view .ctx=${ctx} .rev=${rev}></hue-studio-auto-list-view>`;
+      case "integration":
+        return html`<hue-studio-integration-view .ctx=${ctx} .rev=${rev}></hue-studio-integration-view>`;
       case "devices":
         return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev}></hue-studio-devices-view>`;
       case "experimental":
@@ -186,8 +218,8 @@ export class HueStudioPanel extends LitElement {
     const key = `${this.route?.path ?? ""}${location.search}`;
     if (key !== this.lastRoute) {
       this.lastRoute = key;
-      const main = this.renderRoot.querySelector("main");
-      if (main) main.scrollTop = 0;
+      const body = this.renderRoot.querySelector(".screen-body");
+      if (body) body.scrollTop = 0;
     }
   }
 }

@@ -203,6 +203,21 @@
     },
     "unknown_hue_device": {
       "message": "No Hue device {device} on the bridges of Hue Studio."
+    },
+    "unknown_entertainment_area": {
+      "message": "No entertainment area {area} on the bridges."
+    },
+    "not_entertainment_light": {
+      "message": "{entity_id} cannot be in an entertainment area."
+    },
+    "entertainment_failed": {
+      "message": "The Hue Bridge did not accept the change of {name}."
+    },
+    "unknown_motion_area": {
+      "message": "No MotionAware area {area} on the bridges."
+    },
+    "area_taken": {
+      "message": "Another Hue room or zone already belongs to the area {area}."
     }
   },
   "services": {

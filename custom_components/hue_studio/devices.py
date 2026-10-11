@@ -146,7 +146,7 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
     {hue entry id: {"name", "searching": bool | None (None: no search through the API),
                     "devices": [{"id", "name", "product", "model", "archetype", "kind",
                                  "new", "area", "lights"}]}}
-    Listed: new devices (added while HA runs) and those whose HA device has no area.
+    Every device but the bridge; `new`: added while HA runs and not set up yet.
     """
     setup = _setup(hass)
     devices = dr.async_get(hass)
@@ -171,8 +171,6 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
             ha_device = by_hue_id.get(device.id)
             area = ha_device.area_id if ha_device else None
             new = device.id in setup.found
-            if not new and area:
-                continue
             listed.append(
                 {
                     "id": device.id,

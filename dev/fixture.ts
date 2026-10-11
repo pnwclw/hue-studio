@@ -8,6 +8,7 @@ import type {
   Hass,
   HassState,
   HueDeviceInfo,
+  EntertainmentArea,
   LightInfo,
   LightsMessage,
   Palette,
@@ -410,6 +411,19 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [] },
   ];
   let searching = false;
+  // Entertainment areas: the TV area (the living room's TV lights) and a desk area.
+  const entAreas: EntertainmentArea[] = [
+    { id: "ent-tv", name: "TV area", type: "screen", streaming: false, lights: {
+      "light.tv_strip": [[-0.6, 1, -0.2], [0.6, 1, -0.2]], "light.play_left": [[-0.9, 0.9, 0]], "light.play_right": [[0.9, 0.9, 0]] } },
+    { id: "ent-desk", name: "Desk", type: "monitor", streaming: false, lights: { "light.desk_lamp": [[0, 0.6, 0.2]] } },
+  ];
+  const entListeners = new Set<(m: unknown) => void>();
+  const entMessage = () => ({ "hue-entry": { name: "Hue Bridge", areas: structuredClone(entAreas),
+    lights: ["light.candle", "light.desk_lamp", "light.globe_lights", "light.play_left", "light.play_right", "light.tv_strip"] } });
+  const pushEnt = () => setTimeout(() => entListeners.forEach((cb) => cb(entMessage())), 60);
+  const bridgesMessage = { "hue-entry": { name: "Hue Bridge", host: "192.0.2.10", id: "001788fffe000000", model: "Hue Bridge", software: "1.70.1970",
+    motion_areas: [{ id: "ma-1", name: "Living room", group: "Living room", enabled: true, health: "healthy",
+      lights: [{ entity_id: "light.play_left", health: "healthy" }, { entity_id: "light.play_right", health: "healthy" }] }] } };
   const deviceListeners = new Set<(m: unknown) => void>();
   const devicesMessage = () => ({ "hue-entry": { name: "Hue Bridge", searching, devices: structuredClone(hueDevices) } });
   const pushDevices = () => setTimeout(() => deviceListeners.forEach((cb) => cb(devicesMessage())), 60);
@@ -756,6 +770,30 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         setTimeout(() => positionListeners.forEach((cb) => cb(positionsMessage())), 80);
         return null as T;
       }
+      if (msg.type === "hue_studio/entertainment/create") {
+        entAreas.push({ id: `ent-${Date.now()}`, name: String(msg.name), type: msg.area_type as EntertainmentArea["type"], streaming: false,
+          lights: Object.fromEntries((msg.lights as string[]).map((l, i) => [l, [[i * 0.4 - 0.4, 0.8, 0]]])) });
+        pushEnt();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/entertainment/update" || msg.type === "hue_studio/entertainment/positions") {
+        const area = entAreas.find((a) => a.id === msg.area_id);
+        if (area) {
+          if (msg.name) area.name = String(msg.name);
+          if (msg.area_type) area.type = msg.area_type as EntertainmentArea["type"];
+          if (msg.lights) area.lights = Object.fromEntries((msg.lights as string[]).map((l) => [l, area.lights[l] || [[0, 0.8, 0]]]));
+          if (msg.positions) Object.assign(area.lights, msg.positions);
+        }
+        pushEnt();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/entertainment/delete") {
+        entAreas.splice(entAreas.findIndex((a) => a.id === msg.area_id), 1);
+        pushEnt();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/motion_area") return null as T;
+      if (msg.type === "hue_studio/config/set_group" || msg.type === "hue_studio/config/set_room_sensors") return null as T;
       if (msg.type === "hue_studio/devices/search") {
         searching = true;
         setTimeout(() => {
@@ -822,6 +860,17 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           return () => {
             sceneListeners.delete(send);
           };
+        }
+        if (msg.type === "hue_studio/entertainment/subscribe") {
+          entListeners.add(send);
+          setTimeout(() => send(entMessage()), 40);
+          return () => {
+            entListeners.delete(send);
+          };
+        }
+        if (msg.type === "hue_studio/bridges/subscribe") {
+          setTimeout(() => send(bridgesMessage), 40);
+          return () => {};
         }
         if (msg.type === "hue_studio/devices/subscribe") {
           deviceListeners.add(send);

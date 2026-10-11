@@ -96,9 +96,19 @@ picker. Zones (any lights from any rooms) are created and edited on the same scr
 With "Rooms follow areas" turned on (Settings tab, or the integration options), every area change is
 written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-and-scenes.md).
 
+## Settings
+
+The panel's Settings tab is laid out like the Hue app's. **In this home**: Devices (every
+Hue device by area, and adding new ones), Bridges (and Sync Boxes), MotionAware areas
+(health, on/off) and Entertainment areas (create, rename, change type and lights, arrange
+where the lights stand, delete — they are not rooms or zones). **Hue Studio**: Rooms and
+zones, Auto light, Integration settings (rooms follow areas, which area each Hue room or
+zone belongs to, the sensors of each room — the integration's options, without leaving
+the panel) and Experimental.
+
 ## Adding devices
 
-Settings → **Add devices** in the panel: the bridge searches for new Hue lights, switches
+Settings → **Devices** in the panel: the bridge searches for new Hue lights, switches
 and sensors (optionally by the serial numbers printed on them, for devices from another
 bridge or far away). Each new device — and any Hue device not in a Home Assistant area
 yet — gets a name (on the bridge, so the Hue app shows it too), an area and, for lights,

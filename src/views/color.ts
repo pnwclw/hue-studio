@@ -188,7 +188,7 @@ export class ColorView extends StudioView {
   protected override render() {
     const { ctx, group } = this;
     const { t } = ctx;
-    this.className = this.embedded ? "colorbody" : "page";
+    this.className = this.embedded ? "colorbody" : "";
     if (!group) return html`<p class="empty">${t("room.not_found")}</p>`;
 
     const mode = this.currentMode;
@@ -197,14 +197,7 @@ export class ColorView extends StudioView {
     const back = () => ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`);
     const effects = availableEffects(group.lights, ctx.lightInfo).length > 0;
 
-    return html`
-      ${this.embedded
-        ? nothing
-        : html`<div class="topbar">
-            <button class="round back" aria-label=${t("common.back")} @click=${back}>${icon("back")}</button>
-            <div class="grow" style="font-size:17px;font-weight:600">${group.name}</div>
-            <button class="pill done" @click=${back}>${t("color.done")}</button>
-          </div>`}
+    const content = html`
       ${mode === "effects" ? this.effectsBody(group) : this.wheel(mode)}
       <div class="dock">
         ${mode === "color" ? this.gradientModes() : nothing}
@@ -244,6 +237,8 @@ export class ColorView extends StudioView {
           : nothing}
       </div>
     `;
+    if (this.embedded) return content;
+    return this.screen(this.subHead(group.name, back, html`<button class="pill done" @click=${back}>${t("color.done")}</button>`), content);
   }
 
   private wheel(mode: Mode) {

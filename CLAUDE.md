@@ -185,10 +185,14 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
                                 align_rooms, save_scene, reset_scene, recall_scene, set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
-                                hue_studio/config/set, hue_studio/positions/set, hue_studio/devices/search|identify|setup
+                                hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
+                                hue_studio/devices/search|identify|setup, hue_studio/entertainment/subscribe|create|update|delete|positions,
+                                hue_studio/bridges/subscribe|motion_area
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
-  devices.py                    adding devices: Zigbee search (serials), new/area-less devices, name + area + Hue room
+  devices.py                    adding devices: Zigbee search (serials), all devices, name + area + Hue room
+  entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
+  bridges.py                    bridge facts and MotionAware areas (health, on/off) for the settings
   auto_light.py                 auto light settings per area in a Store: pool/exclude/offset services,
                                 import of the legacy lights.json
   auto_select.py                pure: phase, season, weather, pool, scene of the day, brightness; manual-change tolerance
@@ -218,8 +222,9 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                auto-light (per area), space (arrange lights), experimental, devices (add devices)
-                                — one Lit element per screen
+                                auto-light (per area, and the list), space (arrange a room or an entertainment area),
+                                experimental, devices, bridges (and MotionAware), entertainment, integration (options)
+                                — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
   space.ts                      pure: placed lights, top-view coordinate mapping
   auto-light.ts                 pure: pools of the auto light editor, areas with/without auto light
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`

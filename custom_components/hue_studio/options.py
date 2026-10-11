@@ -11,6 +11,7 @@ from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import (
     area_registry as ar,
     device_registry as dr,
@@ -22,12 +23,14 @@ from .const import (
     CONF_FOOTER,
     CONF_FOOTER_TABS,
     CONF_GROUPS,
+    CONF_HUE_ENTRY_ID,
     CONF_ILLUMINANCE,
     CONF_MOTION,
     CONF_ROOMS,
     CONF_TEMPERATURE,
     DOMAIN,
     GROUP_AUTO,
+    GROUP_ZONE,
     HUE_DOMAIN,
 )
 from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN
@@ -188,3 +191,105 @@ def _panel_option(hass: HomeAssistant, key: str, default: Any) -> Any:
         if key in entry.options:
             return entry.options[key]
     return default
+
+
+# ---- changed from the panel (Settings → Integration settings) ----
+
+
+def _studio_entry(hass: HomeAssistant, hue_entry_id: str | None) -> Any:
+    """The Hue Studio entry of a bridge (the first one without an id)."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if CONF_HUE_ENTRY_ID in entry.data and (
+            hue_entry_id is None or entry.data[CONF_HUE_ENTRY_ID] == hue_entry_id
+        ):
+            return entry
+    raise ServiceValidationError(
+        translation_domain=DOMAIN, translation_key="hue_entry_missing"
+    )
+
+
+@callback
+def async_set_group_area(
+    hass: HomeAssistant, entity_id: str, target: str | None
+) -> None:
+    """Which area a Hue room/zone belongs to: an area id, None (a zone of its own) or
+    "auto" (the area with exactly its lights). Like the options' room mapping, only
+    deviations from the automatic match are stored."""
+    registry = er.async_get(hass)
+    reg = registry.async_get(entity_id)
+    groups = async_hue_groups(hass, reg.config_entry_id if reg else None)
+    group = next((g for g in groups if g.entity_id == entity_id), None)
+    if reg is None or group is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="not_hue_group",
+            translation_placeholders={"entity_id": entity_id},
+        )
+    entry = _studio_entry(hass, reg.config_entry_id)
+    stored = dict(entry.options.get(CONF_GROUPS, {}))
+    auto = async_auto_areas(hass, groups)
+    if target not in (None, GROUP_AUTO):
+        if ar.async_get(hass).async_get_area(target) is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_ha_area",
+                translation_placeholders={"area": target},
+            )
+        taken = {
+            uid: area for uid, area in stored.items() if uid != group.unique_id
+        } | {uid: a for uid, a in auto.items() if uid not in stored}
+        if target in {a for uid, a in taken.items() if uid != group.unique_id}:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="area_taken",
+                translation_placeholders={"area": target},
+            )
+    if target == GROUP_AUTO or target == auto.get(group.unique_id):
+        stored.pop(group.unique_id, None)
+    elif target is None:
+        stored[group.unique_id] = GROUP_ZONE
+    else:
+        stored[group.unique_id] = target
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_GROUPS: stored}
+    )
+
+
+@callback
+def async_set_room_sensors(
+    hass: HomeAssistant, room: str, sensors: dict[str, list[str]]
+) -> None:
+    """Motion, temperature and light sensors of a room ("area.<id>" or
+    "hue.<group entity id>", as the panel keys rooms); all empty: back to defaults."""
+    kind, _, ident = room.partition(".")
+    if kind == "hue":
+        reg = er.async_get(hass).async_get(ident)
+        if reg is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="not_hue_group",
+                translation_placeholders={"entity_id": ident},
+            )
+        key, owner = f"hue.{reg.unique_id}", _studio_entry(hass, reg.config_entry_id)
+    elif kind == "area":
+        key, owner = room, _studio_entry(hass, None)
+    else:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_ha_area",
+            translation_placeholders={"area": room},
+        )
+    value = {
+        k: sensors.get(k, []) for k in (CONF_MOTION, CONF_TEMPERATURE, CONF_ILLUMINANCE)
+    }
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if CONF_HUE_ENTRY_ID not in entry.data:
+            continue
+        rooms = dict(entry.options.get(CONF_ROOMS, {}))
+        if entry is owner and any(value.values()):
+            rooms[key] = value
+        else:
+            rooms.pop(key, None)
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_ROOMS: rooms}
+        )

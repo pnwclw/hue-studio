@@ -15,6 +15,11 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
+from .bridges import (
+    SIGNAL_BRIDGES_UPDATED,
+    async_bridges_payload,
+    async_set_motion_area,
+)
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
@@ -34,6 +39,14 @@ from .devices import (
     async_setup_device,
     async_watch_bridges,
 )
+from .entertainment import (
+    TYPES as ENTERTAINMENT_TYPES,
+    async_create as async_create_entertainment,
+    async_delete as async_delete_entertainment,
+    async_entertainment_payload,
+    async_set_positions as async_set_entertainment_positions,
+    async_update as async_update_entertainment,
+)
 from .lights import (
     HUE_DOMAIN,
     LIGHT_DOMAIN,
@@ -41,7 +54,11 @@ from .lights import (
     async_bridges,
     light_info,
 )
-from .options import async_frontend_config
+from .options import (
+    async_frontend_config,
+    async_set_group_area,
+    async_set_room_sensors,
+)
 from .positions import (
     SIGNAL_POSITIONS_UPDATED,
     async_positions_payload,
@@ -73,6 +90,18 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_search_devices)
     websocket_api.async_register_command(hass, ws_identify_device)
     websocket_api.async_register_command(hass, ws_setup_device)
+    for command in (
+        ws_subscribe_entertainment,
+        ws_create_entertainment,
+        ws_update_entertainment,
+        ws_delete_entertainment,
+        ws_entertainment_positions,
+        ws_subscribe_bridges,
+        ws_set_motion_area,
+        ws_set_group_area,
+        ws_set_room_sensors,
+    ):
+        websocket_api.async_register_command(hass, command)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -517,3 +546,247 @@ async def ws_setup_device(
         msg,
         async_setup_device(hass, msg["device"], msg.get("name"), msg.get("area_id")),
     )
+
+
+def _subscribe(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+    payload: Callable[[], Any],
+    signals: list[str],
+) -> None:
+    """Send `payload()` now and whenever one of the signals (or an area) changes."""
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        data = payload()
+        if data == last.get("payload"):
+            return
+        last["payload"] = data
+        connection.send_message(websocket_api.event_message(msg["id"], data))
+
+    unsubs = [async_dispatcher_connect(hass, s, send) for s in signals]
+    unsubs.append(async_track_areas(hass, send))
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/entertainment/subscribe"}
+)
+@callback
+def ws_subscribe_entertainment(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Entertainment areas of the bridges (see async_entertainment_payload)."""
+    _subscribe(
+        hass,
+        connection,
+        msg,
+        lambda: async_entertainment_payload(hass),
+        [SIGNAL_ENTERTAINMENT_UPDATED],
+    )
+
+
+ENTERTAINMENT_LIGHTS = vol.All([cv.entity_id], vol.Length(min=1, max=20))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/entertainment/create",
+        vol.Optional("hue_entry_id"): str,
+        vol.Required("name"): vol.All(str, vol.Length(min=1)),
+        vol.Optional("area_type", default="screen"): vol.In(ENTERTAINMENT_TYPES),
+        vol.Required("lights"): ENTERTAINMENT_LIGHTS,
+    }
+)
+@websocket_api.async_response
+async def ws_create_entertainment(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """A new entertainment area."""
+    await _ws_call(
+        connection,
+        msg,
+        async_create_entertainment(
+            hass, msg.get("hue_entry_id"), msg["name"], msg["area_type"], msg["lights"]
+        ),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/entertainment/update",
+        vol.Required("area_id"): str,
+        vol.Optional("name"): str,
+        vol.Optional("area_type"): vol.In(ENTERTAINMENT_TYPES),
+        vol.Optional("lights"): ENTERTAINMENT_LIGHTS,
+    }
+)
+@websocket_api.async_response
+async def ws_update_entertainment(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Rename an entertainment area, change its type or lights."""
+    await _ws_call(
+        connection,
+        msg,
+        async_update_entertainment(
+            hass,
+            msg["area_id"],
+            name=msg.get("name"),
+            area_type=msg.get("area_type"),
+            lights=msg.get("lights"),
+        ),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/entertainment/delete",
+        vol.Required("area_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_delete_entertainment(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Remove an entertainment area."""
+    await _ws_call(connection, msg, async_delete_entertainment(hass, msg["area_id"]))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/entertainment/positions",
+        vol.Required("area_id"): str,
+        vol.Required("positions"): {
+            cv.entity_id: [vol.All([vol.Coerce(float)], vol.Length(min=3, max=3))]
+        },
+    }
+)
+@websocket_api.async_response
+async def ws_entertainment_positions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Move lights of an entertainment area."""
+    await _ws_call(
+        connection,
+        msg,
+        async_set_entertainment_positions(hass, msg["area_id"], msg["positions"]),
+    )
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/bridges/subscribe"})
+@callback
+def ws_subscribe_bridges(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The bridges and their MotionAware areas (bridges.async_bridges_payload)."""
+    _subscribe(
+        hass,
+        connection,
+        msg,
+        lambda: async_bridges_payload(hass),
+        [SIGNAL_BRIDGES_UPDATED],
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/motion_area",
+        vol.Required("area_id"): str,
+        vol.Required("enabled"): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_set_motion_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Switch a MotionAware area on or off."""
+    await _ws_call(
+        connection, msg, async_set_motion_area(hass, msg["area_id"], msg["enabled"])
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/config/set_group",
+        vol.Required("entity_id"): cv.entity_id,
+        # An area id, None (a zone of its own) or "auto".
+        vol.Required("area_id"): vol.Any(None, str),
+    }
+)
+@callback
+def ws_set_group_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Which area a Hue room/zone belongs to (the options' room mapping)."""
+    try:
+        async_set_group_area(hass, msg["entity_id"], msg["area_id"])
+    except ServiceValidationError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])
+
+
+SENSOR_IDS = vol.All([cv.entity_id], vol.Length(max=10))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/config/set_room_sensors",
+        # "area.<area id>" or "hue.<group entity id>"
+        vol.Required("room"): str,
+        vol.Optional("motion", default=list): SENSOR_IDS,
+        vol.Optional("temperature", default=list): SENSOR_IDS,
+        vol.Optional("illuminance", default=list): SENSOR_IDS,
+    }
+)
+@callback
+def ws_set_room_sensors(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Sensors of a room (the options' room sensors); all empty: the defaults."""
+    try:
+        async_set_room_sensors(
+            hass,
+            msg["room"],
+            {k: msg[k] for k in ("motion", "temperature", "illuminance")},
+        )
+    except ServiceValidationError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])

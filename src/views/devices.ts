@@ -1,6 +1,6 @@
-// Settings → Add devices: HA-first setup of Hue devices. Search the bridge's Zigbee
-// network (optionally by serial numbers), then give each new device — or one without an
-// area — a name, an HA area and, for lights, the Hue room of that area.
+// Settings → Devices: every Hue device by area, and adding new ones (HA-first setup).
+// Search the bridge's Zigbee network (optionally by serial numbers); any device can get a
+// name, an HA area and, for lights, the Hue room of that area.
 
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -51,13 +51,15 @@ export class DevicesView extends StudioView {
     const unsupported = bridges.length > 0 && bridges.every(([, b]) => b.searching === null);
     const all = bridges.flatMap(([, b]) => b.devices);
     const fresh = all.filter((d) => d.new);
-    const loose = all.filter((d) => !d.new);
-    return html`<div class="page settings-page">
-      <div class="topbar">
-        <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("/settings")}>${icon("back")}</button>
-      </div>
-      <h1 class="big">${t("devices.title")}</h1>
-      <p class="lead">${t("devices.intro")}</p>
+    const loose = all.filter((d) => !d.new && !d.area);
+    const areas = ctx.hass.areas || {};
+    const byArea = Object.entries(areas)
+      .map(([id, a]) => [a.name, all.filter((d) => !d.new && d.area === id)] as const)
+      .filter(([, list]) => list.length)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return this.screen(
+      this.subHead(t("settings.devices"), () => ctx.go("/settings")),
+      html`<p class="lead">${t("devices.intro")}</p>
       <div class="rows">
         <div class="item col">
           <div class="line">
@@ -78,8 +80,9 @@ export class DevicesView extends StudioView {
             <p class="lead small">${t("devices.no_area_hint")}</p>
             <div class="rows">${loose.map((d) => this.device(d))}</div>`
         : nothing}
-      ${this.devices && !all.length ? html`<p class="lead small center-text">${t("devices.all_set")}</p>` : nothing}
-    </div>`;
+      ${byArea.map(([name, list]) => html`<h2 class="label">${name}</h2><div class="rows">${list.map((d) => this.device(d))}</div>`)}`,
+      "settings-page",
+    );
   }
 
   private device(d: HueDeviceInfo) {

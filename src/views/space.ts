@@ -1,4 +1,4 @@
-// Arrange lights (room → Arrange): a top view of the room with the lights as draggable
+// Arrange lights (room → Arrange, or an entertainment area in Settings): a top view with the lights as draggable
 // dots (a gradient strip as its two ends) and a height for the selected light. Lights of
 // the room's entertainment area are saved to the bridge, so the Hue app and sync use the
 // same places; the others are kept by Hue Studio. Spatial palettes use these positions.
@@ -10,13 +10,17 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { findGroup, friendlyName, lightColors, lightIcon } from "../model.ts";
 import { fromView, isUpright, movePoints, newPoint, roundPoint, setHeight, toView } from "../space.ts";
-import type { AreaPositions, RoomPoint } from "../types.ts";
+import type { AreaPositions, EntertainmentArea, EntertainmentMessage, RoomPoint } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
 @customElement("hue-studio-space-view")
 export class SpaceView extends StudioView {
   @property() accessor key = "";
+  /** Arrange an entertainment area (its id) instead of a room. */
+  @property() accessor entertainment: string | null = null;
+  @state() private accessor areas: EntertainmentMessage | null = null;
+  private stop?: () => void;
   /** Moved lights, not saved yet (entity id -> points). */
   @state() private accessor draft: Record<string, RoomPoint[]> = {};
   @state() private accessor selected: string | null = null;
@@ -24,7 +28,30 @@ export class SpaceView extends StudioView {
 
   private drag: { light: string; index: number; rect: DOMRect } | null = null;
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (this.entertainment) this.stop = this.ctx.watch<EntertainmentMessage>("hue_studio/entertainment/subscribe", (m) => (this.areas = m));
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stop?.();
+  }
+
+  private get entArea(): EntertainmentArea | undefined {
+    return Object.values(this.areas || {})
+      .flatMap((b) => b.areas)
+      .find((a) => a.id === this.entertainment);
+  }
+
+  /** The lights and their places: a room's (from its entertainment area or the Store), or an entertainment area's. */
   private get area(): AreaPositions | undefined {
+    if (this.entertainment) {
+      const e = this.entArea;
+      if (!e) return undefined;
+      const lights = Object.fromEntries(Object.entries(e.lights).map(([id, positions]) => [id, { positions, source: "bridge" as const }]));
+      return { lights, configuration: { id: e.id, name: e.name, streaming: e.streaming } };
+    }
     const key = this.key;
     return key.startsWith("area.") ? this.ctx.positions?.[key.slice("area.".length)] : undefined;
   }
@@ -36,29 +63,30 @@ export class SpaceView extends StudioView {
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
-    const group = findGroup(ctx.home, this.key);
-    const back = () => ctx.go(`/room/${encodeURIComponent(this.key)}`);
-    const bar = html`<div class="topbar">
-      <button class="round back" aria-label=${t("common.back")} @click=${back}>${icon("back")}</button>
-      <div class="title">${group?.name || ""}</div>
-    </div>`;
+    const ent = this.entertainment;
+    const group = ent ? null : findGroup(ctx.home, this.key);
+    const name = ent ? this.entArea?.name : group?.name;
+    const back = () => ctx.go(ent ? `/settings/entertainment/${encodeURIComponent(ent)}` : `/room/${encodeURIComponent(this.key)}`);
+    const bar = this.subHead(name ? `${t("space.title")} · ${name}` : t("space.title"), back);
     const area = this.area;
-    if (!group || !area) {
-      return html`<div class="page">${bar}<p class="empty">${t(ctx.positions ? "space.no_area" : "rooms.loading")}</p></div>`;
+    const loaded = ent ? this.areas : ctx.positions;
+    if ((!group && !ent) || !area) {
+      return this.screen(bar, html`<p class="empty">${t(loaded ? "space.no_area" : "rooms.loading")}</p>`);
     }
-    const lights = group.lights.filter((id) => area.lights[id]);
+    const lights = ent ? Object.keys(area.lights) : group!.lights.filter((id) => area.lights[id]);
     const placed = lights.filter((id) => this.points(id).length);
     const loose = lights.filter((id) => !this.points(id).length);
     const streaming = !!area.configuration?.streaming;
     const changed = Object.keys(this.draft).length > 0;
     const sel = this.selected && placed.includes(this.selected) ? this.selected : null;
-    return html`<div class="page space-page">
-      ${bar}
-      <h1 class="big">${t("space.title")}</h1>
-      <p class="lead">${t("space.intro")}</p>
-      ${area.configuration
-        ? html`<p class="lead small">${t("space.from_area", { name: area.configuration.name })}</p>`
-        : html`<p class="lead small">${t("space.no_entertainment")}</p>`}
+    return this.screen(
+      bar,
+      html`<p class="lead">${t("space.intro")}</p>
+      ${ent
+        ? nothing
+        : area.configuration
+          ? html`<p class="lead small">${t("space.from_area", { name: area.configuration.name })}</p>`
+          : html`<p class="lead small">${t("space.no_entertainment")}</p>`}
       ${streaming ? html`<p class="sync-note">${icon("sync")}<span>${t("space.streaming", { name: area.configuration!.name })}</span></p>` : nothing}
       <div class="edge-label">${t("space.front")}</div>
       <div class=${classMap({ room: true, locked: streaming })} @pointermove=${this.onMove} @pointerup=${this.onUp} @pointercancel=${this.onUp}>
@@ -103,8 +131,9 @@ export class SpaceView extends StudioView {
       <div class="center stack">
         <button class="pill go" ?disabled=${!changed || this.busy || streaming} @click=${() => this.save()}>${t("space.save")}</button>
         ${changed ? html`<button class="pill" @click=${() => (this.draft = {})}>${t("space.discard")}</button>` : nothing}
-      </div>
-    </div>`;
+      </div>`,
+      "space-page",
+    );
   }
 
   /** The selected light: its name, where its positions are saved, its height. */
@@ -164,9 +193,10 @@ export class SpaceView extends StudioView {
   };
 
   private async save(): Promise<void> {
-    const area = this.key.slice("area.".length);
     this.busy = true;
-    const ok = await this.ctx.ws({ type: "hue_studio/positions/set", area_id: area, positions: this.draft });
+    const ok = this.entertainment
+      ? await this.ctx.ws({ type: "hue_studio/entertainment/positions", area_id: this.entertainment, positions: this.draft })
+      : await this.ctx.ws({ type: "hue_studio/positions/set", area_id: this.key.slice("area.".length), positions: this.draft });
     this.busy = false;
     if (ok) {
       this.draft = {};
