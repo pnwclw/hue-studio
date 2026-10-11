@@ -287,6 +287,66 @@ mimic intervals, a fade ending at a time) is done in the blueprint itself (HA sc
 `delay` with templates) versus a small Hue Studio service it calls; how blueprints are
 updated with the integration without breaking automations that use them.
 
+### G2. Our scenes and automations in HA: markers, grouping, opening in Hue Studio (2026-10-11)
+
+What Hue Studio creates ends up in HA: scenes as `scene.*` of the native `hue` (bridge
+scenes), automations as HA automations (G). Each gets markers so that Hue Studio
+recognizes it, and grouping so that HA's own lists stay tidy. Everything is
+written through HA's public registries and config APIs, never into our Store.
+
+1. **Markers. Hue Studio recognizes its scenes and automations by them, not by name.**
+   - Scenes: platform `hue` plus the bridge scene id (as today). The bridge stays the
+     source of truth, so a scene made in the Hue app is recognized the same way.
+   - Automations: `use_blueprint.path` under `hue_studio/` gives the type.
+   - The automation `id` gets the prefix `hue_studio_<type>_`. The id survives a takeover
+     in HA, so the panel can still show a taken-over automation as "custom, made in Hue
+     Studio" and link to it.
+   - Labels and categories (item 2) are for people. Recognition never depends on them
+     alone, because the user may change or remove them.
+2. **Grouping in HA.** We assign it on create, and on setup for what already exists.
+   - **Label** "Hue Studio": HA labels are global, so one filter in the entity, scene and
+     automation lists shows everything of ours.
+   - **Scene category** = its Hue room or zone, so HA's scene list is grouped by room,
+     like the Hue app.
+   - **Automation category** "Hue Studio" (HA categories are per list).
+   - **Area:** a scene gets its room's area. An automation gets the area of its one room;
+     with several rooms it gets no area.
+   - **Names:** names follow the HA language (translations), with Hue-style icons.
+   - **The user's choice wins.** We fill only what is empty or still ours. We never
+     overwrite a category, area or label the user set. A rename or move on the bridge
+     updates a category only while it is still one of ours.
+   - **Off switch:** an option, "Organize in Home Assistant" (on by default). Turning it
+     off leaves everything as it is.
+3. **Opening in Hue Studio, like lights.** The more-info override grows beyond lights,
+   under the same rules: only what is ours, the fallback to HA's dialog, "Details" and
+   `detail.view` go to HA.
+   - `scene.*` of `hue` opens our scene sheet: picture and colors, activate, edit in the
+     panel's scene editor.
+   - `automation.*` recognized as ours (by blueprint path, read through HA's automation
+     config API) opens our automation sheet: the switch, a summary in Hue words, edit in
+     the Hue-style editor, "Open in Home Assistant".
+   - Everything else passes through untouched.
+4. **HA's editors stay HA's.** On `/config/...` the automation and scene lists open HA's
+   editors, and we don't intercept that: the rule "never touch `/config/...`" holds, and
+   HA-first means HA's editor is always reachable. The way back is a link instead:
+   - every automation we write gets a `description` with a link to it in the panel
+     (`/hue/automations/<id>`), and HA's editor shows that description;
+   - the blueprints' descriptions link to the panel's Automations tab.
+   - Deep links: `/hue/automations/<id>`, plus the existing scene and room routes.
+5. **Upstream, not patched.** Changing HA itself (a frontend hook that lets an
+   integration offer its own editor for automations from its blueprints, or a custom
+   more-info for scenes) would be a proposal to HA core and frontend. We never monkeypatch
+   HA. Until such a hook exists, items 3 and 4 are the whole mechanism.
+
+Scenes come first: markers, grouping and the scene sheet work today, without waiting
+for G. The automation parts land together with G.
+
+Open questions:
+- Whether HA's scene list opens more-info for non-editable (bridge) scenes, so our sheet
+  can appear there too. Check on the live HA.
+- Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
+  (read-only, opening in HA), or left out.
+
 ### H. Later: Hue Secure
 
 Plans, after research:
@@ -305,8 +365,9 @@ Plans, after research:
 
 ## Order
 
-A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G -> H. Done so far:
-A, B, C, D, R, D2, E (except the HACS submission, kept for later) and F. Next: G.
+A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (scenes) -> G (with
+G2 for automations) -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
+for later) and F. Next: G2 for scenes, then G.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
