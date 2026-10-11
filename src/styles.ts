@@ -175,6 +175,13 @@ export const CSS = `
   .light ha-icon { --mdc-icon-size: 28px; }
   .light .name { font-size: 13px; font-weight: 500; line-height: 1.2; min-height: 2.4em; display: flex; align-items: center; }
   .light.unavailable { opacity: 0.45; }
+  .light.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #fff; }
+  /* The room's lights under the color wheel, like the Hue app: a row of cards, tap to pick one. */
+  .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
+               margin: 4px -16px 0; padding: 4px 16px 6px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+               overscroll-behavior-x: contain; }
+  .light-row::-webkit-scrollbar { display: none; }
+  .light-row .light { scroll-snap-align: start; }
 
   /* color wheel */
   .colorview { display: flex; flex-direction: column; }

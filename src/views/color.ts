@@ -7,7 +7,7 @@
 // effects.
 // Pins are clipped to each light's gamut; commands are throttled to the bridge limits.
 
-import { html, nothing, svg } from "lit";
+import { html, nothing, type PropertyValues, svg } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { repeat } from "lit/directives/repeat.js";
@@ -27,10 +27,10 @@ import {
   wheelYToMirek,
   xyToWheel,
 } from "../color.ts";
-import { commandInterval, groupSlider } from "../controls.ts";
+import { commandInterval, groupSlider, lightTile } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
 import { leavePanel } from "../ha-internals.ts";
-import { friendlyName, type Group, groupState, lightColors, lightIcon } from "../model.ts";
+import { type Group, groupState, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import type { StringKey } from "../i18n.ts";
 import { icon } from "../ui.ts";
@@ -82,8 +82,6 @@ export class ColorView extends StudioView {
   @property() accessor exitPath: string | null = null;
   /** Inside the more-info dialog: no top bar, the body scrolls above a fixed dock. */
   @property({ type: Boolean }) accessor embedded = false;
-  /** Inside the dialog: buttons shown in the dock in place of the brightness slider (the dialog head has one). */
-  @property({ attribute: false }) accessor actions: unknown = null;
 
   @state() private accessor mode: Mode | null = null;
   @state() private accessor merged = false;
@@ -96,6 +94,13 @@ export class ColorView extends StudioView {
   private whiteX = new Map<string, number>();
 
   @state() private accessor dragBrightness: number | null = null;
+
+  protected override updated(changed: PropertyValues): void {
+    // The dialog follows the selection (its head controls the selected light, or the room).
+    if (changed.has("selected")) {
+      this.dispatchEvent(new CustomEvent<string | null>("light-select", { detail: this.selected, bubbles: true, composed: true }));
+    }
+  }
 
   protected override willUpdate(): void {
     // Picked once, like the Hue app: the mode stays while lights change under it.
@@ -224,7 +229,7 @@ export class ColorView extends StudioView {
               >${LINK_ICON}</button>`
             : nothing}
           ${this.embedded
-            ? html`<div class="cv-actions">${this.actions}</div>`
+            ? nothing
             : html`<div
             class=${classMap({ bright: true, off: !state.on })}
             @value-input=${(e: CustomEvent<number>) => (this.dragBrightness = e.detail)}
@@ -235,13 +240,9 @@ export class ColorView extends StudioView {
           </div>`}
         </div>
         ${several
-          ? html`<div class="chips">${group.lights.map((id) => {
-              const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
-              return html`<button
-                class=${classMap({ chip: true, on: id === this.selected })}
-                @click=${() => (this.selected = this.selected === id ? null : id)}
-              ><span class="swatch" style=${styleMap({ "--swatch": colors[0] || "#555" })}></span>${friendlyName(ctx.hass, id)}</button>`;
-            })}</div>`
+          ? html`<div class="light-row">${group.lights.map((id) =>
+              lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), id === this.selected),
+            )}</div>`
           : nothing}
       </div>
     `;
