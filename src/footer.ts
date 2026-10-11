@@ -11,7 +11,7 @@ import { activeTab, FOOTER_SPACE, type FooterTab, footerTabs, footerVisible } fr
 import { navigate, openSidebar, reserveBottom, watchHass } from "./ha-internals.ts";
 import { localize } from "./i18n.ts";
 import type { Hass, StudioConfig } from "./types.ts";
-import { focusedElement, opensKeyboard } from "./ui.ts";
+import { focusedElement, keepTouchInside, opensKeyboard } from "./ui.ts";
 
 class HueStudioFooter extends LitElement {
   static override styles = css`
@@ -38,6 +38,12 @@ class HueStudioFooter extends LitElement {
   `;
 
   @state() private accessor tabs: FooterTab[] = [];
+
+  constructor() {
+    super();
+    // Dragging the footer must not pull the page under it.
+    keepTouchInside(this);
+  }
   @state() private accessor path = location.pathname;
   @state() private accessor strings: ReturnType<typeof localize> = localize(null);
 

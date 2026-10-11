@@ -15,7 +15,7 @@ import { currentHass, navigate, openStockMoreInfo, watchHass } from "./ha-intern
 import { allGroups, friendlyName, type Group, groupOfEntity, groupState, type Home } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
-import { icon, toggle } from "./ui.ts";
+import { icon, keepTouchInside, toggle } from "./ui.ts";
 import "./views/color.ts";
 import type { ColorView } from "./views/color.ts";
 
@@ -97,6 +97,8 @@ class HueStudioLightDialog extends LitElement {
 
     // Backdrop click: the host itself is the first element of the path (clicks inside are retargeted).
     this.addEventListener("click", (e) => e.composedPath()[0] === this && this.close());
+    // Lives as long as the dialog element (removed on close).
+    keepTouchInside(this);
     window.addEventListener("keydown", this.onKey);
     this.stopWatch = watchHass((h) => {
       if (!this.ctx) return;

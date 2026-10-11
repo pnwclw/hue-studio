@@ -30,7 +30,7 @@ import { fitToViewport, toggleSidebar } from "./ha-internals.ts";
 import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
-import { icon, type IconName } from "./ui.ts";
+import { icon, type IconName, keepTouchInside } from "./ui.ts";
 import "./views/auto-light.ts";
 import "./views/bridges.ts";
 import "./views/color.ts";
@@ -104,17 +104,20 @@ export class HueStudioPanel extends LitElement {
   private ctx: StudioContext | null = null;
   private lastRoute = "";
   private unfit?: () => void;
+  private untouch?: () => void;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.ctx ??= new StudioContext(() => this.rev++);
     this.ctx.toggleSidebar = () => toggleSidebar(this);
     this.unfit = fitToViewport(this);
+    this.untouch = keepTouchInside(this);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.unfit?.();
+    this.untouch?.();
     this.ctx?.dispose();
     this.ctx = null;
   }

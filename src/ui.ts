@@ -109,10 +109,6 @@ export function throttle<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   return throttled;
 }
 
-/**
- * Lit element that renders into itself instead of a shadow root, so the stylesheet of the
- * panel (or dialog) it lives in applies. All views and controls are built on it.
- */
 /** Input types that never bring up the on-screen keyboard. */
 const NO_KEYBOARD = new Set(["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"]);
 
@@ -130,6 +126,64 @@ export function opensKeyboard(el: Element | null): el is HTMLElement {
   return el instanceof HTMLInputElement && !NO_KEYBOARD.has(el.type) && !el.readOnly;
 }
 
+/** Whether `el` can scroll along `axis` (it overflows and its style lets it scroll). */
+function scrolls(el: Element, axis: "x" | "y"): boolean {
+  const style = getComputedStyle(el);
+  const overflow = axis === "y" ? style.overflowY : style.overflowX;
+  if (overflow !== "auto" && overflow !== "scroll") return false;
+  return axis === "y" ? el.scrollHeight > el.clientHeight : el.scrollWidth > el.clientWidth;
+}
+
+/**
+ * Keep touch drags inside `host`. A drag that nothing under the finger can scroll along
+ * (a short screen, the header, the tab bar) is not handed on to the page, so HA's page
+ * does not rubber-band under us or pull to refresh in the app. Scrollers with something to
+ * scroll keep their own bounce (`overscroll-behavior: contain`); form controls and
+ * pinches are left alone. Returns a stop function.
+ */
+export function keepTouchInside(host: HTMLElement): () => void {
+  let x = 0;
+  let y = 0;
+  let decided = false;
+  let free = false;
+  const start = (e: TouchEvent): void => {
+    const touch = e.touches[0];
+    x = touch?.clientX ?? 0;
+    y = touch?.clientY ?? 0;
+    decided = false;
+    free = e.touches.length > 1;
+  };
+  const move = (e: TouchEvent): void => {
+    if (e.touches.length > 1) free = true;
+    if (free || !e.cancelable) return;
+    if (!decided) {
+      // The first move decides: once the page starts scrolling it can't be stopped.
+      decided = true;
+      const touch = e.touches[0];
+      const axis = Math.abs((touch?.clientX ?? x) - x) > Math.abs((touch?.clientY ?? y) - y) ? "x" : "y";
+      for (const el of e.composedPath()) {
+        if (el === host || !(el instanceof Element)) break;
+        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || scrolls(el, axis)) {
+          free = true;
+          break;
+        }
+      }
+      if (free) return;
+    }
+    e.preventDefault();
+  };
+  host.addEventListener("touchstart", start, { passive: true });
+  host.addEventListener("touchmove", move, { passive: false });
+  return () => {
+    host.removeEventListener("touchstart", start);
+    host.removeEventListener("touchmove", move);
+  };
+}
+
+/**
+ * Lit element that renders into itself instead of a shadow root, so the stylesheet of the
+ * panel (or dialog) it lives in applies. All views and controls are built on it.
+ */
 export class LightElement extends LitElement {
   protected override createRenderRoot(): HTMLElement {
     return this;

@@ -125,6 +125,10 @@ touching anything outside this repository.
   While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
   what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
   footer hides while a field has focus. New fields need nothing else.
+- **Touch drags stay inside.** The panel, the dialog and the footer use `keepTouchInside`: a
+  drag that nothing under the finger can scroll is not handed to HA's page (no rubber-band,
+  no pull to refresh in the app). Scroll containers need `overflow: auto` plus
+  `overscroll-behavior: contain`; gestures use pointer events.
 - **Frontend: TypeScript + Lit, bundled with esbuild** (`npm run build`). We bundle our own
   Lit (never reach into HA's copy — that is internal API). Standard decorators on `accessor`
   fields (`@property() accessor x`), `strict` TypeScript, `erasableSyntaxOnly` so the pure
