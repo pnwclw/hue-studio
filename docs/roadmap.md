@@ -347,6 +347,65 @@ Open questions:
 - Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
   (read-only, opening in HA), or left out.
 
+### I. Interface: Hue Studio's or Home Assistant's own (2026-10-11)
+
+A choice between our Hue-app look and the stock HA interface (Lovelace, HA's dialogs and
+editors). In the stock mode the user's HA theme styles everything, custom themes included.
+The features stay the same; only who draws them changes.
+
+1. **The setting.**
+   - "Interface: Hue Studio / Home Assistant", with a global default in the integration
+     options.
+   - A per-user override (HA's frontend user data, like HA's own profile settings), so
+     one household can mix both.
+   - Switching needs no reinstall and no YAML.
+2. **Hue Studio mode** (today): the `/hue` panel, our more-info sheets (lights, and with
+   G2 scenes and automations), our cards, the experimental footer. Our own design tokens;
+   the HA theme does not apply.
+3. **Home Assistant mode:**
+   - **No interception.** The more-info override is off, so lights, scenes and
+     automations open HA's own dialogs; automations are edited in HA's editor through our
+     blueprints (G). The footer is off.
+   - **A dashboard strategy** (`custom:hue-studio`): it generates a Lovelace dashboard
+     from stock cards and keeps it current with no saved config. Its content:
+     - rooms and zones as sections;
+     - tile cards with features (brightness, color temperature, effects);
+     - room scenes as buttons (`scene.turn_on`);
+     - Sync Box entities;
+     - auto light entities (control, scene, offset, next scene);
+     - automations of G2's category.
+   - **Getting the dashboard:** the strategy is offered in "Add dashboard", plus a button
+     in the settings that creates it. A user can also "take control" and edit the
+     generated dashboard by hand, as with HA's own strategies.
+   - **Section or view strategies** for a single room, for users who build their own
+     dashboards.
+4. **What stock HA cannot draw:**
+   - Some things have no stock card or dialog: the color wheel with light dots and gamut,
+     multi-color gradients, the gallery, palettes, the auto light pools editor, arranging
+     lights in space, entertainment areas.
+   - These stay our elements, but in HA mode they take the HA theme. All their colors,
+     radii and fonts go through one token map. In Hue Studio mode it holds our values; in
+     HA mode it maps to HA's theme variables (`--primary-color`,
+     `--card-background-color`, `--primary-text-color`, `--ha-card-border-radius`,
+     `--ha-card-box-shadow`, …). Then a theme reaches them without knowing Hue Studio.
+   - They are offered as cards (themed, in the generated dashboard) and through the
+     settings. Wherever HA has a native form (options flow, blueprint form, entity
+     settings), that form is the HA-mode path.
+5. **Rule for new UI.** From now on (G, G2, H), every feature has an HA-mode path:
+   - entities and services first;
+   - then a stock card or form;
+   - our themed element only when neither works.
+   A screen that exists only in the Hue-look panel is not done.
+
+Open questions:
+- Whether the `/hue` panel stays in the sidebar in HA mode, either as the settings home
+  or redirecting to the generated dashboard.
+- How much of the light more-info's color power HA's own dialog loses (gradients,
+  effects beyond the list), and whether a themed card covers it.
+- Whether HA's frontend lets integrations add a strategy to "Add dashboard" without
+  internals. If not, only the button that creates the dashboard through the Lovelace
+  WebSocket API remains.
+
 ### H. Later: Hue Secure
 
 Plans, after research:
@@ -366,7 +425,7 @@ Plans, after research:
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (scenes) -> G (with
-G2 for automations) -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
+G2 for automations) -> I -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
 for later) and F. Next: G2 for scenes, then G.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
