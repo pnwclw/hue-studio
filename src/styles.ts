@@ -118,6 +118,11 @@ export const CSS = `
   nav.tabs { flex: none; display: flex; justify-content: center; gap: 4px; padding: 4px 8px max(4px, var(--safe-bottom));
              background: rgba(18, 18, 20, 0.94); border-top: 1px solid rgba(255, 255, 255, 0.06); }
   nav.tabs[hidden] { display: none; }
+  /* The on-screen keyboard is up (fitToViewport): it covers the tab bar and the home indicator,
+     and dialogs move up so their fields stay above it. */
+  :host([keyboard]) { --safe-bottom: 0px; }
+  :host([keyboard]) nav.tabs:not(.top) { display: none; }
+  :host([keyboard]) .sheet { align-items: flex-start; padding-top: max(16px, calc(var(--safe-top) + 8px)); }
   nav.tabs button { flex: 0 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border: none;
                     background: none; cursor: pointer; color: var(--text-2); font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase;
                     transition: color 0.2s; }
@@ -311,7 +316,7 @@ export const CSS = `
 
   /* gallery */
   .q { display: block; width: 100%; height: 0; box-sizing: border-box; margin: 0; border: none; border-radius: 18px; padding: 0 16px;
-       font: inherit; font-size: 15px; color: var(--text); outline: none; background: var(--surface); opacity: 0;
+       font: inherit; font-size: 16px; color: var(--text); outline: none; background: var(--surface); opacity: 0;
        transition: height 0.25s var(--ease), margin 0.25s var(--ease), opacity 0.2s; }
   .q.on { height: 36px; margin-top: 10px; opacity: 1; }
   .tiles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 2), auto); gap: 10px;
@@ -523,6 +528,8 @@ export const CSS = `
   .round.mini-step:disabled { opacity: 0.35; }
   .round.mini-step svg { width: 16px; height: 16px; }
   .select.time { max-width: 120px; color-scheme: dark; }
+  /* Below 16px iOS zooms the page in when a field or picker gets focus. */
+  @media (pointer: coarse) { .select { font-size: 16px; } }
   .md-row { display: flex; align-items: center; gap: 10px; }
   .sheet .field.md { width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
   .holiday-editor .chips { margin-top: 12px; flex-wrap: wrap; }

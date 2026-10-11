@@ -11,11 +11,13 @@ import { activeTab, FOOTER_SPACE, type FooterTab, footerTabs, footerVisible } fr
 import { navigate, openSidebar, reserveBottom, watchHass } from "./ha-internals.ts";
 import { localize } from "./i18n.ts";
 import type { Hass, StudioConfig } from "./types.ts";
+import { focusedElement, opensKeyboard } from "./ui.ts";
 
 class HueStudioFooter extends LitElement {
   static override styles = css`
     :host { position: fixed; z-index: 5; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
             display: block; pointer-events: none; font-family: var(--ha-font-family-body, Roboto, sans-serif); }
+    :host([typing]) { display: none; }
     nav { pointer-events: auto; display: flex; gap: 2px; height: 62px; padding: 5px; box-sizing: border-box; border-radius: 31px;
           max-width: 520px; margin: 0 auto;
           background: color-mix(in srgb, var(--card-background-color, #1c1c1e) 68%, transparent);
@@ -107,6 +109,11 @@ function start(): void {
   window.addEventListener("location-changed", update);
   window.addEventListener("popstate", update);
   window.addEventListener("resize", update);
+  // Hidden while a text field has focus: the keyboard covers the bottom of the screen and a
+  // fixed footer would float above it. Focus settles after focusout, hence the timer.
+  const typing = () => footer?.toggleAttribute("typing", opensKeyboard(focusedElement()));
+  document.addEventListener("focusin", typing, true);
+  document.addEventListener("focusout", () => setTimeout(typing), true);
 }
 
 const w = window as { __hueStudioFooter?: boolean } & Window;

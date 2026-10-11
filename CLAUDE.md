@@ -121,6 +121,10 @@ touching anything outside this repository.
   existing `hue` entry, or add a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
 - **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
   1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
+- **The on-screen keyboard.** Text fields are at least 16px (smaller ones make iOS zoom in).
+  While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
+  what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
+  footer hides while a field has focus. New fields need nothing else.
 - **Frontend: TypeScript + Lit, bundled with esbuild** (`npm run build`). We bundle our own
   Lit (never reach into HA's copy — that is internal API). Standard decorators on `accessor`
   fields (`@property() accessor x`), `strict` TypeScript, `erasableSyntaxOnly` so the pure

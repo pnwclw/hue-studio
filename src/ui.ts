@@ -113,6 +113,23 @@ export function throttle<A extends unknown[]>(fn: (...args: A) => void, ms: numb
  * Lit element that renders into itself instead of a shadow root, so the stylesheet of the
  * panel (or dialog) it lives in applies. All views and controls are built on it.
  */
+/** Input types that never bring up the on-screen keyboard. */
+const NO_KEYBOARD = new Set(["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"]);
+
+/** The focused element under `root`, looking through open shadow roots. */
+export function focusedElement(root: DocumentOrShadowRoot | null | undefined = document): Element | null {
+  let el = root?.activeElement ?? null;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+  return el;
+}
+
+/** Whether a focused element brings up the on-screen keyboard (text fields, not sliders or pickers). */
+export function opensKeyboard(el: Element | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable || el instanceof HTMLTextAreaElement) return true;
+  return el instanceof HTMLInputElement && !NO_KEYBOARD.has(el.type) && !el.readOnly;
+}
+
 export class LightElement extends LitElement {
   protected override createRenderRoot(): HTMLElement {
     return this;

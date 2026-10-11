@@ -8,6 +8,7 @@
 //   "hass-more-info" event                 – how every card opens more-info
 
 import type { Hass } from "./types.ts";
+import { focusedElement, opensKeyboard } from "./ui.ts";
 
 /** Open/close the HA sidebar (what the stock `ha-menu-button` does). */
 export function toggleSidebar(fromElement: EventTarget): void {
@@ -52,6 +53,9 @@ export function openStockMoreInfo(entityId: string): void {
   );
 }
 
+/** How much the visible height has to shrink to count as the on-screen keyboard (px). */
+const KEYBOARD_MIN = 120;
+
 /**
  * Size a custom panel to the space HA leaves it. HA gives custom panels no height
  * (`partial-panel-resolver` is `height: auto`). The panel is registered with
@@ -64,10 +68,31 @@ export function openStockMoreInfo(entityId: string): void {
  */
 export function fitToViewport(host: HTMLElement): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // The height with the keyboard down: phones shrink only the visual viewport (iOS, recent
+  // Android) or the whole window (older Android) while it is up.
+  let full = window.innerHeight;
+  let typing: HTMLElement | null = null;
   const fit = () => {
     timer = undefined;
-    const viewport = window.innerHeight;
     const doc = document.scrollingElement;
+    const field = focusedElement(host.shadowRoot);
+    const vv = window.visualViewport;
+    if (!opensKeyboard(field)) full = window.innerHeight;
+    // The keyboard is up: fill only what stays visible above it, so the header, the field
+    // and any dialog stay on screen (otherwise iOS pans the page and the panel goes blank).
+    if (opensKeyboard(field) && vv && full - vv.height > KEYBOARD_MIN) {
+      if (doc?.scrollTop) doc.scrollTop = 0;
+      if (window.scrollY) window.scrollTo(0, 0);
+      const top = Math.max(0, Math.round(host.getBoundingClientRect().top));
+      host.style.height = `${Math.round(vv.height) - top}px`;
+      host.toggleAttribute("keyboard", true);
+      if (typing !== field) field.scrollIntoView({ block: "nearest" });
+      typing = field;
+      return;
+    }
+    typing = null;
+    host.toggleAttribute("keyboard", false);
+    const viewport = window.innerHeight;
     if (doc?.scrollTop) doc.scrollTop = 0;
     const top = Math.max(0, Math.round(host.getBoundingClientRect().top));
     host.style.height = `${viewport - top}px`;
@@ -89,13 +114,19 @@ export function fitToViewport(host: HTMLElement): () => void {
   schedule();
   // HA may still be laying out (sidebar, app chrome) right after the panel appears.
   const late = setTimeout(schedule, 400);
-  window.addEventListener("resize", schedule);
-  window.visualViewport?.addEventListener("resize", schedule);
+  // The keyboard: focus moves first, the viewport shrinks (and iOS pans it) as it slides up.
+  const events: [EventTarget | null | undefined, string][] = [
+    [window, "resize"],
+    [window.visualViewport, "resize"],
+    [window.visualViewport, "scroll"],
+    [host, "focusin"],
+    [host, "focusout"],
+  ];
+  for (const [target, type] of events) target?.addEventListener(type, schedule);
   return () => {
     clearTimeout(timer);
     clearTimeout(late);
-    window.removeEventListener("resize", schedule);
-    window.visualViewport?.removeEventListener("resize", schedule);
+    for (const [target, type] of events) target?.removeEventListener(type, schedule);
   };
 }
 
