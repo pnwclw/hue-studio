@@ -177,11 +177,20 @@ export const CSS = `
   .light.unavailable { opacity: 0.45; }
   .light.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #fff; }
   /* The room's lights under the color wheel, like the Hue app: a row of cards, tap to pick one. */
-  .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
-               margin: 4px -16px 0; padding: 4px 16px 6px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+  .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 100px; gap: 12px; overflow-x: auto;
+               margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
-  .light-row .light { scroll-snap-align: start; }
+  /* Tall cards: icon and name on top, the switch in a zone of its own below (the Hue app's). */
+  .light-row .light { scroll-snap-align: start; height: 157px; box-sizing: border-box; justify-content: flex-start; gap: 0;
+                      padding: 0; border-radius: 16px; overflow: visible; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
+  .light-row .light ha-icon { margin-top: 20px; --mdc-icon-size: 30px; }
+  .light-row .light .name { flex: 1; align-items: flex-start; justify-content: center; min-height: 0; margin: 8px 8px 0; font-size: 15px; font-weight: 600;
+                            line-height: 1.15; overflow: hidden; }
+  .light-row .light::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 52px; border-radius: 0 0 16px 16px;
+                             background: rgba(0, 0, 0, 0.14); border-top: 1px solid rgba(255, 255, 255, 0.1); pointer-events: none; }
+  .light-row .light .toggle, .light-row .light .busy-tag { position: relative; z-index: 1; flex: none; margin: 0 0 12px; }
+  .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 3px solid var(--ring); outline-offset: 3px; }
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
   .busy-tag { display: flex; align-items: center; gap: 4px; height: 28px; font-size: 11px; font-weight: 600; opacity: 0.8; }
@@ -189,15 +198,15 @@ export const CSS = `
 
   /* The color screen's bar, like the Hue app: "...", Save; Done. Transparent over the screen's glow. */
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .cv-bar { position: relative; display: flex; align-items: center; gap: 10px; min-height: 52px; }
+  .cv-bar { position: relative; display: flex; align-items: center; gap: 8px; min-height: 46px; }
   .cv-bar .grow { flex: 1; min-width: 0; }
   .cv-bar .bar-title { text-align: center; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                        opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .cv-bar.scrolled .bar-title { opacity: 1; transform: none; }
   .colorview .screen-head:has(.cv-bar.scrolled) { background: rgba(22, 22, 24, 0.82); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
   .fx-title { margin: 8px 0 18px; font-size: 36px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.1; }
-  .cv-bar .round.more { width: 40px; height: 40px; }
-  .cv-bar .pill { height: 40px; padding: 0 18px; border-radius: 20px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px;
+  .cv-bar .round.more { width: 34px; height: 34px; }
+  .cv-bar .pill { height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
                   background: rgba(120, 120, 128, 0.28); color: var(--text); }
   .menu-scrim { position: fixed; inset: 0; z-index: 9; }
   .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: 14px;
@@ -209,15 +218,20 @@ export const CSS = `
   .menu svg { width: 20px; height: 20px; opacity: 0.85; }
   @keyframes menu-in { from { transform: scale(0.85); opacity: 0; } }
   /* Brightness: a button you drag along, its value above it (the Hue app's). */
-  .bri { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
-  .bri-value { min-height: 13px; font-size: 11px; letter-spacing: 1px; color: var(--text-2); }
-  .bri-pill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 76px; height: 50px;
-              padding: 0; border: none; border-radius: 25px; background: rgba(60, 60, 64, 0.7); color: var(--text); cursor: pointer;
+  .bri { position: relative; margin-left: auto; }
+  .bri-value { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); text-align: center; font-size: 11px; letter-spacing: 1.5px;
+               color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .bri-pill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 72px; height: 48px;
+              padding: 0; border: none; border-radius: 24px; background: rgba(60, 60, 64, 0.7); color: #fff; cursor: pointer;
               touch-action: none; -webkit-user-select: none; user-select: none; transition: transform 0.15s var(--ease); }
   .bri-pill:active { transform: scale(0.95); }
-  .bri-pill::before { content: ""; position: absolute; inset: auto 0 0; height: 3px; width: var(--level); background: rgba(255, 255, 255, 0.55); }
-  .bri-pill svg { position: relative; width: 24px; height: 24px; }
+  /* Filled from the bottom, like the slider it opens. */
+  .bri-pill::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--level);
+                      background: linear-gradient(#c7c7cc, #8e8e93); transition: height 0.15s linear; }
+  .bri-pill svg { position: relative; width: 24px; height: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
   .bri-pill:focus-visible { box-shadow: 0 0 0 2px #fff; }
+  .bri.off { opacity: 0.4; }
+  .bri.off .bri-pill { cursor: default; }
   /* The open slider: grows up from the button over a dimmed screen. */
   .bri-layer { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.6); animation: fade 0.2s ease; touch-action: none; }
   .bri-track { position: fixed; box-sizing: border-box; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
@@ -230,8 +244,6 @@ export const CSS = `
   .bri-chip { position: fixed; transform: translateX(-50%); padding: 5px 10px; border-radius: 10px; background: rgba(44, 44, 46, 0.95);
               font-size: 13px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; animation: fade 0.2s ease; }
   @keyframes bri-grow { from { transform: scaleY(0.22); opacity: 0.5; } }
-  .bri.off { opacity: 0.4; }
-  .bri.off .bri-pill { cursor: default; }
   .controls:has(.bri) { align-items: flex-end; }
   /* Lights a Sync Box drives: why they are locked, and a way to stop it. */
   .sync-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 6px 0 2px; padding: 10px 12px;
@@ -250,8 +262,12 @@ export const CSS = `
   .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; padding: 14px 16px max(10px, var(--safe-bottom));
           background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 14px); }
   .colorbody .dock { position: static; margin: 0; padding: 0; background: none; }
-  .wheel-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 0 8px; }
-  .wheel { position: relative; width: min(84vw, 420px, 50vh); aspect-ratio: 1; border-radius: 50%; touch-action: none;
+  .wheel-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 0 8px; }
+  .wheel-wrap::before { content: ""; position: absolute; left: 50%; top: 50%; width: min(120%, 520px); aspect-ratio: 1; border-radius: 50%;
+                        transform: translate(-50%, -50%); background: var(--wheel-color); filter: blur(60px); opacity: 0.22; pointer-events: none; }
+  .wheel-wrap.white::before { background: var(--wheel-white); }
+  .wheel-wrap > .wheel { position: relative; }
+  .wheel { position: relative; width: min(100%, 440px, 50dvh); aspect-ratio: 1; border-radius: 50%; touch-action: none;
            box-shadow: 0 0 60px rgba(255, 255, 255, 0.06); transition: background 0.3s; }
   .wheel.color { background: var(--wheel-color); }
   .wheel.white { background: var(--wheel-white); }
@@ -270,7 +286,7 @@ export const CSS = `
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   .pin.merged::before { border-width: 3px; }
-  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 16px; }
   .gmodes { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px 2px; scrollbar-width: none; }
   .colorbody .gmodes { margin: 0 0 8px; padding: 0 0 2px; }
   .gmodes::-webkit-scrollbar { display: none; }
@@ -282,7 +298,8 @@ export const CSS = `
   .gm-interpolated_palette_mirrored { background: linear-gradient(90deg, #6dd5ed, #ffc371, #ff5f6d, #ffc371, #6dd5ed); }
   .gm-random_pixelated { background: conic-gradient(from 45deg, #ff5f6d 0 25%, #6dd5ed 0 50%, #ffc371 0 75%, #ff5f6d 0) 0 0 / 10px 10px; }
   .gm-segmented_palette { background: linear-gradient(90deg, #ff5f6d 0 33%, #ffc371 0 66%, #6dd5ed 0); }
-  .modes { display: flex; gap: 4px; padding: 4px; border-radius: 22px; background: rgba(60, 60, 64, 0.7); }
+  .modes { display: flex; align-items: center; gap: 6px; height: 48px; box-sizing: border-box; padding: 0 7px; border-radius: 24px;
+           background: rgba(60, 60, 64, 0.7); }
   /* A filled disc (a pseudo-element: iOS paints a button's own gradient background square); the selected one gets a ring. */
   .modes button { position: relative; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
                   -webkit-appearance: none; appearance: none; background: transparent; color: inherit;
@@ -296,8 +313,8 @@ export const CSS = `
   .modes .m-white::before { background: linear-gradient(#cfe3ff, #fff3d6, #ffc46b); }
   .modes .m-effects { display: flex; align-items: center; justify-content: center; }
   .modes .m-effects::before { content: none; }
-  .modes .sep { width: 1px; margin: 8px 2px; background: rgba(255, 255, 255, 0.2); }
-  .link { width: 42px; height: 42px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  .modes .sep { width: 1px; height: 22px; margin: 0 2px; background: rgba(255, 255, 255, 0.2); }
+  .link { width: 48px; height: 48px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
           background: rgba(60, 60, 64, 0.7); transition: background 0.2s, color 0.2s; }
   .link.on { background: #fff; color: #1c1c1e; }
   .bright { flex: 1; min-width: 180px; }

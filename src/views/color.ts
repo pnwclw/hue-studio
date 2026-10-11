@@ -284,8 +284,8 @@ export class ColorView extends StudioView {
         ? html`<h1 class="fx-title">${t("color.mode_effects")}</h1>${this.effectsBody(live)}`
         : this.wheel(mode);
     const content = html`
-      ${this.embedded ? html`<div class="cv-scroll">${main}</div>` : main}
-      <div class="dock">
+      ${this.embedded ? html`<div class=${classMap({ "cv-scroll": true, fx })}>${main}</div>` : main}
+      <div class=${classMap({ dock: true, over: fx })}>
         ${idle && mode === "color" ? this.gradientModes() : nothing}
         ${idle
           ? html`<div class="controls">
@@ -494,8 +494,9 @@ export class ColorView extends StudioView {
 
   private wheel(mode: Mode) {
     const pins = this.pins();
-    return html`<div class="wheel-wrap">
-      <div class="wheel ${mode}" style="--wheel-color:${WHEEL_CSS};--wheel-white:${WHITE_CSS}">
+    // The wrap carries the wheel's colors: they also glow, blurred, behind it (like the Hue app).
+    return html`<div class="wheel-wrap ${mode}" style="--wheel-color:${WHEEL_CSS};--wheel-white:${WHITE_CSS}">
+      <div class="wheel ${mode}">
         ${mode === "color" && !this.merged ? this.paths() : nothing}
         ${repeat(pins, (p) => p.key, (p) => this.pin(p, mode))}
         ${pins.length ? nothing : html`<p class="empty" style="text-align:center;padding:40% 12%">${this.ctx.t("color.no_color")}</p>`}

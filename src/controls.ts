@@ -70,7 +70,8 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !!state && state.state !== "unavailable" });
   // Busy: a Sync Box drives it; shown as such, nothing to tap.
-  return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })} style=${styleMap(surface.style)} @click=${busy ? null : open}>
+  const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
+  return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })} style=${styleMap(style)} @click=${busy ? null : open}>
     <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
     <div class="name">${friendlyName(ctx.hass, id)}</div>
     ${busy

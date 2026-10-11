@@ -23,25 +23,30 @@ const DIALOG_CSS = css`
           background: rgba(0, 0, 0, calc(0.5 * var(--scrim, 1))); animation: scrim-in 0.35s ease; transition: background-color 0.3s ease; }
   :host(.closing) { background-color: rgba(0, 0, 0, 0); pointer-events: none; }
   .dlg { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 440px; overflow: hidden;
-         max-height: calc(100dvh - max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), 12px) - 8px);
+         height: calc(100dvh - max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), 12px) - 8px);
          border-radius: 22px 22px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
          animation: sheet-in 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
   :host(.closing) .dlg { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1); }
   .grip { touch-action: none; cursor: grab; }
   .handle { width: 36px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.35); margin: 0 auto; }
   .handle-zone { flex: none; padding: 8px 0 0; }
-  .colorbody .cv-bar { flex: none; padding: 6px 16px 0; }
+  .colorbody .cv-bar { flex: none; position: relative; z-index: 3; padding: 4px 16px 0; }
   hue-studio-color-view.colorbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .cv-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 28px; }
+  /* The wheel sits in the middle of the free space, its glow spreading under the bar and the dock; effects scroll. */
+  .cv-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: visible; padding: 0 16px; }
+  .cv-scroll.fx { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 28px; }
+  .cv-scroll > * { flex: none; }
+  .cv-scroll > .wheel-wrap { flex: 1; }
   .colorbody .cv-bar { transition: box-shadow 0.2s; }
   .colorbody .cv-bar.scrolled { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07); }
-  .colorbody .wheel { width: min(76vw, 320px, 36dvh); }
+  .colorbody .wheel { width: min(100%, 440px, 46dvh); }
   /* Room for the pins above the disc: the scroller clips them. */
   .colorbody .wheel-wrap { padding-top: 44px; }
   .colorbody .effects { display: block; padding-bottom: 8px; }
   /* The dock floats over the end of the body: it fades in over what scrolls under it. */
-  .colorbody .dock { flex: none; position: relative; z-index: 2; margin-top: -28px; padding: 28px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-                     background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 28px); pointer-events: none; }
+  .colorbody .dock { flex: none; position: relative; z-index: 2; padding: 0 16px calc(10px + env(safe-area-inset-bottom, 0px));
+                     pointer-events: none; }
+  .colorbody .dock.over { margin-top: -28px; padding-top: 28px; background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 28px); }
   .colorbody .dock > * { pointer-events: auto; }
   .colorbody .controls { margin: 0; }
   /* Sheets opened inside (effect settings, a new scene) cover the whole screen, above the dialog. */
@@ -52,7 +57,7 @@ const DIALOG_CSS = css`
   @keyframes pop-in { from { transform: translateY(16px) scale(0.96); opacity: 0; } }
   @media (min-width: 600px) {
     :host { align-items: center; }
-    .dlg { border-radius: 22px; max-height: 90dvh; animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
+    .dlg { border-radius: 22px; height: min(880px, 92dvh); animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
     :host(.closing) .dlg { transform: translateY(12px) scale(0.97); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
     .colorbody .dock { padding-bottom: 14px; }
     .handle-zone { visibility: hidden; }
