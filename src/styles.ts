@@ -185,12 +185,14 @@ export const CSS = `
   .light-row .light { scroll-snap-align: start; height: 157px; box-sizing: border-box; justify-content: flex-start; gap: 0;
                       padding: 0; border-radius: 16px; overflow: visible; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
   .light-row .light ha-icon { margin-top: 20px; --mdc-icon-size: 30px; }
-  .light-row .light .name { flex: 1; align-items: flex-start; justify-content: center; min-height: 0; margin: 8px 8px 0; font-size: 15px; font-weight: 600;
-                            line-height: 1.15; overflow: hidden; }
+  .light-row .light .name { flex: none; align-items: flex-start; justify-content: center; min-height: 0; margin: 8px 8px 0; font-size: 15px;
+                            font-weight: 600; line-height: 1.15; overflow: hidden; }
+  .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                           max-width: calc(100% - 16px); }
   .light-row .light::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 52px; border-radius: 0 0 16px 16px;
                              background: rgba(0, 0, 0, 0.14); border-top: 1px solid rgba(255, 255, 255, 0.1); pointer-events: none; }
-  .light-row .light .toggle, .light-row .light .busy-tag { position: relative; z-index: 1; flex: none; margin: 0 0 12px; }
-  .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 3px solid var(--ring); outline-offset: 3px; }
+  .light-row .light .toggle, .light-row .light .busy-tag { position: relative; z-index: 1; flex: none; margin: auto 0 12px; }
+  .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
   .busy-tag { display: flex; align-items: center; gap: 4px; height: 28px; font-size: 11px; font-weight: 600; opacity: 0.8; }

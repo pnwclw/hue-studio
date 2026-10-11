@@ -34,7 +34,7 @@ const DIALOG_CSS = css`
   hue-studio-color-view.colorbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* The wheel sits in the middle of the free space, its glow spreading under the bar and the dock; effects scroll. */
   .cv-scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: visible; padding: 0 16px; }
-  .cv-scroll.fx { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 28px; }
+  .cv-scroll.fx-mode { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 28px; }
   .cv-scroll > * { flex: none; }
   .cv-scroll > .wheel-wrap { flex: 1; }
   .colorbody .cv-bar { transition: box-shadow 0.2s; }

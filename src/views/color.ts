@@ -30,7 +30,7 @@ import {
 import { brightnessSender, commandInterval, lightTile } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
 import { leavePanel, openStockMoreInfo } from "../ha-internals.ts";
-import { type Group, groupState, lightIcon } from "../model.ts";
+import { type Group, groupOfEntity, groupState, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import type { StringKey } from "../i18n.ts";
 import { syncedLights, syncingIn } from "../sync.ts";
@@ -284,7 +284,7 @@ export class ColorView extends StudioView {
         ? html`<h1 class="fx-title">${t("color.mode_effects")}</h1>${this.effectsBody(live)}`
         : this.wheel(mode);
     const content = html`
-      ${this.embedded ? html`<div class=${classMap({ "cv-scroll": true, fx })}>${main}</div>` : main}
+      ${this.embedded ? html`<div class=${classMap({ "cv-scroll": true, "fx-mode": fx })}>${main}</div>` : main}
       <div class=${classMap({ dock: true, over: fx })}>
         ${idle && mode === "color" ? this.gradientModes() : nothing}
         ${idle
@@ -309,7 +309,12 @@ export class ColorView extends StudioView {
           : nothing}
         ${idle && busy.length ? this.syncNote(busy, false) : nothing}
         <div class="light-row">${group.lights.map((id) =>
-          lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), { selected: id === this.selected, busy: busy.includes(id) }),
+          lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), {
+            selected: id === this.selected,
+            busy: busy.includes(id),
+            // The light's room, like the Hue app's cards (a zone's lights come from several).
+            sub: groupOfEntity(ctx.home, id)?.name ?? "",
+          }),
         )}</div>
       </div>
     `;
