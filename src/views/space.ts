@@ -9,7 +9,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { findGroup, friendlyName, lightColors, lightIcon } from "../model.ts";
-import { fromView, newPoint, roundPoint, toView } from "../space.ts";
+import { fromView, isUpright, movePoints, newPoint, roundPoint, setHeight, toView } from "../space.ts";
 import type { AreaPositions, RoomPoint } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -65,14 +65,15 @@ export class SpaceView extends StudioView {
         <div class="edge back">${t("space.back")}</div>
         <svg class="links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           ${placed
-            .filter((id) => this.points(id).length > 1)
+            .filter((id) => this.points(id).length > 1 && !isUpright(this.points(id)))
             .map((id) => {
               const [a, b] = this.points(id).map(toView);
               return svg`<line x1=${a.left} y1=${a.top} x2=${b.left} y2=${b.top}></line>`;
             })}
         </svg>
         ${placed.flatMap((id) =>
-          this.points(id).map((p, index) => {
+          // An upright lamp (ends one above the other) is one spot from above.
+          (isUpright(this.points(id)) ? this.points(id).slice(0, 1) : this.points(id)).map((p, index) => {
             const view = toView(p);
             const color = lightColors(ctx.hass, id, ctx.lightInfo[id])[index] || "rgb(90,90,94)";
             return html`<button
@@ -113,7 +114,7 @@ export class SpaceView extends StudioView {
     const points = this.points(id);
     const z = points[0]?.[2] ?? 0;
     const source = this.area?.lights[id]?.source;
-    const setZ = (value: number) => this.setPoints(id, points.map(([x, y]) => [x, y, value] as RoomPoint));
+    const setZ = (value: number) => this.setPoints(id, setHeight(points, value));
     return html`<div class="rows height">
       <div class="item col">
         <div class="line"><span>${friendlyName(ctx.hass, id)}</span>
@@ -155,9 +156,7 @@ export class SpaceView extends StudioView {
     const drag = this.drag;
     if (!drag) return;
     const [x, y] = fromView((e.clientX - drag.rect.left) / drag.rect.width, (e.clientY - drag.rect.top) / drag.rect.height);
-    const points = [...this.points(drag.light)];
-    points[drag.index] = [x, y, points[drag.index][2]];
-    this.setPoints(drag.light, points);
+    this.setPoints(drag.light, movePoints(this.points(drag.light), drag.index, x, y));
   };
 
   private onUp = (): void => {

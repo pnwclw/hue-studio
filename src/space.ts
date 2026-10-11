@@ -35,3 +35,22 @@ export const roundPoint = (p: RoomPoint): RoomPoint => p.map((v) => Math.round(c
 
 /** Where a newly placed light goes: the middle, a little off for each one already there. */
 export const newPoint = (placed: number): RoomPoint => [clamp(-0.6 + (placed % 4) * 0.4), clamp(0.2 - Math.floor(placed / 4) * 0.4), 0];
+
+/** Whether all points of a light share one spot seen from above (an upright lamp's ends). */
+export const isUpright = (points: RoomPoint[]): boolean =>
+  points.length > 1 && points.every(([x, y]) => Math.abs(x - points[0][0]) < 0.01 && Math.abs(y - points[0][1]) < 0.01);
+
+/** Move a light's points: an upright light (or `whole`) as one, else just point `index`. */
+export function movePoints(points: RoomPoint[], index: number, x: number, y: number, whole = false): RoomPoint[] {
+  if (whole || isUpright(points)) {
+    const [dx, dy] = [x - points[index][0], y - points[index][1]];
+    return points.map(([px, py, pz]) => [clamp(px + dx), clamp(py + dy), pz]);
+  }
+  return points.map((p, i) => (i === index ? [x, y, p[2]] : p));
+}
+
+/** Set a light's height by its first point, keeping the others where they are relative to it. */
+export function setHeight(points: RoomPoint[], z: number): RoomPoint[] {
+  const dz = z - (points[0]?.[2] ?? 0);
+  return points.map(([x, y, pz]) => [x, y, clamp(pz + dz)]);
+}
