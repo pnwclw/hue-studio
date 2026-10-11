@@ -30,7 +30,7 @@ export const CSS = `
                  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.06); z-index: 3; }
   .screen-head > * { max-width: 928px; margin-left: auto; margin-right: auto; }
   .screen-head:empty { display: none; }
-  .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -191,6 +191,11 @@ export const CSS = `
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .cv-bar { position: relative; display: flex; align-items: center; gap: 10px; min-height: 52px; }
   .cv-bar .grow { flex: 1; min-width: 0; }
+  .cv-bar .bar-title { text-align: center; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                       opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
+  .cv-bar.scrolled .bar-title { opacity: 1; transform: none; }
+  .colorview .screen-head:has(.cv-bar.scrolled) { background: rgba(22, 22, 24, 0.82); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .fx-title { margin: 8px 0 18px; font-size: 36px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.1; }
   .cv-bar .round.more { width: 40px; height: 40px; }
   .cv-bar .pill { height: 40px; padding: 0 18px; border-radius: 20px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2px;
                   background: rgba(120, 120, 128, 0.28); color: var(--text); }
@@ -207,11 +212,24 @@ export const CSS = `
   .bri { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
   .bri-value { min-height: 13px; font-size: 11px; letter-spacing: 1px; color: var(--text-2); }
   .bri-pill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 76px; height: 50px;
-              border-radius: 25px; background: rgba(60, 60, 64, 0.7); touch-action: none; cursor: ew-resize; outline: none; }
-  .bri-pill::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--level); background: rgba(255, 255, 255, 0.16);
-                      transition: width 0.12s linear; }
+              padding: 0; border: none; border-radius: 25px; background: rgba(60, 60, 64, 0.7); color: var(--text); cursor: pointer;
+              touch-action: none; -webkit-user-select: none; user-select: none; transition: transform 0.15s var(--ease); }
+  .bri-pill:active { transform: scale(0.95); }
+  .bri-pill::before { content: ""; position: absolute; inset: auto 0 0; height: 3px; width: var(--level); background: rgba(255, 255, 255, 0.55); }
   .bri-pill svg { position: relative; width: 24px; height: 24px; }
   .bri-pill:focus-visible { box-shadow: 0 0 0 2px #fff; }
+  /* The open slider: grows up from the button over a dimmed screen. */
+  .bri-layer { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.6); animation: fade 0.2s ease; touch-action: none; }
+  .bri-track { position: fixed; box-sizing: border-box; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
+               padding-bottom: 13px; border-radius: 26px; background: rgba(72, 72, 76, 0.92); color: #fff; touch-action: none; outline: none;
+               box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); transform-origin: 50% 100%; animation: bri-grow 0.32s var(--spring); }
+  .bri-track::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--level);
+                       background: linear-gradient(#e5e5ea, #a1a1a6); }
+  .bri-track svg { position: relative; width: 28px; height: 28px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
+  .bri-track:focus-visible { box-shadow: 0 0 0 2px #fff, 0 16px 40px rgba(0, 0, 0, 0.5); }
+  .bri-chip { position: fixed; transform: translateX(-50%); padding: 5px 10px; border-radius: 10px; background: rgba(44, 44, 46, 0.95);
+              font-size: 13px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; animation: fade 0.2s ease; }
+  @keyframes bri-grow { from { transform: scaleY(0.22); opacity: 0.5; } }
   .bri.off { opacity: 0.4; }
   .bri.off .bri-pill { cursor: default; }
   .controls:has(.bri) { align-items: flex-end; }
@@ -296,10 +314,11 @@ export const CSS = `
   .colorview hue-studio-effects { flex: 1; }
   .effects .label:first-child { margin-top: 6px; }
   .fx-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
-            margin: 0 -16px 10px; padding: 0 16px 2px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+            margin: 0 -16px 0; padding: 2px 16px 18px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
             overscroll-behavior-x: contain; }
   .fx-row::-webkit-scrollbar { display: none; }
   .fx { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border: 2px solid transparent;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
         border-radius: var(--radius); background: var(--surface); cursor: pointer; scroll-snap-align: start; text-align: center;
         transition: transform 0.15s var(--ease), border-color 0.2s; }
   .fx:active { transform: scale(0.96); }

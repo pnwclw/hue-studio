@@ -32,12 +32,17 @@ const DIALOG_CSS = css`
   .handle-zone { flex: none; padding: 8px 0 0; }
   .colorbody .cv-bar { flex: none; padding: 6px 16px 0; }
   hue-studio-color-view.colorbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .cv-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 0 16px; }
+  .cv-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 28px; }
+  .colorbody .cv-bar { transition: box-shadow 0.2s; }
+  .colorbody .cv-bar.scrolled { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07); }
   .colorbody .wheel { width: min(76vw, 320px, 36dvh); }
   /* Room for the pins above the disc: the scroller clips them. */
   .colorbody .wheel-wrap { padding-top: 44px; }
   .colorbody .effects { display: block; padding-bottom: 8px; }
-  .colorbody .dock { flex: none; padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  /* The dock floats over the end of the body: it fades in over what scrolls under it. */
+  .colorbody .dock { flex: none; position: relative; z-index: 2; margin-top: -28px; padding: 28px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+                     background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 28px); pointer-events: none; }
+  .colorbody .dock > * { pointer-events: auto; }
   .colorbody .controls { margin: 0; }
   /* Sheets opened inside (effect settings, a new scene) cover the whole screen, above the dialog. */
   .sheet { position: fixed; z-index: 20; padding: max(16px, var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) 16px

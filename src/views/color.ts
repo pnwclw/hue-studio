@@ -36,6 +36,8 @@ import type { StringKey } from "../i18n.ts";
 import { syncedLights, syncingIn } from "../sync.ts";
 import { icon, type IconName } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import "./effect-sheet.ts";
+import type { Custom } from "./effects.ts";
 import "./effects.ts";
 import "./new-scene.ts";
 
@@ -54,8 +56,10 @@ const SENDER = "color:";
 
 const pct = (v: number) => `${((v + 1) / 2) * 100}%`;
 const LINK_ICON = svg`<svg viewBox="0 0 24 24"><path d="M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13.8,8.78 14.44,8.78 14.83,9.17C16.78,11.12 16.78,14.29 14.83,16.24L11.29,19.78C9.34,21.73 6.17,21.73 4.22,19.78C2.27,17.83 2.27,14.66 4.22,12.71L5.71,11.22C5.7,12.04 5.83,12.86 6.11,13.65L5.64,14.12C4.46,15.29 4.46,17.19 5.64,18.36C6.81,19.54 8.71,19.54 9.88,18.36L13.41,14.83C14.59,13.66 14.59,11.76 13.41,10.59C13,10.2 13,9.56 13.41,9.17Z"/></svg>`;
-/** Finger travel (px) for the whole brightness range on the brightness button. */
-const BRIGHT_TRAVEL = 160;
+/** Height (px) of the brightness slider the button opens: the whole range over it. */
+const BRIGHT_TRACK = 240;
+/** Finger travel (px) that makes a press on the brightness button a drag, not a tap. */
+const BRIGHT_SLOP = 6;
 
 /** An entry of the "..." menu; `run` gets the picked light (or null: the whole group). */
 export interface MenuItem {
@@ -112,7 +116,32 @@ export class ColorView extends StudioView {
   @state() private accessor menuOpen = false;
   /** The "Save" sheet (a new scene from what the lights show now) is open. */
   @state() private accessor saving = false;
-  private briDrag: { id: number; x: number; y: number; start: number } | null = null;
+  /**
+   * The brightness slider the button opens (the Hue app's): `at` is the button's place on
+   * screen, the slider grows up from it. Opened by a press: dragging right away changes the
+   * brightness from where it was and closes on release; a tap leaves it open to drag or tap.
+   */
+  @state() private accessor bri: { at: DOMRect; held: boolean } | null = null;
+  private briDrag: { id: number; y: number; start: number; moved: boolean; relative: boolean } | null = null;
+  /** The body scrolled down (the effects title moves into the bar). */
+  @state() private accessor scrolled = false;
+  @state() private accessor adjust: { custom: Custom; start: boolean } | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // Scroll events don't bubble: catch the scrolling body's on the way down.
+    this.addEventListener("scroll", this.onScroll, true);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.removeEventListener("scroll", this.onScroll, true);
+  }
+
+  private onScroll = (e: Event): void => {
+    const scrolled = (e.target as Element).scrollTop > 40;
+    if (scrolled !== this.scrolled) this.scrolled = scrolled;
+  };
 
   /** Lights a Sync Box drives right now: shown, but not controllable. */
   private get syncing(): string[] {
@@ -237,17 +266,23 @@ export class ColorView extends StudioView {
     const picked = this.selected && live.lights.includes(this.selected) ? this.selected : null;
     const target = picked ? { ...live, key: `${live.key}:${picked}`, lights: [picked], target: [picked], group: null } : live;
 
-    const bar = html`<div class=${classMap({ "cv-bar": true, grip: this.embedded })}>
+    const fx = idle && mode === "effects";
+    const bar = html`<div class=${classMap({ "cv-bar": true, grip: this.embedded, scrolled: fx && this.scrolled })}>
       <button class="round more" aria-label=${t("more.menu")} aria-haspopup="menu" aria-expanded=${this.menuOpen} @click=${() => (this.menuOpen = !this.menuOpen)}>
         ${icon("dots")}
       </button>
       <button class="pill save" ?disabled=${!idle} @click=${() => (this.saving = true)}>${t("color.save")}</button>
-      <div class="grow"></div>
+      <div class="grow bar-title">${fx ? t("color.mode_effects") : ""}</div>
       <button class="pill done" @click=${done}>${t("color.done")}</button>
       ${this.menuOpen ? this.menu(picked) : nothing}
     </div>`;
 
-    const main = !idle ? this.syncNote(busy, true) : mode === "effects" ? this.effectsBody(live) : this.wheel(mode);
+    // Effects: a large title, like the Hue app's; it moves into the bar once scrolled past.
+    const main = !idle
+      ? this.syncNote(busy, true)
+      : fx
+        ? html`<h1 class="fx-title">${t("color.mode_effects")}</h1>${this.effectsBody(live)}`
+        : this.wheel(mode);
     const content = html`
       ${this.embedded ? html`<div class="cv-scroll">${main}</div>` : main}
       <div class="dock">
@@ -277,12 +312,26 @@ export class ColorView extends StudioView {
           lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), { selected: id === this.selected, busy: busy.includes(id) }),
         )}</div>
       </div>
+    `;
+    // Sheets and the brightness slider sit outside the scrolling body: a scroller (iOS) would clip them.
+    const layers = html`
+      ${this.bri ? this.briLayer(target) : nothing}
+      ${this.adjust
+        ? html`<hue-studio-effect-sheet
+            .ctx=${ctx}
+            .rev=${this.rev}
+            .lights=${picked ? [picked] : live.lights}
+            .initial=${this.adjust.custom}
+            ?start=${this.adjust.start}
+            @close=${() => (this.adjust = null)}
+          ></hue-studio-effect-sheet>`
+        : nothing}
       ${this.saving
         ? html`<hue-studio-new-scene .ctx=${ctx} .rev=${this.rev} .group=${group} @close=${() => (this.saving = false)}></hue-studio-new-scene>`
         : nothing}
     `;
-    if (this.embedded) return html`${bar}${content}`;
-    return this.screen(bar, content);
+    if (this.embedded) return html`${bar}${content}${layers}`;
+    return html`${this.screen(bar, content)}${layers}`;
   }
 
   /** The "..." menu: the owner's entries, then HA's own dialog of the picked light or the group. */
@@ -323,62 +372,121 @@ export class ColorView extends StudioView {
     </div>`;
   }
 
-  /** The Hue app's brightness button: drag along it (up or right: brighter), the value above it. */
+  /** The Hue app's brightness button: its value above it; a press opens the slider. */
   private brightness(target: Group) {
     const { ctx } = this;
     const state = groupState(ctx.hass, target, ctx.lightInfo);
     const value = this.dragBrightness ?? state.brightness;
     const inert = !state.on || !state.available;
-    const send = brightnessSender(ctx, target);
-    const set = (v: number) => {
-      this.dragBrightness = v;
-      send(v);
-    };
     const down = (e: PointerEvent) => {
       if (inert) return;
-      try {
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      } catch {
-        // A pointer that is already gone: no capture, the drag still works while over the button.
-      }
-      this.briDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, start: value };
+      const at = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      this.capture(e);
+      this.briDrag = { id: e.pointerId, y: e.clientY, start: value, moved: false, relative: true };
+      this.bri = { at, held: true };
     };
-    const move = (e: PointerEvent) => {
-      const d = this.briDrag;
-      if (!d || d.id !== e.pointerId) return;
-      const delta = e.clientX - d.x - (e.clientY - d.y);
-      set(Math.min(100, Math.max(1, Math.round(d.start + (delta / BRIGHT_TRAVEL) * 100))));
+    const key = (e: KeyboardEvent) => {
+      if (inert || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      this.bri = { at: (e.currentTarget as HTMLElement).getBoundingClientRect(), held: false };
     };
-    const up = (e: PointerEvent) => {
-      if (this.briDrag?.id !== e.pointerId) return;
-      this.briDrag = null;
-      send.flush();
+    return html`<div class=${classMap({ bri: true, off: inert, open: !!this.bri })}>
+      <div class="bri-value">${state.on ? `${value}%` : ""}</div>
+      <button
+        class="bri-pill"
+        aria-label=${ctx.t("common.brightness")}
+        aria-haspopup="dialog"
+        ?disabled=${inert}
+        style=${styleMap({ "--level": `${state.on ? value : 0}%` })}
+        @pointerdown=${down}
+        @pointermove=${(e: PointerEvent) => this.briMove(e, target)}
+        @pointerup=${(e: PointerEvent) => this.briUp(e, target)}
+        @pointercancel=${(e: PointerEvent) => this.briUp(e, target)}
+        @keydown=${key}
+      >${icon("sun")}</button>
+    </div>`;
+  }
+
+  private capture(e: PointerEvent): void {
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // A pointer that is already gone: the drag still works while over the element.
+    }
+  }
+
+  private briSet(target: Group, v: number): void {
+    this.dragBrightness = Math.min(100, Math.max(1, Math.round(v)));
+    brightnessSender(this.ctx, target)(this.dragBrightness);
+  }
+
+  private briMove(e: PointerEvent, target: Group): void {
+    const d = this.briDrag;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.moved && Math.abs(e.clientY - d.y) < BRIGHT_SLOP) return;
+    d.moved = true;
+    if (d.relative) this.briSet(target, d.start + ((d.y - e.clientY) / BRIGHT_TRACK) * 100);
+    else this.briSet(target, this.briAt(e));
+  }
+
+  private briUp(e: PointerEvent, target: Group): void {
+    const d = this.briDrag;
+    if (!d || d.id !== e.pointerId) return;
+    this.briDrag = null;
+    if (d.moved || !d.relative) {
+      brightnessSender(this.ctx, target).flush();
       this.dragBrightness = null;
+    }
+    // A press that dragged closes with the release; a tap leaves the slider open.
+    if (d.relative && d.moved) this.bri = null;
+    else if (this.bri) this.bri = { ...this.bri, held: false };
+  }
+
+  /** Brightness at the finger on the open slider (bottom 1 %, top 100 %). */
+  private briAt(e: PointerEvent): number {
+    const track = this.querySelector(".bri-track")!.getBoundingClientRect();
+    return ((track.bottom - e.clientY) / track.height) * 100;
+  }
+
+  /** The open brightness slider over a dimmed screen. */
+  private briLayer(target: Group) {
+    const { ctx } = this;
+    const { at } = this.bri!;
+    const state = groupState(ctx.hass, target, ctx.lightInfo);
+    const value = this.dragBrightness ?? state.brightness;
+    const close = () => {
+      brightnessSender(ctx, target).flush();
+      this.dragBrightness = null;
+      this.bri = null;
+    };
+    const down = (e: PointerEvent) => {
+      this.capture(e);
+      this.briDrag = { id: e.pointerId, y: e.clientY, start: value, moved: true, relative: false };
+      this.briSet(target, this.briAt(e));
     };
     const key = (e: KeyboardEvent) => {
       const step = { ArrowUp: 5, ArrowRight: 5, ArrowDown: -5, ArrowLeft: -5 }[e.key];
-      if (!step || inert) return;
+      if (e.key === "Escape") close();
+      if (!step) return;
       e.preventDefault();
-      set(Math.min(100, Math.max(1, value + step)));
-      send.flush();
-      this.dragBrightness = null;
+      this.briSet(target, value + step);
     };
-    return html`<div class=${classMap({ bri: true, off: inert })}>
-      <div class="bri-value">${state.on ? `${value}%` : ""}</div>
+    const place = { left: `${at.left}px`, width: `${at.width}px`, top: `${at.bottom - BRIGHT_TRACK}px`, height: `${BRIGHT_TRACK}px` };
+    return html`<div class="bri-layer" @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="bri-chip" style=${styleMap({ left: `${at.left + at.width / 2}px`, top: `${at.bottom - BRIGHT_TRACK - 40}px` })}>${value}%</div>
       <div
-        class="bri-pill"
+        class="bri-track"
         role="slider"
-        tabindex=${inert ? -1 : 0}
+        tabindex="0"
         aria-label=${ctx.t("common.brightness")}
         aria-valuemin="1"
         aria-valuemax="100"
         aria-valuenow=${value}
-        aria-disabled=${inert ? "true" : "false"}
-        style=${styleMap({ "--level": `${state.on ? value : 0}%` })}
+        style=${styleMap({ ...place, "--level": `${value}%` })}
         @pointerdown=${down}
-        @pointermove=${move}
-        @pointerup=${up}
-        @pointercancel=${up}
+        @pointermove=${(e: PointerEvent) => this.briMove(e, target)}
+        @pointerup=${(e: PointerEvent) => this.briUp(e, target)}
+        @pointercancel=${(e: PointerEvent) => this.briUp(e, target)}
         @keydown=${key}
       >${icon("sun")}</div>
     </div>`;
@@ -449,7 +557,12 @@ export class ColorView extends StudioView {
   private effectsBody(group: Group) {
     const { ctx } = this;
     const lights = this.selected && group.lights.includes(this.selected) ? [this.selected] : group.lights;
-    return html`<hue-studio-effects .ctx=${ctx} .rev=${this.rev} .lights=${lights}></hue-studio-effects>`;
+    return html`<hue-studio-effects
+      .ctx=${ctx}
+      .rev=${this.rev}
+      .lights=${lights}
+      @effect-adjust=${(e: CustomEvent<{ custom: Custom; start: boolean }>) => (this.adjust = e.detail)}
+    ></hue-studio-effects>`;
   }
 
   private modeButton(mode: Mode, cls: string, label: string, content: unknown = nothing) {
