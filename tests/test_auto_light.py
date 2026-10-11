@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
@@ -189,3 +189,18 @@ async def test_pool_rejects_bad_step(
                 },
             )
         assert err.value.translation_key == "auto_light_bad_step"
+
+
+async def test_new_area_takes_the_season_integration(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    hue_lights: MagicMock,
+    office: str,
+) -> None:
+    """A new area reads the season from HA's Season integration when it is set up."""
+    er.async_get(hass).async_get_or_create(
+        "sensor", "season", "season_entry", suggested_object_id="season"
+    )
+    await _call(hass, "auto_light_exclude", {"area": office, "scene": "rest"})
+    config = hass_storage["hue_studio.auto_light"]["data"]["areas"][office]
+    assert config["settings"] == {"season": "sensor.season"}

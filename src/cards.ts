@@ -311,7 +311,8 @@ class HueStudioAutoLightCard extends StudioCard {
     const pic = now.kelvin ? whiteArt(now.kelvin) : now.scene ? `url("${thumbUrl(now.scene)}") center / cover` : "var(--surface)";
     const title = now.kelvin ? `${t("auto.style_natural")} · ${now.kelvin} K` : now.scene_name || t("auto.no_scene");
     const line = [
-      now.phase ? t(`auto.phase_${now.phase}` as StringKey) : "",
+      // The phase the scene comes from: an evening-only area shows "Evening" all day.
+      (now.pool_phase || now.phase) ? t(`auto.phase_${now.pool_phase || now.phase}` as StringKey) : "",
       now.season && !now.kelvin ? t(`auto.season_${now.season}` as StringKey) : "",
       now.mood ? t(`auto.mood_${now.mood}` as StringKey) : "",
       now.brightness !== undefined ? `${now.brightness} %` : "",

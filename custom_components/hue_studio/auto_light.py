@@ -32,7 +32,11 @@ from homeassistant.core import (
     SupportsResponse,
 )
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import area_registry as ar, config_validation as cv
+from homeassistant.helpers import (
+    area_registry as ar,
+    config_validation as cv,
+    entity_registry as er,
+)
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util.hass_dict import HassKey
@@ -159,8 +163,13 @@ class AutoLightStore:
                 _LOGGER.warning("Auto light of %s ignored: %s", area_id, err)
 
     def area(self, area_id: str) -> dict[str, Any]:
-        """Settings of an area (empty settings for one without any yet)."""
-        return deepcopy(self.areas.get(area_id) or AREA_CONFIG({}))
+        """Settings of an area (defaults for one without any yet)."""
+        if (config := self.areas.get(area_id)) is not None:
+            return deepcopy(config)
+        config = AREA_CONFIG({})
+        if season := native_season_sensor(self.hass):
+            config["settings"]["season"] = season
+        return config
 
     async def async_remove(self, area_id: str) -> None:
         """Forget an area's auto light."""
@@ -173,6 +182,20 @@ class AutoLightStore:
         self.areas[area_id] = AREA_CONFIG(config)
         await self._store.async_save({"areas": self.areas})
         async_dispatcher_send(self.hass, SIGNAL_AUTO_LIGHT_UPDATED)
+
+
+def native_season_sensor(hass: HomeAssistant) -> str | None:
+    """The sensor of Home Assistant's own Season integration, when it is set up."""
+    return next(
+        (
+            entry.entity_id
+            for entry in er.async_get(hass).entities.values()
+            if entry.platform == "season"
+            and entry.domain == "sensor"
+            and not entry.disabled
+        ),
+        None,
+    )
 
 
 def auto_light_store(hass: HomeAssistant) -> AutoLightStore:
