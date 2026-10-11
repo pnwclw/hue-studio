@@ -39,6 +39,11 @@ export class SettingsView extends StudioView {
           ${planHasNews(plan) ? html`<span class="dot-badge" aria-hidden="true"></span>` : nothing}
           <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
         </button>
+        <button class="item" @click=${() => ctx.go("/settings/devices")}>
+          <ha-icon icon="mdi:plus-circle-outline"></ha-icon>
+          <div class="grow">${t("devices.title")}<div class="dim small">${t("devices.sub")}</div></div>
+          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+        </button>
         <div class="item">
           <ha-icon icon="mdi:sync"></ha-icon>
           <div class="grow">

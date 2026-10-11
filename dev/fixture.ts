@@ -7,6 +7,7 @@ import type {
   Gallery,
   Hass,
   HassState,
+  HueDeviceInfo,
   LightInfo,
   LightsMessage,
   Palette,
@@ -403,6 +404,15 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
+  // Add devices: a switch and a sensor without an area; the search finds a lamp.
+  const hueDevices: HueDeviceInfo[] = [
+    { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [] },
+    { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [] },
+  ];
+  let searching = false;
+  const deviceListeners = new Set<(m: unknown) => void>();
+  const devicesMessage = () => ({ "hue-entry": { name: "Hue Bridge", searching, devices: structuredClone(hueDevices) } });
+  const pushDevices = () => setTimeout(() => deviceListeners.forEach((cb) => cb(devicesMessage())), 60);
   /** A small copy of the backend's alignment plan (alignment.py), one light per device. */
   const planRooms = (): RoomsPlan => {
     const ids = Object.keys(LIGHTS);
@@ -746,6 +756,23 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         setTimeout(() => positionListeners.forEach((cb) => cb(positionsMessage())), 80);
         return null as T;
       }
+      if (msg.type === "hue_studio/devices/search") {
+        searching = true;
+        setTimeout(() => {
+          searching = false;
+          hueDevices.unshift({ id: "dev-new", name: "Hue color lamp 3", product: "Hue color lamp", model: "LCA006", archetype: "sultan_bulb", kind: "light", new: true, found: Date.now() / 1000, area: null, lights: [] });
+          pushDevices();
+        }, 3000);
+        pushDevices();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/devices/identify") return null as T;
+      if (msg.type === "hue_studio/devices/setup") {
+        const i = hueDevices.findIndex((d) => d.id === msg.device);
+        if (i >= 0) hueDevices.splice(i, 1);
+        pushDevices();
+        return null as T;
+      }
       if (msg.type === "hue_studio/config/set") {
         const { type: _type, ...change } = msg;
         config = { ...config, ...(change as Partial<StudioConfig>) };
@@ -794,6 +821,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           setTimeout(() => send({ scenes: { ...sceneInfo } }), 40);
           return () => {
             sceneListeners.delete(send);
+          };
+        }
+        if (msg.type === "hue_studio/devices/subscribe") {
+          deviceListeners.add(send);
+          setTimeout(() => send(devicesMessage()), 40);
+          return () => {
+            deviceListeners.delete(send);
           };
         }
         if (msg.type === "hue_studio/sync/subscribe") {

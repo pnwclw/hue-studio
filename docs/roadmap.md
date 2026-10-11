@@ -202,8 +202,10 @@ directly. Per HA area with auto light settings:
 
 ### E. Later
 
-- HA-first device setup: add Hue devices (lights, sensors, switches) through a wizard
-  of Hue Studio itself, assigning HA areas (and the matching Hue rooms) on the way.
+- ~~HA-first device setup~~ — done: Settings → Add devices (`devices.py`): the bridge's
+  `zigbee_device_discovery` search (optionally by serial numbers), new devices and those
+  without an HA area, each named on the bridge, put into an area and (lights) into the
+  area's Hue room; identify. Checked on a live HA (read-only: no search started).
 
 - ~~Sync Box, direct pairing only~~ — done: music palette, background lighting, presets
   (start, save the current state, delete; starting and deleting built on aiohuesyncbox's
@@ -221,7 +223,7 @@ directly. Per HA area with auto light settings:
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R
-and D2; only E is left.
+D2 and E (except the HACS submission, kept for later).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

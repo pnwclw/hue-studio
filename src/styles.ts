@@ -19,7 +19,7 @@ export const CSS = `
   }
   button { font: inherit; color: inherit; }
   hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-space-view, hue-studio-effects,
-  hue-studio-experimental-view, hue-studio-slider { display: block; }
+  hue-studio-experimental-view, hue-studio-devices-view, hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
 
@@ -288,7 +288,7 @@ export const CSS = `
   .scene.add-scene .dot svg { width: 26px; height: 26px; fill: currentColor; }
   .scene-actions .shuffle { margin-left: 6px; }
   .sheet .form-body { padding: 16px 16px 0; }
-  .sheet .field { width: 100%; box-sizing: border-box; height: 44px; padding: 0 12px; border: none; border-radius: 12px; font: inherit;
+  .sheet .field, .page .field { width: 100%; box-sizing: border-box; height: 44px; padding: 0 12px; border: none; border-radius: 12px; font: inherit;
                   font-size: 17px; color: inherit; background: rgba(120, 120, 128, 0.24); outline: none; }
   .sheet .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
@@ -387,6 +387,11 @@ export const CSS = `
   .palette .art { width: 34px; height: 34px; flex: none; border-radius: 50%; }
   .select.wide { width: 100%; margin-top: 10px; }
   .rows.mode-extra { margin-top: 10px; }
+  .device-card + .device-card { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .device-card > .item { width: 100%; }
+  .device-form { padding: 0 14px 14px 50px; }
+  .device-form .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .item.col .field { margin-top: 10px; }
   .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--radius);
                 cursor: pointer; text-align: left; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
                 transition: transform 0.15s var(--ease), box-shadow 0.2s; }

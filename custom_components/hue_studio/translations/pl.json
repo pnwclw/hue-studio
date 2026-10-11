@@ -194,6 +194,15 @@
     },
     "sync_box_no_ir": {
       "message": "{name} nie ma odbiornika pilota."
+    },
+    "search_unsupported": {
+      "message": "Ten mostek Hue nie może szukać urządzeń przez swoje API (zaktualizuj jego oprogramowanie w aplikacji Hue)."
+    },
+    "search_failed": {
+      "message": "Mostek Hue nie zaczął szukać urządzeń."
+    },
+    "unknown_hue_device": {
+      "message": "Brak urządzenia Hue {device} na mostkach Hue Studio."
     }
   },
   "services": {

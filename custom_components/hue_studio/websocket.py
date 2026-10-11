@@ -25,6 +25,15 @@ from .const import (
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
+from .devices import (
+    MAX_SERIALS,
+    SIGNAL_DEVICES_UPDATED,
+    async_devices_payload,
+    async_identify,
+    async_search,
+    async_setup_device,
+    async_watch_bridges,
+)
 from .lights import (
     HUE_DOMAIN,
     LIGHT_DOMAIN,
@@ -60,6 +69,10 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_set_config)
     websocket_api.async_register_command(hass, ws_subscribe_positions)
     websocket_api.async_register_command(hass, ws_set_positions)
+    websocket_api.async_register_command(hass, ws_subscribe_devices)
+    websocket_api.async_register_command(hass, ws_search_devices)
+    websocket_api.async_register_command(hass, ws_identify_device)
+    websocket_api.async_register_command(hass, ws_setup_device)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -398,3 +411,109 @@ async def ws_set_positions(
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
     connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/devices/subscribe"})
+@callback
+def ws_subscribe_devices(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send the "Add devices" state of every bridge now and whenever it changes
+    (see devices.async_devices_payload)."""
+    async_watch_bridges(hass)
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        payload = async_devices_payload(hass)
+        if payload == last.get("payload"):
+            return
+        last["payload"] = payload
+        connection.send_message(websocket_api.event_message(msg["id"], payload))
+
+    unsubs = [
+        async_dispatcher_connect(hass, SIGNAL_DEVICES_UPDATED, send),
+        async_track_areas(hass, send),
+    ]
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()
+
+
+async def _ws_call(
+    connection: websocket_api.ActiveConnection, msg: dict[str, Any], call: Any
+) -> None:
+    try:
+        await call
+    except (HomeAssistantError, ServiceValidationError) as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/devices/search",
+        vol.Optional("hue_entry_id"): str,
+        vol.Optional("serials", default=list): vol.All(
+            [cv.string], vol.Length(max=MAX_SERIALS)
+        ),
+    }
+)
+@websocket_api.async_response
+async def ws_search_devices(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Let new Hue devices join the bridge (all bridges without an entry id)."""
+    await _ws_call(
+        connection, msg, async_search(hass, msg.get("hue_entry_id"), msg["serials"])
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/devices/identify", vol.Required("device"): str}
+)
+@websocket_api.async_response
+async def ws_identify_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Make a Hue device show itself."""
+    await _ws_call(connection, msg, async_identify(hass, msg["device"]))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/devices/setup",
+        vol.Required("device"): str,
+        vol.Optional("name"): vol.Any(None, str),
+        vol.Optional("area_id"): vol.Any(None, str),
+    }
+)
+@websocket_api.async_response
+async def ws_setup_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Name a Hue device, put it into an area and its lights into that Hue room."""
+    await _ws_call(
+        connection,
+        msg,
+        async_setup_device(hass, msg["device"], msg.get("name"), msg.get("area_id")),
+    )

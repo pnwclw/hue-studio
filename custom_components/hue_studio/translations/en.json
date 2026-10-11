@@ -194,6 +194,15 @@
     },
     "sync_box_no_ir": {
       "message": "{name} has no remote control receiver."
+    },
+    "search_unsupported": {
+      "message": "This Hue Bridge cannot search for devices through its API (update its software in the Hue app)."
+    },
+    "search_failed": {
+      "message": "The Hue Bridge did not start searching for devices."
+    },
+    "unknown_hue_device": {
+      "message": "No Hue device {device} on the bridges of Hue Studio."
     }
   },
   "services": {

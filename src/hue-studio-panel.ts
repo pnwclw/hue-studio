@@ -12,6 +12,7 @@
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/auto/<area>      auto light of an area
 //   /settings/experimental     experimental features (the Liquid Glass footer)
+//   /settings/devices          add Hue devices: search, name, area, Hue room
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -27,6 +28,7 @@ import type { Hass } from "./types.ts";
 import { icon, type IconName } from "./ui.ts";
 import "./views/auto-light.ts";
 import "./views/color.ts";
+import "./views/devices.ts";
 import "./views/experimental.ts";
 import "./views/gallery.ts";
 import "./views/home.ts";
@@ -48,6 +50,7 @@ type Route =
   | { name: "rooms" }
   | { name: "settings" }
   | { name: "experimental" }
+  | { name: "devices" }
   | { name: "auto"; area: string };
 
 function parseRoute(path: string, search: string): Route {
@@ -66,6 +69,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "rooms") return { name: "rooms" };
   if (parts[0] === "settings" && parts[1] === "auto" && parts[2]) return { name: "auto", area: parts[2] };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
+  if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
 }
@@ -117,7 +121,7 @@ export class HueStudioPanel extends LitElement {
         ? "gallery"
         : route.name === "sync"
           ? "sync"
-          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental"
+          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental" || route.name === "devices"
             ? "settings"
             : "home";
     const tabs: [string, string, IconName, string][] = [
@@ -164,6 +168,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-auto-light-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-auto-light-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
+      case "devices":
+        return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev}></hue-studio-devices-view>`;
       case "experimental":
         return html`<hue-studio-experimental-view .ctx=${ctx} .rev=${rev}></hue-studio-experimental-view>`;
       case "rooms":

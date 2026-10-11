@@ -96,6 +96,14 @@ picker. Zones (any lights from any rooms) are created and edited on the same scr
 With "Rooms follow areas" turned on (Settings tab, or the integration options), every area change is
 written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-and-scenes.md).
 
+## Adding devices
+
+Settings → **Add devices** in the panel: the bridge searches for new Hue lights, switches
+and sensors (optionally by the serial numbers printed on them, for devices from another
+bridge or far away). Each new device — and any Hue device not in a Home Assistant area
+yet — gets a name (on the bridge, so the Hue app shows it too), an area and, for lights,
+the Hue room of that area. "Identify" makes a light breathe or a sensor blink.
+
 ## Dashboard cards
 
 Three cards for regular dashboards (in the card picker, with a visual editor):

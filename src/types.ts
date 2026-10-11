@@ -46,6 +46,25 @@ export interface HassData {
   locale?: { language: string };
 }
 
+/** A Hue device in the "Add devices" screen (hue_studio/devices/subscribe). */
+export interface HueDeviceInfo {
+  /** The bridge's device id. */
+  id: string;
+  name: string;
+  product: string;
+  model: string;
+  archetype: string;
+  kind: "light" | "switch" | "sensor" | "other";
+  /** Added while Home Assistant runs and not set up yet. */
+  new: boolean;
+  found: number | null;
+  area: string | null;
+  lights: string[];
+}
+
+/** Per bridge (native hue entry id); `searching` null: the bridge cannot search via its API. */
+export type DevicesMessage = Record<string, { name: string; searching: boolean | null; devices: HueDeviceInfo[] }>;
+
 /** A sidebar panel (`hass.panels`). */
 export interface HassPanel {
   url_path: string;
