@@ -35,7 +35,7 @@ from aiohue.v2.models.feature import (
 from aiohue.v2.models.light import LightPut
 from aiohue.v2.models.resource import ResourceTypes
 from aiohue.v2.models.scene import SceneMetadataPut, ScenePut
-from aiohuesyncbox import ExecutionMode, HdmiSource
+from aiohuesyncbox import AiohuesyncboxException, ExecutionMode, HdmiSource, Ir
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import (
     HomeAssistant,
@@ -90,11 +90,13 @@ from .scenes import (
 )
 from .sync import (
     INTENSITIES,
+    PALETTES,
     SYNC_MODES,
     SyncBoxCoordinator,
     async_streaming_lights,
     hue_target,
     inputs,
+    ir_execution,
     pct_to_api,
 )
 from .sync_link import SyncBoxLink
@@ -111,6 +113,11 @@ SERVICE_SAVE_SCENE = "save_scene"
 SERVICE_RESET_SCENE = "reset_scene"
 SERVICE_RECALL_SCENE = "recall_scene"
 SERVICE_SET_SYNC = "set_sync"
+SERVICE_SAVE_SYNC_PRESET = "save_sync_preset"
+SERVICE_DELETE_SYNC_PRESET = "delete_sync_preset"
+SERVICE_LEARN_SYNC_IR_CODE = "learn_sync_ir_code"
+SERVICE_SET_SYNC_IR_CODE = "set_sync_ir_code"
+SERVICE_DELETE_SYNC_IR_CODE = "delete_sync_ir_code"
 SERVICE_ALIGN_ROOMS = "align_rooms"
 SERVICE_UPDATE_ZONE = "update_zone"
 SERVICE_DELETE_ZONE = "delete_zone"
@@ -135,6 +142,10 @@ ATTR_SYNC = "sync"
 ATTR_INTENSITY = "intensity"
 ATTR_INPUT = "input"
 ATTR_AREA = "entertainment_area"
+ATTR_BACKGROUND = "background_lighting"
+ATTR_PRESET = "preset"
+ATTR_CODE = "code"
+ATTR_ACTION = "action"
 ATTR_DRY_RUN = "dry_run"
 ATTR_COMPLETE_SCENES = "complete_scenes"
 ATTR_DELETE_EMPTY_ROOMS = "delete_empty_rooms"
@@ -291,6 +302,11 @@ SET_SYNC_SCHEMA = vol.All(
             # Id or name of an entertainment area.
             vol.Optional(ATTR_AREA): cv.string,
             vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+            # Direct pairing only: music palette, background lighting, a preset.
+            vol.Optional(ATTR_PALETTE): vol.In(list(PALETTES)),
+            vol.Optional(ATTR_BACKGROUND): cv.boolean,
+            # Id or name of a preset of the box.
+            vol.Optional(ATTR_PRESET): cv.string,
         }
     ),
     cv.has_at_least_one_key(
@@ -301,7 +317,32 @@ SET_SYNC_SCHEMA = vol.All(
         ATTR_INPUT,
         ATTR_AREA,
         ATTR_BRIGHTNESS,
+        ATTR_PALETTE,
+        ATTR_BACKGROUND,
+        ATTR_PRESET,
     ),
+)
+# The box keeps names of presets and remote buttons in 24 bytes.
+SYNC_NAME = vol.All(
+    cv.string, vol.Length(min=1), lambda v: v.encode()[:24].decode(errors="ignore")
+)
+SAVE_SYNC_PRESET_SCHEMA = cv.make_entity_service_schema(
+    {vol.Required(ATTR_NAME): SYNC_NAME}
+)
+DELETE_SYNC_PRESET_SCHEMA = cv.make_entity_service_schema(
+    {vol.Required(ATTR_PRESET): cv.string}
+)
+LEARN_SYNC_IR_CODE_SCHEMA = cv.make_entity_service_schema({})
+SET_SYNC_IR_CODE_SCHEMA = cv.make_entity_service_schema(
+    {
+        vol.Required(ATTR_CODE): cv.matches_regex(r"^[0-9a-fA-F]{2,32}$"),
+        vol.Required(ATTR_NAME): SYNC_NAME,
+        # toggle_sync, mode_video, input:input2, preset:<id>, … (sync.IR_ACTIONS)
+        vol.Required(ATTR_ACTION): cv.string,
+    }
+)
+DELETE_SYNC_IR_CODE_SCHEMA = cv.make_entity_service_schema(
+    {vol.Required(ATTR_CODE): cv.string}
 )
 
 
@@ -554,13 +595,76 @@ def async_setup_services(hass: HomeAssistant) -> None:
         """Change a Sync Box in one command (power, sync, mode, input, …)."""
         for box in await _async_target_boxes(hass, call):
             if isinstance(box, SyncBoxLink):
+                if {ATTR_PALETTE, ATTR_BACKGROUND, ATTR_PRESET} & set(call.data):
+                    raise _link_unsupported(box.sync_entry.title)
                 await box.async_set_sync(dict(call.data))
-            else:
-                await box.async_set_state(**_sync_changes(box, call.data))
+                continue
+            if (preset := call.data.get(ATTR_PRESET)) is not None:
+                preset_id = _preset_id(box, preset)
+                await box.async_command(box.presets.activate(preset_id))
+            if changes := _sync_changes(box, call.data):
+                await box.async_set_state(**changes)
+
+    async def save_sync_preset(call: ServiceCall) -> ServiceResponse:
+        """Save what a box does now (mode, input, area, brightness, …) as a preset."""
+        saved: dict[str, str | None] = {}
+        for box in _direct_boxes(await _async_target_boxes(hass, call)):
+            create = box.presets.create(call.data[ATTR_NAME], box.current_execution())
+            try:
+                saved[box.box_id] = await create
+            except AiohuesyncboxException as err:
+                raise _box_failed(box) from err
+            await box.async_refresh()
+        return {"presets": saved}
+
+    async def delete_sync_preset(call: ServiceCall) -> None:
+        for box in _direct_boxes(await _async_target_boxes(hass, call)):
+            preset_id = _preset_id(box, call.data[ATTR_PRESET])
+            await box.async_command(box.presets.delete(preset_id))
+
+    async def learn_sync_ir_code(call: ServiceCall) -> None:
+        """Listen for a remote button (the box stops after one code or 20 s)."""
+        for box in _direct_boxes(await _async_target_boxes(hass, call)):
+            await box.async_command(_ir(box).set_scanning(True))
+
+    async def set_sync_ir_code(call: ServiceCall) -> None:
+        """Make a remote button do something on the box."""
+        execution = ir_execution(call.data[ATTR_ACTION])
+        if execution is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_ir_action",
+                translation_placeholders={"action": call.data[ATTR_ACTION]},
+            )
+        for box in _direct_boxes(await _async_target_boxes(hass, call)):
+            if "preset" in execution:
+                execution = {"preset": _preset_id(box, execution["preset"])}
+            command = _ir(box).set_code(
+                call.data[ATTR_CODE].lower(), call.data[ATTR_NAME], execution
+            )
+            await box.async_command(command)
+
+    async def delete_sync_ir_code(call: ServiceCall) -> None:
+        for box in _direct_boxes(await _async_target_boxes(hass, call)):
+            await box.async_command(_ir(box).delete_code(call.data[ATTR_CODE].lower()))
 
     hass.services.async_register(
         DOMAIN, SERVICE_SET_SYNC, set_sync, schema=SET_SYNC_SCHEMA
     )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SAVE_SYNC_PRESET,
+        save_sync_preset,
+        schema=SAVE_SYNC_PRESET_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    for name, handler, schema in (
+        (SERVICE_DELETE_SYNC_PRESET, delete_sync_preset, DELETE_SYNC_PRESET_SCHEMA),
+        (SERVICE_LEARN_SYNC_IR_CODE, learn_sync_ir_code, LEARN_SYNC_IR_CODE_SCHEMA),
+        (SERVICE_SET_SYNC_IR_CODE, set_sync_ir_code, SET_SYNC_IR_CODE_SCHEMA),
+        (SERVICE_DELETE_SYNC_IR_CODE, delete_sync_ir_code, DELETE_SYNC_IR_CODE_SCHEMA),
+    ):
+        hass.services.async_register(DOMAIN, name, handler, schema=schema)
     hass.services.async_register(
         DOMAIN, SERVICE_RECALL_SCENE, recall_scene, schema=RECALL_SCENE_SCHEMA
     )
@@ -738,8 +842,13 @@ def _sync_changes(
         changes["sync_active"] = sync
     elif data.get(ATTR_POWER) and not state.power:
         changes["mode"] = ExecutionMode.PASSTHROUGH
-    if (intensity := data.get(ATTR_INTENSITY)) is not None:
-        changes.update(coordinator.intensity_changes(intensity, mode))
+    settings = {
+        "intensity": data.get(ATTR_INTENSITY),
+        "background_lighting": data.get(ATTR_BACKGROUND),
+        "palette": data.get(ATTR_PALETTE),
+    }
+    if any(v is not None for v in settings.values()):
+        changes.update(coordinator.mode_changes(mode, **settings))
     if (source := data.get(ATTR_INPUT)) is not None:
         changes["hdmi_source"] = HdmiSource(_input_id(coordinator, source))
     if (area := data.get(ATTR_AREA)) is not None:
@@ -974,3 +1083,52 @@ async def _async_update(light: HueLight, put: LightPut) -> None:
             translation_key="command_failed",
             translation_placeholders={"entity_id": light.entity_id},
         ) from err
+
+
+def _direct_boxes(
+    boxes: list[SyncBoxCoordinator | SyncBoxLink],
+) -> list[SyncBoxCoordinator]:
+    """Boxes paired directly; presets and remote buttons are not offered through
+    the huesyncbox integration."""
+    for box in boxes:
+        if isinstance(box, SyncBoxLink):
+            raise _link_unsupported(box.sync_entry.title)
+    return [box for box in boxes if isinstance(box, SyncBoxCoordinator)]
+
+
+def _link_unsupported(name: str) -> ServiceValidationError:
+    return ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="sync_box_link_unsupported",
+        translation_placeholders={"name": name},
+    )
+
+
+def _box_failed(box: SyncBoxCoordinator) -> HomeAssistantError:
+    return HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="sync_box_command_failed",
+        translation_placeholders={"name": box.box_name},
+    )
+
+
+def _preset_id(box: SyncBoxCoordinator, value: str) -> str:
+    """A preset of the box by id or name."""
+    for preset in box.api.presets:
+        if value in (preset.id, preset.name):
+            return preset.id
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="unknown_sync_preset",
+        translation_placeholders={"preset": value},
+    )
+
+
+def _ir(box: SyncBoxCoordinator) -> Ir:
+    if box.api.ir is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="sync_box_no_ir",
+            translation_placeholders={"name": box.box_name},
+        )
+    return box.api.ir

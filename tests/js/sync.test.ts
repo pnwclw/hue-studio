@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { boxesForGroup, confirmed, predictSync, statusKey, syncedLights, syncingIn } from "../../src/sync.ts";
+import { boxesForGroup, confirmed, hasFeature, predictSync, statusKey, syncedLights, syncingIn } from "../../src/sync.ts";
 import type { SyncBoxInfo } from "../../src/types.ts";
 
 const BOX: SyncBoxInfo = {
@@ -72,4 +72,12 @@ test("status", () => {
   assert.equal(statusKey({ ...BOX, syncing: true }), "sync.syncing");
   assert.equal(statusKey({ ...BOX, power: false }), "sync.off");
   assert.equal(statusKey({ ...BOX, available: false }), "sync.unavailable");
+});
+
+test("music palette and background lighting are predicted too", () => {
+  const box = { ...BOX, mode: "video" as const, palette: "neutral", background_lighting: { video: false, game: false } };
+  assert.equal(predictSync(box, { palette: "happy_calm" }).palette, "happy_calm");
+  assert.deepEqual(predictSync(box, { background_lighting: true }).background_lighting, { video: true, game: false });
+  assert.equal(hasFeature(box, "presets"), false);
+  assert.equal(hasFeature({ ...box, features: ["presets"] }, "presets"), true);
 });

@@ -380,6 +380,13 @@ export const CSS = `
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; transition: background 0.2s var(--ease); }
   .seg button.on { background: #636366; font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); }
   .grid.inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .palette { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: var(--radius); border: 1.5px solid transparent;
+             background: var(--surface); cursor: pointer; font-size: 13px; text-align: left; }
+  .palette.on { border-color: #fff; }
+  .palette .art { width: 34px; height: 34px; flex: none; border-radius: 50%; }
+  .select.wide { width: 100%; margin-top: 10px; }
+  .rows.mode-extra { margin-top: 10px; }
   .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--radius);
                 cursor: pointer; text-align: left; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
                 transition: transform 0.15s var(--ease), box-shadow 0.2s; }

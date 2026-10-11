@@ -23,6 +23,21 @@
     },
     "apply_auto_light": {
       "service": "mdi:lightbulb-auto"
+    },
+    "save_sync_preset": {
+      "service": "mdi:content-save-outline"
+    },
+    "delete_sync_preset": {
+      "service": "mdi:delete-outline"
+    },
+    "learn_sync_ir_code": {
+      "service": "mdi:remote"
+    },
+    "set_sync_ir_code": {
+      "service": "mdi:remote-tv"
+    },
+    "delete_sync_ir_code": {
+      "service": "mdi:remote-off"
     }
   },
   "entity": {

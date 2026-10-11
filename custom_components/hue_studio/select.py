@@ -77,7 +77,9 @@ DESCRIPTIONS = (
         key="intensity",
         options_fn=lambda c: INTENSITIES,
         current_fn=lambda c: c.state.intensity,
-        select_fn=lambda c, option: c.async_set_state(**c.intensity_changes(option)),
+        select_fn=lambda c, option: c.async_set_state(
+            **c.mode_changes(intensity=option)
+        ),
     ),
     SyncBoxSelectDescription(
         key="hdmi_input",

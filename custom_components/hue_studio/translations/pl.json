@@ -182,6 +182,18 @@
     },
     "positions_streaming": {
       "message": "Obszar rozrywki {name} właśnie synchronizuje; pozycje można zmienić, gdy skończy."
+    },
+    "sync_box_link_unsupported": {
+      "message": "{name} działa przez integrację huesyncbox, która nie daje palet muzyki, oświetlenia tła, presetów ani przycisków pilota. Sparuj skrzynkę z Hue Studio, aby z nich korzystać."
+    },
+    "unknown_sync_preset": {
+      "message": "Skrzynka nie ma presetu {preset}."
+    },
+    "unknown_ir_action": {
+      "message": "Nieznane działanie przycisku pilota: {action}."
+    },
+    "sync_box_no_ir": {
+      "message": "{name} nie ma odbiornika pilota."
     }
   },
   "services": {
@@ -355,7 +367,7 @@
     },
     "set_sync": {
       "name": "Ustaw Sync Box",
-      "description": "Zmienia Hue Play HDMI Sync Box jednym poleceniem: zasilanie, synchronizację światła, tryb, intensywność, wejście HDMI, obszar rozrywki i jasność.",
+      "description": "Zmienia Hue Play HDMI Sync Box jednym poleceniem: zasilanie, synchronizację świateł, tryb, intensywność, wejście HDMI, obszar rozrywki, jasność, paletę muzyki, oświetlenie tła albo preset.",
       "fields": {
         "power": {
           "name": "Zasilanie",
@@ -384,6 +396,18 @@
         "brightness": {
           "name": "Jasność",
           "description": "Jasność synchronizacji w procentach."
+        },
+        "palette": {
+          "name": "Paleta muzyki",
+          "description": "Kolory trybu muzyki (tylko skrzynki sparowane bezpośrednio)."
+        },
+        "background_lighting": {
+          "name": "Oświetlenie tła",
+          "description": "Delikatnie oświetla pokój wokół synchronizacji wideo lub gier (tylko skrzynki sparowane bezpośrednio)."
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "Nazwa lub id presetu skrzynki do uruchomienia (tylko skrzynki sparowane bezpośrednio)."
         }
       }
     },
@@ -524,6 +548,58 @@
           "description": "Najpierw oddaj ręcznie sterowane światła automatycznemu światłu (np. gdy ktoś wchodzi do pokoju)."
         }
       }
+    },
+    "save_sync_preset": {
+      "name": "Zapisz preset Sync Box",
+      "description": "Zapisuje to, co skrzynka sparowana bezpośrednio robi teraz (tryb, ustawienia, wejście, obszar rozrywki, jasność), jako preset skrzynki.",
+      "fields": {
+        "name": {
+          "name": "Nazwa",
+          "description": "Do 24 bajtów."
+        }
+      }
+    },
+    "delete_sync_preset": {
+      "name": "Usuń preset Sync Box",
+      "description": "Usuwa preset skrzynki sparowanej bezpośrednio.",
+      "fields": {
+        "preset": {
+          "name": "Preset",
+          "description": "Nazwa lub id presetu."
+        }
+      }
+    },
+    "learn_sync_ir_code": {
+      "name": "Naucz przycisk pilota",
+      "description": "Skrzynka sparowana bezpośrednio nasłuchuje jednego przycisku pilota (20 sekund); jego kod pojawi się w panelu."
+    },
+    "set_sync_ir_code": {
+      "name": "Ustaw przycisk pilota",
+      "description": "Przypisuje przyciskowi pilota działanie na skrzynce sparowanej bezpośrednio.",
+      "fields": {
+        "code": {
+          "name": "Kod",
+          "description": "Kod przycisku (hex), którego nauczyła się skrzynka."
+        },
+        "name": {
+          "name": "Nazwa",
+          "description": "Do 24 bajtów."
+        },
+        "action": {
+          "name": "Działanie",
+          "description": "toggle_sync, sync_on, sync_off, power_off, passthrough, mode_video, mode_music, mode_game, next_mode, next_input, next_intensity, brighter, darker, toggle_background, input:input1-4 albo preset:<nazwa lub id>."
+        }
+      }
+    },
+    "delete_sync_ir_code": {
+      "name": "Zapomnij przycisk pilota",
+      "description": "Usuwa przycisk pilota ze skrzynki sparowanej bezpośrednio.",
+      "fields": {
+        "code": {
+          "name": "Kod",
+          "description": "Kod przycisku (hex)."
+        }
+      }
     }
   },
   "selector": {
@@ -587,6 +663,15 @@
       "options": {
         "classic": "Klasyczny",
         "spatial": "Przestrzenny"
+      }
+    },
+    "music_palette": {
+      "options": {
+        "happy_energetic": "Radosna, energiczna",
+        "happy_calm": "Radosna, spokojna",
+        "melancholic_calm": "Melancholijna, spokojna",
+        "melancholic_energetic": "Melancholijna, energiczna",
+        "neutral": "Neutralna"
       }
     }
   },

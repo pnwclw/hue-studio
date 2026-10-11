@@ -266,6 +266,28 @@ export interface SyncBoxInfo {
   video_supported?: boolean;
   audio_supported?: boolean;
   connection?: string | null;
+  /** Direct pairing only (not a box linked through huesyncbox). */
+  features?: ("palette" | "background_lighting" | "presets" | "ir")[];
+  /** Music mode's palette. */
+  palette?: string | null;
+  background_lighting?: { video: boolean; game: boolean };
+  presets?: SyncPreset[];
+  /** The preset applied last, if the box reports it. */
+  preset?: string | null;
+  ir?: { scanning: boolean; scanned: string[]; codes: SyncIrCode[] } | null;
+}
+
+export interface SyncPreset {
+  id: string;
+  name: string;
+  last_used: string | null;
+}
+
+/** A remote button the box knows; `action` is one of ours (sync.IR_ACTIONS) or null. */
+export interface SyncIrCode {
+  code: string;
+  name: string;
+  action: string | null;
 }
 
 export interface SyncMessage {
@@ -281,6 +303,9 @@ export interface SyncChange {
   input?: string;
   entertainment_area?: string;
   brightness?: number;
+  palette?: string;
+  background_lighting?: boolean;
+  preset?: string;
 }
 
 export type Phase = "morning" | "day" | "golden" | "evening" | "night";

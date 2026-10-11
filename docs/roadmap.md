@@ -205,8 +205,11 @@ directly. Per HA area with auto light settings:
 - HA-first device setup: add Hue devices (lights, sensors, switches) through a wizard
   of Hue Studio itself, assigning HA areas (and the matching Hue rooms) on the way.
 
-- Sync Box, direct pairing only: presets, IR codes, music palettes, background
-  lighting (aiohuesyncbox already has them).
+- ~~Sync Box, direct pairing only~~ — done: music palette, background lighting, presets
+  (start, save the current state, delete; starting and deleting built on aiohuesyncbox's
+  `Presets` controller, which lacks them in 0.1.6) and remote buttons (learn, assign an
+  action, forget) in the Sync tab and as services; a linked box answers with an error
+  that explains why.
 - ~~Dashboard cards~~ — done: room, auto light and gallery cards (`cards.ts`, one shared
   context, theme colors, card picker + visual editor), verified on a live HA.
 - ~~"Liquid Glass" footer~~ — done as an experimental setting: phones only, chosen

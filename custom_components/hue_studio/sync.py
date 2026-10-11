@@ -22,16 +22,21 @@ from aiohue.v2.models.entertainment_configuration import (
 )
 from aiohuesyncbox import (
     AiohuesyncboxException,
+    CycleDirection,
     ExecutionMode,
     GameMode,
+    HdmiSource,
     HueSyncBox,
     Input,
     Intensity,
     MusicMode,
+    MusicPalette,
+    Presets,
     SyncMode,
     Unauthorized,
     VideoMode,
 )
+from aiohuesyncbox.models import ExecutionUpdate
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import entity_registry as er
@@ -63,6 +68,80 @@ INTENSITIES = [
     Intensity.INTENSE.value,
 ]
 INPUTS = ["input1", "input2", "input3", "input4"]
+
+# Music palettes: service values (snake_case) -> the box's.
+PALETTES = {
+    "happy_energetic": MusicPalette.HAPPY_ENERGETIC,
+    "happy_calm": MusicPalette.HAPPY_CALM,
+    "melancholic_calm": MusicPalette.MELANCHOLIC_CALM,
+    "melancholic_energetic": MusicPalette.MELANCHOLIC_ENERGETIC,
+    "neutral": MusicPalette.NEUTRAL,
+}
+BRIGHTNESS_STEP = 20  # of the box's 0-200
+
+# What a remote button (IR code) can do: action -> the execution change it sends.
+# Also "input:<input1-4>" and "preset:<id>".
+IR_ACTIONS: dict[str, ExecutionUpdate] = {
+    "toggle_sync": ExecutionUpdate(toggle_sync_active=True),
+    "sync_on": ExecutionUpdate(sync_active=True),
+    "sync_off": ExecutionUpdate(sync_active=False),
+    "power_off": ExecutionUpdate(mode=ExecutionMode.POWERSAVE),
+    "passthrough": ExecutionUpdate(mode=ExecutionMode.PASSTHROUGH),
+    "mode_video": ExecutionUpdate(mode=ExecutionMode.VIDEO),
+    "mode_music": ExecutionUpdate(mode=ExecutionMode.MUSIC),
+    "mode_game": ExecutionUpdate(mode=ExecutionMode.GAME),
+    "next_mode": ExecutionUpdate(cycle_sync_mode=CycleDirection.NEXT),
+    "next_input": ExecutionUpdate(cycle_hdmi_source=CycleDirection.NEXT),
+    "next_intensity": ExecutionUpdate(cycle_intensity=CycleDirection.NEXT),
+    "brighter": ExecutionUpdate(increment_brightness=BRIGHTNESS_STEP),
+    "darker": ExecutionUpdate(increment_brightness=-BRIGHTNESS_STEP),
+    "toggle_background": ExecutionUpdate(toggle_background_lighting=True),
+}
+
+
+def ir_execution(action: str) -> dict[str, Any] | None:
+    """The execution change of a remote button action (None: unknown action)."""
+    if action in IR_ACTIONS:
+        return IR_ACTIONS[action].to_dict()
+    kind, _, value = action.partition(":")
+    if kind == "input" and value in INPUTS:
+        return ExecutionUpdate(hdmi_source=HdmiSource(value)).to_dict()
+    if kind == "preset" and value:
+        return ExecutionUpdate(preset=value).to_dict()
+    return None
+
+
+def ir_action(execution: dict[str, Any]) -> str | None:
+    """The action of a remote button's execution change, if it is one of ours."""
+    for action, update in IR_ACTIONS.items():
+        if update.to_dict() == execution:
+            return action
+    if set(execution) == {"hdmiSource"}:
+        return f"input:{execution['hdmiSource']}"
+    if set(execution) == {"preset"}:
+        return f"preset:{execution['preset']}"
+    return None
+
+
+class SyncPresets(Presets):
+    """The box's presets with what aiohuesyncbox (0.1.6) does not have yet: starting
+    one and deleting one. Built on its controller and models."""
+
+    def __init__(self, presets: Presets) -> None:
+        """Wrap the presets of a box (same request function, same items)."""
+        super().__init__(presets._request)
+        self._items = presets._items
+
+    async def activate(self, preset_id: str) -> None:
+        """Apply a preset (its execution change)."""
+        await self._request(
+            "put", "/execution", data=ExecutionUpdate(preset=preset_id).to_dict()
+        )
+
+    async def delete(self, preset_id: str) -> None:
+        """Forget a preset."""
+        await self._request("delete", f"{self._path}/{preset_id}")
+
 
 MODELS = {
     "HSB1": "Hue Play HDMI Sync Box",
@@ -226,26 +305,59 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         """`execution.set_state` of aiohuesyncbox with these keyword arguments."""
         await self.async_command(self.api.execution.set_state(**changes))
 
-    def intensity_changes(
-        self, intensity: str, mode: str | None = None
+    def mode_changes(
+        self,
+        mode: str | None = None,
+        *,
+        intensity: str | None = None,
+        background_lighting: bool | None = None,
+        palette: str | None = None,
     ) -> dict[str, Any]:
-        """set_state arguments giving `mode` (default: the current one) an intensity.
+        """set_state arguments changing the settings of `mode` (default: current).
 
         `intensity=` alone only applies while syncing, so the mode's own settings are
-        sent instead; the API expects them complete.
+        sent instead; the API expects them complete. A palette is music's, background
+        lighting video's and game's; the other one is ignored.
         """
         mode = mode or self.state.mode
         execution = self.api.execution
-        level = Intensity(intensity)
         if mode == SyncMode.MUSIC:
+            current = execution.music
             return {
-                "music": MusicMode(intensity=level, palette=execution.music.palette)
+                "music": MusicMode(
+                    intensity=Intensity(intensity) if intensity else current.intensity,
+                    palette=PALETTES[palette] if palette else current.palette,
+                )
             }
+        current = execution.game if mode == SyncMode.GAME else execution.video
+        settings = {
+            "intensity": Intensity(intensity) if intensity else current.intensity,
+            "background_lighting": current.background_lighting
+            if background_lighting is None
+            else background_lighting,
+        }
         if mode == SyncMode.GAME:
-            lighting = execution.game.background_lighting
-            return {"game": GameMode(intensity=level, background_lighting=lighting)}
-        lighting = execution.video.background_lighting
-        return {"video": VideoMode(intensity=level, background_lighting=lighting)}
+            return {"game": GameMode(**settings)}
+        return {"video": VideoMode(**settings)}
+
+    @property
+    def presets(self) -> SyncPresets:
+        """The box's presets (start, delete as well)."""
+        return SyncPresets(self.api.presets)
+
+    def current_execution(self) -> dict[str, Any]:
+        """What the box does now as an execution change (to save as a preset)."""
+        execution = self.api.execution
+        state = self.state
+        mode = ExecutionMode(state.mode) if state.syncing else execution.mode
+        update = ExecutionUpdate(
+            mode=mode,
+            hdmi_source=execution.hdmi_source,
+            brightness=execution.brightness,
+            hue_target=execution.hue_target,
+            **self.mode_changes(state.mode),
+        )
+        return update.to_dict()
 
 
 class SyncBoxSource(Protocol):
@@ -393,8 +505,38 @@ def sync_box_info(
             ),
             key=lambda a: a["name"].casefold(),
         ),
+        "palette": _palette_key(api.execution.music.palette),
+        "background_lighting": {
+            "video": api.execution.video.background_lighting,
+            "game": api.execution.game.background_lighting,
+        },
+        "presets": sorted(
+            (
+                {"id": p.id, "name": p.name, "last_used": p.last_used}
+                for p in api.presets
+            ),
+            key=lambda p: p["name"].casefold(),
+        ),
+        "preset": api.execution.preset,
+        "ir": {
+            "scanning": api.ir.scan.scanning,
+            "scanned": list(api.ir.scan.codes),
+            "codes": [
+                {"code": c.code, "name": c.name, "action": ir_action(c.execution)}
+                for c in sorted(api.ir.codes.values(), key=lambda c: c.name.casefold())
+            ],
+        }
+        if api.ir
+        else None,
+        # What only a directly paired box can do (not one linked through huesyncbox).
+        "features": ["palette", "background_lighting", "presets"]
+        + (["ir"] if api.ir else []),
         "content": (hdmi.content_specs or None) if hdmi else None,
         "video_supported": hdmi.video_sync_supported if hdmi else True,
         "audio_supported": hdmi.audio_sync_supported if hdmi else True,
         "connection": api.hue.connection_state.value,
     }
+
+
+def _palette_key(palette: MusicPalette) -> str | None:
+    return next((k for k, v in PALETTES.items() if v == palette), None)

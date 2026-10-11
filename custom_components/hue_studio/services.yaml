@@ -272,6 +272,87 @@ set_sync:
           min: 1
           max: 100
           unit_of_measurement: "%"
+    palette:
+      selector:
+        select:
+          options:
+            - happy_energetic
+            - happy_calm
+            - melancholic_calm
+            - melancholic_energetic
+            - neutral
+          translation_key: music_palette
+    background_lighting:
+      selector:
+        boolean:
+    preset:
+      example: Movie night
+      selector:
+        text:
+
+save_sync_preset:
+  target:
+    entity:
+      - integration: hue_studio
+        domain: switch
+  fields:
+    name:
+      required: true
+      example: Movie night
+      selector:
+        text:
+
+delete_sync_preset:
+  target:
+    entity:
+      - integration: hue_studio
+        domain: switch
+  fields:
+    preset:
+      required: true
+      example: Movie night
+      selector:
+        text:
+
+learn_sync_ir_code:
+  target:
+    entity:
+      - integration: hue_studio
+        domain: switch
+
+set_sync_ir_code:
+  target:
+    entity:
+      - integration: hue_studio
+        domain: switch
+  fields:
+    code:
+      required: true
+      example: 20df10ef
+      selector:
+        text:
+    name:
+      required: true
+      example: Red button
+      selector:
+        text:
+    action:
+      required: true
+      example: toggle_sync
+      selector:
+        text:
+
+delete_sync_ir_code:
+  target:
+    entity:
+      - integration: hue_studio
+        domain: switch
+  fields:
+    code:
+      required: true
+      example: 20df10ef
+      selector:
+        text:
 
 auto_light_exclude:
   fields:

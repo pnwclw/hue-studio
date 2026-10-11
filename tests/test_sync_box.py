@@ -34,7 +34,12 @@ from custom_components.hue_studio.const import (
     DOMAIN,
     KIND_SYNC_BOX,
 )
-from custom_components.hue_studio.sync import SyncBoxNotFound, async_get_box_id
+from custom_components.hue_studio.sync import (
+    SyncBoxNotFound,
+    async_get_box_id,
+    ir_action,
+    ir_execution,
+)
 
 from .conftest import ENTERTAINMENT, make_entertainment
 
@@ -89,7 +94,14 @@ BOX_STATE: dict[str, Any] = {
         "audioSyncSupported": True,
     },
     "registrations": {},
-    "presets": {},
+    "presets": {
+        "p1": {"name": "Movie night", "lastUsed": None, "execution": {"mode": "video"}},
+    },
+    "ir": {
+        "defaultCodes": True,
+        "scan": {"scanning": False, "codes": []},
+        "codes": {"aa10": {"name": "Red", "execution": {"toggleSyncActive": True}}},
+    },
 }
 
 
@@ -465,6 +477,14 @@ async def test_led_indicator(hass: HomeAssistant, sync_box: FakeBox) -> None:
         ),
         ({"power": False, "sync": True}, {"mode": "powersave"}),
         ({"sync": False, "mode": "video"}, {"syncActive": False}),
+        (
+            {"mode": "music", "palette": "happy_calm"},
+            {"mode": "music", "music": {"intensity": "subtle", "palette": "happyCalm"}},
+        ),
+        (
+            {"background_lighting": True, "intensity": "intense"},
+            {"video": {"intensity": "intense", "backgroundLighting": True}},
+        ),
     ],
 )
 async def test_set_sync(
@@ -481,6 +501,84 @@ async def test_set_sync(
         blocking=True,
     )
     assert sync_box.sent() == [sent]
+
+
+def test_ir_actions() -> None:
+    """Remote button actions and the execution changes the box stores for them."""
+    assert ir_execution("toggle_sync") == {"toggleSyncActive": True}
+    assert ir_execution("input:input3") == {"hdmiSource": "input3"}
+    assert ir_execution("preset:p1") == {"preset": "p1"}
+    assert ir_execution("input:input9") is None
+    assert ir_execution("dance") is None
+    for action in ("darker", "mode_game", "input:input2", "preset:p1"):
+        assert ir_action(ir_execution(action)) == action
+    assert ir_action({"mode": "video", "brightness": 10}) is None
+
+
+async def test_presets(hass: HomeAssistant, sync_box: FakeBox) -> None:
+    """A preset is started by name, saved from the current state, deleted."""
+    target = {"entity_id": "switch.sync_box_light_sync"}
+    await hass.services.async_call(
+        DOMAIN, "set_sync", {**target, "preset": "Movie night"}, blocking=True
+    )
+    assert sync_box.sent() == [{"preset": "p1"}]
+
+    response = await hass.services.async_call(
+        DOMAIN,
+        "save_sync_preset",
+        {**target, "name": "Evening"},
+        blocking=True,
+        return_response=True,
+    )
+    assert response == {"presets": {BOX_ID: None}}
+    assert sync_box.sent("post", "/presets") == [
+        {
+            "name": "Evening",
+            "execution": {
+                "mode": "passthrough",
+                "hdmiSource": "input1",
+                "brightness": 100,
+                "hueTarget": "ent-tv",
+                "video": {"intensity": "high", "backgroundLighting": False},
+            },
+        }
+    ]
+
+    await hass.services.async_call(
+        DOMAIN, "delete_sync_preset", {**target, "preset": "p1"}, blocking=True
+    )
+    assert sync_box.sent("delete", "/presets/p1") == [None]
+    with pytest.raises(ServiceValidationError, match="Gone"):
+        await hass.services.async_call(
+            DOMAIN, "set_sync", {**target, "preset": "Gone"}, blocking=True
+        )
+
+
+async def test_ir_codes(hass: HomeAssistant, sync_box: FakeBox) -> None:
+    """Learning a remote button, giving it an action, forgetting it."""
+    target = {"entity_id": "switch.sync_box_light_sync"}
+    await hass.services.async_call(DOMAIN, "learn_sync_ir_code", target, blocking=True)
+    assert sync_box.sent(path="/ir/scan") == [{"scanning": True}]
+    await hass.services.async_call(
+        DOMAIN,
+        "set_sync_ir_code",
+        {**target, "code": "BB20", "name": "Blue", "action": "preset:Movie night"},
+        blocking=True,
+    )
+    assert sync_box.sent(path="/ir/codes/bb20") == [
+        {"name": "Blue", "execution": {"preset": "p1"}}
+    ]
+    await hass.services.async_call(
+        DOMAIN, "delete_sync_ir_code", {**target, "code": "aa10"}, blocking=True
+    )
+    assert sync_box.sent("delete", "/ir/codes/aa10") == [None]
+    with pytest.raises(ServiceValidationError, match="dance"):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_sync_ir_code",
+            {**target, "code": "cc", "name": "X", "action": "dance"},
+            blocking=True,
+        )
 
 
 async def test_set_sync_errors(hass: HomeAssistant, sync_box: FakeBox) -> None:
@@ -569,6 +667,16 @@ async def test_subscribe_sync(
     ]
 
     # The box starts syncing: the next poll pushes the change.
+    assert box["palette"] == "neutral"
+    assert box["background_lighting"] == {"video": False, "game": False}
+    assert box["presets"] == [{"id": "p1", "name": "Movie night", "last_used": None}]
+    assert box["ir"] == {
+        "scanning": False,
+        "scanned": [],
+        "codes": [{"code": "aa10", "name": "Red", "action": "toggle_sync"}],
+    }
+    assert box["features"] == ["palette", "background_lighting", "presets", "ir"]
+
     sync_box.state["execution"].update(mode="video", syncActive=True)
     await box_entry.runtime_data.sync.async_refresh()
     box = (await client.receive_json())["event"]["boxes"][box_entry.entry_id]

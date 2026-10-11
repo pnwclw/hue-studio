@@ -135,6 +135,22 @@ const SYNC_BOX: SyncBoxInfo = {
   video_supported: true,
   audio_supported: true,
   connection: "connected",
+  features: ["palette", "background_lighting", "presets", "ir"],
+  palette: "neutral",
+  background_lighting: { video: false, game: true },
+  presets: [
+    { id: "p1", name: "Movie night", last_used: null },
+    { id: "p2", name: "Gaming", last_used: null },
+  ],
+  preset: null,
+  ir: {
+    scanning: false,
+    scanned: ["20df10ef"],
+    codes: [
+      { code: "20df4eb1", name: "Red button", action: "toggle_sync" },
+      { code: "20df8e71", name: "Green button", action: "preset:p1" },
+    ],
+  },
 };
 // Colors the synced lights show per mode (what the picture would do).
 const SYNC_COLORS: Record<string, XY[]> = {
@@ -633,6 +649,29 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         if (d.name) states[one] = { ...states[one], attributes: { ...states[one].attributes, name: d.name } };
         sceneInfo[one] = { ...info, speed: d.speed !== undefined ? d.speed / 100 : info.speed, auto_dynamic: d.auto_dynamic ?? info.auto_dynamic };
         pushScenes([one]);
+      }
+      if (domain === "hue_studio" && service === "save_sync_preset") {
+        box = { ...box, presets: [...(box.presets || []), { id: `p${Date.now()}`, name: String(d.name), last_used: null }] };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
+      }
+      if (domain === "hue_studio" && service === "delete_sync_preset") {
+        box = { ...box, presets: (box.presets || []).filter((p) => p.id !== d.preset) };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
+      }
+      if (domain === "hue_studio" && service === "learn_sync_ir_code" && box.ir) {
+        box = { ...box, ir: { ...box.ir, scanning: true } };
+        setTimeout(() => {
+          box = { ...box, ir: { ...box.ir!, scanning: false, scanned: [...box.ir!.scanned, "20df40bf"] } };
+          syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } }));
+        }, 2500);
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
+      }
+      if (domain === "hue_studio" && (service === "set_sync_ir_code" || service === "delete_sync_ir_code") && box.ir) {
+        const code = String(d.code);
+        const codes = box.ir.codes.filter((c) => c.code !== code);
+        if (service === "set_sync_ir_code") codes.push({ code, name: String(d.name), action: String(d.action) });
+        box = { ...box, ir: { ...box.ir, codes, scanned: box.ir.scanned.filter((c) => c !== code) } };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
       }
       if (domain === "hue_studio" && service === "set_sync") {
         const { entity_id: _, ...change } = data as ServiceData & SyncChange;

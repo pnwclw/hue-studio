@@ -44,7 +44,9 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.auto_light_exclude` | Never (or again, `excluded: false`) pick a gallery scene in an area's auto light. |
 | `hue_studio.auto_light_offset` | Shift an area's brightness in one phase by `delta` percent (0 resets); returns the offset. |
 | `hue_studio.import_legacy` | Import the auto light of rooms from a legacy `lights.json` into Hue Studio. |
-| `hue_studio.set_sync` | Change a Sync Box in one command: `power`, `sync`, `mode` (video/music/game), `intensity`, `input` (id or name), `entertainment_area` (id or name), `brightness`. |
+| `hue_studio.set_sync` | Change a Sync Box in one command: `power`, `sync`, `mode` (video/music/game), `intensity`, `input` (id or name), `entertainment_area` (id or name), `brightness`; paired directly also `palette` (music), `background_lighting`, `preset` (name or id). |
+| `hue_studio.save_sync_preset`, `delete_sync_preset` | Save what a directly paired box does now as a preset of the box (`name`), or delete one. |
+| `hue_studio.learn_sync_ir_code`, `set_sync_ir_code`, `delete_sync_ir_code` | Remote buttons of a directly paired box: listen for one, make one do something (`code`, `name`, `action`: `toggle_sync`, `mode_game`, `input:input2`, `preset:Movie night`, …), forget one. |
 
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
@@ -129,7 +131,10 @@ intensity, HDMI input, entertainment area and LED selects; brightness; HDMI port
 content, bridge connection and Wi-Fi sensors. Entity ids and option values match the
 HACS Sync Box integration (`switch.sync_box_light_sync`, `select.sync_box_hdmi_input`
 with your input names, …), so automations keep working when you switch over: remove the
-box from that integration first, then add it to Hue Studio.
+box from that integration first, then add it to Hue Studio. Only in this mode: the music
+palette, background lighting, presets of the box and remote buttons (any infrared remote
+can be taught to start syncing, switch modes or inputs, or apply a preset) — in the
+Sync tab and through the services above.
 
 ### Compatibility mode: through the Sync Box integration
 

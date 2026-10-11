@@ -182,6 +182,18 @@
     },
     "positions_streaming": {
       "message": "The entertainment area {name} is syncing right now; positions can be changed once it stops."
+    },
+    "sync_box_link_unsupported": {
+      "message": "{name} is used through the huesyncbox integration, which offers no music palettes, background lighting, presets or remote buttons. Pair the box with Hue Studio for them."
+    },
+    "unknown_sync_preset": {
+      "message": "The Sync Box has no preset {preset}."
+    },
+    "unknown_ir_action": {
+      "message": "Unknown remote button action: {action}."
+    },
+    "sync_box_no_ir": {
+      "message": "{name} has no remote control receiver."
     }
   },
   "services": {
@@ -355,7 +367,7 @@
     },
     "set_sync": {
       "name": "Set Sync Box",
-      "description": "Changes a Hue Play HDMI Sync Box in one command: power, light sync, mode, intensity, HDMI input, entertainment area and brightness.",
+      "description": "Changes a Hue Play HDMI Sync Box in one command: power, light sync, mode, intensity, HDMI input, entertainment area, brightness, music palette, background lighting or a preset.",
       "fields": {
         "power": {
           "name": "Power",
@@ -384,6 +396,18 @@
         "brightness": {
           "name": "Brightness",
           "description": "Sync brightness in percent."
+        },
+        "palette": {
+          "name": "Music palette",
+          "description": "Colors of music mode (directly paired boxes only)."
+        },
+        "background_lighting": {
+          "name": "Background lighting",
+          "description": "Light the room softly around video or game sync (directly paired boxes only)."
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "Name or id of a preset of the box to start (directly paired boxes only)."
         }
       }
     },
@@ -524,6 +548,58 @@
           "description": "Hand lights under manual control back to auto light first (e.g. when someone enters the room)."
         }
       }
+    },
+    "save_sync_preset": {
+      "name": "Save Sync Box preset",
+      "description": "Saves what a directly paired Sync Box does now (mode, settings, input, entertainment area, brightness) as a preset of the box.",
+      "fields": {
+        "name": {
+          "name": "Name",
+          "description": "Up to 24 bytes."
+        }
+      }
+    },
+    "delete_sync_preset": {
+      "name": "Delete Sync Box preset",
+      "description": "Deletes a preset of a directly paired Sync Box.",
+      "fields": {
+        "preset": {
+          "name": "Preset",
+          "description": "Name or id of the preset."
+        }
+      }
+    },
+    "learn_sync_ir_code": {
+      "name": "Learn a remote button",
+      "description": "A directly paired Sync Box listens for one remote button (20 seconds); its code then shows in the panel."
+    },
+    "set_sync_ir_code": {
+      "name": "Set a remote button",
+      "description": "Makes a remote button do something on a directly paired Sync Box.",
+      "fields": {
+        "code": {
+          "name": "Code",
+          "description": "The button's code (hex) the box learned."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Up to 24 bytes."
+        },
+        "action": {
+          "name": "Action",
+          "description": "toggle_sync, sync_on, sync_off, power_off, passthrough, mode_video, mode_music, mode_game, next_mode, next_input, next_intensity, brighter, darker, toggle_background, input:input1-4 or preset:<name or id>."
+        }
+      }
+    },
+    "delete_sync_ir_code": {
+      "name": "Forget a remote button",
+      "description": "Removes a remote button from a directly paired Sync Box.",
+      "fields": {
+        "code": {
+          "name": "Code",
+          "description": "The button's code (hex)."
+        }
+      }
     }
   },
   "selector": {
@@ -587,6 +663,15 @@
       "options": {
         "classic": "Classic",
         "spatial": "Spatial"
+      }
+    },
+    "music_palette": {
+      "options": {
+        "happy_energetic": "Happy, energetic",
+        "happy_calm": "Happy, calm",
+        "melancholic_calm": "Melancholic, calm",
+        "melancholic_energetic": "Melancholic, energetic",
+        "neutral": "Neutral"
       }
     }
   },
