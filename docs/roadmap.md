@@ -397,14 +397,15 @@ The features stay the same; only who draws them changes.
    - our themed element only when neither works.
    A screen that exists only in the Hue-look panel is not done.
 
-Open questions:
-- Whether the `/hue` panel stays in the sidebar in HA mode, either as the settings home
-  or redirecting to the generated dashboard.
-- How much of the light more-info's color power HA's own dialog loses (gradients,
-  effects beyond the list), and whether a themed card covers it.
-- Whether HA's frontend lets integrations add a strategy to "Add dashboard" without
-  internals. If not, only the button that creates the dashboard through the Lovelace
-  WebSocket API remains.
+Decided:
+- **The `/hue` panel stays in the sidebar in both modes.** In HA mode it is the same
+  panel; its colors, radii and fonts follow the HA theme through the token map.
+- **HA mode loses nothing.** Whatever HA's own dialogs can't do (gradients, effects beyond
+  the list, the wheel) stays reachable: in the panel, and in the themed cards.
+- **"Add dashboard" lists our strategy through a public hook.** It is registered like
+  custom cards: `window.customStrategies.push({type: "hue-studio", strategyType:
+  "dashboard", name, description})`. HA 2026.10's new dashboard dialog lists those
+  entries. No internals are involved; the settings button is just a shortcut.
 
 ### H. Later: Hue Secure
 
