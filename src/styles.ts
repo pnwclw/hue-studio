@@ -215,13 +215,19 @@ export const CSS = `
   .gm-random_pixelated { background: conic-gradient(from 45deg, #ff5f6d 0 25%, #6dd5ed 0 50%, #ffc371 0 75%, #ff5f6d 0) 0 0 / 10px 10px; }
   .gm-segmented_palette { background: linear-gradient(90deg, #ff5f6d 0 33%, #ffc371 0 66%, #6dd5ed 0); }
   .modes { display: flex; gap: 4px; padding: 4px; border-radius: 22px; background: rgba(60, 60, 64, 0.7); }
-  .modes button { width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid transparent; cursor: pointer; padding: 0;
-                  transition: border-color 0.2s, transform 0.15s var(--ease); }
+  /* A filled disc (a pseudo-element: iOS paints a button's own gradient background square); the selected one gets a ring. */
+  .modes button { position: relative; width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
+                  -webkit-appearance: none; appearance: none; background: transparent; color: inherit;
+                  transition: box-shadow 0.2s, transform 0.15s var(--ease); }
+  .modes button::before { content: ""; position: absolute; inset: 1px; border-radius: 50%; transition: inset 0.2s var(--ease); }
   .modes button:active { transform: scale(0.9); }
-  .modes button.on { border-color: #fff; }
-  .modes .m-color { background: conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
-  .modes .m-white { background: linear-gradient(#cfe3ff, #fff3d6, #ffc46b); }
-  .modes .m-effects { display: flex; align-items: center; justify-content: center; background: transparent; }
+  .modes button.on { box-shadow: inset 0 0 0 2px #fff; }
+  .modes button.on::before { inset: 4px; }
+  .modes .m-color::before { background: radial-gradient(circle, #fff 0, rgba(255, 255, 255, 0) 62%),
+                                        conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  .modes .m-white::before { background: linear-gradient(#cfe3ff, #fff3d6, #ffc46b); }
+  .modes .m-effects { display: flex; align-items: center; justify-content: center; }
+  .modes .m-effects::before { content: none; }
   .modes .sep { width: 1px; margin: 8px 2px; background: rgba(255, 255, 255, 0.2); }
   .link { width: 42px; height: 42px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
           background: rgba(60, 60, 64, 0.7); transition: background 0.2s, color 0.2s; }
@@ -240,7 +246,8 @@ export const CSS = `
   .colorview hue-studio-effects { flex: 1; }
   .effects .label:first-child { margin-top: 6px; }
   .fx-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
-            margin: 0 -16px 10px; padding: 0 16px 2px; scrollbar-width: none; scroll-snap-type: x proximity; }
+            margin: 0 -16px 10px; padding: 0 16px 2px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+            overscroll-behavior-x: contain; }
   .fx-row::-webkit-scrollbar { display: none; }
   .fx { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border: 2px solid transparent;
         border-radius: var(--radius); background: var(--surface); cursor: pointer; scroll-snap-align: start; text-align: center;

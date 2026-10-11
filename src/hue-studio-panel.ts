@@ -26,7 +26,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 
 import { PANEL_PATH, StudioContext } from "./context.ts";
-import { fitToViewport, toggleSidebar } from "./ha-internals.ts";
+import { fitToViewport, outsidePath, toggleSidebar } from "./ha-internals.ts";
 import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
@@ -50,7 +50,7 @@ import "./views/sync.ts";
 type Route =
   | { name: "home" }
   | { name: "room"; key: string }
-  | { name: "color"; key: string; light: string | null; back: string | null }
+  | { name: "color"; key: string; light: string | null; back: string | null; exit: string | null }
   | { name: "scene"; key: string; scene: string }
   | { name: "space"; key: string }
   | { name: "gallery"; room: string | null }
@@ -71,7 +71,8 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "room" && parts[1] && parts[2] === "color") {
     // Only paths inside the panel: `back` comes from the URL.
     const back = params.get("back");
-    return { name: "color", key: parts[1], light: params.get("light"), back: back?.startsWith("/room/") ? back : null };
+    // `from`: a page outside the panel (the dialog's "Hue Studio" button) that "Done" returns to.
+    return { name: "color", key: parts[1], light: params.get("light"), back: back?.startsWith("/room/") ? back : null, exit: outsidePath(params.get("from")) };
   }
   if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3]) return { name: "scene", key: parts[1], scene: parts[3] };
   if (parts[0] === "room" && parts[1] && parts[2] === "space") return { name: "space", key: parts[1] };
@@ -182,6 +183,7 @@ export class HueStudioPanel extends LitElement {
           .group=${findGroup(ctx.home, route.key)}
           .focusLight=${route.light}
           .backPath=${route.back}
+          .exitPath=${route.exit}
         ></hue-studio-color-view>`;
       case "space":
         return html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .key=${route.key}></hue-studio-space-view>`;

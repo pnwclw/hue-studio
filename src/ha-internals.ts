@@ -16,10 +16,34 @@ export function toggleSidebar(fromElement: EventTarget): void {
 }
 
 /** Navigate inside HA without a reload (what HA's own `navigate()` helper does). */
-export function navigate(path: string, { replace = false } = {}): void {
-  if (replace) history.replaceState(history.state, "", path);
-  else history.pushState(null, "", path);
+export function navigate(path: string, { replace = false, state = null as unknown } = {}): void {
+  if (replace) history.replaceState(state ?? history.state, "", path);
+  else history.pushState(state, "", path);
   window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace } }));
+}
+
+/** History state of a panel page opened from elsewhere (the dialog's "Hue Studio" button). */
+interface FromState {
+  hueStudioFrom?: string;
+}
+
+/** Open a panel page from `from` (a page outside the panel) so that its "Done" leads back there. */
+export function openPanelFrom(path: string, from: string): void {
+  const url = new URL(path, location.origin);
+  url.searchParams.set("from", from);
+  navigate(url.pathname + url.search, { state: { hueStudioFrom: from } satisfies FromState });
+}
+
+/** A `from` value from the URL, only if it is a page of this HA outside the panel. */
+export function outsidePath(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
+  return value === "/hue" || value.startsWith("/hue/") || value.startsWith("/hue?") || value.startsWith("/hue#") ? null : value;
+}
+
+/** Leave the panel for the page it was opened from: back in history if we came straight from it. */
+export function leavePanel(path: string): void {
+  if ((history.state as FromState | null)?.hueStudioFrom === path) history.back();
+  else navigate(path, { replace: true });
 }
 
 /** The root <home-assistant> element; it holds the current `hass`. */

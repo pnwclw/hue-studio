@@ -29,6 +29,7 @@ import {
 } from "../color.ts";
 import { commandInterval, groupSlider } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
+import { leavePanel } from "../ha-internals.ts";
 import { friendlyName, type Group, groupState, lightColors, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import type { StringKey } from "../i18n.ts";
@@ -77,8 +78,12 @@ export class ColorView extends StudioView {
   @property() accessor focusLight: string | null = null;
   /** Where "Done" goes (default: the room). */
   @property() accessor backPath: string | null = null;
-  /** Inside the more-info dialog: no top bar. */
+  /** Where "Done" leaves the panel for (a page outside it, e.g. the dashboard the dialog was on). */
+  @property() accessor exitPath: string | null = null;
+  /** Inside the more-info dialog: no top bar, the body scrolls above a fixed dock. */
   @property({ type: Boolean }) accessor embedded = false;
+  /** Inside the dialog: buttons shown in the dock in place of the brightness slider (the dialog head has one). */
+  @property({ attribute: false }) accessor actions: unknown = null;
 
   @state() private accessor mode: Mode | null = null;
   @state() private accessor merged = false;
@@ -194,11 +199,12 @@ export class ColorView extends StudioView {
     const mode = this.currentMode;
     const several = group.lights.length > 1;
     const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const back = () => ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`);
+    const back = () => (this.exitPath ? leavePanel(this.exitPath) : ctx.go(this.backPath ?? `/room/${encodeURIComponent(group.key)}`));
     const effects = availableEffects(group.lights, ctx.lightInfo).length > 0;
 
+    const main = mode === "effects" ? this.effectsBody(group) : this.wheel(mode);
     const content = html`
-      ${mode === "effects" ? this.effectsBody(group) : this.wheel(mode)}
+      ${this.embedded ? html`<div class="cv-scroll">${main}</div>` : main}
       <div class="dock">
         ${mode === "color" ? this.gradientModes() : nothing}
         <div class="controls">
@@ -217,14 +223,16 @@ export class ColorView extends StudioView {
                 @click=${() => (this.merged = !this.merged)}
               >${LINK_ICON}</button>`
             : nothing}
-          <div
+          ${this.embedded
+            ? html`<div class="cv-actions">${this.actions}</div>`
+            : html`<div
             class=${classMap({ bright: true, off: !state.on })}
             @value-input=${(e: CustomEvent<number>) => (this.dragBrightness = e.detail)}
             @value-change=${() => (this.dragBrightness = null)}
           >
             <div class="value">${this.dragBrightness !== null ? `${this.dragBrightness}%` : state.on ? `${state.brightness}%` : ""}</div>
             ${groupSlider(ctx, group, state, t("common.brightness"))}
-          </div>
+          </div>`}
         </div>
         ${several
           ? html`<div class="chips">${group.lights.map((id) => {
