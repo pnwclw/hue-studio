@@ -157,9 +157,9 @@ wants to treat as an area's command target, or a setup where alignment is off.
    screen and the rooms screen.
 4. ~~Option~~ — "Rooms follow areas" (`auto_align`) in the options: HA area changes only;
    empty rooms are never deleted automatically.
-5. On a real bridge: dry run first, apply only after review. Still to verify there: that
-   the bridge accepts room PUTs in this order, drops moved lights from the old room's
-   scenes by itself, and accepts scene actions for lights right after they joined.
+5. ~~On a real bridge~~ — done (2026-10-11): dry run, review, apply. The bridge accepted
+   the room PUTs in this order (devices leave, rooms are created with them) in one go;
+   a second dry run showed nothing left to change.
 6. ~~Split rooms~~ — `align_rooms` `keep_split_scenes`: scenes of a split room are copied
-   into a new zone over its original lights first (above). Still to verify on a real
-   bridge: that a scene POST into a zone created a moment earlier is accepted.
+   into a new zone over its original lights first (above). Verified on a real bridge
+   with the same apply: scene POSTs into the zone created a moment earlier went through.

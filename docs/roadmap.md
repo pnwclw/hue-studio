@@ -138,7 +138,9 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
    editor), mismatch notes in rooms, "No room" section. Still to do: screenshots on a
    live HA.
 4. ~~Optional automatic alignment~~ — done: "Rooms follow areas" option.
-5. On the live bridge: dry run, review, then apply (see `rooms-and-scenes.md`, Work 5).
+5. ~~On the live bridge~~ — done (2026-10-11): dry run, review, applied with
+   `keep_split_scenes`: two rooms created, two lights moved, the split room's seven scenes
+   copied into a zone over its old lights; a second dry run shows nothing left to do.
 6. ~~Keeping a split room's scenes~~ — done: `align_rooms` `keep_split_scenes` (and a
    toggle on the rooms screen) copies the scenes that would lose lights into a new zone
    over the room's original lights before the room is split.
@@ -212,7 +214,7 @@ directly. Per HA area with auto light settings:
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R
-and D2 (except R5, the live alignment, waiting for R6).
+and D2; only E is left.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
