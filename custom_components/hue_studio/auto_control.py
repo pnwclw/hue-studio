@@ -23,6 +23,7 @@ import logging
 import time
 from typing import Any
 
+from astral import sun as astral_sun
 from homeassistant.components import websocket_api
 from homeassistant.const import (
     EVENT_HOMEASSISTANT_STOP,
@@ -49,7 +50,7 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.sun import get_astral_event_date, get_astral_location
+from homeassistant.helpers.sun import get_astral_event_date, get_astral_observer
 from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
@@ -216,8 +217,7 @@ class AutoLightManager:
         """What the selection of an area depends on, right now."""
         now = dt_util.as_local(now or dt_util.now())
         settings = self._settings(area_id)
-        location, elevation = get_astral_location(self.hass)
-        sun_elevation = location.solar_elevation(now, elevation)
+        sun_elevation = astral_sun.elevation(get_astral_observer(self.hass), now)
         day = now.date()
         sunrise = get_astral_event_date(self.hass, "sunrise", day)
         sunset = get_astral_event_date(self.hass, "sunset", day)
@@ -607,7 +607,19 @@ async def ws_auto_light_remove(
     """Take auto light away from an area: its settings, entities and device."""
     area_id = msg["area_id"]
     await auto_light_store(hass).async_remove(area_id)
+    entities = er.async_get(hass)
+    device_ids = {
+        entry.device_id
+        for key, platform in ENTITY_KEYS.items()
+        if (
+            entity_id := entities.async_get_entity_id(
+                platform, DOMAIN, f"auto_light_{area_id}_{key}"
+            )
+        )
+        and (entry := entities.async_get(entity_id))
+        and entry.device_id
+    }
     devices = dr.async_get(hass)
-    if device := devices.async_get_device({(DOMAIN, f"auto_light_{area_id}")}):
-        devices.async_remove_device(device.id)
+    for device_id in device_ids:
+        devices.async_remove_device(device_id)
     connection.send_result(msg["id"])

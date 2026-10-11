@@ -80,7 +80,11 @@ class AutoLightEntity(Entity):
             async_dispatcher_connect(self.hass, SIGNAL_AREAS, self.async_write_ha_state)
         )
         devices = dr.async_get(self.hass)
-        device = devices.async_get_device({(DOMAIN, f"auto_light_{self.area_id}")})
+        device = (
+            devices.async_get(self.registry_entry.device_id)
+            if self.registry_entry and self.registry_entry.device_id
+            else None
+        )
         if device is not None and device.area_id is None:
             devices.async_update_device(device.id, area_id=self.area_id)
 
