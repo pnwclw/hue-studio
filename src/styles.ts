@@ -19,7 +19,7 @@ export const CSS = `
   }
   button { font: inherit; color: inherit; }
   hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-space-view, hue-studio-effects,
-  hue-studio-slider { display: block; }
+  hue-studio-experimental-view, hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
 
@@ -106,6 +106,17 @@ export const CSS = `
                     transition: color 0.2s; }
   nav.tabs button svg { width: 24px; height: 24px; }
   nav.tabs button.on { color: var(--text); }
+  /* tabs on top while the experimental footer sits at the bottom */
+  nav.tabs.top { order: -1; gap: 4px;
+                 padding: max(8px, var(--safe-top)) 12px 8px; border-top: none; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  nav.tabs.top button { flex: 1 1 0; min-width: 0; flex-direction: row; justify-content: center; gap: 5px; padding: 7px 8px;
+                        border-radius: 16px; font-size: 12px; letter-spacing: 0; text-transform: none;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  nav.tabs.top button svg { flex: none; }
+  nav.tabs.top button svg { width: 18px; height: 18px; }
+  nav.tabs.top button.on { background: var(--surface); }
+  main.under-footer { padding-bottom: var(--safe-bottom); }
+  main.under-footer .topbar { padding-top: 6px; }
 
   /* room */
   .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 22px 22px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }

@@ -46,8 +46,20 @@ export interface HassData {
   locale?: { language: string };
 }
 
+/** A sidebar panel (`hass.panels`). */
+export interface HassPanel {
+  url_path: string;
+  /** A dashboard's title, or a translation key for built-in panels ("map", "history"). */
+  title: string | null;
+  icon: string | null;
+  component_name?: string;
+}
+
 export interface Hass extends HassData {
   connection?: HassConnection;
+  panels?: Record<string, HassPanel>;
+  /** HA's own translations ("panel.map", …). */
+  localize?: (key: string) => string;
   callService(domain: string, service: string, data?: ServiceData): Promise<unknown>;
   /** One WebSocket command (HA's frontend API). */
   callWS?<T>(msg: { type: string } & Record<string, unknown>): Promise<T>;
@@ -120,6 +132,9 @@ export interface StudioConfig {
   rooms: Record<string, Partial<RoomSensors>>;
   /** Hue rooms follow area changes automatically (an option of the integration). */
   auto_align?: boolean;
+  /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */
+  footer?: boolean;
+  footer_tabs?: string[];
 }
 
 /** The Hue room of an area after alignment (hue_studio/rooms/subscribe). */

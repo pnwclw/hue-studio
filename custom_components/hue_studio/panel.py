@@ -18,7 +18,9 @@ PANEL_COMPONENT = "hue-studio-panel"
 PANEL_ICON = "mdi:lightbulb-group"
 PANEL_TITLE = "Hue"
 
-MORE_INFO_MODULE = "hue-studio-more-info.js"
+# Loaded on every HA page: the more-info override, dashboard cards, the experimental
+# footer (each part on its own, see src/hue-studio-extra.ts).
+EXTRA_MODULE = "hue-studio-extra.js"
 
 _STATIC_REGISTERED = f"{DOMAIN}_static_registered"
 _EXTRA_JS = f"{DOMAIN}_extra_js"
@@ -38,7 +40,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     integration = await async_get_integration(hass, DOMAIN)
     # Loaded on every HA page: opens our dialog instead of more-info for Hue lights.
     # If it fails to load or throws, HA's own more-info dialog opens as usual.
-    hass.data[_EXTRA_JS] = f"{STATIC_URL}/{MORE_INFO_MODULE}?v={integration.version}"
+    hass.data[_EXTRA_JS] = f"{STATIC_URL}/{EXTRA_MODULE}?v={integration.version}"
     frontend.add_extra_js_url(hass, hass.data[_EXTRA_JS])
     await panel_custom.async_register_panel(
         hass,

@@ -11,14 +11,17 @@ from aiohue.v2.models.scene import Scene
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
 from .const import (
     CONF_AUTO_ALIGN,
+    CONF_FOOTER,
+    CONF_FOOTER_TABS,
     CONF_HUE_ENTRY_ID,
     DOMAIN,
+    FOOTER_MAX_TABS,
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
@@ -296,6 +299,10 @@ def ws_set_light_area(
     {
         vol.Required("type"): "hue_studio/config/set",
         vol.Optional(CONF_AUTO_ALIGN): bool,
+        vol.Optional(CONF_FOOTER): bool,
+        vol.Optional(CONF_FOOTER_TABS): vol.All(
+            [cv.string], vol.Length(max=FOOTER_MAX_TABS)
+        ),
     }
 )
 @callback
@@ -309,7 +316,11 @@ def ws_set_config(
     The same options as the options flow; open panels get them through
     hue_studio/config/subscribe.
     """
-    changes = {k: v for k, v in msg.items() if k == CONF_AUTO_ALIGN}
+    changes = {
+        k: v
+        for k, v in msg.items()
+        if k in (CONF_AUTO_ALIGN, CONF_FOOTER, CONF_FOOTER_TABS)
+    }
     for entry in hass.config_entries.async_entries(DOMAIN):
         if CONF_HUE_ENTRY_ID in entry.data:
             hass.config_entries.async_update_entry(

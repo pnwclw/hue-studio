@@ -1,5 +1,5 @@
 // Settings (a tab of the panel): rooms and zones, how the Hue rooms follow the HA areas,
-// auto light per area, and the integration's own options page for the rest.
+// auto light per area, experimental features and the integration's own options page.
 
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -56,6 +56,14 @@ export class SettingsView extends StudioView {
       ${autoLightRows(ctx, () => (this.adding = true))}
       <h2 class="label">${t("settings.more")}</h2>
       <div class="rows">
+        <button class="item" @click=${() => ctx.go("/settings/experimental")}>
+          <ha-icon icon="mdi:flask-outline"></ha-icon>
+          <div class="grow">
+            ${t("exp.title")}
+            <div class="dim small">${t(ctx.config.footer ? "exp.on" : "exp.sub")}</div>
+          </div>
+          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+        </button>
         <button class="item" @click=${() => ctx.openSettings()}>
           <ha-icon icon="mdi:cog-outline"></ha-icon>
           <div class="grow">

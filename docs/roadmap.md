@@ -207,8 +207,12 @@ directly. Per HA area with auto light settings:
 
 - Sync Box, direct pairing only: presets, IR codes, music palettes, background
   lighting (aiohuesyncbox already has them).
-- Dashboard cards replacing the legacy gallery and auto-light cards.
-- "Liquid Glass" footer with `/hue` as a tab.
+- ~~Dashboard cards~~ — done: room, auto light and gallery cards (`cards.ts`, one shared
+  context, theme colors, card picker + visual editor), verified on a live HA.
+- ~~"Liquid Glass" footer~~ — done as an experimental setting: phones only, chosen
+  panels as tabs plus More (the side menu), room reserved through
+  `--safe-area-inset-bottom`, hidden on `/config`; the `/hue` panel moves its own tabs
+  to the top while it is on.
 - Submission to the HACS default repository list.
 
 ## Order

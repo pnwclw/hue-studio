@@ -29,10 +29,10 @@ const common = {
 };
 
 const contexts = [
-  // Both entries share one chunk, so custom elements are defined exactly once.
+  // The entries share chunks, so custom elements are defined exactly once.
   await esbuild.context({
     ...common,
-    entryPoints: [`${root}src/hue-studio-panel.ts`, `${root}src/hue-studio-more-info.ts`],
+    entryPoints: [`${root}src/hue-studio-panel.ts`, `${root}src/hue-studio-more-info.ts`, `${root}src/hue-studio-extra.ts`],
     outdir,
     splitting: true,
     chunkNames: "chunk-[hash]",

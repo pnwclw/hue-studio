@@ -11,6 +11,7 @@
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/auto/<area>      auto light of an area
+//   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
@@ -26,6 +27,7 @@ import type { Hass } from "./types.ts";
 import { icon, type IconName } from "./ui.ts";
 import "./views/auto-light.ts";
 import "./views/color.ts";
+import "./views/experimental.ts";
 import "./views/gallery.ts";
 import "./views/home.ts";
 import "./views/room.ts";
@@ -45,6 +47,7 @@ type Route =
   | { name: "sync"; box: string | null }
   | { name: "rooms" }
   | { name: "settings" }
+  | { name: "experimental" }
   | { name: "auto"; area: string };
 
 function parseRoute(path: string, search: string): Route {
@@ -62,6 +65,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
   if (parts[0] === "settings" && parts[1] === "auto" && parts[2]) return { name: "auto", area: parts[2] };
+  if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
 }
@@ -113,7 +117,7 @@ export class HueStudioPanel extends LitElement {
         ? "gallery"
         : route.name === "sync"
           ? "sync"
-          : route.name === "settings" || route.name === "rooms" || route.name === "auto"
+          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental"
             ? "settings"
             : "home";
     const tabs: [string, string, IconName, string][] = [
@@ -123,9 +127,11 @@ export class HueStudioPanel extends LitElement {
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
     const full = route.name === "color" || route.name === "scene";
+    // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
+    const top = !!ctx.config.footer && ctx.narrow;
     return html`
-      <main class=${route.name === "color" ? "colorview" : ""}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
-      <nav class="tabs" ?hidden=${full}>
+      <main class=${classMap({ colorview: route.name === "color", "under-footer": top })}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
+      <nav class=${classMap({ tabs: true, top })} ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) => html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(to)}>${icon(name)}${label}</button>`,
         )}
@@ -158,6 +164,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-auto-light-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-auto-light-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
+      case "experimental":
+        return html`<hue-studio-experimental-view .ctx=${ctx} .rev=${rev}></hue-studio-experimental-view>`;
       case "rooms":
         return html`<hue-studio-rooms-view .ctx=${ctx} .rev=${rev}></hue-studio-rooms-view>`;
       case "gallery":

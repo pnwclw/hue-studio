@@ -26,6 +26,10 @@ GROUP_AUTO: Final = "auto"
 GROUP_ZONE: Final = "zone"
 # Options: align the bridge's rooms with the HA areas whenever areas change.
 CONF_AUTO_ALIGN: Final = "auto_align"
+# Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths).
+CONF_FOOTER: Final = "footer"
+CONF_FOOTER_TABS: Final = "footer_tabs"
+FOOTER_MAX_TABS: Final = 5
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
 

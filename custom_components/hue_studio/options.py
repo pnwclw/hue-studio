@@ -19,6 +19,8 @@ from homeassistant.helpers import (
 
 from .const import (
     CONF_AUTO_ALIGN,
+    CONF_FOOTER,
+    CONF_FOOTER_TABS,
     CONF_GROUPS,
     CONF_ILLUMINANCE,
     CONF_MOTION,
@@ -175,4 +177,14 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
             entry.options.get(CONF_AUTO_ALIGN, False)
             for entry in hass.config_entries.async_entries(DOMAIN)
         ),
+        # Panel settings (same on every bridge entry): the first entry that has them.
+        CONF_FOOTER: _panel_option(hass, CONF_FOOTER, False),
+        CONF_FOOTER_TABS: _panel_option(hass, CONF_FOOTER_TABS, []),
     }
+
+
+def _panel_option(hass: HomeAssistant, key: str, default: Any) -> Any:
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if key in entry.options:
+            return entry.options[key]
+    return default
