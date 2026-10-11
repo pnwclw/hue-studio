@@ -1,5 +1,6 @@
-// Auto light of one area (Settings → Auto light → area): who controls the lights, today's
-// scene, phase boundaries, inputs (weather, light sensor, season), brightness, scene pools,
+// Auto light of one area (Settings → Auto light → area): who controls the lights, the style
+// (gallery scenes, or natural light: a white per phase), today's scene, phase boundaries,
+// inputs (weather, light sensor, season), brightness, scene pools or color temperatures,
 // excluded scenes and holidays. Everything is saved at once through the WebSocket API and
 // services; the backend pushes the result back (hue_studio/auto_light/subscribe).
 
@@ -14,6 +15,8 @@ import {
   DEFAULT_SHIFTS,
   GRADIENT_MODES,
   isMonthDay,
+  KELVIN_RANGE,
+  NATURAL_KELVIN,
   monthDay,
   PHASES,
   phaseCounts,
@@ -23,6 +26,7 @@ import {
   SHIFTS,
   stepsOf,
 } from "../auto-light.ts";
+import { paletteArt } from "../color.ts";
 import type { StudioContext } from "../context.ts";
 import { thumbUrl } from "../gallery-data.ts";
 import type { StringKey } from "../i18n.ts";
@@ -80,9 +84,14 @@ export function autoLightRows(ctx: StudioContext, onAdd: () => void): TemplateRe
   return html`<div class="rows">
     ${areas.map((area) => {
       const s = msg?.state[area];
-      const sub = [s ? t(`auto.control_${s.control}` as StringKey) : "", s?.scene_name || ""].filter(Boolean).join(" · ");
+      const what = s?.kelvin ? `${t("auto.style_natural")} · ${s.kelvin} K` : s?.scene_name || "";
+      const sub = [s ? t(`auto.control_${s.control}` as StringKey) : "", what].filter(Boolean).join(" · ");
       return html`<button class="item" @click=${() => ctx.go(`/settings/auto/${encodeURIComponent(area)}`)}>
-        ${s?.scene ? html`<img class="thumb" src=${thumbUrl(s.scene)} alt="" />` : html`<ha-icon icon=${CONTROL_ICONS[s?.control || "auto"]}></ha-icon>`}
+        ${s?.kelvin
+          ? html`<span class="thumb" style="background:${whiteArt(s.kelvin)}"></span>`
+          : s?.scene
+            ? html`<img class="thumb" src=${thumbUrl(s.scene)} alt="" />`
+            : html`<ha-icon icon=${CONTROL_ICONS[s?.control || "auto"]}></ha-icon>`}
         <div class="grow">${areaName(ctx, area)}<div class="dim small">${sub}</div></div>
         <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
       </button>`;
@@ -145,22 +154,23 @@ export class AutoLightView extends StudioView {
     if (!ctx.autoLight) return html`<div class="page">${back}<p class="empty">${t("rooms.loading")}</p></div>`;
     const config = this.config;
     if (!config) return html`<div class="page">${back}<p class="empty">${t("auto.not_found")}</p></div>`;
+    const natural = config.settings.style === "natural";
     return html`<div class="page auto-page">
         ${back}
         <h1 class="big">${areaName(ctx, this.area)}</h1>
-        <p class="lead">${t("auto.intro")}</p>
-        ${this.control()} ${this.today(config)}
-        <h2 class="label">${t("auto.pools")}</h2>
-        ${this.pools(config)}
+        <p class="lead">${t(natural ? "auto.intro_natural" : "auto.intro")}</p>
+        ${this.control()} ${this.styleChoice(natural)} ${this.today(config)}
+        ${natural
+          ? html`<h2 class="label">${t("auto.kelvin")}</h2>${this.kelvin(config.settings)}`
+          : html`<h2 class="label">${t("auto.pools")}</h2>${this.pools(config)}`}
         <h2 class="label">${t("auto.phases")}</h2>
         ${this.phases(config.settings)}
         <h2 class="label">${t("auto.brightness")}</h2>
         ${this.brightness(config)}
         <h2 class="label">${t("auto.inputs")}</h2>
-        ${this.inputs(config.settings)}
-        <h2 class="label">${t("auto.holidays")}</h2>
-        ${this.holidays(config)}
-        ${config.excluded.length ? html`<h2 class="label">${t("auto.excluded")}</h2>${this.excluded(config)}` : nothing}
+        ${this.inputs(config.settings, natural)}
+        ${natural ? nothing : html`<h2 class="label">${t("auto.holidays")}</h2>${this.holidays(config)}`}
+        ${config.excluded.length && !natural ? html`<h2 class="label">${t("auto.excluded")}</h2>${this.excluded(config)}` : nothing}
         <div class="center stack">
           <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmRemove })} @click=${() => this.removeArea()}>
             ${this.confirmRemove ? t("auto.remove_confirm") : t("auto.remove")}
@@ -216,10 +226,42 @@ export class AutoLightView extends StudioView {
       <p class="lead small">${t(`auto.control_${current}_hint` as StringKey)}</p>`;
   }
 
+  /** Scenes of the gallery, or natural light. */
+  private styleChoice(natural: boolean) {
+    const { t } = this.ctx;
+    const choose = (value: "scenes" | "natural") => {
+      if ((value === "natural") !== natural) this.settings({ style: value === "natural" ? "natural" : undefined });
+    };
+    return html`<h2 class="label">${t("auto.style")}</h2>
+      <div class="seg two" role="radiogroup" aria-label=${t("auto.style")}>
+        ${(["scenes", "natural"] as const).map(
+          (s) => html`<button role="radio" aria-checked=${(s === "natural") === natural} class=${classMap({ on: (s === "natural") === natural })} @click=${() => choose(s)}>
+            ${t(`auto.style_${s}` as StringKey)}
+          </button>`,
+        )}
+      </div>
+      <p class="lead small">${t(natural ? "auto.style_natural_hint" : "auto.style_scenes_hint")}</p>`;
+  }
+
   private today(config: AutoLightConfig) {
     const { ctx } = this;
     const { t } = ctx;
     const now = this.now;
+    if (now?.kelvin) {
+      return html`<div class="today">
+        <span class="pic" style="background:${whiteArt(now.kelvin)}"></span>
+        <div class="text">
+          <div class="dim small">${t("auto.now")}</div>
+          <div class="name">${t("auto.style_natural")} · ${now.kelvin} K</div>
+          <div class="dim small">${stateLine(ctx, now)}</div>
+        </div>
+        <div class="today-actions">
+          <button class="pill" ?disabled=${now.control === "off"} @click=${() => this.service("apply_auto_light", { resume: true, transition: 2 })}>
+            ${t("auto.show_now")}
+          </button>
+        </div>
+      </div>`;
+    }
     if (!now?.scene) {
       return html`<div class="today empty-today"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon><span>${t("auto.no_scene")}</span></div>`;
     }
@@ -333,6 +375,27 @@ export class AutoLightView extends StudioView {
       </div>`;
   }
 
+  /** Natural light: the white of each phase. */
+  private kelvin(settings: AutoLightSettings) {
+    const { t } = this.ctx;
+    const values = { ...NATURAL_KELVIN, ...settings.kelvin };
+    const set = (phase: Phase, value: number) => {
+      const next = { ...settings.kelvin, [phase]: value } as Record<string, number>;
+      if (value === NATURAL_KELVIN[phase]) delete next[phase];
+      this.settings({ kelvin: next });
+    };
+    return html`<p class="lead">${t("auto.kelvin_hint")}</p>
+      <div class="rows">
+        ${PHASES.map(
+          (phase) => html`<div class="item">
+            <span class="swatch-dot" style="background:${whiteArt(values[phase])}"></span>
+            <div class="grow">${t(`auto.phase_${phase}` as StringKey)}</div>
+            ${this.stepper(values[phase], KELVIN_RANGE[0], KELVIN_RANGE[1], 100, "K", (v) => set(phase, v))}
+          </div>`,
+        )}
+      </div>`;
+  }
+
   private brightness(config: AutoLightConfig) {
     const { t } = this.ctx;
     const fixed = config.settings.brightness || {};
@@ -360,7 +423,7 @@ export class AutoLightView extends StudioView {
       </div>`;
   }
 
-  private inputs(settings: AutoLightSettings) {
+  private inputs(settings: AutoLightSettings, natural: boolean) {
     const { ctx } = this;
     const { t } = ctx;
     const states = ctx.hass.states;
@@ -384,8 +447,10 @@ export class AutoLightView extends StudioView {
         <div class="grow">${t("auto.input_light_sensor")}<div class="dim small">${t("auto.input_light_sensor_sub")}</div></div>${picker("light_sensor", lux, "auto.none")}</div>
       <div class="item wrap"><ha-icon icon="mdi:leaf"></ha-icon>
         <div class="grow">${t("auto.input_season")}<div class="dim small">${t("auto.input_season_sub")}</div></div>${picker("season", seasons, "auto.season_by_month")}</div>
-      <div class="item wrap"><ha-icon icon="mdi:gradient-horizontal"></ha-icon>
-        <div class="grow">${t("auto.gradient_mode")}<div class="dim small">${t("auto.gradient_mode_sub")}</div></div>${modes}</div>
+      ${natural
+        ? nothing
+        : html`<div class="item wrap"><ha-icon icon="mdi:gradient-horizontal"></ha-icon>
+            <div class="grow">${t("auto.gradient_mode")}<div class="dim small">${t("auto.gradient_mode_sub")}</div></div>${modes}</div>`}
     </div>`;
   }
 
@@ -503,6 +568,9 @@ export class AutoLightView extends StudioView {
     </div>`;
   }
 }
+
+/** A round swatch of a white (K). */
+export const whiteArt = (kelvin: number): string => paletteArt({ kind: "white", mirek: Math.round(1e6 / kelvin) });
 
 const PHASE_ICONS: Record<Phase, string> = {
   morning: "mdi:weather-sunset-up",

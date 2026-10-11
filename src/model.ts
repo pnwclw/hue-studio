@@ -43,7 +43,11 @@ export interface GroupState {
   brightness: number;
   colors: string[];
   temperature: number | null;
+  /** Mean of the light sensors (lx), or null. */
+  illuminance: number | null;
   motion: boolean;
+  /** When a motion sensor last changed while none reports motion now (ISO), or null. */
+  lastMotion: string | null;
 }
 
 export interface AdaptiveSwitch {
@@ -86,14 +90,18 @@ export function scenesOf(hass: HassData, groupId: string): Scene[] {
 const hasDeviceClass = (hass: HassData, id: string, classes: string[]): boolean => classes.includes(hass.states[id]?.attributes.device_class);
 const MOTION_CLASSES = ["motion", "occupancy", "presence"];
 
-/** Default sensors of an area: Hue motion sensors in it; the area's temperature sensor or Hue thermometers. */
+/**
+ * Default sensors of an area: Hue motion and light sensors in it; the area's temperature
+ * sensor or Hue thermometers.
+ */
 function defaultSensors(hass: HassData, areaId: string | null): RoomSensors {
-  if (!areaId) return { motion: [], temperature: [] };
+  if (!areaId) return { motion: [], temperature: [], illuminance: [] };
   const inArea = Object.keys(hass.states).filter((id) => areaOf(hass, id) === areaId && hass.entities?.[id]?.platform === "hue");
   const areaTemp = hass.areas?.[areaId]?.temperature_entity_id;
   return {
     motion: inArea.filter((id) => id.startsWith("binary_sensor.") && hasDeviceClass(hass, id, MOTION_CLASSES)),
     temperature: areaTemp ? [areaTemp] : inArea.filter((id) => id.startsWith("sensor.") && hasDeviceClass(hass, id, ["temperature"])),
+    illuminance: inArea.filter((id) => id.startsWith("sensor.") && hasDeviceClass(hass, id, ["illuminance"])),
   };
 }
 
@@ -188,7 +196,7 @@ const numeric = (hass: HassData, id: string): number | null => {
 
 /**
  * Aggregate state of a group: on, brightness 0-100 (mean of lit lights), colors,
- * temperature (mean of its temperature sensors, or null) and motion (any sensor on).
+ * temperature and illuminance (means of its sensors, or null) and motion (any sensor on).
  */
 export function groupState(hass: HassData, group: Group, lightInfo: Record<string, LightInfo> = {}): GroupState {
   const states = group.lights.map((id) => hass.states[id]).filter(Boolean);
@@ -196,14 +204,22 @@ export function groupState(hass: HassData, group: Group, lightInfo: Record<strin
   const brightness = lit.length
     ? Math.round(lit.reduce((sum, s) => sum + (s.attributes.brightness ?? 255), 0) / lit.length / 2.55)
     : 0;
-  const temps = (group.sensors?.temperature || []).map((id) => numeric(hass, id)).filter((v) => v !== null);
+  const mean = (ids: string[] = []): number | null => {
+    const values = ids.map((id) => numeric(hass, id)).filter((v) => v !== null);
+    return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  };
+  const motionStates = (group.sensors?.motion || []).map((id) => hass.states[id]).filter(Boolean);
+  const motion = motionStates.some((s) => s.state === "on");
+  const changed = motionStates.filter((s) => s.state === "off" && s.last_changed).map((s) => s.last_changed as string);
   return {
     on: lit.length > 0,
     available: states.some((s) => s.state !== "unavailable"),
     brightness,
     colors: group.lights.flatMap((id) => lightColors(hass, id, lightInfo[id])),
-    temperature: temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null,
-    motion: (group.sensors?.motion || []).some((id) => hass.states[id]?.state === "on"),
+    temperature: mean(group.sensors?.temperature),
+    illuminance: mean(group.sensors?.illuminance),
+    motion,
+    lastMotion: !motion && changed.length ? changed.sort().at(-1)! : null,
   };
 }
 

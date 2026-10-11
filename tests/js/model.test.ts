@@ -100,14 +100,25 @@ test("room sensors: defaults from the area, overridable by options", () => {
   h.states["sensor.t1"] = { state: "21.0", attributes: {} };
   h.states["sensor.t2"] = { state: "23.0", attributes: {} };
 
+  h.entities["sensor.office_lux"] = { platform: "hue", device_id: "d_desk" };
+  h.states["sensor.office_lux"] = { state: "40", attributes: { device_class: "illuminance" } };
+
   let office = buildHome(h).rooms[0];
-  assert.deepEqual(office.sensors, { motion: ["binary_sensor.office_motion"], temperature: ["sensor.t1"] });
+  assert.deepEqual(office.sensors, { motion: ["binary_sensor.office_motion"], temperature: ["sensor.t1"], illuminance: ["sensor.office_lux"] });
+  assert.equal(groupState(h, office).illuminance, 40);
+  assert.equal(groupState(h, office).lastMotion, null);
   assert.equal(groupState(h, office).motion, true);
   assert.equal(groupState(h, office).temperature, 21);
 
   office = buildHome(h, { rooms: { "area.office": { motion: [], temperature: ["sensor.t1", "sensor.t2"] } } }).rooms[0];
   assert.equal(groupState(h, office).temperature, 22);
   assert.equal(groupState(h, office).motion, false);
+
+  // The latest change of a quiet motion sensor is when motion was last seen.
+  h.states["binary_sensor.hall_motion"] = { state: "off", last_changed: "2026-01-01T10:00:00Z", attributes: {} };
+  h.states["binary_sensor.office_motion"] = { state: "off", last_changed: "2026-01-01T11:00:00Z", attributes: {} };
+  office = buildHome(h, { rooms: { "area.office": { motion: ["binary_sensor.hall_motion", "binary_sensor.office_motion"] } } }).rooms[0];
+  assert.equal(groupState(h, office).lastMotion, "2026-01-01T11:00:00Z");
 });
 
 test("adaptive lighting switches covering a room", () => {

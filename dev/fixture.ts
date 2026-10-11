@@ -210,7 +210,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       gamut: GAMUT_C,
       gamut_type: "C",
       mirek: [153, 454],
-      gradient: points ? { points_capable: 5, points, mode: "interpolated_palette", modes: ["interpolated_palette", "random_pixelated"] } : null,
+      gradient: points ? { points_capable: 5, points, mode: "interpolated_palette", modes: ["interpolated_palette", "interpolated_palette_mirrored", "random_pixelated", "segmented_palette"] } : null,
       effects: EFFECTS,
       effect: null,
       archetype: ARCHETYPES[id],
@@ -343,6 +343,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     pool = pool.filter((s) => !config.excluded.includes(s));
     const scene = pool.length ? pool[(new Date().getDate() + (skips[area] || 0)) % pool.length] : null;
     const control = config.control === "off" ? "off" : manualAreas.has(area) ? "manual" : "auto";
+    if (config.settings.style === "natural") {
+      const kelvin = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000, ...config.settings.kelvin }[phase];
+      const level = config.settings.brightness?.[phase] ?? 70;
+      return { control, phase, pool_phase: phase, season: "autumn", mood: "gloomy", holiday: false, scene: null, scene_name: null, brightness: level, step: null, pool: [], kelvin };
+    }
     const fixed = config.settings.brightness?.[poolPhase];
     return {
       control, phase, pool_phase: poolPhase, season: "autumn", mood: "gloomy", holiday: false, scene,
@@ -547,7 +552,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (domain === "hue_studio" && service === "apply_auto_light") {
         if ((auto as { resume?: boolean }).resume) manualAreas.delete(auto.area!);
         const s = autoState(auto.area!);
-        if (s.control === "auto" && s.scene) {
+        if (s.control === "auto" && s.kelvin) {
+          applyPalette(["light.desk_lamp"], { kind: "white", mirek: Math.round(1e6 / s.kelvin), brightness: s.brightness });
+        } else if (s.control === "auto" && s.scene) {
           const scene = gallery?.scenes.find((g) => g.id === s.scene);
           if (scene) applyPalette(["light.desk_lamp"], { ...scene, brightness: s.brightness });
         }
@@ -612,7 +619,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (domain === "hue_studio" && service === "set_gradient") {
         for (const id of ids) {
           const gradient = lightInfo[id].gradient;
-          if (gradient) lightInfo[id] = { ...lightInfo[id], gradient: { ...gradient, points: d.points } };
+          if (gradient) lightInfo[id] = { ...lightInfo[id], gradient: { ...gradient, points: d.points, ...(d.mode ? { mode: String(d.mode) } : {}) } };
           update(id, { on: true, xy: d.points[0], mirek: null });
         }
         push(Object.fromEntries(ids.map((id) => [id, lightInfo[id]])));

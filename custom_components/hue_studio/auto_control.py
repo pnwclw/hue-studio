@@ -87,7 +87,8 @@ ENTITY_KEYS = {
     "next_light_scene": "button",
 }
 REFRESH_INTERVAL = timedelta(minutes=1)
-# Changes within this long after auto light's own command are its own.
+# Changes within this long after auto light's own command, plus its transition (the
+# bridge reports the brightness on the way every ~10 s), are its own.
 QUIET_SECONDS = 15
 # Attributes compared to tell a real change from the bridge settling.
 COMPARED = ("brightness", "xy_color", "color_mode", "color_temp_kelvin")
@@ -99,8 +100,8 @@ class AreaState:
 
     selection: auto_select.Selection | None = None
     manual: bool = False
-    # time.monotonic() of auto light's last command.
-    applied_at: float = -1e9
+    # time.monotonic() until which light changes are auto light's own command settling.
+    quiet_until: float = -1e9
 
 
 class AutoLightManager:
@@ -197,6 +198,7 @@ class AutoLightManager:
                 "brightness": selection.brightness,
                 "step": selection.step,
                 "pool": list(selection.pool),
+                "kelvin": selection.kelvin,
             }
         return info
 
@@ -300,7 +302,7 @@ class AutoLightManager:
         state = self.areas.get(area_id or "")
         if state is None or state.manual or self.control(area_id) != CONTROL_AUTO:
             return
-        if time.monotonic() - state.applied_at < QUIET_SECONDS:
+        if time.monotonic() < state.quiet_until:
             return
         before = {"state": old.state, **{k: old.attributes.get(k) for k in COMPARED}}
         after = {"state": new.state, **{k: new.attributes.get(k) for k in COMPARED}}
@@ -343,23 +345,26 @@ class AutoLightManager:
         self.async_refresh(area_id)
         selection = state.selection
         lights = self.area_lights(area_id)
-        if selection is None or selection.scene is None or not lights:
+        if selection is None or not lights:
             return False
-        data: dict[str, Any] = {
-            "entity_id": lights,
-            "gallery_scene": selection.scene,
-            "brightness": selection.brightness,
-        }
+        data: dict[str, Any] = {"entity_id": lights, "brightness": selection.brightness}
+        if selection.kelvin is not None:
+            data["mirek"] = round(1_000_000 / selection.kelvin)
+        elif selection.scene is not None:
+            data["gallery_scene"] = selection.scene
+            if mode := self._settings(area_id).get("gradient_mode"):
+                data["mode"] = mode
+        else:
+            return False
         if transition is not None:
             data["transition"] = transition
-        if mode := self._settings(area_id).get("gradient_mode"):
-            data["mode"] = mode
-        state.applied_at = time.monotonic()
+        quiet = QUIET_SECONDS + (transition or 0)
+        state.quiet_until = time.monotonic() + quiet
         await self.hass.services.async_call(
             DOMAIN, "apply_palette", data, blocking=True
         )
         # The lights report back after the call: the quiet window starts now.
-        state.applied_at = time.monotonic()
+        state.quiet_until = time.monotonic() + quiet
         return True
 
     async def async_next_scene(self, area_id: str) -> None:

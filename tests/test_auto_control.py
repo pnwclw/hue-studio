@@ -79,6 +79,8 @@ async def test_apply_and_manual(
     hass: HomeAssistant, auto: MagicMock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Applying shows the scene; a change by anyone else makes the area manual."""
+    # Only the transition keeps changes quiet here.
+    monkeypatch.setattr(auto_control, "QUIET_SECONDS", 0)
     await _apply(hass, transition=5)
     sent = _sent(auto)
     assert set(sent) == {"res-bulb", "res-strip"}
@@ -91,7 +93,13 @@ async def test_apply_and_manual(
     await hass.async_block_till_done()
     assert hass.states.get("select.office_light_control").state == "auto"
 
-    monkeypatch.setattr(auto_control, "QUIET_SECONDS", 0)
+    # The bridge reporting the brightness on the way during the transition.
+    hass.states.async_set("light.bulb", "on", {"brightness": 150})
+    await hass.async_block_till_done()
+    assert hass.states.get("select.office_light_control").state == "auto"
+
+    manager = auto_control.auto_light_manager(hass)
+    manager.areas["office"].quiet_until = 0
     hass.states.async_set("light.bulb", "on", {"brightness": 200})
     await hass.async_block_till_done()
     assert hass.states.get("select.office_light_control").state == "manual"
@@ -180,6 +188,34 @@ async def test_errors_and_settings(
     assert "night_from" not in store.areas["office"]["settings"]
     assert not await settings("office", {"night_from": "late"})
     assert not await settings("nowhere", {})
+    assert not await settings("office", {"style": "natural", "kelvin": {"day": 9000}})
+
+
+async def test_natural_light(
+    hass: HomeAssistant, auto: MagicMock, hass_ws_client: WebSocketGenerator
+) -> None:
+    """Natural light: a white per phase, shown through the same service."""
+    client = await hass_ws_client(hass)
+    kelvin = {phase: 2500 for phase in ("morning", "day", "golden", "evening", "night")}
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/auto_light/settings",
+            "area_id": "office",
+            "settings": {"style": "natural", "kelvin": kelvin},
+        }
+    )
+    assert (await client.receive_json())["success"]
+    await hass.async_block_till_done()
+    scene = hass.states.get("sensor.office_light_scene")
+    assert scene.state == "2500 K"
+    assert scene.attributes["kelvin"] == 2500
+    assert scene.attributes["scene_id"] is None
+    assert "entity_picture" not in scene.attributes
+
+    auto.lights.update.reset_mock()
+    await _apply(hass)
+    sent = _sent(auto)
+    assert sent["res-bulb"].color_temperature.mirek == 400
 
 
 async def test_subscribe_update_remove(

@@ -11,6 +11,9 @@ export const DAY_STEPS = [0, 1, 2, 3];
 export const SHIFTS = ["morning", "day", "golden", "evening"] as const;
 export const DEFAULT_SHIFTS = { morning: 0, day: 50, golden: 50, evening: 0 };
 export const DEFAULT_NIGHT_FROM = "23:00";
+/** Natural light: color temperature per phase (K), as the backend's defaults. */
+export const NATURAL_KELVIN: Record<Phase, number> = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000 };
+export const KELVIN_RANGE = [2000, 6500] as const;
 export const GRADIENT_MODES = ["interpolated_palette", "interpolated_palette_mirrored", "random_pixelated", "segmented_palette"];
 
 /**

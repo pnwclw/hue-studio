@@ -112,6 +112,10 @@ export const CSS = `
   .hero .title { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hero .inner { max-width: 960px; margin: 0 auto; }
   .hero .meta { margin: 2px 2px 0; }
+  .sensor-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+  .sensor-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 999px; border: 0; background: var(--surface); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+  .sensor-chip ha-icon { --mdc-icon-size: 18px; opacity: 0.75; }
+  .sensor-chip.on ha-icon { color: #3ddc84; opacity: 1; }
   .hero.dark-text .round { background: rgba(0, 0, 0, 0.1); }
   .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: 14px; cursor: pointer;
@@ -166,6 +170,17 @@ export const CSS = `
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   .pin.merged::before { border-width: 3px; }
   .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .gmodes { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px 2px; scrollbar-width: none; }
+  .colorbody .gmodes { margin: 0 0 8px; padding: 0 0 2px; }
+  .gmodes::-webkit-scrollbar { display: none; }
+  .gmodes button { flex: none; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 6px; border-radius: 16px;
+                   border: 1.5px solid transparent; background: var(--surface); color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .gmodes button.on { border-color: #fff; }
+  .gm-art { width: 30px; height: 20px; border-radius: 10px; }
+  .gm-interpolated_palette { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6dd5ed); }
+  .gm-interpolated_palette_mirrored { background: linear-gradient(90deg, #6dd5ed, #ffc371, #ff5f6d, #ffc371, #6dd5ed); }
+  .gm-random_pixelated { background: conic-gradient(from 45deg, #ff5f6d 0 25%, #6dd5ed 0 50%, #ffc371 0 75%, #ff5f6d 0) 0 0 / 10px 10px; }
+  .gm-segmented_palette { background: linear-gradient(90deg, #ff5f6d 0 33%, #ffc371 0 66%, #6dd5ed 0); }
   .modes { display: flex; gap: 4px; padding: 4px; border-radius: 22px; background: rgba(60, 60, 64, 0.7); }
   .modes button { width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid transparent; cursor: pointer; padding: 0;
                   transition: border-color 0.2s, transform 0.15s var(--ease); }
@@ -419,12 +434,14 @@ export const CSS = `
   .on > .check { border-color: var(--accent); background: var(--accent); }
   .on > .check svg { opacity: 1; }
   /* auto light */
-  .rows .item img.thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
+  .rows .item .thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
   .rows .item.wrap { flex-wrap: wrap; }
   .rows .item.wrap .grow { min-width: 140px; }
   .rows .item .plain { padding: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .lead.pad { padding: 0 16px 16px; }
   .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
+  .swatch-dot { width: 26px; height: 26px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  .today span.pic { display: block; }
   .seg button:disabled { opacity: 0.4; }
   .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--radius);
            background: var(--surface); }

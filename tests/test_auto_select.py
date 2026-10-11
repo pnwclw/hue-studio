@@ -161,3 +161,14 @@ def test_real_changes() -> None:
     assert is_real_change(on, {**on, "color_mode": "color_temp"})
     assert is_real_change(on, {"state": "off"})
     assert not is_real_change({"state": "off"}, {"state": "off", "brightness": 1})
+
+
+def test_natural_light() -> None:
+    """Natural light: no scenes, a white per phase (overridable), usual brightness."""
+    natural = {"settings": {"style": "natural", "kelvin": {"evening": 2400}}}
+    day = select(natural, _inputs(12))
+    assert (day.scene, day.pool, day.kelvin, day.pool_phase) == (None, (), 4300, "day")
+    assert day.brightness == select({}, _inputs(12)).brightness
+    assert select(natural, _inputs(20)).kelvin == 2400
+    assert select(natural, _inputs(0, 30)).kelvin == 2000
+    assert select(CONFIG, _inputs(12)).kelvin is None

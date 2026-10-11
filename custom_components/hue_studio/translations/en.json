@@ -607,10 +607,11 @@
       },
       "room_sensors": {
         "title": "{room}",
-        "description": "Motion sensors show presence on the room card. Temperature sensors are averaged into the room temperature; a Hue motion sensor's own thermometer can be combined with the room's thermostat.",
+        "description": "Motion sensors show presence on the room card. Temperature sensors are averaged into the room temperature; a Hue motion sensor's own thermometer can be combined with the room's thermostat. Light sensors show how bright the room is. Without a choice, the room's Hue sensors are used.",
         "data": {
           "motion": "Motion sensors",
-          "temperature": "Temperature sensors"
+          "temperature": "Temperature sensors",
+          "illuminance": "Light sensors"
         }
       },
       "alignment": {

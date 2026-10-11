@@ -14,8 +14,9 @@ integration instead of replacing it. Lights, scenes and sensors stay with the na
 integration; Hue Studio reuses its bridge connection, so no second pairing is needed.
 
 > **Status:** early development. So far: config flow, bridge connection, services and a
-> `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes and
-> lights, a gamut-aware color wheel with one pin per gradient point, light effects
+> `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes,
+> lights and the room's sensors (motion, temperature, light level), a gamut-aware color
+> wheel with one pin per gradient point, white mode and gradient styles, light effects
 > (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
 > dynamic speed, auto-play, reset, dynamic playback), the scene gallery with
 > "set once", Hue rooms that follow your HA areas (a "Rooms and zones" screen with
@@ -53,7 +54,10 @@ streams to them (Sync Box, PC or TV sync): the stream would overwrite them anywa
 Hue Studio works out what each area with auto light settings should show — the phase
 of the day (from the sun), a scene of the day from pools by phase, season, weather and
 holidays, and a brightness — and gives every such area a device with entities for
-dashboards and automations:
+dashboards and automations. An area can use **natural light** instead of scenes, like
+the Hue app's Natural light: a white per phase (cool in the morning and during the day,
+warm in the evening and at night) with the same brightness rules; its scene sensor then
+shows the color temperature (`2900 K`, attribute `kelvin`).
 
 | Entity | |
 |---|---|
@@ -64,8 +68,9 @@ dashboards and automations:
 | `number.<area>_light_offset` | Your brightness offset for the current phase |
 | `button.<area>_next_light_scene` | Another scene for the rest of the day |
 
-Pools, holidays, phases, brightness and inputs are edited in the panel (Settings →
-Auto light). *When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
+Pools (or color temperatures), holidays, phases, brightness and inputs are edited in
+the panel (Settings → Auto light); a room with auto light also gets an "Auto light" (or
+"Natural light") tile among its scenes that shows it and hands the lights back to it. *When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
 example on presence, with `resume: true`, and again when the scene or brightness
 sensor changes).
 

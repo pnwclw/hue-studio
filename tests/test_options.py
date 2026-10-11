@@ -64,7 +64,11 @@ async def test_options_flow_and_config_ws(
     assert result["step_id"] == "room_sensors"
     result = await flow.async_configure(
         result["flow_id"],
-        {"motion": ["binary_sensor.office_motion"], "temperature": ["sensor.office_t"]},
+        {
+            "motion": ["binary_sensor.office_motion"],
+            "temperature": ["sensor.office_t"],
+            "illuminance": ["sensor.office_lux"],
+        },
     )
     assert result["type"] is FlowResultType.MENU
 
@@ -85,6 +89,7 @@ async def test_options_flow_and_config_ws(
             f"area.{office.id}": {
                 "motion": ["binary_sensor.office_motion"],
                 "temperature": ["sensor.office_t"],
+                "illuminance": ["sensor.office_lux"],
             }
         },
     }
@@ -97,6 +102,7 @@ async def test_options_flow_and_config_ws(
     assert event["rooms"][f"area.{office.id}"]["motion"] == [
         "binary_sensor.office_motion"
     ]
+    assert event["rooms"][f"area.{office.id}"]["illuminance"] == ["sensor.office_lux"]
 
 
 def _suggested(result: dict, field: str) -> str | None:

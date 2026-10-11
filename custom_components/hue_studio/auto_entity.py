@@ -127,7 +127,10 @@ class SceneSensor(AutoLightEntity, SensorEntity):
 
     @property
     def native_value(self) -> str | None:
-        """The scene's name."""
+        """The scene's name (natural light: its color temperature)."""
+        state = self.state_info
+        if state and state.selection and state.selection.kelvin is not None:
+            return f"{state.selection.kelvin} K"
         scene = self._scene()
         return self.manager.scene_name(self.area_id, scene) if scene else None
 
@@ -156,6 +159,7 @@ class SceneSensor(AutoLightEntity, SensorEntity):
             "mood": selection.mood,
             "holiday": selection.holiday,
             "step": selection.step,
+            "kelvin": selection.kelvin,
         }
 
 

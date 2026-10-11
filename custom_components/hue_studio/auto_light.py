@@ -38,6 +38,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
+from .auto_select import KELVIN_MAX, KELVIN_MIN, STYLES
 from .const import DOMAIN
 from .gallery import async_gallery_scenes
 
@@ -116,6 +117,13 @@ AREA_CONFIG = vol.Schema(
                     vol.In(PHASES): vol.All(vol.Coerce(int), vol.Range(min=1, max=100))
                 },
                 vol.Optional("gradient_mode"): vol.Any(None, cv.string),
+                # "natural": a white per phase instead of scenes (auto_select.py).
+                vol.Optional("style"): vol.In(STYLES),
+                vol.Optional("kelvin"): {
+                    vol.In(PHASES): vol.All(
+                        vol.Coerce(int), vol.Range(min=KELVIN_MIN, max=KELVIN_MAX)
+                    )
+                },
             }
         ),
         # "off": auto light is off for the area ("manual" is not stored).

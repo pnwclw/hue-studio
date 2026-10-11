@@ -8,6 +8,8 @@ export type RGB = [number, number, number];
 export interface HassState {
   entity_id?: string;
   state: string;
+  /** ISO time of the last state change. */
+  last_changed?: string;
   // Attributes depend on the domain and integration.
   attributes: Record<string, any>;
 }
@@ -107,6 +109,7 @@ export interface ScenesMessage {
 export interface RoomSensors {
   motion: string[];
   temperature: string[];
+  illuminance: string[];
 }
 
 /** Integration options (hue_studio/config/subscribe). */
@@ -266,6 +269,10 @@ export interface AutoLightSettings {
   /** Fixed brightness per phase (else the curve). */
   brightness?: Partial<Record<Phase, number>>;
   gradient_mode?: string | null;
+  /** "natural": a white per phase instead of scenes (the Hue app's Natural light). */
+  style?: "scenes" | "natural";
+  /** Natural light: color temperature (K) per phase, overriding the defaults. */
+  kelvin?: Partial<Record<Phase, number>>;
 }
 
 export interface Holiday {
@@ -301,6 +308,8 @@ export interface AutoLightState {
   brightness?: number;
   step?: number | null;
   pool?: string[];
+  /** Natural light: the white shown now (K). */
+  kelvin?: number | null;
 }
 
 export interface AutoLightMessage {

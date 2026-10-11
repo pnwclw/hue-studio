@@ -21,6 +21,7 @@ CONF_GROUPS: Final = "groups"
 CONF_ROOMS: Final = "rooms"
 CONF_MOTION: Final = "motion"
 CONF_TEMPERATURE: Final = "temperature"
+CONF_ILLUMINANCE: Final = "illuminance"
 GROUP_AUTO: Final = "auto"
 GROUP_ZONE: Final = "zone"
 # Options: align the bridge's rooms with the HA areas whenever areas change.

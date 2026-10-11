@@ -2,7 +2,9 @@
 // one per color point it can show (`points_capable` from the bridge), joined by the path
 // its gradient blends along; any other light one. A uniform gradient light has its pins
 // stacked until they are dragged apart. All lights of the group can be merged into one
-// pin (the Hue app's link button) and split back. A third mode lists light effects.
+// pin (the Hue app's link button) and split back. Gradient lights also pick how their
+// colors are laid out (smooth, mirrored, scattered, segments). A third mode lists light
+// effects.
 // Pins are clipped to each light's gamut; commands are throttled to the bridge limits.
 
 import { html, nothing, svg } from "lit";
@@ -29,6 +31,7 @@ import { commandInterval, groupSlider } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
 import { friendlyName, type Group, groupState, lightColors, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
+import type { StringKey } from "../i18n.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import "./effects.ts";
@@ -42,6 +45,8 @@ const GRADIENT_INTERVAL = 250;
 // After a local change, ignore HA/bridge state for a moment so pins don't jump back.
 const HOLD_MS = 2500;
 const ALL = "*";
+/** Gradient layouts in the order they are offered (CLIP v2 `gradient.mode`). */
+const GRADIENT_MODES = ["interpolated_palette", "interpolated_palette_mirrored", "random_pixelated", "segmented_palette"];
 const SENDER = "color:";
 
 const pct = (v: number) => `${((v + 1) / 2) * 100}%`;
@@ -60,6 +65,7 @@ interface Pin {
 interface Held {
   points?: XY[];
   mirek?: number;
+  mode?: string;
   until: number;
 }
 
@@ -81,6 +87,8 @@ export class ColorView extends StudioView {
   @state() private accessor dragging: { key: string; pos: XY } | null = null;
   /** Local edits per light, shown instead of HA state until `until`. */
   private local = new Map<string, Held>();
+  /** White pins only use their height; where they were dropped sideways (pin key -> x). */
+  private whiteX = new Map<string, number>();
 
   @state() private accessor dragBrightness: number | null = null;
 
@@ -153,7 +161,7 @@ export class ColorView extends StudioView {
     if (!lights.length) return [];
     if (this.merged) {
       const ref = lights.find((id) => this.ctx.hass.states[id]?.state === "on") || lights[0];
-      return [{ key: ALL, id: ALL, index: -1, pos: this.posOf(ref, 0, 0) }];
+      return [{ key: ALL, id: ALL, index: -1, pos: this.posOf(ref, 0, 0, ALL) }];
     }
     return lights.flatMap((id, order) => {
       if (this.currentMode === "white") return [{ key: `${id}#0`, id, index: -1, pos: this.posOf(id, 0, order) }];
@@ -162,9 +170,15 @@ export class ColorView extends StudioView {
     });
   }
 
-  private posOf(id: string, index: number, order: number): XY {
+  private posOf(id: string, index: number, order: number, key = `${id}#0`): XY {
     const spreadX = (order - (this.lights().length - 1) / 2) * 0.2;
-    if (this.currentMode === "white") return [Math.max(-0.6, Math.min(0.6, spreadX)), mirekToWheelY(this.mirek(id))];
+    if (this.currentMode === "white") {
+      const y = mirekToWheelY(this.mirek(id));
+      const x = this.whiteX.get(key) ?? Math.max(-0.6, Math.min(0.6, spreadX));
+      // Keep the pin on the disc when its height changes.
+      const edge = Math.sqrt(Math.max(0, 1 - y * y)) * 0.92;
+      return [Math.max(-edge, Math.min(edge, x)), y];
+    }
     const p = this.points(id)?.[index];
     return p ? xyToWheel(...p) : [spreadX, -0.45];
   }
@@ -193,6 +207,7 @@ export class ColorView extends StudioView {
           </div>`}
       ${mode === "effects" ? this.effectsBody(group) : this.wheel(mode)}
       <div class="dock">
+        ${mode === "color" ? this.gradientModes() : nothing}
         <div class="controls">
           <div class="modes">
             ${this.colorLights.length ? this.modeButton("color", "m-color", t("color.mode_color")) : nothing}
@@ -249,6 +264,48 @@ export class ColorView extends StudioView {
       const points = this.points(id);
       return points ? svg`<path class=${id === this.selected ? "selected" : ""} d=${gradientPath(points)}></path>` : nothing;
     })}</svg>`;
+  }
+
+  /** Gradient lights to lay out: the selected one, else all of them (not while merged). */
+  private gradientTargets(): string[] {
+    if (this.merged) return [];
+    const layable = (id: string) => this.capable(id) > 1 && (this.ctx.lightInfo[id]?.gradient?.modes?.length ?? 0) > 1;
+    if (this.selected && this.colorLights.includes(this.selected)) return layable(this.selected) ? [this.selected] : [];
+    return this.colorLights.filter(layable);
+  }
+
+  private gradientMode(id: string): string | null {
+    return this.held(id)?.mode ?? this.ctx.lightInfo[id]?.gradient?.mode ?? null;
+  }
+
+  /** How the colors of gradient lights are laid out, like the Hue app's gradient styles. */
+  private gradientModes() {
+    const { t } = this.ctx;
+    const targets = this.gradientTargets();
+    if (!targets.length) return nothing;
+    const modes = GRADIENT_MODES.filter((m) => targets.every((id) => this.ctx.lightInfo[id]?.gradient?.modes?.includes(m)));
+    if (modes.length < 2) return nothing;
+    const current = new Set(targets.map((id) => this.gradientMode(id)));
+    const active = current.size === 1 ? [...current][0] : null;
+    return html`<div class="gmodes" role="radiogroup" aria-label=${t("color.gradient_style")}>
+      ${modes.map(
+        (m) => html`<button role="radio" aria-checked=${m === active ? "true" : "false"} class=${classMap({ on: m === active })} @click=${() => this.setGradientMode(targets, m)}>
+          <span class="gm-art gm-${m}" aria-hidden="true"></span>${t(`color.gradient_${m}` as StringKey)}
+        </button>`,
+      )}
+    </div>`;
+  }
+
+  private setGradientMode(lights: string[], mode: string): void {
+    const { ctx } = this;
+    this.stopEffects(lights);
+    for (const id of lights) {
+      const points = this.points(id);
+      if (!points || points.length < 2) continue;
+      this.local.set(id, { ...this.held(id), points, mode, until: Date.now() + HOLD_MS });
+      ctx.call("hue_studio", "set_gradient", { entity_id: id, points, mode }, { optimistic: false });
+    }
+    this.requestUpdate();
   }
 
   private effectsBody(group: Group) {
@@ -335,6 +392,7 @@ export class ColorView extends StudioView {
       const [lo, hi] = info?.mirek || [153, 500];
       const mirek = Math.min(hi, Math.max(lo, wheelYToMirek(raw[1])));
       this.dragging = { key: p.key, pos: [raw[0], mirekToWheelY(mirek)] };
+      this.whiteX.set(p.key, raw[0]);
       lights.forEach((id) => this.hold(id, { mirek }));
       const target = p.id === ALL ? group.target : [p.id];
       const interval = p.id === ALL ? commandInterval(group) : LIGHT_INTERVAL;

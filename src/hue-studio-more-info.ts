@@ -54,7 +54,7 @@ function subjectOf(hass: Hass, home: Home, id: string): { group: Group; room: Gr
     target,
     group,
     scenes: [],
-    sensors: { motion: [], temperature: [] },
+    sensors: { motion: [], temperature: [], illuminance: [] },
   });
   if (attrs.is_hue_group) {
     const known = allGroups(home).find((g) => g.group === id);

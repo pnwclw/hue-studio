@@ -607,10 +607,11 @@
       },
       "room_sensors": {
         "title": "{room}",
-        "description": "Czujniki ruchu pokazują obecność na karcie pokoju. Czujniki temperatury są uśredniane do temperatury pokoju; termometr czujnika ruchu Hue można połączyć z termostatem pokoju.",
+        "description": "Czujniki ruchu pokazują obecność na karcie pokoju. Czujniki temperatury są uśredniane do temperatury pokoju; termometr czujnika ruchu Hue można połączyć z termostatem pokoju. Czujniki światła pokazują, jak jasno jest w pokoju. Bez wyboru używane są czujniki Hue z pokoju.",
         "data": {
           "motion": "Czujniki ruchu",
-          "temperature": "Czujniki temperatury"
+          "temperature": "Czujniki temperatury",
+          "illuminance": "Czujniki światła"
         }
       },
       "alignment": {

@@ -1,4 +1,6 @@
-// Room: header with toggle, brightness and Adaptive Lighting; the room's Hue scenes (plus
+// Room: header with toggle, brightness and Adaptive Lighting; the room's sensors (motion,
+// temperature, light level); auto light (or natural light) when the area has it; the
+// room's Hue scenes (plus
 // "New scene": what the lights show now, saved as a scene of the room's Hue room/zone on
 // the bridge, so the Hue app has it too); its lights.
 
@@ -8,13 +10,15 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../color.ts";
-import { groupSlider, lightTile, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
+import { groupSlider, lightTile, surfaceOf, toggleGroup } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
-import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, groupState, type Scene } from "../model.ts";
+import { openStockMoreInfo } from "../ha-internals.ts";
+import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, type GroupState, groupState, type Scene } from "../model.ts";
 import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
+import { whiteArt } from "./auto-light.ts";
 import { StudioView } from "./base.ts";
 
 const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
@@ -58,15 +62,16 @@ export class RoomView extends StudioView {
             </button>
             ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
           </div>
-          ${metaOf(state)} ${groupSlider(ctx, g, state, t("common.brightness"))}
+          ${groupSlider(ctx, g, state, t("common.brightness"))}
           <div class="badges">${adaptiveFor(ctx.hass, g).map((al) => this.adaptiveBadge(al))}</div>
         </div>
       </div>
+      ${this.sensors(g, state)}
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
       ${this.syncNote(g)}
       <div class=${classMap({ grid: true, locked: syncingIn(ctx.boxes, g).length > 0 })}>
-        ${g.scenes.map((s) => this.scene(g, s))}
+        ${this.autoTile(g)} ${g.scenes.map((s) => this.scene(g, s))}
         <button class="scene add-scene" @click=${() => this.openNew()}>
           <div class="dot">${icon("plus")}</div>
           <div class="name">${t("room.new_scene")}</div>
@@ -144,6 +149,32 @@ export class RoomView extends StudioView {
     </div>`;
   }
 
+  /** Motion, temperature and light level of the room; a tap opens the sensor in HA. */
+  private sensors(g: Group, state: GroupState) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const lang = ctx.hass.locale?.language || ctx.hass.language || "en";
+    const number = (v: number, digits: number) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(v);
+    const chip = (ids: string[], glyph: string, text: string, on = false) =>
+      html`<button class=${classMap({ "sensor-chip": true, on })} @click=${() => openStockMoreInfo(ids[0])}>
+        <ha-icon icon=${glyph}></ha-icon><span>${text}</span>
+      </button>`;
+    const { motion, temperature, illuminance } = g.sensors;
+    const chips = [
+      motion.length
+        ? chip(
+            motion,
+            state.motion ? "mdi:motion-sensor" : "mdi:motion-sensor-off",
+            state.motion ? t("sensors.motion") : state.lastMotion ? t("sensors.motion_ago", { time: since(state.lastMotion, lang) }) : t("sensors.no_motion"),
+            state.motion,
+          )
+        : nothing,
+      state.temperature !== null ? chip(temperature, "mdi:thermometer", `${number(state.temperature, 1)} °C`) : nothing,
+      state.illuminance !== null ? chip(illuminance, "mdi:brightness-5", `${number(state.illuminance, 0)} lx`) : nothing,
+    ].filter((c) => c !== nothing);
+    return chips.length ? html`<div class="sensor-row">${chips}</div>` : nothing;
+  }
+
   /** Sync Boxes whose entertainment area has lights of this room: status, start/stop. */
   private syncCards(g: Group) {
     const boxes = boxesForGroup(this.ctx.boxes, g);
@@ -198,6 +229,35 @@ export class RoomView extends StudioView {
     return html`<button class=${classMap({ badge: true, on: al.on && !al.manual.length })} @click=${click}>
       ${icon("sun")}${label}
     </button>`;
+  }
+
+  /**
+   * Auto light of the area as a scene tile (natural light like the Hue app's): shows what
+   * auto light picks now and hands the lights back to it.
+   */
+  private autoTile(g: Group) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const area = g.kind === "area" ? g.key.slice("area.".length) : null;
+    const now = area ? ctx.autoLight?.state[area] : undefined;
+    if (!area || !now || now.control === "off" || (!now.kelvin && !now.scene)) return nothing;
+    const dot = now.kelvin ? whiteArt(now.kelvin) : `url("${thumbUrl(now.scene!)}") center / cover`;
+    const apply = () => {
+      if (syncingIn(ctx.boxes, g).length) return;
+      ctx.call("hue_studio", "apply_auto_light", { area, resume: true, transition: 1 }, { optimistic: false });
+    };
+    const settings = (e: Event) => {
+      e.stopPropagation();
+      ctx.go(`/settings/auto/${encodeURIComponent(area)}`);
+    };
+    return html`<div class=${classMap({ scene: true, "auto-scene": true, surface: true, off: true })} role="button" tabindex="0" @click=${apply}>
+      <div class="dot" style=${styleMap({ background: dot })}></div>
+      <div class="name">${t(now.kelvin ? "auto.style_natural" : "room.auto_light")}</div>
+      <div class="sub">${now.kelvin ? `${now.kelvin} K` : now.scene_name || ""}${now.control === "manual" ? ` · ${t("auto.control_manual")}` : ""}</div>
+      <div class="scene-actions">
+        <button class="round mini edit" aria-label=${t("auto.settings")} @click=${settings}>${icon("cog")}</button>
+      </div>
+    </div>`;
   }
 
   /**
@@ -278,6 +338,15 @@ export class RoomView extends StudioView {
     const room = encodeURIComponent(g.key);
     return lightTile(this.ctx, id, () => this.ctx.go(`/room/${room}/color?light=${encodeURIComponent(id)}`));
   }
+}
+
+/** "5 min ago", "2 hr ago", "yesterday" in the user's language. */
+export function since(iso: string, lang: string, now = Date.now()): string {
+  const minutes = Math.round((Date.parse(iso) - now) / 60000);
+  const format = new Intl.RelativeTimeFormat(lang, { numeric: "auto", style: "short" });
+  if (Math.abs(minutes) < 60) return format.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  return Math.abs(hours) < 24 ? format.format(hours, "hour") : format.format(Math.round(hours / 24), "day");
 }
 
 const FALLBACK_COLORS = ["rgb(255,231,184)", "rgb(242,166,90)"];

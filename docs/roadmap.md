@@ -99,10 +99,18 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
    (`create_zone`) or the settings.
 2. ~~Shuffle colors~~ — done: on the active scene tile (palette spread anew and kept,
    like the Hue app) and live in the scene editor.
-3. White mode on the wheel for single lights and groups (verify both).
-4. Gradient mode picker (`interpolated_palette`, `random_pixelated`, …).
-5. Natural Light — built as a subset of auto light (day phases -> color temperature).
-6. Room sensors on the room screen (motion, temperature, illuminance) from the options.
+3. ~~White mode on the wheel~~ — verified for single lights and groups (merged pin);
+   white pins keep where they were dropped sideways (only their height matters).
+4. ~~Gradient mode picker~~ — done: smooth / mirrored / scattered / segments on the
+   wheel for the selected gradient light (or all of them), only modes every target
+   supports.
+5. ~~Natural Light~~ — done as an auto light style (`settings.style: natural`): a color
+   temperature per phase (defaults like the Hue app's Energize … Nightlight, editable),
+   the same brightness, entities and `apply_auto_light`; the room screen shows an
+   "Auto light" / "Natural light" tile.
+6. ~~Room sensors~~ — done: motion (with when it was last seen), temperature and light
+   level under the room header, from the room's Hue sensors or the options (light
+   sensors added to the room sensors step); a tap opens the sensor in HA.
 
 ### C. Space: our SpatialAware, without a Bridge Pro
 
@@ -149,7 +157,10 @@ directly. Per HA area with auto light settings:
    an `entity_picture` where it helps cards:
    - **light control** (`select`: auto / manual / off): who controls the lights right
      now. Hue Studio sets `manual` when the lights change by anything but auto light
-     and back to `auto` once the area's lights are all off; `off` disables auto light
+     (outside a 15 s quiet window after its own command); back to `auto` through the
+     select or `apply_auto_light` with `resume` — automations decide when (e.g. on
+     leaving the room), and also hand control back after they turn the lights off
+     themselves, which Hue Studio sees as a manual change; `off` disables auto light
      for the area;
    - phase (`sensor`, enum), scene of the day (`sensor`, the gallery picture as
      `entity_picture`), brightness (`sensor`, %), brightness offset of the current
@@ -163,8 +174,14 @@ directly. Per HA area with auto light settings:
    phase boundaries, brightness (curve or fixed, offsets), weather / light sensor /
    season / gradient layout, holidays, excluded scenes, turning auto light off for the
    area. Still to do: screenshots on a live HA.
-5. Live switch-over: the legacy template sensors, helpers and the light config shim go;
-   the existing automations call `apply_auto_light`.
+5. ~~Live switch-over~~ — done (2026-10-11): the existing automations take scene and
+   brightness from the auto light entities, call `apply_auto_light` and leave manual
+   detection to the control select; presence, illuminance thresholds and time windows
+   stay in the automations. Dashboard helpers (auto/manual switches, "another scene")
+   are bridged to the select and the button by the automations themselves, which read
+   the current states rather than `trigger.to_state` (queued runs go stale). The legacy
+   template sensors, helpers and the light config shim stay until the dashboards move
+   to Hue Studio cards (D2/E).
 
 ### D2. Cards
 
@@ -185,7 +202,8 @@ directly. Per HA area with auto light settings:
 
 ## Order
 
-A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E.
+A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R
+(except R5, the live alignment, and D2, the cards).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

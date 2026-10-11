@@ -20,6 +20,7 @@ from homeassistant.helpers import (
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_GROUPS,
+    CONF_ILLUMINANCE,
     CONF_MOTION,
     CONF_ROOMS,
     CONF_TEMPERATURE,
@@ -162,6 +163,7 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
         frontend_key: {
             CONF_MOTION: value.get(CONF_MOTION, []),
             CONF_TEMPERATURE: value.get(CONF_TEMPERATURE, []),
+            CONF_ILLUMINANCE: value.get(CONF_ILLUMINANCE, []),
         }
         for key, value in options[CONF_ROOMS].items()
         if (frontend_key := room_key(key)) is not None

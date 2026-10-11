@@ -46,6 +46,7 @@ from .const import (
     CONF_BOX_ID,
     CONF_GROUPS,
     CONF_HUE_ENTRY_ID,
+    CONF_ILLUMINANCE,
     CONF_KIND,
     CONF_MOTION,
     CONF_REGISTRATION_ID,
@@ -546,15 +547,16 @@ class HueStudioOptionsFlow(OptionsFlow):
     async def async_step_room_sensors(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Motion and temperature sensors of the selected room."""
+        """Motion, temperature and illuminance sensors of the selected room."""
         assert self._selected is not None
         rooms = self._opts[CONF_ROOMS]
         if user_input is not None:
             value = {
                 CONF_MOTION: user_input.get(CONF_MOTION, []),
                 CONF_TEMPERATURE: user_input.get(CONF_TEMPERATURE, []),
+                CONF_ILLUMINANCE: user_input.get(CONF_ILLUMINANCE, []),
             }
-            if value[CONF_MOTION] or value[CONF_TEMPERATURE]:
+            if any(value.values()):
                 rooms[self._selected] = value
             else:
                 rooms.pop(self._selected, None)
@@ -582,6 +584,16 @@ class HueStudioOptionsFlow(OptionsFlow):
                     ): EntitySelector(
                         EntitySelectorConfig(
                             domain="sensor", device_class="temperature", multiple=True
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_ILLUMINANCE,
+                        description={
+                            "suggested_value": current.get(CONF_ILLUMINANCE, [])
+                        },
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor", device_class="illuminance", multiple=True
                         )
                     ),
                 }

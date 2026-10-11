@@ -19,6 +19,9 @@ templates this replaces, generalized:
   light day starts with the morning, so the scene does not change at midnight.
 - Brightness: fixed per phase, or the curve (day: the darker outside, the brighter;
   morning and evening follow the sun), plus the personal offset of the phase.
+- Natural light (style "natural", the Hue app's Natural light): no scenes, a white of
+  its own per phase instead — cool in the morning and during the day, warm towards the
+  evening and at night — with the same brightness rules.
 """
 
 from __future__ import annotations
@@ -32,6 +35,19 @@ PHASES = ("morning", "day", "golden", "evening", "night")
 SEASONS = ("winter", "spring", "summer", "autumn")
 MOODS = ("clear", "gloomy")
 DAY_STEPS = 4
+STYLES = ("scenes", "natural")
+STYLE_NATURAL = "natural"
+# Natural light: color temperature per phase (like the Hue app's Energize, Concentrate,
+# Read, Relax and Nightlight); settings["kelvin"] overrides it.
+NATURAL_KELVIN = {
+    "morning": 5000,
+    "day": 4300,
+    "golden": 2900,
+    "evening": 2200,
+    "night": 2000,
+}
+KELVIN_MIN = 2000
+KELVIN_MAX = 6500
 
 GLOOMY_CONDITIONS = frozenset(
     {
@@ -86,6 +102,8 @@ class Selection:
     brightness: int
     light_day: date
     step: int | None = None
+    # Natural light: the white to show (no scene).
+    kelvin: int | None = None
 
 
 def _minutes(moment: datetime | None, fallback: int) -> int:
@@ -206,6 +224,21 @@ def select(
     mood = mood_of(inputs)
     step = _step(inputs.elevation, mood)
     md = day.strftime("%m-%d")
+
+    if settings.get("style") == STYLE_NATURAL:
+        kelvin = {**NATURAL_KELVIN, **(settings.get("kelvin") or {})}[phase]
+        return Selection(
+            phase=phase,
+            pool_phase=phase,
+            season=season,
+            mood=mood,
+            holiday=False,
+            scene=None,
+            pool=(),
+            brightness=_brightness(config, phase, mood, inputs),
+            light_day=day,
+            kelvin=min(max(int(kelvin), KELVIN_MIN), KELVIN_MAX),
+        )
 
     pool: list[str] = []
     holiday = False
