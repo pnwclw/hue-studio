@@ -1,9 +1,9 @@
 # Roadmap
 
 What Hue Studio still needs, measured against the current Philips Hue app (5.6x–5.7x,
-2026) and the phases in `CLAUDE.md`. We copy the Hue app's **light-control screens**;
-automations, schedules and assistants stay with Home Assistant, which is where Hue Studio
-adds value.
+2026) and the phases in `CLAUDE.md`. We copy the Hue app's **light-control screens** and
+its **automation screens**, but every automation is a Home Assistant automation (G):
+Home Assistant runs, stores and edits it, Hue Studio only gives it the Hue app's look.
 
 ## The Hue app today (reference)
 
@@ -29,9 +29,16 @@ adds value.
   it is documented as of 2026-10.
 - Entertainment areas with manually placed lights (x, y, z in -1..1, up to 10 lights).
 
-**Out of scope for us** (Home Assistant's job or hardware-bound): MotionAware, automations /
-lighting schedules, the AI assistant, Sports Live, doorbell, bridge backup. Sync is in
-scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
+**Automations** (tab): Wake up with light, Go to sleep, Coming home, Leaving home, Mimic
+presence, Schedule — each a form with time, days, rooms and a light (scene, brightness,
+fade). In scope as HA automations (G).
+
+**Security** (Hue Secure): cameras (wired, battery, floodlight, desktop), contact sensors,
+armed/disarmed modes, alarms with lights and sirens, recordings in the cloud. Later (H).
+
+**Out of scope for us** (Home Assistant's job or hardware-bound): MotionAware, the AI
+assistant, Sports Live, doorbell, bridge backup. Sync is in scope for the Hue Play HDMI
+Sync Box (done); TV and PC sync apps stay outside.
 
 ## Already in Hue Studio
 
@@ -148,7 +155,8 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 ### D. Phase 4 — auto light as building blocks (the main difference from the Hue app)
 
 Hue Studio decides *what* to show; *when* stays with Home Assistant automations (no
-presence or time-window logic in the integration, no blueprints). What matters are
+presence or time-window logic in the integration). Since G, the panel can set up that
+*when* too, as HA automations from our blueprints. What matters are
 entities that dashboards (Lovelace, Mushroom, Bubble Card) and automations can use
 directly. Per HA area with auto light settings:
 
@@ -231,10 +239,74 @@ directly. Per HA area with auto light settings:
 - ~~Headers~~ — every screen has a fixed header and a body that scrolls (and bounces) on
   its own; tabs have a large title, other screens a compact back + title bar.
 
+### G. Automations like the Hue app, HA-first (2026-10-11)
+
+The Hue app's Automations tab in the panel, with every automation a **real HA automation**:
+stored by HA (`automations.yaml`, through HA's own automation config API, the one its editor
+uses), run by HA, listed in Settings → Automations, readable and editable there. No
+automation engine and no second copy in Hue Studio.
+
+1. **Blueprints** shipped with the integration (`blueprints/automation/hue_studio/`, put in
+   place on setup like core integrations do), one per Hue type. A Hue Studio automation is
+   `use_blueprint` with that blueprint and its inputs, so HA shows it with a form and the
+   panel reads it back by the blueprint path. Taken over in HA ("take control", edited
+   away from the blueprint): the panel lists it as custom and links to HA's editor.
+2. **Types**, copied from the Hue app (names, steps, defaults):
+   1. **Wake up with light** — time, days, rooms; fade in over N minutes before the time
+      to a white or scene; optional off after.
+   2. **Go to sleep** — time, days, rooms; fade out over N minutes.
+   3. **Coming home** — when the first person arrives (HA `person`/zone), optionally
+      only after sunset; rooms and scene.
+   4. **Leaving home** — when everyone has left: rooms off (all by default).
+   5. **Mimic presence** — while nobody is home, in a time window (or sunset to a
+      time): rooms on and off at random intervals.
+   6. **Schedule** — time or sunrise/sunset with offsets, days, rooms and a light. Our
+      current auto light editor (pools by phase, season and weather, brightness,
+      holidays) moves here from Settings → Auto light: a schedule whose light is
+      "auto light" shows the scene of the day (`apply_auto_light`); its settings stay in
+      the Store, the timing is the automation.
+   7. **Custom (Home Assistant)** — a card that opens HA's automation editor for a new
+      automation; below it, the other HA automations that touch Hue lights, each opening
+      in HA.
+3. **Panel:** an Automations tab: the list (icon, name, time, days, rooms; the switch is
+   the `automation.*` entity: on/off), "+" → the seven types, a Hue-style editor per type
+   (time wheel, day chips, room picker, scene from the room or the gallery, fade). Saving
+   writes the automation; deleting removes it from HA. A room's screen shows its
+   automations, like the Hue app.
+4. **Tab bar** exactly like the Hue app: **Home – Automations – Sync – Explore –
+   Settings** (now Home – Explore – Sync – Settings). Settings → Auto light goes away
+   (moved to Schedule).
+5. **Live switch-over:** the existing hand-written light automations become Schedule (and
+   Coming home / Leaving home) automations where they fit; whatever does not fit stays a
+   custom HA automation.
+6. **Adaptive Lighting:** the blueprints' light actions mark lights as manually controlled,
+   like our services do.
+
+Open questions: how a Hue type that the blueprint form cannot express well (random
+mimic intervals, a fade ending at a time) is done in the blueprint itself (HA scripts,
+`delay` with templates) versus a small Hue Studio service it calls; how blueprints are
+updated with the integration without breaking automations that use them.
+
+### H. Later: Hue Secure
+
+Plans, after research:
+
+1. **What the bridge and the cloud expose** (2026): CLIP v2 resources for contact sensors,
+   tamper, camera motion and security areas; whether cameras talk to the bridge at all or
+   only to the Hue cloud; any documented local or cloud API for live view, events and
+   recordings. HA has no Hue camera support today.
+2. **Contact sensors and camera motion** as HA entities when the native `hue` does not
+   provide them (respecting the rule: extend `hue`, never duplicate it).
+3. **Security in Settings** (the "Security comes later" row of F): armed/disarmed modes
+   built on HA's `alarm_control_panel`, not a mode store of our own; alarms as HA
+   automations (G) that flash lights and sound sirens.
+4. **Cameras** only with a usable API (live view as a `camera` entity, events, recordings);
+   otherwise a link to the Hue app.
+
 ## Order
 
-A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R
-D2 and E (except the HACS submission, kept for later).
+A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G -> H. Done so far:
+A, B, C, D, R, D2, E (except the HACS submission, kept for later) and F. Next: G.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
