@@ -800,6 +800,9 @@
           },
           "step": {
             "name": "Day step"
+          },
+          "kelvin": {
+            "name": "Color temperature"
           }
         }
       },
@@ -815,7 +818,7 @@
   },
   "device": {
     "auto_light": {
-      "name": "{area} auto light"
+      "name": "{area}"
     }
   }
 }

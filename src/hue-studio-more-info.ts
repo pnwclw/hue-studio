@@ -27,11 +27,11 @@ const DIALOG_CSS = css`
          box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); animation: up 0.34s var(--spring); padding-bottom: env(safe-area-inset-bottom); }
   :host(.closing) .dlg { animation: up 0.2s ease reverse forwards; }
   .handle { width: 36px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.25); margin: 8px auto 0; }
-  .head { padding: 0 16px 14px; border-radius: 22px 22px 0 0; }
-  .head .topbar { padding-top: 4px; }
-  .head .title { flex: 1; min-width: 0; }
-  .head .title b { display: block; font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .head .title small { font-size: 12px; opacity: 0.7; }
+  .dlg-head { padding: 0 16px 14px; border-radius: 22px 22px 0 0; }
+  .dlg-head .topbar { padding-top: 4px; }
+  .dlg-head .title { flex: 1; min-width: 0; }
+  .dlg-head .title b { display: block; font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dlg-head .title small { font-size: 12px; opacity: 0.7; }
   .colorbody { padding: 0 16px 4px; }
   .colorbody .wheel { width: min(76vw, 320px, 40dvh); }
   .footer { display: flex; gap: 8px; justify-content: center; padding: 6px 16px 16px; }
@@ -133,7 +133,7 @@ class HueStudioLightDialog extends LitElement {
     };
 
     return html`<div class="dlg" role="dialog" aria-label=${group.name}>
-        <div class=${classMap({ head: true, ...surface.classes })} style=${styleMap(surface.style)}>
+        <div class=${classMap({ "dlg-head": true, ...surface.classes })} style=${styleMap(surface.style)}>
           <div class="handle"></div>
           <div class="topbar">
             <div class="title"><b>${group.name}</b>${room && room.name !== group.name ? html`<small>${room.name}</small>` : nothing}</div>

@@ -185,9 +185,16 @@ directly. Per HA area with auto light settings:
 
 ### D2. Cards
 
-- Hue lights, sensors and scenes behave in Lovelace, Mushroom and Bubble Card: the
-  more-info override catches their more-info, everything else stays stock.
-- Our entities render well in those cards (state names, icons, pictures).
+- ~~More-info from cards~~ — verified on a live HA (2026-10-11) with tile, button,
+  entities and Bubble Card cards: a Hue light opens our dialog both through
+  `hass-action` (tile; Mushroom uses the same path) and a direct `hass-more-info`
+  (Bubble Card); Hue sensors, scenes and our own entities open HA's dialog.
+- ~~Our entities in cards~~ — state names, state icons, the scene picture, the
+  brightness offset slider and the control select render in tile, entities and Bubble
+  Card. The auto light device is named after its area, so entities read "<area> Scene
+  of the day" (HA's dialog shows "<area> ▸ <area>" as the breadcrumb, the price of
+  that).
+- Fixed on the way: the dialog header shared a class with the settings pages' header.
 
 ### E. Later
 
@@ -203,7 +210,7 @@ directly. Per HA area with auto light settings:
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E. Done so far: A, B, C, D, R
-(except R5, the live alignment, and D2, the cards).
+and D2 (except R5, the live alignment, waiting for R6).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

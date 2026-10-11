@@ -673,7 +673,7 @@
       "light_control": {
         "name": "Sterowanie światłem",
         "state": {
-          "auto": "Automatyczne światło",
+          "auto": "Automatyczne",
           "manual": "Ręcznie",
           "off": "Wyłączone"
         }
@@ -800,6 +800,9 @@
           },
           "step": {
             "name": "Stopień dnia"
+          },
+          "kelvin": {
+            "name": "Barwa światła"
           }
         }
       },
@@ -815,7 +818,7 @@
   },
   "device": {
     "auto_light": {
-      "name": "Automatyczne światło: {area}"
+      "name": "{area}"
     }
   }
 }
