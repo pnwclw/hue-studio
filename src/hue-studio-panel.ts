@@ -6,6 +6,7 @@
 //   /room/<key>                room: scenes and lights
 //   /room/<key>/color?light=&back=   color wheel (effects too)
 //   /room/<key>/scene/<scene>  scene editor
+//   /room/<key>/space          arrange the room's lights (positions)
 //   /gallery?room=<key>        scene gallery
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
@@ -30,6 +31,7 @@ import "./views/home.ts";
 import "./views/room.ts";
 import "./views/rooms.ts";
 import "./views/settings.ts";
+import "./views/space.ts";
 import "./views/scene.ts";
 import "./views/sync.ts";
 
@@ -38,6 +40,7 @@ type Route =
   | { name: "room"; key: string }
   | { name: "color"; key: string; light: string | null; back: string | null }
   | { name: "scene"; key: string; scene: string }
+  | { name: "space"; key: string }
   | { name: "gallery"; room: string | null }
   | { name: "sync"; box: string | null }
   | { name: "rooms" }
@@ -53,6 +56,7 @@ function parseRoute(path: string, search: string): Route {
     return { name: "color", key: parts[1], light: params.get("light"), back: back?.startsWith("/room/") ? back : null };
   }
   if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3]) return { name: "scene", key: parts[1], scene: parts[3] };
+  if (parts[0] === "room" && parts[1] && parts[2] === "space") return { name: "space", key: parts[1] };
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
@@ -144,6 +148,8 @@ export class HueStudioPanel extends LitElement {
           .focusLight=${route.light}
           .backPath=${route.back}
         ></hue-studio-color-view>`;
+      case "space":
+        return html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .key=${route.key}></hue-studio-space-view>`;
       case "scene":
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":

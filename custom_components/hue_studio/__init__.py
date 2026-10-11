@@ -48,6 +48,7 @@ from .const import (
     SYNC_BOX_INTEGRATION,
 )
 from .panel import async_register_panel, async_unregister_panel
+from .positions import async_setup_positions
 from .rooms import async_align, async_track_areas
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
@@ -97,6 +98,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
     async_setup_websocket(hass)
     await async_setup_auto_light(hass)
+    await async_setup_positions(hass)
     await async_setup_auto_control(hass)
     return True
 

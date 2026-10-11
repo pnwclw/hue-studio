@@ -176,6 +176,9 @@
     },
     "no_auto_light": {
       "message": "The area {area} has no auto light settings."
+    },
+    "positions_streaming": {
+      "message": "The entertainment area {name} is syncing right now; positions can be changed once it stops."
     }
   },
   "services": {
@@ -210,6 +213,10 @@
         "mode": {
           "name": "Gradient mode",
           "description": "How gradient lights lay the colors out (when they support it)."
+        },
+        "layout": {
+          "name": "Layout",
+          "description": "Classic: colors in turn over the lights. Spatial: colors by where the lights stand in the room (positions from entertainment areas or the panel)."
         }
       }
     },
@@ -567,6 +574,12 @@
         "spring": "Spring",
         "summer": "Summer",
         "autumn": "Autumn"
+      }
+    },
+    "palette_layout": {
+      "options": {
+        "classic": "Classic",
+        "spatial": "Spatial"
       }
     }
   },

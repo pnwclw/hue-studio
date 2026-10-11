@@ -106,13 +106,15 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 
 ### C. Space: our SpatialAware, without a Bridge Pro
 
-1. Read channel positions from `entertainment_configuration`
-   (`hue_studio/positions/subscribe`).
-2. Position editor: top view plus height, draggable lights. Write back to the bridge for
-   lights in an entertainment area, store in the Store for the rest.
-   Lock the editor while the entertainment area is streaming.
-3. Spatial palettes: distribute palette points along the room by light position;
-   classic/spatial toggle as in the Hue app.
+1. ~~Positions~~ — done (`positions.py`): per area, from the entertainment
+   configuration holding most of its lights (`service_locations`: one point per light,
+   two for a strip's ends), else from the Store; `hue_studio/positions/subscribe`.
+2. ~~Position editor~~ — done: room → Arrange, top view with draggable lights (strips
+   as two ends) and height; lights of the entertainment area are written back to the
+   bridge (`hue_studio/positions/set`), the rest go to the Store; locked while syncing.
+3. ~~Spatial palettes~~ — done: `apply_palette` `layout: spatial` lays the palette
+   along the room's longest side, strips get the stretch between their ends; the
+   gallery sheet has the classic/spatial toggle.
 4. Verify on a real bridge: actual coordinate values, whether CLIP v2 accepts position
    writes, and whether any SpatialAware resources appear in the API.
 

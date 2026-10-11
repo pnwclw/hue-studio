@@ -70,6 +70,7 @@ from .lights import (
     async_resolve_lights,
     supported_effects,
 )
+from .positions import async_light_positions, spatial_colors
 from .rooms import async_align
 from .scenes import (
     SCENE_DOMAIN,
@@ -138,6 +139,8 @@ ATTR_DRY_RUN = "dry_run"
 ATTR_COMPLETE_SCENES = "complete_scenes"
 ATTR_DELETE_EMPTY_ROOMS = "delete_empty_rooms"
 ATTR_LIGHTS = "lights"
+ATTR_LAYOUT = "layout"
+LAYOUTS = ("classic", "spatial")
 
 XY_POINT = vol.All(
     vol.ExactSequence([vol.Coerce(float), vol.Coerce(float)]),
@@ -166,6 +169,8 @@ APPLY_PALETTE_SCHEMA = vol.All(
             vol.Optional(ATTR_TRANSITION): TRANSITION,
             # How gradient lights lay the colors out (if they support the mode).
             vol.Optional(ATTR_MODE): vol.In([mode.value for mode in GradientMode]),
+            # "spatial": colors by where the lights stand (positions.py).
+            vol.Optional(ATTR_LAYOUT, default="classic"): vol.In(LAYOUTS),
         }
     ),
     cv.has_at_least_one_key(ATTR_PALETTE, ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK),
@@ -308,10 +313,18 @@ def async_setup_services(hass: HomeAssistant) -> None:
         brightness = call.data.get(ATTR_BRIGHTNESS, palette.get("brightness"))
         transition = call.data.get(ATTR_TRANSITION)
         mode = call.data.get(ATTR_MODE)
+        spatial = (
+            _spatial(hass, lights, palette)
+            if call.data.get(ATTR_LAYOUT) == "spatial"
+            else {}
+        )
         # Sequential on purpose: one command per light, at most a handful per room;
         # aiohue additionally caps concurrent requests and retries on 429.
         for index, light in enumerate(lights):
-            put = _palette_put(light, palette, index, brightness, mode)
+            if (colors := spatial.get(light.resource.id)) is not None:
+                put = _colors_put(light, colors, brightness, mode)
+            else:
+                put = _palette_put(light, palette, index, brightness, mode)
             if transition is not None:
                 put.dynamics = DynamicsFeaturePut(duration=round(transition * 1000))
             await _async_update(light, put)
@@ -842,6 +855,42 @@ def _palette_put(
     elif resource.color is not None:
         x, y = points[index % len(points)]
         put.color = ColorFeaturePut(xy=ColorPoint(x, y))
+    return put
+
+
+def _spatial(
+    hass: HomeAssistant, lights: list[HueLight], palette: dict[str, Any]
+) -> dict[str, list[tuple[float, float]]]:
+    """Colors per light (resource id) by position; lights without one are left out."""
+    if palette["kind"] != "gradient" or len(palette["points"]) < 2:
+        return {}
+    positions = async_light_positions(hass, lights)
+    counts = {
+        light.resource.id: light.resource.gradient.points_capable
+        if light.resource.gradient and light.resource.gradient.points_capable >= 2
+        else 1
+        for light in lights
+    }
+    points = [(x, y) for x, y in palette["points"]]
+    return spatial_colors(points, positions, counts)
+
+
+def _colors_put(
+    light: HueLight,
+    colors: list[tuple[float, float]],
+    brightness: float | None,
+    mode: str | None,
+) -> LightPut:
+    """Exact colors for one light: a gradient, or one color."""
+    put = _base_put(brightness)
+    resource = light.resource
+    if resource.gradient is not None and len(colors) >= 2:
+        supported = {m.value for m in resource.gradient.mode_values}
+        put.gradient = _gradient(
+            light, [list(c) for c in colors], mode if mode in supported else None
+        )
+    elif resource.color is not None:
+        put.color = ColorFeaturePut(xy=ColorPoint(*colors[0]))
     return put
 
 

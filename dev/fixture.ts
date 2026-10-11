@@ -15,6 +15,8 @@ import type {
   AutoLightState,
   Holiday,
   Phase,
+  PositionsMessage,
+  RoomPoint,
   RoomsPlan,
   StudioConfig,
   SceneInfo,
@@ -354,6 +356,26 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     entities: Object.fromEntries(Object.keys(autoAreas).map((a) => [a, { light_control: `select.${a}_light_control`, next_light_scene: `button.${a}_next_light_scene` }])),
   });
   const pushAuto = () => setTimeout(() => autoListeners.forEach((cb) => cb(structuredClone(autoMessage()))), 60);
+  // Positions: the TV area (an entertainment area) places the living room's TV lights;
+  // the office lamp is placed by Hue Studio; the candle is not placed yet.
+  const positionListeners = new Set<(msg: unknown) => void>();
+  const positions: Record<string, { points: RoomPoint[]; source: "bridge" | "store" }> = {
+    tv_strip: { points: [[-0.5, 0.95, 0.1], [0.5, 0.95, 0.1]], source: "bridge" },
+    play_left: { points: [[-0.75, 0.85, -0.2]], source: "bridge" },
+    play_right: { points: [[0.75, 0.85, -0.2]], source: "bridge" },
+    desk_lamp: { points: [[0.4, -0.3, 0.2]], source: "store" },
+  };
+  const positionsMessage = (): PositionsMessage => {
+    const out: PositionsMessage = {};
+    for (const [id] of Object.entries(LIGHTS)) {
+      const area = devices[`dev_${id}`].area_id;
+      if (!area) continue;
+      out[area] ??= { lights: {}, configuration: area === "living_room" ? { id: "ent-tv", name: "TV area", streaming: box.syncing ?? false } : null };
+      const p = positions[id];
+      out[area].lights[`light.${id}`] = { positions: p?.points || [], source: p ? (area === "living_room" ? "bridge" : "store") : null };
+    }
+    return out;
+  };
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
@@ -619,6 +641,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         pushAuto();
         return null as T;
       }
+      if (msg.type === "hue_studio/positions/set") {
+        for (const [entity, points] of Object.entries(msg.positions as Record<string, RoomPoint[]>)) {
+          positions[entity.replace("light.", "")] = { points, source: "store" };
+        }
+        setTimeout(() => positionListeners.forEach((cb) => cb(positionsMessage())), 80);
+        return null as T;
+      }
       if (msg.type === "hue_studio/config/set") {
         config = { ...config, auto_align: !!msg.auto_align };
         setTimeout(() => configListeners.forEach((cb) => cb(config)), 80);
@@ -633,6 +662,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     connection: {
       async subscribeMessage<T>(cb: (msg: T) => void, msg: { type: string }) {
         const send = cb as unknown as (m: unknown) => void;
+        if (msg.type === "hue_studio/positions/subscribe") {
+          positionListeners.add(send);
+          setTimeout(() => send(positionsMessage()), 50);
+          return () => {
+            positionListeners.delete(send);
+          };
+        }
         if (msg.type === "hue_studio/auto_light/subscribe") {
           autoListeners.add(send);
           setTimeout(() => send(structuredClone(autoMessage())), 55);

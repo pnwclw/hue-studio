@@ -183,7 +183,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
   services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
                                 align_rooms, save_scene, reset_scene, recall_scene, set_sync
-  websocket.py                  hue_studio/lights|scenes|config|sync|rooms/subscribe, hue_studio/lights/set_area, hue_studio/config/set
+  websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions/subscribe, hue_studio/lights/set_area,
+                                hue_studio/config/set, hue_studio/positions/set
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   auto_light.py                 auto light settings per area in a Store: pool/exclude/offset services,
@@ -192,6 +193,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   auto_control.py               selections and who controls each area (auto/manual/off), apply_auto_light,
                                 hue_studio/auto_light/subscribe|settings|update|remove
   auto_entity.py, button.py     per-area auto light entities (phase, scene, brightness, control, offset, next scene)
+  positions.py                  light positions (entertainment areas + Store), editor saves, spatial palette layout
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities (select/number/sensor: auto light too)
@@ -211,7 +213,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                auto-light (per area) — one Lit element per screen
+                                auto-light (per area), space (arrange lights) — one Lit element per screen
+  space.ts                      pure: placed lights, top-view coordinate mapping
   auto-light.ts                 pure: pools of the auto light editor, areas with/without auto light
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync

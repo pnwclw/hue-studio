@@ -211,6 +211,19 @@ def make_entertainment(
         light_services=[
             ResourceIdentifier(rid=rid, rtype=ResourceTypes.LIGHT) for rid in lights
         ],
+        # Entertainment service `ent-<light>` of each light at x = its index.
+        locations=SimpleNamespace(
+            service_locations=[
+                SimpleNamespace(
+                    service=ResourceIdentifier(
+                        rid=f"ent-{rid}", rtype=ResourceTypes.ENTERTAINMENT
+                    ),
+                    positions=[SimpleNamespace(x=float(i), y=0.5, z=0.0)],
+                    equalization_factor=1.0,
+                )
+                for i, rid in enumerate(lights)
+            ]
+        ),
     )
 
 
@@ -245,6 +258,16 @@ def mock_bridge() -> Generator[MagicMock]:
         configs = bridge.config.entertainment_configuration
         configs.__iter__.side_effect = lambda: iter(ENTERTAINMENT)
         configs.subscribe.return_value = MagicMock()
+        # Entertainment services: `ent-<light>` renders light `<light>`.
+        bridge.config.entertainment.__iter__.side_effect = lambda: iter(
+            SimpleNamespace(
+                id=f"ent-{rid}",
+                renderer_reference=ResourceIdentifier(
+                    rid=rid, rtype=ResourceTypes.LIGHT
+                ),
+            )
+            for rid in LIGHTS
+        )
         yield bridge_cls
 
 

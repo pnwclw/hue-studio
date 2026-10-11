@@ -26,7 +26,7 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 
 | Service | What it does |
 |---|---|
-| `hue_studio.apply_palette` | Apply a gallery scene (`gallery_scene`), up to 5 colors (`points`, CIE xy), a white (`mirek`) or a `palette` reference (`gallery:<id>`, `b64:<base64 JSON>`) to Hue lights, rooms or areas (an area uses its Hue lights only). Gradient lights get the whole palette (laid out by `mode` when they support it), others one color each; optional `brightness` and `transition` (s). |
+| `hue_studio.apply_palette` | Apply a gallery scene (`gallery_scene`), up to 5 colors (`points`, CIE xy), a white (`mirek`) or a `palette` reference (`gallery:<id>`, `b64:<base64 JSON>`) to Hue lights, rooms or areas (an area uses its Hue lights only). Gradient lights get the whole palette (laid out by `mode` when they support it), others one color each; with `layout: spatial`, colors follow where the lights stand (see "Space"). Optional `brightness` and `transition` (s). |
 | `hue_studio.set_gradient` | Set 2-5 color points (and the mode) of Hue gradient lights. |
 | `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
 | `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. |
@@ -68,6 +68,15 @@ Pools, holidays, phases, brightness and inputs are edited in the panel (Settings
 Auto light). *When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
 example on presence, with `resume: true`, and again when the scene or brightness
 sensor changes).
+
+## Space
+
+Where lights stand drives spatial scenes, like the Hue app's SpatialAware but without a
+Bridge Pro. Positions come from your entertainment areas (as the Hue app placed the
+lights); a room's **Arrange** screen shows them from above and lets you drag lights and
+set their height. Lights of an entertainment area are saved back to the bridge, the
+rest in Hue Studio. "Set once" in the gallery then offers Classic or Spatial: spatial
+spreads the scene's colors along the room.
 
 ## Rooms and zones
 

@@ -10,7 +10,7 @@ from aiohue.v2.models.light import Light
 from aiohue.v2.models.scene import Scene
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
@@ -30,7 +30,17 @@ from .lights import (
     light_info,
 )
 from .options import async_frontend_config
-from .rooms import async_rooms_payload, async_set_light_area, async_track_rooms
+from .positions import (
+    SIGNAL_POSITIONS_UPDATED,
+    async_positions_payload,
+    async_set_positions,
+)
+from .rooms import (
+    async_rooms_payload,
+    async_set_light_area,
+    async_track_areas,
+    async_track_rooms,
+)
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import async_sync_boxes
 
@@ -45,6 +55,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_subscribe_rooms)
     websocket_api.async_register_command(hass, ws_set_light_area)
     websocket_api.async_register_command(hass, ws_set_config)
+    websocket_api.async_register_command(hass, ws_subscribe_positions)
+    websocket_api.async_register_command(hass, ws_set_positions)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_studio/config/subscribe"})
@@ -303,4 +315,75 @@ def ws_set_config(
             hass.config_entries.async_update_entry(
                 entry, options={**entry.options, **changes}
             )
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/positions/subscribe"}
+)
+@callback
+def ws_subscribe_positions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send where the Hue lights of each area are, now and whenever it changes.
+
+    Event payload (always complete):
+        {area_id: {"lights": {entity_id: {"positions": [[x, y, z], ...],
+                                          "source": "bridge" | "store" | None}},
+                   "configuration": {"id", "name", "streaming"} | None}}
+    """
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        payload = async_positions_payload(hass)
+        if payload == last.get("payload"):
+            return
+        last["payload"] = payload
+        connection.send_message(websocket_api.event_message(msg["id"], payload))
+
+    unsubs = [
+        async_dispatcher_connect(hass, SIGNAL_POSITIONS_UPDATED, send),
+        # Entertainment areas changed (positions written, streaming started/stopped).
+        async_dispatcher_connect(hass, SIGNAL_ENTERTAINMENT_UPDATED, send),
+        async_track_areas(hass, send),
+    ]
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/positions/set",
+        vol.Required("area_id"): str,
+        vol.Required("positions"): {
+            str: vol.All(
+                [vol.All([vol.Coerce(float)], vol.Length(min=3, max=3))],
+                vol.Length(min=1, max=2),
+            )
+        },
+    }
+)
+@websocket_api.async_response
+async def ws_set_positions(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Save positions of an area's lights: to the bridge or the Store (positions.py)."""
+    try:
+        await async_set_positions(hass, msg["area_id"], msg["positions"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
     connection.send_result(msg["id"])

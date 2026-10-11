@@ -309,3 +309,15 @@ export interface AutoLightMessage {
   /** Area -> entity key ("light_control", …) -> entity id. */
   entities: Record<string, Record<string, string>>;
 }
+
+/** A light's points in the room: x left→right, y back→front, z floor→ceiling (-1..1). */
+export type RoomPoint = [number, number, number];
+
+export interface AreaPositions {
+  lights: Record<string, { positions: RoomPoint[]; source: "bridge" | "store" | null }>;
+  /** The entertainment area the positions come from (written back on save). */
+  configuration: { id: string; name: string; streaming: boolean } | null;
+}
+
+/** hue_studio/positions/subscribe: area id -> its lights' positions. */
+export type PositionsMessage = Record<string, AreaPositions>;

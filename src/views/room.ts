@@ -72,7 +72,12 @@ export class RoomView extends StudioView {
           <div class="name">${t("room.new_scene")}</div>
         </button>
       </div>
-      <h2 class="label">${t("room.lights")}</h2>
+      <div class="section-head">
+        <h2 class="label">${t("room.lights")}</h2>
+        ${g.kind === "area" && g.lights.length > 1
+          ? html`<button class="pill shuffle" @click=${() => ctx.go(`/room/${room}/space`)}>${icon("rooms")}${t("space.arrange")}</button>`
+          : nothing}
+      </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
     </div>

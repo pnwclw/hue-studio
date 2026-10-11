@@ -45,6 +45,14 @@ apply_palette:
             - interpolated_palette_mirrored
             - random_pixelated
             - segmented_palette
+    layout:
+      default: classic
+      selector:
+        select:
+          translation_key: palette_layout
+          options:
+            - classic
+            - spatial
 
 set_gradient:
   target:

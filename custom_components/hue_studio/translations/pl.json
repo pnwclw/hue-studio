@@ -176,6 +176,9 @@
     },
     "no_auto_light": {
       "message": "Obszar {area} nie ma ustawień automatycznego światła."
+    },
+    "positions_streaming": {
+      "message": "Obszar rozrywki {name} właśnie synchronizuje; pozycje można zmienić, gdy skończy."
     }
   },
   "services": {
@@ -210,6 +213,10 @@
         "mode": {
           "name": "Tryb gradientu",
           "description": "Jak światła gradientowe układają kolory (jeśli to obsługują)."
+        },
+        "layout": {
+          "name": "Układ",
+          "description": "Klasyczny: kolory po kolei na światłach. Przestrzenny: kolory według miejsca świateł w pokoju (pozycje z obszarów rozrywki lub z panelu)."
         }
       }
     },
@@ -567,6 +574,12 @@
         "spring": "Wiosna",
         "summer": "Lato",
         "autumn": "Jesień"
+      }
+    },
+    "palette_layout": {
+      "options": {
+        "classic": "Klasyczny",
+        "spatial": "Przestrzenny"
       }
     }
   },

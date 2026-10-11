@@ -14,6 +14,7 @@ import type {
   Hass,
   LightInfo,
   LightsMessage,
+  PositionsMessage,
   RoomsPlan,
   SceneInfo,
   ScenesMessage,
@@ -55,6 +56,8 @@ export class StudioContext {
   rooms: RoomsPlan | null = null;
   /** The backend could not send the plan (older version, or no bridge). */
   roomsUnavailable = false;
+  /** Where the Hue lights of each area stand (null until known). */
+  positions: PositionsMessage | null = null;
   /** Auto light settings and state of the areas (null until known). */
   autoLight: AutoLightMessage | null = null;
   /** Sync Boxes by config entry id, with pending predictions applied. */
@@ -147,6 +150,9 @@ export class StudioContext {
     });
     sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
       this.rawBoxes = msg.boxes;
+    });
+    sub<PositionsMessage>("hue_studio/positions/subscribe", (msg) => {
+      this.positions = msg;
     });
     sub<AutoLightMessage>("hue_studio/auto_light/subscribe", (msg) => {
       this.autoLight = msg;

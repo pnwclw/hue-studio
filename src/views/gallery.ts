@@ -10,6 +10,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import { paletteArt, paletteColors } from "../color.ts";
 import { thumbUrl } from "../gallery-data.ts";
 import { allGroups, findGroup, type Group } from "../model.ts";
+import { canSpread } from "../space.ts";
 import type { Gallery, GalleryScene } from "../types.ts";
 import { icon, normalize } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -23,6 +24,8 @@ export class GalleryView extends StudioView {
   @state() private accessor searching = false;
   @state() private accessor targetKey: string | null = null;
   @state() private accessor open: GalleryScene | null = null;
+  /** How "Set once" lays the colors out: in turn (classic) or by where lights stand. */
+  @state() private accessor layout: "classic" | "spatial" = "spatial";
 
   private get target(): Group | null {
     const { home } = this.ctx;
@@ -106,10 +109,14 @@ export class GalleryView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const close = () => (this.open = null);
+    // Spatial needs two placed lights and colors to spread.
+    const spreadable = !!target && scene.kind === "gradient" && canSpread(ctx.positions, target.lights);
+    const spatial = spreadable && this.layout === "spatial";
     const apply = async () => {
       close();
       if (!target) return;
-      const ok = await ctx.call("hue_studio", "apply_palette", { entity_id: target.target, gallery_scene: scene.id });
+      const data = { entity_id: target.target, gallery_scene: scene.id, ...(spatial ? { layout: "spatial" } : {}) };
+      const ok = await ctx.call("hue_studio", "apply_palette", data);
       if (ok) ctx.toast(t("gallery.applied", { name: target.name }));
     };
     const save = async () => {
@@ -128,6 +135,15 @@ export class GalleryView extends StudioView {
         </div>
         <div class="dots">${paletteColors(scene).map((c) => html`<i style=${styleMap({ background: c })}></i>`)}</div>
         <div class="actions">
+          ${spreadable
+            ? html`<div class="seg two" role="radiogroup" aria-label=${t("gallery.layout")}>
+                ${(["classic", "spatial"] as const).map(
+                  (l) => html`<button role="radio" aria-checked=${this.layout === l} class=${classMap({ on: this.layout === l })} @click=${() => (this.layout = l)}>
+                    ${t(`gallery.layout_${l}`)}
+                  </button>`,
+                )}
+              </div>`
+            : nothing}
           <button class="pill apply" ?disabled=${!target} @click=${apply}>${t("gallery.set_once")}</button>
           ${target?.group ? html`<button class="pill" @click=${save}>${t("gallery.save")}</button>` : nothing}
           ${target ? html`<div class="target">${t("gallery.target")}: ${target.name}</div>` : nothing}

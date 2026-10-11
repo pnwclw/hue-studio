@@ -18,7 +18,7 @@ export const CSS = `
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; }
-  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-effects,
+  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-space-view, hue-studio-effects,
   hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
@@ -457,6 +457,31 @@ export const CSS = `
   .md-row { display: flex; align-items: center; gap: 10px; }
   .sheet .field.md { width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
   .holiday-editor .chips { margin-top: 12px; flex-wrap: wrap; }
+
+  /* arrange lights */
+  .room { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 14px auto 0; border-radius: 18px; touch-action: none;
+          background: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 25% 25%,
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 25% 25%, var(--surface);
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+  .room.locked { opacity: 0.6; }
+  .room .edge { position: absolute; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase;
+                color: var(--text-2); pointer-events: none; }
+  .room .edge.front { top: 6px; }
+  .room .edge.back { bottom: 6px; }
+  .room .links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .room .links line { stroke: rgba(255, 255, 255, 0.45); stroke-width: 0.8; stroke-dasharray: 2 1.5; }
+  .spot { position: absolute; width: 38px; height: 38px; margin: -19px 0 0 -19px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.85);
+         border-radius: 50%; cursor: grab; display: flex; align-items: center; justify-content: center; background: var(--pin);
+         color: #fff; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45); touch-action: none; transition: transform 0.15s var(--ease); }
+  .spot ha-icon { --mdc-icon-size: 18px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+  .spot.on { transform: scale(1.18); border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35), 0 3px 10px rgba(0, 0, 0, 0.45); }
+  .spot:active { cursor: grabbing; }
+  .rows.height { margin-top: 14px; }
+  .height-line { align-items: center; margin-top: 10px; }
+  .height-line input { flex: 1; accent-color: #fff; }
+  .center-text { text-align: center; margin-top: 12px; }
+  .rows button.item:disabled { opacity: 0.5; }
+  .seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 260px); }
 
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
   .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
