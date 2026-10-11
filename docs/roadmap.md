@@ -115,8 +115,10 @@ scope for the Hue Play HDMI Sync Box (done); TV and PC sync apps stay outside.
 3. ~~Spatial palettes~~ — done: `apply_palette` `layout: spatial` lays the palette
    along the room's longest side, strips get the stretch between their ends; the
    gallery sheet has the classic/spatial toggle.
-4. Verify on a real bridge: actual coordinate values, whether CLIP v2 accepts position
-   writes, and whether any SpatialAware resources appear in the API.
+4. ~~Verify on a real bridge~~ — done (2026-10-11): coordinates are -1..1 (lights on
+   walls sit at ±1); a light has one point, an upright lamp (Signe) two points one above
+   the other, which the editor keeps as one spot; a PUT of `locations` is accepted and
+   read back unchanged; no SpatialAware resources in the API of a regular bridge.
 
 ### R. Rooms and zones, HA-first (design: `rooms-and-scenes.md`)
 

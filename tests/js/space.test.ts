@@ -23,9 +23,11 @@ test("placed lights and whether a palette can be spread", () => {
 });
 
 test("top view: front at the top, round trip", () => {
-  assert.deepEqual(toView([-1, 1, 0]), { left: 0, top: 0 });
-  assert.deepEqual(toView([1, -1, 0]), { left: 100, top: 100 });
-  assert.deepEqual(fromView(0.5, 0.25), [0, 0.5]);
+  assert.deepEqual(toView([-1, 1, 0]), { left: 6, top: 6 });
+  assert.deepEqual(toView([1, -1, 0]), { left: 94, top: 94 });
+  assert.deepEqual(toView([0, 0, 0]), { left: 50, top: 50 });
+  assert.deepEqual(fromView(0.5, 0.5), [0, 0]);
+  assert.deepEqual(fromView(0.06, 0.94), [-1, -1]);
   assert.deepEqual(fromView(-0.2, 1.4), [-1, -1]);
   assert.deepEqual(roundPoint([0.123456789, 2, -0.5]), [0.12346, 1, -0.5]);
 });

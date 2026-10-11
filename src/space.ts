@@ -24,11 +24,21 @@ export const canSpread = (msg: PositionsMessage | null, lights: string[]): boole
 
 const clamp = (v: number): number => Math.min(1, Math.max(-1, v));
 
+/** Room edges sit this far (percent) inside the view, so lights on a wall stay visible. */
+export const VIEW_MARGIN = 6;
+const SPAN = 100 - 2 * VIEW_MARGIN;
+
 /** Room point -> top-view percentages ({left, top}, 0-100). */
-export const toView = ([x, y]: RoomPoint): { left: number; top: number } => ({ left: ((x + 1) / 2) * 100, top: ((1 - y) / 2) * 100 });
+export const toView = ([x, y]: RoomPoint): { left: number; top: number } => ({
+  left: VIEW_MARGIN + ((x + 1) / 2) * SPAN,
+  top: VIEW_MARGIN + ((1 - y) / 2) * SPAN,
+});
 
 /** A spot in the top view (fractions 0-1 of its width/height) -> room x and y. */
-export const fromView = (fx: number, fy: number): [number, number] => [clamp(fx * 2 - 1), clamp(1 - fy * 2)];
+export const fromView = (fx: number, fy: number): [number, number] => [
+  clamp(((fx * 100 - VIEW_MARGIN) / SPAN) * 2 - 1),
+  clamp(1 - ((fy * 100 - VIEW_MARGIN) / SPAN) * 2),
+];
 
 /** Round to the bridge's precision (5 decimals) so saved values compare equal. */
 export const roundPoint = (p: RoomPoint): RoomPoint => p.map((v) => Math.round(clamp(v) * 1e5) / 1e5) as RoomPoint;

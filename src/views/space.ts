@@ -60,9 +60,8 @@ export class SpaceView extends StudioView {
         ? html`<p class="lead small">${t("space.from_area", { name: area.configuration.name })}</p>`
         : html`<p class="lead small">${t("space.no_entertainment")}</p>`}
       ${streaming ? html`<p class="sync-note">${icon("sync")}<span>${t("space.streaming", { name: area.configuration!.name })}</span></p>` : nothing}
+      <div class="edge-label">${t("space.front")}</div>
       <div class=${classMap({ room: true, locked: streaming })} @pointermove=${this.onMove} @pointerup=${this.onUp} @pointercancel=${this.onUp}>
-        <div class="edge front">${t("space.front")}</div>
-        <div class="edge back">${t("space.back")}</div>
         <svg class="links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           ${placed
             .filter((id) => this.points(id).length > 1 && !isUpright(this.points(id)))
@@ -87,6 +86,7 @@ export class SpaceView extends StudioView {
           }),
         )}
       </div>
+      <div class="edge-label">${t("space.back")}</div>
       ${sel ? this.heightRow(sel, streaming) : html`<p class="lead small center-text">${t("space.select_hint")}</p>`}
       ${loose.length
         ? html`<h2 class="label">${t("space.not_placed")}</h2>

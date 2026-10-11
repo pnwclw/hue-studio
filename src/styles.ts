@@ -460,14 +460,12 @@ export const CSS = `
 
   /* arrange lights */
   .room { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 14px auto 0; border-radius: 18px; touch-action: none;
-          background: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 25% 25%,
-                      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 25% 25%, var(--surface);
+          background: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 6% 6% / 22% 22%,
+                      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 6% 6% / 22% 22%, var(--surface);
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
   .room.locked { opacity: 0.6; }
-  .room .edge { position: absolute; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase;
-                color: var(--text-2); pointer-events: none; }
-  .room .edge.front { top: 6px; }
-  .room .edge.back { bottom: 6px; }
+  .edge-label { margin: 8px 0 0; text-align: center; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); }
+  .edge-label + .room { margin-top: 6px; }
   .room .links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .room .links line { stroke: rgba(255, 255, 255, 0.45); stroke-width: 0.8; stroke-dasharray: 2 1.5; }
   .spot { position: absolute; width: 38px; height: 38px; margin: -19px 0 0 -19px; padding: 0; border: 2px solid rgba(255, 255, 255, 0.85);
