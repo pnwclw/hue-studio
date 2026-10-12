@@ -197,6 +197,15 @@ export const CSS = `
                                    border-top: 1px solid rgba(255, 255, 255, 0.1); }
   .switch-zone.inert { pointer-events: none; }
   .switch-zone.inert .toggle { opacity: 0.35; }
+  /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
+  @media (max-height: 760px) {
+    .light-row .light { min-height: 128px; padding-bottom: 54px; }
+    .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 26px; }
+    .light-row .light .name { margin-top: 4px; font-size: 14px; }
+    .light-row .light .switch-zone { height: 44px; }
+    .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
+    .controls { margin-bottom: 12px; }
+  }
   .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
@@ -265,6 +274,10 @@ export const CSS = `
   /* color wheel */
   .colorview { display: flex; flex-direction: column; }
   .colorview .page { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding-bottom: 0; }
+  /* The wheel takes the height the dock leaves (container units), a little above the middle. */
+  .colorview .page:has(> .wheel-wrap) { height: 100%; }
+  .colorview .wheel-wrap { container-type: size; min-height: 240px; padding: 20px 0 36px; }
+  .colorview .wheel { width: min(100cqw, 100cqh, 440px); }
   .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; padding: 14px 16px max(10px, var(--safe-bottom));
           background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 14px); }
   .colorbody .dock { position: static; margin: 0; padding: 0; background: none; }
@@ -292,9 +305,10 @@ export const CSS = `
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   .pin.merged::before { border-width: 3px; }
-  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 16px; }
-  .gmodes { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 8px; padding: 0 16px 2px; scrollbar-width: none; }
-  .colorbody .gmodes { margin: 0 0 8px; padding: 0 0 2px; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 18px; }
+  .gmodes { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 2px; scrollbar-width: none; }
+  /* Room below for the brightness value floating over its button. */
+  .colorbody .gmodes { margin: 0 0 22px; padding: 0 0 2px; }
   .gmodes::-webkit-scrollbar { display: none; }
   .gmodes button { flex: none; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 6px; border-radius: 16px;
                    border: 1.5px solid transparent; background: var(--surface); color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
