@@ -81,7 +81,7 @@ export class RoomView extends StudioView {
           : nothing}
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
-      <div class="grid">${g.lights.map((id) => this.light(g, id))}</div>
+      <div class="light-row">${g.lights.map((id) => this.light(id))}</div>
     </div></div>
     ${this.adding
       ? html`<hue-studio-new-scene .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-new-scene>`
@@ -277,9 +277,10 @@ export class RoomView extends StudioView {
     </div>`;
   }
 
-  private light(g: Group, id: string) {
-    const room = encodeURIComponent(g.key);
-    return lightTile(this.ctx, id, () => this.ctx.go(`/room/${room}/color?light=${encodeURIComponent(id)}`));
+  /** A light card, the same as in the color screen; a tap opens the light's dialog (the color screen). */
+  private light(id: string) {
+    const open = () => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
+    return lightTile(this.ctx, id, open);
   }
 }
 

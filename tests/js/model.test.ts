@@ -78,7 +78,7 @@ test("group state averages lit lights", () => {
 });
 
 import { adaptiveFor } from "../../src/model.ts";
-import { gradientPath, resample, xyToWheel } from "../../src/color.ts";
+import { resample, smoothPath } from "../../src/color.ts";
 
 test("options map a Hue group onto an area and mark another as a zone", () => {
   const { rooms, zones } = buildHome(hass, { groups: { "light.downstairs": "kitchen", "light.office": "zone" } });
@@ -143,10 +143,11 @@ test("gradient points fit the fixed point count of a light", () => {
   assert.deepEqual(resample([[0.5, 0.4]], 3), [[0.5, 0.4], [0.5, 0.4], [0.5, 0.4]]);
 });
 
-test("gradient path runs through every point on the wheel", () => {
-  const pts: XY[] = [[0.6, 0.35], [0.2, 0.3]];
-  const d = gradientPath(pts, 4);
-  assert.equal(d.match(/[ML]/g)?.length, 5);
-  const [x0, y0] = xyToWheel(...pts[0]);
-  assert.ok(d.startsWith(`M${x0.toFixed(4)} ${y0.toFixed(4)}`));
+test("gradient line: a smooth curve through every pin, stacked pins skipped", () => {
+  const pins: XY[] = [[-0.5, 0], [0, 0.5], [0, 0.5], [0.5, 0]];
+  const d = smoothPath(pins);
+  assert.ok(d.startsWith("M-0.5000 0.0000"));
+  assert.equal(d.match(/C/g)?.length, 2);
+  assert.ok(d.endsWith("0.5000 0.0000"));
+  assert.equal(smoothPath([[0.1, 0.1], [0.1, 0.1]]), "");
 });

@@ -7,9 +7,27 @@
 //   hass.callService / hass.connection     – documented frontend API
 //   "hass-more-info" event                 – how every card opens more-info
 //   window.customIconsets / customIcons    – how custom icon sets plug into <ha-icon>
+//   "haptic" event on window                – the companion app's haptic feedback
 
 import type { Hass } from "./types.ts";
 import { focusedElement, opensKeyboard } from "./ui.ts";
+
+export type Haptic = "selection" | "light" | "medium" | "heavy" | "success" | "warning" | "failure";
+
+/** Vibration on a tap, a drop, a step: what HA's own controls do in the companion app. */
+const VIBRATE_MS: Record<Haptic, number | number[]> = {
+  selection: 6, light: 10, medium: 16, heavy: 24, success: [10, 40, 10], warning: [16, 60, 16], failure: [24, 60, 24],
+};
+
+/**
+ * Haptic feedback. HA's companion apps turn the window's "haptic" event into the phone's
+ * own haptics (iOS has no `navigator.vibrate`); elsewhere a short vibration, where there is one.
+ */
+export function haptic(kind: Haptic): void {
+  window.dispatchEvent(new CustomEvent("haptic", { detail: kind }));
+  const w = window as Window & { externalApp?: unknown; webkit?: { messageHandlers?: { externalBus?: unknown } } };
+  if (!w.externalApp && !w.webkit?.messageHandlers?.externalBus) navigator.vibrate?.(VIBRATE_MS[kind]);
+}
 
 /** An icon of a custom icon set: what `<ha-icon icon="prefix:name">` draws. */
 export interface CustomIcon {

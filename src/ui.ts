@@ -2,6 +2,8 @@
 
 import { html, LitElement, svg, type TemplateResult } from "lit";
 
+import { haptic } from "./ha-internals.ts";
+
 export const normalize = (s: string): string =>
   String(s).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
 
@@ -74,6 +76,7 @@ export const toggle = (on: boolean, label: string, onToggle: () => void): Templa
     aria-label=${label}
     @click=${(e: Event) => {
       e.stopPropagation();
+      haptic("light");
       onToggle();
     }}
   ><span></span></button>`;

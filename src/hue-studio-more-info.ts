@@ -173,7 +173,7 @@ class HueStudioLightDialog extends LitElement {
           .group=${group}
           .focusLight=${focus}
           .done=${() => this.close()}
-          .extraMenu=${room ? [studio] : []}
+          .extraMenu=${room && !location.pathname.startsWith("/hue") ? [studio] : []}
         ></hue-studio-color-view>
       </div>
       <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>`;

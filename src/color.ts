@@ -184,18 +184,23 @@ export function resample(points: XY[], n: number): XY[] {
 }
 
 /**
- * Path on the wheel (SVG, viewBox -1 -1 2 2) through a gradient's points: straight lines
- * in CIE xy — what the light blends through — which curve on the wheel, as in the Hue app.
+ * A smooth path (SVG, viewBox -1 -1 2 2) through the pins of a gradient light, in order:
+ * a Catmull-Rom curve through the points as they sit on the wheel, like the Hue app's
+ * line. Pins on top of each other are skipped (no loops on stacked points).
  */
-export function gradientPath(points: XY[], samples = 12): string {
-  const out: XY[] = [];
-  points.forEach((p, i) => {
-    if (i === 0) return void out.push(xyToWheel(...p));
-    const a = points[i - 1];
-    for (let k = 1; k <= samples; k++) {
-      const f = k / samples;
-      out.push(xyToWheel(a[0] + (p[0] - a[0]) * f, a[1] + (p[1] - a[1]) * f));
-    }
-  });
-  return out.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(4)} ${y.toFixed(4)}`).join("");
+export function smoothPath(pins: XY[]): string {
+  const pts = pins.filter((p, i) => i === 0 || Math.hypot(p[0] - pins[i - 1]![0], p[1] - pins[i - 1]![1]) > 1e-3);
+  if (pts.length < 2) return "";
+  const f = (v: number) => v.toFixed(4);
+  let d = `M${f(pts[0]![0])} ${f(pts[0]![1])}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    const c1: XY = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2: XY = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(p2[0])} ${f(p2[1])}`;
+  }
+  return d;
 }

@@ -125,6 +125,8 @@ touching anything outside this repository.
   While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
   what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
   footer hides while a field has focus. New fields need nothing else.
+- **Haptics.** Picks, drops, snaps, steps and toggles call `haptic()` (`ha-internals.ts`): HA's
+  companion apps turn it into the phone's haptics, browsers get `navigator.vibrate`.
 - **Sheets and overlays never live inside a scrolling element**: iOS clips them to it. A view
   that opens one renders it outside its scrolling body (the color view's `layers`).
 - **Touch drags stay inside.** The panel, the dialog and the footer use `keepTouchInside`: a

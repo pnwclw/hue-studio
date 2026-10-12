@@ -15,10 +15,10 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import {
   clipToGamut,
-  gradientPath,
   mirekToRgb,
   mirekToWheelY,
   resample,
+  smoothPath,
   rgbCss,
   WHEEL_CSS,
   WHITE_CSS,
@@ -29,7 +29,7 @@ import {
 } from "../color.ts";
 import { brightnessSender, commandInterval, lightTile } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
-import { leavePanel, openStockMoreInfo } from "../ha-internals.ts";
+import { haptic, leavePanel, openStockMoreInfo } from "../ha-internals.ts";
 import { type Group, groupOfEntity, groupState, lightIcon } from "../model.ts";
 import type { HassState, XY } from "../types.ts";
 import type { StringKey } from "../i18n.ts";
@@ -68,6 +68,12 @@ export interface MenuItem {
 
 type Mode = "color" | "white" | "effects";
 
+/** The point, pulled onto the disc if it is outside. */
+const onDisc = ([x, y]: XY): XY => {
+  const len = Math.hypot(x, y);
+  return len > 1 ? [x / len, y / len] : [x, y];
+};
+
 /** A little pin (the Hue app's style pictures): pointing down to (x, y + 4). */
 const pinGlyph = (x: number, y: number) => svg`<path d="M${x} ${y + 4}L${x - 2.6} ${y + 0.9}A3.3 3.3 0 1 1 ${x + 2.6} ${y + 0.9}Z"/>`;
 const rule = (x1: number, x2: number) => svg`<rect x=${x1} y="15.5" width=${x2 - x1} height="1.6" rx="0.8"/>`;
@@ -84,10 +90,8 @@ function modeArt(mode: string) {
 
 /** Pins closer than this (wheel radii) show the same color: one pin with a count. */
 const STACK_EPS = 0.035;
-/** A pin dropped this close (px) to another one's tip or head joins it (takes its exact color). */
-const SNAP_PX = 30;
-/** How far (px) a pin's head sits above its tip, the point that shows its color. */
-const PIN_HEAD_PX = 27;
+/** A pin dropped this close (px) to another one joins it (takes its exact color). */
+const SNAP_PX = 28;
 /** Radius of the disc a tapped stack spreads its pins around. */
 const SPREAD_R = 0.5;
 /** Finger travel (px) that makes a press on a pin a drag, not a tap. */
@@ -139,8 +143,26 @@ export class ColorView extends StudioView {
   @state() private accessor pulling: { key: string; pos: XY; out: boolean } | null = null;
   @state() private accessor styleOpen = false;
   @state() private accessor selected: string | null = null;
-  /** The stack being dragged: it follows the finger, not the state. */
-  @state() private accessor dragging: { key: string; pins: Pin[]; pos: XY; x: number; y: number; moved: boolean } | null = null;
+  /**
+   * The stack being dragged: it follows the finger (keeping where it was grabbed: `off`)
+   * anywhere on the disc, not the state; `near` is the pin it would join if dropped now.
+   */
+  @state() private accessor dragging: {
+    key: string;
+    pins: Pin[];
+    pos: XY;
+    off: XY;
+    x: number;
+    y: number;
+    moved: boolean;
+    near: string | null;
+  } | null = null;
+  /**
+   * Where pins were dropped, with what was sent: a color outside a light's gamut (or a
+   * white beyond its range) is clipped, but the pin stays where it was put while the light
+   * shows what was sent.
+   */
+  private dropped = new Map<string, { mode: Mode; raw: XY; xy?: XY; mirek?: number }>();
   /** Local edits per light, shown instead of HA state until `until`. */
   private local = new Map<string, Held>();
   /** White pins only use their height; where they were dropped sideways (pin key -> x). */
@@ -280,6 +302,12 @@ export class ColorView extends StudioView {
   }
 
   private posOf(id: string, index: number, order: number, key = `${id}#0`): XY {
+    const put = this.dropped.get(`${id}#${index}`);
+    if (put?.mode === this.currentMode) {
+      if (put.mirek !== undefined && Math.abs(this.mirek(id) - put.mirek) < 3) return put.raw;
+      const xy = this.points(id)?.[index];
+      if (put.xy && xy && Math.hypot(xy[0] - put.xy[0], xy[1] - put.xy[1]) < 0.004) return put.raw;
+    }
     const spreadX = (order - (this.lights().length - 1) / 2) * 0.2;
     if (this.currentMode === "white") {
       const y = mirekToWheelY(this.mirek(id));
@@ -346,7 +374,10 @@ export class ColorView extends StudioView {
           : nothing}
         ${idle && busy.length ? this.syncNote(busy, false) : nothing}
         <div class="light-row">${group.lights.map((id) =>
-          lightTile(ctx, id, () => (this.selected = this.selected === id ? null : id), {
+          lightTile(ctx, id, () => {
+            haptic("selection");
+            this.selected = this.selected === id ? null : id;
+          }, {
             selected: id === this.selected,
             busy: busy.includes(id),
             // The light's room, like the Hue app's cards (a zone's lights come from several).
@@ -426,6 +457,7 @@ export class ColorView extends StudioView {
       const at = (e.currentTarget as HTMLElement).getBoundingClientRect();
       this.capture(e);
       this.briDrag = { id: e.pointerId, y: e.clientY, start: value, moved: false, relative: true };
+      haptic("light");
       this.bri = { at, held: true };
     };
     const key = (e: KeyboardEvent) => {
@@ -459,7 +491,14 @@ export class ColorView extends StudioView {
   }
 
   private briSet(target: Group, v: number): void {
-    this.dragBrightness = Math.min(100, Math.max(1, Math.round(v)));
+    const next = Math.min(100, Math.max(1, Math.round(v)));
+    const prev = this.dragBrightness;
+    // A tick every 10 %, a firmer one at either end.
+    if (prev !== null && prev !== next) {
+      if (next === 1 || next === 100) haptic("light");
+      else if (Math.floor(prev / 10) !== Math.floor(next / 10)) haptic("selection");
+    }
+    this.dragBrightness = next;
     brightnessSender(this.ctx, target)(this.dragBrightness);
   }
 
@@ -552,9 +591,13 @@ export class ColorView extends StudioView {
   /** Lines joining the pins of each gradient light. */
   private paths() {
     const gradients = this.colorLights.filter((id) => this.capable(id) > 1);
+    const drag = this.dragging;
+    const pins = this.pins();
     return svg`<svg class="paths" viewBox="-1 -1 2 2" aria-hidden="true">${gradients.map((id) => {
-      const points = this.points(id);
-      return points ? svg`<path class=${id === this.selected ? "selected" : ""} d=${gradientPath(points)}></path>` : nothing;
+      // Through the pins where they are drawn (the dragged ones under the finger).
+      const at = pins.filter((p) => p.id === id).map((p) => (drag?.pins.some((q) => q.key === p.key) ? drag.pos : p.pos));
+      const d = smoothPath(at);
+      return d ? svg`<path class=${id === this.selected ? "selected" : ""} d=${d}></path>` : nothing;
     })}</svg>`;
   }
 
@@ -618,6 +661,7 @@ export class ColorView extends StudioView {
   /** Run the gradient the other way: its points in reverse order. */
   private reverse(lights: string[]): void {
     const { ctx } = this;
+    haptic("light");
     this.stopEffects(lights);
     for (const id of lights) {
       const points = this.points(id);
@@ -632,6 +676,7 @@ export class ColorView extends StudioView {
 
   private setGradientMode(lights: string[], mode: string): void {
     const { ctx } = this;
+    haptic("selection");
     this.stopEffects(lights);
     for (const id of lights) {
       const points = this.points(id);
@@ -654,7 +699,11 @@ export class ColorView extends StudioView {
   }
 
   private modeButton(mode: Mode, cls: string, label: string, content: unknown = nothing) {
-    return html`<button class=${classMap({ [cls]: true, on: this.currentMode === mode })} aria-label=${label} title=${label} @click=${() => (this.mode = mode)}>${content}</button>`;
+    const pick = () => {
+      if (this.currentMode !== mode) haptic("selection");
+      this.mode = mode;
+    };
+    return html`<button class=${classMap({ [cls]: true, on: this.currentMode === mode })} aria-label=${label} title=${label} @click=${pick}>${content}</button>`;
   }
 
   private pin(st: Stack, mode: Mode) {
@@ -709,6 +758,7 @@ export class ColorView extends StudioView {
             if (this.pulling?.key !== p.key) return;
             const pos = this.wheelPos(e);
             const out = Math.hypot(...pos) > SPREAD_R;
+            if (out && !this.pulling.out) haptic("light");
             this.pulling = { key: p.key, pos, out: out || this.pulling.out };
             if (out) this.drag([p], pos);
           }}
@@ -740,20 +790,32 @@ export class ColorView extends StudioView {
 
   // ---------- dragging ----------
 
-  /** Pointer position on the wheel ([-1, 1] each, clamped to the disc). */
-  private wheelPos(e: PointerEvent): XY {
+  /** Pointer position on the wheel ([-1, 1] across the disc; not clamped). */
+  private wheelPoint(e: PointerEvent): XY {
     const r = this.querySelector(".wheel")!.getBoundingClientRect();
-    let x = ((e.clientX - r.left) / r.width) * 2 - 1;
-    let y = ((e.clientY - r.top) / r.height) * 2 - 1;
-    const len = Math.hypot(x, y);
-    if (len > 1) [x, y] = [x / len, y / len];
-    return [x, y];
+    return [((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1];
+  }
+
+  /** Pointer position on the wheel, clamped to the disc. */
+  private wheelPos(e: PointerEvent): XY {
+    return onDisc(this.wheelPoint(e));
+  }
+
+  /** The other pin a dragged one at `pos` would join, if it is close enough. */
+  private nearPin(pins: Pin[], pos: XY): Stack | null {
+    const unit = this.querySelector(".wheel")!.getBoundingClientRect().width / 2;
+    const others = this.stacks(this.pins()).filter((st) => !st.pins.some((p) => pins.some((q) => q.key === p.key)));
+    const near = others.map((st) => ({ st, dist: Math.hypot(st.pos[0] - pos[0], st.pos[1] - pos[1]) })).sort((a, b) => a.dist - b.dist)[0];
+    return near && near.dist * unit < SNAP_PX ? near.st : null;
   }
 
   private onPinDown(e: PointerEvent, st: Stack): void {
     e.preventDefault();
     this.capture(e);
-    this.dragging = { key: st.key, pins: st.pins, pos: st.pos, x: e.clientX, y: e.clientY, moved: false };
+    // Where the pin was grabbed relative to its tip: it moves with the finger, never jumps under it.
+    const at = this.wheelPoint(e);
+    const off: XY = [st.pos[0] - at[0], st.pos[1] - at[1]];
+    this.dragging = { key: st.key, pins: st.pins, pos: st.pos, off, x: e.clientX, y: e.clientY, moved: false, near: null };
     const lights = [...new Set(st.pins.map((p) => p.id))];
     if (lights.length === 1) this.selected = lights[0]!;
     this.stopEffects(lights);
@@ -763,7 +825,14 @@ export class ColorView extends StudioView {
     const d = this.dragging;
     if (!d) return;
     if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < PIN_SLOP) return;
-    this.dragging = { ...d, moved: true, pos: this.drag(d.pins, this.wheelPos(e)) };
+    if (!d.moved) haptic("selection");
+    const at = this.wheelPoint(e);
+    const pos = onDisc([at[0] + d.off[0], at[1] + d.off[1]]);
+    this.drag(d.pins, pos);
+    // A light tick when it comes close enough to join another pin.
+    const near = this.nearPin(d.pins, pos)?.key ?? null;
+    if (near && near !== d.near) haptic("selection");
+    this.dragging = { ...d, moved: true, pos, near };
   }
 
   /** A drag ends (dropped near another pin: it joins it); a tap on a stack spreads it. */
@@ -772,18 +841,19 @@ export class ColorView extends StudioView {
     if (!d) return;
     this.dragging = null;
     if (!d.moved) {
-      if (d.pins.length > 1) this.spread = { pins: d.pins, pos: d.pos, angle: Math.hypot(...d.pos) > 0.15 ? Math.atan2(d.pos[1], d.pos[0]) : -Math.PI / 2 };
+      if (d.pins.length > 1) {
+        haptic("selection");
+        this.spread = { pins: d.pins, pos: d.pos, angle: Math.hypot(...d.pos) > 0.15 ? Math.atan2(d.pos[1], d.pos[0]) : -Math.PI / 2 };
+      }
       return;
     }
-    let pos = this.wheelPos(e);
-    // Fingers aim at a pin's head, drawn above the tip that shows its color: either counts.
-    const unit = this.querySelector(".wheel")!.getBoundingClientRect().width / 2;
-    const head = PIN_HEAD_PX / unit;
-    const others = this.stacks(this.pins()).filter((st) => !st.pins.some((p) => d.pins.some((q) => q.key === p.key)));
-    const near = others
-      .map((st) => ({ st, dist: Math.min(Math.hypot(st.pos[0] - pos[0], st.pos[1] - pos[1]), Math.hypot(st.pos[0] - pos[0], st.pos[1] - head - pos[1])) }))
-      .sort((a, b) => a.dist - b.dist)[0];
-    if (near && near.dist * unit < SNAP_PX) pos = near.st.pos;
+    const at = this.wheelPoint(e);
+    let pos = onDisc([at[0] + d.off[0], at[1] + d.off[1]]);
+    const near = this.nearPin(d.pins, pos);
+    if (near) {
+      pos = near.pos;
+      haptic("medium");
+    }
     this.drag(d.pins, pos);
     this.ctx.flushSenders(SENDER);
   }
@@ -821,7 +891,10 @@ export class ColorView extends StudioView {
     if (white) {
       const [lo, hi] = info?.mirek || [153, 500];
       const mirek = Math.min(hi, Math.max(lo, wheelYToMirek(raw[1])));
-      pins.forEach((p) => this.whiteX.set(p.key, raw[0]));
+      pins.forEach((p) => {
+        this.whiteX.set(p.key, raw[0]);
+        this.dropped.set(p.key, { mode: "white", raw, mirek });
+      });
       ids.forEach((id) => this.hold(id, { mirek }));
       const target = whole ? group.target : ids;
       const interval = whole ? commandInterval(group) : LIGHT_INTERVAL * spacing;
@@ -832,6 +905,7 @@ export class ColorView extends StudioView {
     const xy = wheelToXy(...raw);
     const first = clipToGamut(xy, info?.gamut);
     const shown: XY = first === xy ? raw : xyToWheel(...first);
+    for (const p of pins) this.dropped.set(p.key, { mode: "color", raw, xy: clipToGamut(xy, ctx.lightInfo[p.id]?.gamut) });
     if (whole) {
       // Every light of the group, every point: one color, one group command.
       ids.forEach((id) => this.hold(id, { points: Array.from({ length: this.capable(id) }, () => first) }));

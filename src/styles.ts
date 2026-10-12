@@ -65,10 +65,15 @@ export const CSS = `
   .empty { margin: 24px 4px; color: var(--text-2); font-size: 14px; line-height: 1.5; }
 
   /* lit surfaces: the color layer fades in instead of jumping */
-  .surface { position: relative; isolation: isolate; background: var(--surface); }
-  .surface::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--lit-bg);
-                     opacity: 0; transition: opacity 0.35s var(--ease); }
-  .surface.lit::before { opacity: 1; }
+  /* The light's colors, softened like the Hue app's: blurred into each other and a touch less
+     saturated, a light shade towards the bottom, a soft shadow under light text. */
+  .surface { position: relative; isolation: isolate; overflow: clip; background: var(--surface); }
+  .surface::before { content: ""; position: absolute; inset: -24px; z-index: -1; background: var(--lit-bg);
+                     filter: blur(18px) saturate(0.85); opacity: 0; transition: opacity 0.35s var(--ease); }
+  .surface::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+                    background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.16)); opacity: 0; transition: opacity 0.35s var(--ease); }
+  .surface.lit::before, .surface.lit::after { opacity: 1; }
+  .surface.lit:not(.dark-text) { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.32); }
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
   .dark-text { color: #1c1c1e; }
 
@@ -183,11 +188,11 @@ export const CSS = `
   .light-row::-webkit-scrollbar { display: none; }
   /* Tall cards: icon, name, room and status on top, the switch in a zone of its own below (the Hue app's). The row
      stretches every card to the tallest, so a status line never squeezes the switch. */
-  .light-row .light { scroll-snap-align: start; min-height: 157px; box-sizing: border-box; justify-content: flex-start; gap: 0;
-                      padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
+  .light-row .light { scroll-snap-align: start; height: 172px; box-sizing: border-box; justify-content: flex-start; gap: 0;
+                      padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
   .light-row .light ha-icon { margin-top: 16px; --mdc-icon-size: 30px; }
-  .light-row .light .name { flex: none; align-items: flex-start; justify-content: center; min-height: 0; margin: 6px 8px 0; font-size: 15px;
-                            font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+  .light-row .light .name { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 0;
+                            margin: 6px 8px 0; font-size: 15px; font-weight: 600; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
   .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
                            text-overflow: ellipsis; max-width: calc(100% - 16px); }
   .light-row .light .status { max-width: calc(100% - 12px); margin: 3px 6px 0; font-size: 11px; font-weight: 700; line-height: 1.2;
@@ -199,7 +204,7 @@ export const CSS = `
   .switch-zone.inert .toggle { opacity: 0.35; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
-    .light-row .light { min-height: 128px; padding-bottom: 54px; }
+    .light-row .light { height: 146px; padding-bottom: 54px; }
     .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 26px; }
     .light-row .light .name { margin-top: 4px; font-size: 14px; }
     .light-row .light .switch-zone { height: 44px; }
