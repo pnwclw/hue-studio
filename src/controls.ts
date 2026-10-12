@@ -8,7 +8,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import type { StudioContext } from "./context.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
-import { LightElement, type Throttled, throttle, toggle } from "./ui.ts";
+import { LightElement, refuse, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -69,24 +69,30 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
 /** A light tile (room, scene editor, color view): icon, name, toggle; colored like the light. */
 export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false, sub = "" } = {}): TemplateResult {
   const state = ctx.hass.states[id];
-  const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
+  const colors = busy ? [] : lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const unreachable = !state || state.state === "unavailable";
   const brightness = state?.state === "on" ? Math.round(((state.attributes.brightness as number | undefined) ?? 255) / 2.55) : undefined;
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable, brightness });
   const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
-  // Busy: a Sync Box drives it; unreachable: the bridge lost it. Either is said, and the switch rests.
+  // Busy: a Sync Box drives it (the Hue app's "Sync active": a moving glow, the switch off, a
+  // tap refused); unreachable: the bridge lost it. Either is said, and the switch rests.
   const status = busy
-    ? html`<div class="status">${ctx.t("sync.syncing")}</div>`
+    ? html`<div class="status">${ctx.t("light.sync_active")}</div>`
     : unreachable
       ? html`<div class="status">${ctx.t("light.unreachable")}</div>`
       : nothing;
-  return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })} style=${styleMap(style)} @click=${busy ? null : open}>
+  return html`<div
+    class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })}
+    style=${styleMap(style)}
+    @click=${busy ? (e: Event) => refuse(e.currentTarget) : open}
+  >
+    ${busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing}
     <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
     <div class="name">${friendlyName(ctx.hass, id)}</div>
     ${sub ? html`<div class="sub">${sub}</div>` : nothing}
     ${status}
     <div class=${classMap({ "switch-zone": true, inert: busy || unreachable })}>
-      ${toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
+      ${toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
     </div>
   </div>`;
 }

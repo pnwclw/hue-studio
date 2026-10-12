@@ -27,11 +27,8 @@ export class HomeView extends StudioView {
       list.length ? html`<h2 class="label">${title}</h2><div class="cards">${list.map((g) => this.card(g))}</div>` : nothing;
 
     const loose = noRoomRows(ctx);
-    return this.screen(
-      this.tabHead(
-        ctx.hass.config?.location_name || t("home.title"),
-        groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing,
-      ),
+    return this.tabScreen(
+      ctx.hass.config?.location_name || t("home.title"),
       html`${this.syncBanners()}
       ${planHasNews(ctx.rooms)
         ? html`<button class="notice" @click=${() => ctx.go("/rooms")}>
@@ -41,6 +38,7 @@ export class HomeView extends StudioView {
       ${section(t("home.rooms"), home.rooms)} ${section(t("home.zones"), home.zones)}
       ${loose === nothing ? nothing : html`<h2 class="label">${t("home.no_room")}</h2>${loose}`}
       ${groups.length ? nothing : html`<p class="empty">${t("home.empty")}</p>`}`,
+      { end: groups.length ? toggle(anyOn, t("home.all_lights"), () => this.toggleAll(anyOn)) : nothing },
     );
   }
 

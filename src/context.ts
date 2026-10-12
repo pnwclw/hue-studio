@@ -7,7 +7,7 @@ import { navigate } from "./ha-internals.ts";
 import { localize, type Translate } from "./i18n.ts";
 import { adaptiveFor, buildHome, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
-import { confirmed, predictSync } from "./sync.ts";
+import { confirmed, predictSync, type SyncMemo, syncMemo } from "./sync.ts";
 import type {
   AutoLightMessage,
   Gallery,
@@ -41,6 +41,25 @@ export interface SceneDraft {
 const TOAST_MS = 3200;
 /** Like optimistic.ts: a prediction falls back to the real state after this long. */
 const SYNC_PREDICTION_MS = 5000;
+
+const SYNC_MEMO_KEY = "hue_studio.sync_memo";
+
+/** Sync Boxes' switches and lights, for HA's more-info before any WebSocket answer (per browser). */
+export function loadSyncMemo(): SyncMemo {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_MEMO_KEY) || "{}") as SyncMemo;
+  } catch {
+    return {};
+  }
+}
+
+function saveSyncMemo(memo: SyncMemo): void {
+  try {
+    localStorage.setItem(SYNC_MEMO_KEY, JSON.stringify(memo));
+  } catch {
+    // Private mode or blocked storage: more-info then learns it once the dialog subscribed.
+  }
+}
 
 export class StudioContext {
   /** `hass` with pending optimistic patches applied. */
@@ -150,6 +169,7 @@ export class StudioContext {
     });
     sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
       this.rawBoxes = msg.boxes;
+      saveSyncMemo(syncMemo(msg.boxes));
     });
     sub<PositionsMessage>("hue_studio/positions/subscribe", (msg) => {
       this.positions = msg;
@@ -291,7 +311,7 @@ export class StudioContext {
   }
 
   /** Change integration options from the panel (hue_studio/config/set); shown at once. */
-  async setConfig(change: Partial<Pick<StudioConfig, "auto_align" | "footer" | "footer_tabs">>): Promise<boolean> {
+  async setConfig(change: Partial<Pick<StudioConfig, "auto_align" | "footer" | "footer_tabs" | "gallery_seasonal" | "gallery_windows">>): Promise<boolean> {
     if (!this.raw?.callWS) return false;
     const before = this.config;
     this.config = { ...this.config, ...change };

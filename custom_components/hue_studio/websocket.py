@@ -25,6 +25,8 @@ from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
     CONF_FOOTER_TABS,
+    CONF_GALLERY_SEASONAL,
+    CONF_GALLERY_WINDOWS,
     CONF_HUE_ENTRY_ID,
     DOMAIN,
     FOOTER_MAX_TABS,
@@ -348,6 +350,10 @@ def ws_set_light_area(
     connection.send_result(msg["id"])
 
 
+# "MM-DD": a day of any year (a holiday window of the scene gallery).
+MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
+
+
 @websocket_api.require_admin
 @websocket_api.websocket_command(
     {
@@ -357,6 +363,10 @@ def ws_set_light_area(
         vol.Optional(CONF_FOOTER_TABS): vol.All(
             [cv.string], vol.Length(max=FOOTER_MAX_TABS)
         ),
+        vol.Optional(CONF_GALLERY_SEASONAL): bool,
+        vol.Optional(CONF_GALLERY_WINDOWS): {
+            cv.string: vol.All([vol.Match(MONTH_DAY)], vol.Length(min=2, max=2))
+        },
     }
 )
 @callback
@@ -373,7 +383,14 @@ def ws_set_config(
     changes = {
         k: v
         for k, v in msg.items()
-        if k in (CONF_AUTO_ALIGN, CONF_FOOTER, CONF_FOOTER_TABS)
+        if k
+        in (
+            CONF_AUTO_ALIGN,
+            CONF_FOOTER,
+            CONF_FOOTER_TABS,
+            CONF_GALLERY_SEASONAL,
+            CONF_GALLERY_WINDOWS,
+        )
     }
     for entry in hass.config_entries.async_entries(DOMAIN):
         if CONF_HUE_ENTRY_ID in entry.data:

@@ -43,6 +43,8 @@ async def test_options_flow_and_config_ws(
         "auto_align": False,
         "footer": False,
         "footer_tabs": [],
+        "gallery_seasonal": False,
+        "gallery_windows": {},
     }
 
     flow = hass.config_entries.options

@@ -34,11 +34,20 @@ export const CSS = `
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tab-head h1.big { margin: 2px 0 4px; }
-  /* A tab's header floats: the body scrolls under its blur. */
+  /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
+     title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
+     room header's size) and blurs what scrolls below. A search field takes the title's place. */
   main > * { position: relative; }
   .screen-head:has(> .tab-head) { position: absolute; top: 0; left: 0; right: 0; }
   .screen-head:has(> .tab-head) + .screen-body > .page { padding-top: calc(var(--head-h, 0px) + 10px); }
+  .screen-head:has(> .tab-head:not(.wide)) { transition: background-color 0.2s, border-color 0.2s; }
+  .screen-head:has(> .tab-head:not(.wide)):not(.scrolled):not(:has(.search-field)) {
+    background-color: transparent; border-bottom-color: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .screen-head:has(> .tab-head:not(.wide)) + .screen-body > .page { padding-top: var(--head-h, 0px); }
+  h1.big.tab-title { margin: 0 2px 2px; }
+  .tab-head .bar-title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                         opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
+  .screen-head.scrolled .bar-title { opacity: 1; transform: none; }
   /* Desktop: one row as tall as the HA sidebar's header. */
   .screen-head:has(> .tab-head.wide) { padding-top: var(--safe-top, 0px); padding-bottom: 0; }
   .tab-head.wide { display: flex; align-items: center; gap: 12px; height: calc(var(--header-height, 56px) - 1px); }
@@ -227,8 +236,27 @@ export const CSS = `
     .controls { margin-bottom: 12px; }
   }
   .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
+  /* A Sync Box drives it (the Hue app's "Sync active"): a soft light drifting over the tile. */
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
+  .light .sync-glow { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none;
+                      background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 70%); }
+  .light .sync-glow::before { content: ""; position: absolute; left: -50%; top: -30%; width: 200%; height: 160%;
+                              background: radial-gradient(closest-side, rgba(255, 255, 255, 0.16), transparent),
+                                          radial-gradient(closest-side, rgba(255, 255, 255, 0.09), transparent) 70% 80% / 70% 60% no-repeat;
+                              filter: blur(8px); animation: sync-drift 7s ease-in-out infinite alternate; }
+  @keyframes sync-drift {
+    0% { transform: translate(-22%, -12%) scale(0.7); }
+    50% { transform: translate(18%, 4%) scale(0.9); }
+    100% { transform: translate(-6%, 18%) scale(0.75); }
+  }
+  /* A tap that can't be served: a shake, left and right (with the error haptic). */
+  .refused { animation: refuse 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+  @keyframes refuse {
+    15% { transform: translateX(-7px); } 35% { transform: translateX(6px); } 55% { transform: translateX(-4px); }
+    75% { transform: translateX(2px); } 100% { transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .light .sync-glow::before { animation: none; } }
   .light .status { font-size: 12px; font-weight: 600; opacity: 0.85; }
 
   /* The color screen's bar, like the Hue app: "...", Save; Done. Transparent over the screen's glow. */
@@ -466,10 +494,10 @@ export const CSS = `
   .sheet .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
   /* gallery */
-  .search-field { display: flex; align-items: center; gap: 7px; height: 0; margin: 0; padding: 0 10px; box-sizing: border-box; overflow: hidden;
-                  border-radius: 10px; background: rgba(120, 120, 128, 0.24); color: var(--text-2); opacity: 0; cursor: text;
-                  transition: height 0.25s var(--ease), margin 0.25s var(--ease), opacity 0.2s; }
-  .search-field.on { height: 36px; margin: 4px 0 6px; opacity: 1; }
+  /* In a bar instead of its title (phones), or before the actions (desktop Explore tab). */
+  .search-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 34px; margin: 0; padding: 0 10px; box-sizing: border-box;
+                  border-radius: 10px; background: rgba(120, 120, 128, 0.24); color: var(--text-2); cursor: text; animation: field-in 0.25s var(--ease); }
+  @keyframes field-in { from { opacity: 0; transform: scaleX(0.96); } }
   .search-field svg { width: 18px; height: 18px; flex: none; }
   .search-field .q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: none; background: none; outline: none;
                      font: inherit; font-size: 16px; color: var(--text); }
@@ -643,6 +671,16 @@ export const CSS = `
   .sync-banner .title { font-size: 14px; font-weight: 500; line-height: 1.3; }
   .sync-banner .sub { font-size: 14px; line-height: 1.3; color: var(--text-2); }
   .sync-banner .pill { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; background: rgba(255, 255, 255, 0.14); }
+  /* Settings → Scene gallery: a holiday's dates under its name; whether a category shows now. */
+  .item.holiday { flex-wrap: wrap; }
+  .item.holiday .dates { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+  .date-field { display: flex; flex-direction: column; gap: 4px; }
+  .date-value { position: relative; display: flex; align-items: center; min-width: 76px; height: 36px; padding: 0 12px; box-sizing: border-box;
+                border-radius: 10px; background: rgba(120, 120, 128, 0.24); font-size: 16px; cursor: pointer; }
+  .date-value input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: none; opacity: 0; cursor: pointer;
+                      font-size: 16px; color-scheme: dark; }
+  .season-state { flex: none; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .season-state.on { color: #3ddc84; }
   .lead { margin: 0 2px 10px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
   .lead.small { margin-top: 12px; font-size: 13px; }
   .text-link { display: inline; margin-left: 4px; padding: 0; border: none; background: none; cursor: pointer; color: #6c9dff; font-size: inherit; }

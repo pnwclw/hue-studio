@@ -40,6 +40,32 @@ export function syncingIn(boxes: Record<string, SyncBoxInfo>, group: Pick<Group,
   return group.lights.filter((id) => synced.has(id));
 }
 
+/** The box that syncs every one of `lights` right now (a light, or a room fully synced), or null. */
+export function boxSyncing(boxes: Record<string, SyncBoxInfo>, lights: string[]): string | null {
+  if (!lights.length) return null;
+  return Object.entries(boxes).find(([, box]) => lights.every((id) => syncedLights(box).includes(id)))?.[0] ?? null;
+}
+
+/**
+ * What HA's more-info needs before our WebSocket answers: each box's sync switch and the
+ * lights of its current entertainment area (kept by the page between visits).
+ */
+export type SyncMemo = Record<string, { entity: string; lights: string[] }>;
+
+export function syncMemo(boxes: Record<string, SyncBoxInfo>): SyncMemo {
+  const memo: SyncMemo = {};
+  for (const [id, box] of Object.entries(boxes)) {
+    const lights = currentArea(box)?.lights;
+    if (box.entity_id && lights?.length) memo[id] = { entity: box.entity_id, lights };
+  }
+  return memo;
+}
+
+/** The box whose sync switch is on and whose area holds `light`, by the memo and HA's states. */
+export function memoBoxFor(memo: SyncMemo, states: Record<string, { state: string } | undefined>, light: string): string | null {
+  return Object.entries(memo).find(([, m]) => states[m.entity]?.state === "on" && m.lights.includes(light))?.[0] ?? null;
+}
+
 /** What the box will report after `hue_studio.set_sync` with `change` (mirrors the backend). */
 export function predictSync(box: SyncBoxInfo, change: SyncChange): SyncBoxInfo {
   const next: SyncBoxInfo = { ...box };

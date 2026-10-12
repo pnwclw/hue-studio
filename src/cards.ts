@@ -17,6 +17,7 @@ import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { currentHass, navigate } from "./ha-internals.ts";
 import { localize, type StringKey } from "./i18n.ts";
 import { findGroup, type Group, groupState, type Scene } from "./model.ts";
+import { gallerySeasons, shownCategories } from "./seasons.ts";
 import { CSS } from "./styles.ts";
 import type { Hass, LightControl } from "./types.ts";
 import { icon, toggle } from "./ui.ts";
@@ -225,7 +226,6 @@ class HueStudioRoomCard extends StudioCard {
               <div class="name">${g.name}</div>
               <div class="sub">${st.on ? `${st.brightness}%` : t("card.off")}</div>
             </button>
-            <button class="round" aria-label=${t("room.colors")} @click=${() => this.panel(`/room/${key}/color`)}>${icon("palette")}</button>
             ${toggle(st.on, t("common.toggle"), () => toggleGroup(ctx, g))}
           </div>
           ${groupSlider(ctx, g, st, t("common.brightness"))}
@@ -399,9 +399,10 @@ class HueStudioGalleryCard extends StudioCard {
     if (!target) return this.missing("card.no_room");
     if (!ctx.gallery) return html`<ha-card><div class="body warn">${t("rooms.loading")}</div></ha-card>`;
     const wanted = this.config.categories;
-    // Without a choice, the first few categories; the whole gallery is one tap away.
+    // Without a choice, the first few categories shown now (seasonal gallery); the whole gallery is one tap away.
+    const shown = wanted?.length ? wanted : shownCategories(ctx.gallery.categories, gallerySeasons(ctx.config), ctx.hass);
     const sections = ctx.gallery.categories
-      .filter((c) => !wanted?.length || wanted.includes(c.id))
+      .filter((c) => shown.includes(c.id))
       .map((c) => ({ c, items: ctx.gallery!.scenes.filter((s) => s.category === c.id) }))
       .filter((s) => s.items.length)
       .slice(0, wanted?.length ? undefined : DEFAULT_CATEGORIES);

@@ -238,12 +238,14 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
                                 auto-light (per area, and the list), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area),
-                                experimental, devices, bridges (and MotionAware), entertainment, integration (options)
+                                experimental, devices, bridges (and MotionAware), entertainment, integration (options),
+                                gallery-settings (all scenes, or everyday + seasonal)
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
   space.ts                      pure: placed lights, top-view coordinate mapping
   auto-light.ts                 pure: pools of the auto light editor, areas with/without auto light
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
-  sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync
+  sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
+  seasons.ts                    pure: seasonal gallery (holiday windows, season categories, season source)
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
   color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)

@@ -16,6 +16,7 @@ import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts"
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup, friendlyName, type Group, groupState } from "../model.ts";
+import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { sceneArt, sceneColors } from "./room.ts";
@@ -96,6 +97,7 @@ export class SceneView extends StudioView {
     const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
     const surface = surfaceOf({ on: true, colors: sceneColors(info) });
     const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}`;
+    const syncing = syncingIn(ctx.boxes, group);
     const name = draft.name ?? this.name;
     const speed = draft.speed ?? speedToStep(info?.speed ?? 0.5);
     const autoplay = draft.autoplay ?? !!info?.auto_dynamic;
@@ -166,7 +168,9 @@ export class SceneView extends StudioView {
       </div>
       <div class="grid">
         ${group.lights.map((id) =>
-          lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`)),
+          lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
+            busy: syncing.includes(id),
+          }),
         )}
       </div>
 

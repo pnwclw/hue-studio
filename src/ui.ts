@@ -4,6 +4,16 @@ import { html, LitElement, svg, type TemplateResult } from "lit";
 
 import { haptic } from "./ha-internals.ts";
 
+/** A tap on something that can't be used now (a light a Sync Box drives): the error haptic and a shake. */
+export function refuse(el: EventTarget | null): void {
+  haptic("failure");
+  if (!(el instanceof HTMLElement)) return;
+  el.classList.remove("refused");
+  void el.offsetWidth; // restart the animation
+  el.classList.add("refused");
+  el.addEventListener("animationend", () => el.classList.remove("refused"), { once: true });
+}
+
 export const normalize = (s: string): string =>
   String(s).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g, "");
 
@@ -28,12 +38,6 @@ export const ICONS = {
     "C18.14 7.41 18.15 8.68 17.37 9.46C16.59 10.24 15.32 10.24 14.54 9.46M8.88 16.53L7.47 15.12L8.88 16.53" +
     "M6.24 22L9.88 18.36C9.54 18.27 9.21 18.12 8.91 17.91L4.83 22H6.24M2 22H3.41L8.18 17.24L6.76 15.83L2 20.59V22" +
     "M2 19.17L6.09 15.09C5.88 14.79 5.73 14.47 5.64 14.12L2 17.76V19.17Z",
-  palette:
-    "M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5" +
-    "A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5" +
-    "A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5" +
-    "A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5" +
-    "C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z",
   effects:
     "M19,1L17.74,3.75L15,5L17.74,6.26L19,9L20.25,6.26L23,5L20.25,3.75M9,4L6.5,9.5L1,12L6.5,14.5L9,20L11.5,14.5L17,12L11.5,9.5" +
     "M19,15L17.74,17.74L15,19L17.74,20.25L19,23L20.25,20.25L23,19L20.25,17.74",

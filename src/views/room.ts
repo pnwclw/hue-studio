@@ -17,7 +17,7 @@ import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, 
 import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
-import { icon, toggle } from "../ui.ts";
+import { icon, refuse, toggle } from "../ui.ts";
 import { whiteArt } from "./auto-light.ts";
 import { StudioView } from "./base.ts";
 import "./new-scene.ts";
@@ -43,6 +43,7 @@ export class RoomView extends StudioView {
     const state = groupState(ctx.hass, g, ctx.lightInfo);
     const surface = surfaceOf(state);
     const room = encodeURIComponent(g.key);
+    const syncing = syncingIn(ctx.boxes, g);
 
     // The room's colored header stays; scenes and lights scroll below it.
     return html`<div class="screen-head hero-head">
@@ -59,9 +60,6 @@ export class RoomView extends StudioView {
             <button class="round add" aria-label=${t("room.gallery")} @click=${() => ctx.go(`/gallery?room=${room}`)}>
               ${icon("plus")}
             </button>
-            <button class="round colors" aria-label=${t("room.colors")} @click=${() => ctx.go(`/room/${room}/color`)}>
-              ${icon("palette")}
-            </button>
             ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
           </div>
           ${groupSlider(ctx, g, state, t("common.brightness"))}
@@ -74,7 +72,7 @@ export class RoomView extends StudioView {
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
       ${this.syncNote(g)}
-      <div class=${classMap({ grid: true, "scene-row": true, locked: syncingIn(ctx.boxes, g).length > 0 })}>
+      <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>
         ${this.autoTile(g)} ${g.scenes.map((s) => this.scene(g, s))}
         <button class="scene add-scene" @click=${() => this.openNew()}>
           <div class="dot">${icon("plus")}</div>
@@ -88,7 +86,7 @@ export class RoomView extends StudioView {
           : nothing}
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
-      <div class="light-row">${g.lights.map((id) => this.light(id))}</div>
+      <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
     </div></div>
     ${this.adding
       ? html`<hue-studio-new-scene .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-new-scene>`
@@ -192,8 +190,8 @@ export class RoomView extends StudioView {
     const now = area ? ctx.autoLight?.state[area] : undefined;
     if (!area || !now || now.control === "off" || (!now.kelvin && !now.scene)) return nothing;
     const dot = now.kelvin ? whiteArt(now.kelvin) : `url("${thumbUrl(now.scene!)}") center / cover`;
-    const apply = () => {
-      if (syncingIn(ctx.boxes, g).length) return;
+    const apply = (e: Event) => {
+      if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
       ctx.call("hue_studio", "apply_auto_light", { area, resume: true, transition: 1 }, { optimistic: false });
     };
     const settings = (e: Event) => {
@@ -226,9 +224,9 @@ export class RoomView extends StudioView {
     const colors = info ? sceneColors(info) : [];
     const surface = surfaceOf({ on: active, colors });
     const room = encodeURIComponent(g.key);
-    const apply = async () => {
+    const apply = async (e: Event) => {
       // The Sync Box would overwrite the scene right away.
-      if (syncingIn(ctx.boxes, g).length) return;
+      if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
       if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);
     };
     const play = async (e: Event) => {
@@ -284,10 +282,13 @@ export class RoomView extends StudioView {
     </div>`;
   }
 
-  /** A light card, the same as in the color screen; a tap opens the light's dialog (the color screen). */
-  private light(id: string) {
+  /**
+   * A light card, the same as in the color screen; a tap opens the light's dialog (the color
+   * screen). A light a Sync Box drives is not opened: the tap is refused.
+   */
+  private light(id: string, busy: boolean) {
     const open = () => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
-    return lightTile(this.ctx, id, open);
+    return lightTile(this.ctx, id, open, { busy });
   }
 }
 

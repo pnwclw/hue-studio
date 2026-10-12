@@ -10,6 +10,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import { paletteArt, paletteColors } from "../color.ts";
 import { thumbUrl } from "../gallery-data.ts";
 import { allGroups, findGroup, type Group } from "../model.ts";
+import { gallerySeasons, shownCategories } from "../seasons.ts";
 import { canSpread } from "../space.ts";
 import type { Gallery, GalleryScene } from "../types.ts";
 import { icon, normalize } from "../ui.ts";
@@ -44,52 +45,54 @@ export class GalleryView extends StudioView {
       else this.query = "";
     };
     const q = normalize(this.query);
+    // Seasonal gallery (a setting): holiday and season categories only in their time.
+    const shown = ctx.gallery ? shownCategories(ctx.gallery.categories, gallerySeasons(ctx.config), ctx.hass) : [];
 
     // The search field lives in the header: always there in the desktop Explore tab, else
-    // under the title (or the bar) while the search button is on.
+    // in the bar instead of the title while the search button is on.
     const wide = !this.room && !ctx.narrow;
-    const shown = wide || this.searching;
-    const field = html`<label class=${classMap({ "search-field": true, on: shown })} ?inert=${!shown}>
-      ${icon("search")}
-      <input
-        class="q"
-        type="search"
-        placeholder=${t("gallery.search")}
-        autocomplete="off"
-        .value=${this.query}
-        @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
-        @keydown=${(e: KeyboardEvent) => e.key === "Escape" && (wide ? (this.query = "") : this.searching && toggleSearch())}
-      />
-    </label>`;
-    const toggle = html`<button class="round search" aria-label=${t("gallery.search_button")} aria-pressed=${this.searching} @click=${toggleSearch}>
-      ${icon(this.searching ? "close" : "search")}
-    </button>`;
-    // Opened from a room: a screen of its own; else the Explore tab.
-    const head = this.room
-      ? html`${this.subHead(t("gallery.title"), back, toggle)}${field}`
-      : wide
-        ? this.tabHead(t("gallery.title"), field)
-        : this.tabHead(t("gallery.title"), toggle, { below: field });
-    return html`${this.screen(
-        head,
-        html`        ${groups.length > 1 && !this.room
-          ? html`<h2 class="label">${t("gallery.target")}</h2>
-              <div class="chips">
-                ${groups.map(
-                  (g) => html`<button class=${classMap({ chip: true, on: g.key === target?.key })} @click=${() => (this.targetKey = g.key)}>
-                    <ha-icon icon=${g.icon}></ha-icon>${g.name}
-                  </button>`,
-                )}
-              </div>`
-          : nothing}
-        ${ctx.gallery ? guard([ctx.gallery, q], () => this.body(ctx.gallery!, q)) : nothing}
-        ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`,
-      )}
+    const field = wide || this.searching
+      ? html`<label class="search-field">
+          ${icon("search")}
+          <input
+            class="q"
+            type="search"
+            placeholder=${t("gallery.search")}
+            autocomplete="off"
+            .value=${this.query}
+            @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => e.key === "Escape" && (wide ? (this.query = "") : this.searching && toggleSearch())}
+          />
+        </label>`
+      : nothing;
+    const toggle = wide
+      ? nothing
+      : html`<button class="round search" aria-label=${t("gallery.search_button")} aria-pressed=${this.searching} @click=${toggleSearch}>
+          ${icon(this.searching ? "close" : "search")}
+        </button>`;
+    const body = html`${groups.length > 1 && !this.room
+        ? html`<h2 class="label">${t("gallery.target")}</h2>
+            <div class="chips">
+              ${groups.map(
+                (g) => html`<button class=${classMap({ chip: true, on: g.key === target?.key })} @click=${() => (this.targetKey = g.key)}>
+                  <ha-icon icon=${g.icon}></ha-icon>${g.name}
+                </button>`,
+              )}
+            </div>`
+        : nothing}
+      ${ctx.gallery ? guard([ctx.gallery, q, shown.join()], () => this.body(ctx.gallery!, q, shown)) : nothing}
+      ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`;
+    // Opened from a room: a screen of its own (the field replaces its title); else the Explore tab.
+    const screen = this.room
+      ? this.screen(this.subHead(t("gallery.title"), back, toggle, field), body)
+      : this.tabScreen(t("gallery.title"), body, { center: field, end: toggle });
+    return html`${screen}
       ${this.open ? this.sheet(this.open, target) : nothing}`;
   }
 
-  private body(gallery: Gallery, q: string) {
+  private body(gallery: Gallery, q: string, shown: string[]) {
     const sections = gallery.categories
+      .filter((c) => shown.includes(c.id))
       .map((c) => ({ c, items: gallery.scenes.filter((s) => s.category === c.id && (!q || normalize(s.name).includes(q))) }))
       .filter(({ items }) => items.length);
     return html`<div class=${classMap({ body: true, searching: !!q })} @click=${this.onTileClick}>

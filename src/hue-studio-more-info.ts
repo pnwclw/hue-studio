@@ -8,11 +8,12 @@
 import { css, html, LitElement, nothing, unsafeCSS } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 
-import { StudioContext } from "./context.ts";
-import { currentHass, openPanelFrom, watchHass } from "./ha-internals.ts";
+import { loadSyncMemo, PANEL_PATH, StudioContext } from "./context.ts";
+import { currentHass, navigate, openPanelFrom, watchHass } from "./ha-internals.ts";
 import { allGroups, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
+import { boxSyncing, memoBoxFor } from "./sync.ts";
 import { keepTouchInside } from "./ui.ts";
 import "./views/color.ts";
 import type { ColorView, MenuItem } from "./views/color.ts";
@@ -141,6 +142,17 @@ class HueStudioLightDialog extends LitElement {
   }
 
   private changed(): void {
+    const ctx = this.ctx;
+    if (ctx?.ready) {
+      // A Sync Box drives what was opened: its page instead of a color picker that can't act.
+      const { group, focus } = subjectOf(ctx.hass, ctx.home, this.entityId);
+      const box = boxSyncing(ctx.boxes, focus ? [focus] : group.lights);
+      if (box) {
+        this.close();
+        openSyncPage(box);
+        return;
+      }
+    }
     this.rev++;
     this.requestUpdate();
   }
@@ -192,6 +204,11 @@ class HueStudioLightDialog extends LitElement {
 
 if (!customElements.get("hue-studio-light-dialog")) customElements.define("hue-studio-light-dialog", HueStudioLightDialog);
 
+/** The panel's Sync page of a box (HA's back button returns to where more-info was opened). */
+function openSyncPage(box: string): void {
+  navigate(`${PANEL_PATH}/sync?box=${encodeURIComponent(box)}`);
+}
+
 function isHueLight(hass: Hass | undefined, id: unknown): id is string {
   return typeof id === "string" && id.startsWith("light.") && hass?.entities?.[id]?.platform === "hue";
 }
@@ -207,7 +224,14 @@ function onMoreInfo(ev: Event): void {
   } catch {
     return;
   }
-  if (!isHueLight(hass, id)) return;
+  if (!hass || !isHueLight(hass, id)) return;
+  // A light a Sync Box drives now (known from an earlier visit): straight to the box's page.
+  const box = memoBoxFor(loadSyncMemo(), hass.states, id);
+  if (box) {
+    ev.stopImmediatePropagation();
+    openSyncPage(box);
+    return;
+  }
   let dialog: HueStudioLightDialog | undefined;
   try {
     dialog = document.createElement("hue-studio-light-dialog") as HueStudioLightDialog;

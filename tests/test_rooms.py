@@ -384,3 +384,30 @@ async def test_ws_set_footer(
         {"type": "hue_studio/config/set", "footer_tabs": list("abcdef")}
     )
     assert not (await client.receive_json())["success"]
+
+
+async def test_ws_set_gallery_seasons(
+    hass: HomeAssistant,
+    rooms_bridge: MagicMock,
+    studio_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """The seasonal gallery is a panel option; holiday windows are "MM-DD" pairs."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/config/set",
+            "gallery_seasonal": True,
+            "gallery_windows": {"halloween": ["10-15", "11-01"]},
+        }
+    )
+    assert (await client.receive_json())["success"]
+    config = async_frontend_config(hass)
+    assert config["gallery_seasonal"] is True
+    assert config["gallery_windows"] == {"halloween": ["10-15", "11-01"]}
+
+    for bad in (["10-15"], ["13-01", "11-01"], ["10-32", "11-01"], ["1-5", "2-6"]):
+        await client.send_json_auto_id(
+            {"type": "hue_studio/config/set", "gallery_windows": {"halloween": bad}}
+        )
+        assert not (await client.receive_json())["success"]

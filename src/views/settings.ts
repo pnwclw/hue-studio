@@ -28,8 +28,8 @@ export class SettingsView extends StudioView {
       : planHasNews(plan)
         ? t("settings.rooms_differ")
         : t("settings.rooms_zones", { zones: hueZones(ctx.hass).length });
-    return this.screen(
-      this.tabHead(t("settings.title")),
+    return this.tabScreen(
+      t("settings.title"),
       html`<h2 class="label">${t("settings.home")}</h2>
         <div class="rows">
           ${row("mdi:lightbulb-group-outline", t("settings.devices"), "/settings/devices", t("settings.devices_sub"))}
@@ -41,10 +41,11 @@ export class SettingsView extends StudioView {
         <div class="rows">
           ${row("mdi:floor-plan", t("rooms.title"), "/rooms", roomsSub, planHasNews(plan))}
           ${row("mdi:lightbulb-auto-outline", t("settings.auto_light"), "/settings/auto", autoAreas ? t("settings.auto_areas", { count: autoAreas }) : "")}
+          ${row("mdi:image-multiple-outline", t("settings.gallery"), "/settings/gallery", t(ctx.config.gallery_seasonal ? "settings.gallery_seasonal" : "settings.gallery_all"))}
           ${row("mdi:cog-outline", t("settings.integration"), "/settings/integration", t("settings.integration_sub"))}
           ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t(ctx.config.footer ? "exp.on" : "exp.sub"))}
         </div>`,
-      "settings-page",
+      { cls: "settings-page" },
     );
   }
 }

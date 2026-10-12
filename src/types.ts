@@ -191,6 +191,9 @@ export interface StudioConfig {
   /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */
   footer?: boolean;
   footer_tabs?: string[];
+  /** Scene gallery: only everyday categories plus those in season; holiday windows ("MM-DD") that differ from the defaults. */
+  gallery_seasonal?: boolean;
+  gallery_windows?: Record<string, [string, string]>;
 }
 
 /** The Hue room of an area after alignment (hue_studio/rooms/subscribe). */

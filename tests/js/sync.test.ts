@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { boxesForGroup, confirmed, hasFeature, predictSync, statusKey, syncedLights, syncingIn } from "../../src/sync.ts";
+import { boxesForGroup, boxSyncing, confirmed, hasFeature, memoBoxFor, predictSync, statusKey, syncedLights, syncingIn, syncMemo } from "../../src/sync.ts";
 import type { SyncBoxInfo } from "../../src/types.ts";
 
 const BOX: SyncBoxInfo = {
@@ -80,4 +80,21 @@ test("music palette and background lighting are predicted too", () => {
   assert.deepEqual(predictSync(box, { background_lighting: true }).background_lighting, { video: true, game: false });
   assert.equal(hasFeature(box, "presets"), false);
   assert.equal(hasFeature({ ...box, features: ["presets"] }, "presets"), true);
+});
+
+test("the box that syncs a light or a whole room", () => {
+  const boxes = { tv: { ...BOX, syncing: true } };
+  assert.equal(boxSyncing(boxes, ["light.tv_strip"]), "tv");
+  assert.equal(boxSyncing(boxes, LIVING.lights), null);
+  assert.equal(boxSyncing(boxes, []), null);
+  assert.equal(boxSyncing({ tv: BOX }, ["light.tv_strip"]), null);
+});
+
+test("the sync memo answers more-info from the switch's state", () => {
+  const memo = syncMemo({ tv: BOX });
+  assert.deepEqual(memo, { tv: { entity: "switch.sync_box_light_sync", lights: ["light.tv_strip", "light.play_left"] } });
+  const on = { "switch.sync_box_light_sync": { state: "on" } };
+  assert.equal(memoBoxFor(memo, on, "light.play_left"), "tv");
+  assert.equal(memoBoxFor(memo, on, "light.candle"), null);
+  assert.equal(memoBoxFor(memo, { "switch.sync_box_light_sync": { state: "off" } }, "light.play_left"), null);
 });

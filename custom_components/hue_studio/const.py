@@ -30,6 +30,10 @@ CONF_AUTO_ALIGN: Final = "auto_align"
 CONF_FOOTER: Final = "footer"
 CONF_FOOTER_TABS: Final = "footer_tabs"
 FOOTER_MAX_TABS: Final = 5
+# Scene gallery: everyday categories plus those in season (else all), and holiday date
+# windows ({category: ["MM-DD", "MM-DD"]}) that differ from the panel's defaults.
+CONF_GALLERY_SEASONAL: Final = "gallery_seasonal"
+CONF_GALLERY_WINDOWS: Final = "gallery_windows"
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
 
