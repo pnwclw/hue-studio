@@ -245,7 +245,8 @@ export function adaptiveFor(hass: HassData, group: Pick<Group, "lights" | "group
 export function colorsCss(colors: string[], fallback: string): string {
   if (!colors.length) return fallback;
   const list = colors.length === 1 ? [colors[0], colors[0]] : colors;
-  return `linear-gradient(90deg, ${list.join(", ")})`;
+  // The angle comes from the surface (cards run top to bottom, wide headers across).
+  return `linear-gradient(var(--lit-angle, 160deg), ${list.join(", ")})`;
 }
 
 /** True when the mean of CSS rgb() colors is light enough to need dark text on top. */

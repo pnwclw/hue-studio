@@ -71,9 +71,10 @@ export const CSS = `
   .surface::before { content: ""; position: absolute; inset: -24px; z-index: -1; background: var(--lit-bg);
                      filter: blur(18px) saturate(0.85); opacity: 0; transition: opacity 0.35s var(--ease); }
   .surface::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-                    background: linear-gradient(rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.16)); opacity: 0; transition: opacity 0.35s var(--ease); }
+                    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.26));
+                    opacity: 0; transition: opacity 0.35s var(--ease); }
   .surface.lit::before, .surface.lit::after { opacity: 1; }
-  .surface.lit:not(.dark-text) { text-shadow: 0 1px 3px rgba(0, 0, 0, 0.32); }
+  .hero, .card.surface { --lit-angle: 105deg; }
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
   .dark-text { color: #1c1c1e; }
 
@@ -147,7 +148,7 @@ export const CSS = `
 
   /* room */
   .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 22px 22px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }
-  .hero .title { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hero .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hero .inner { max-width: 960px; margin: 0 auto; }
   .hero .meta { margin: 2px 2px 0; }
   .sensor-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
@@ -182,7 +183,7 @@ export const CSS = `
   .light.unavailable { opacity: 0.45; }
   .light.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #fff; }
   /* The room's lights under the color wheel, like the Hue app: a row of cards, tap to pick one. */
-  .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 100px; gap: 12px; overflow-x: auto;
+  .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto;
                margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
@@ -190,15 +191,17 @@ export const CSS = `
      stretches every card to the tallest, so a status line never squeezes the switch. */
   .light-row .light { scroll-snap-align: start; height: 172px; box-sizing: border-box; justify-content: flex-start; gap: 0;
                       padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
-  .light-row .light ha-icon { margin-top: 16px; --mdc-icon-size: 30px; }
+  /* The icon on top, the text centered in what is left above the switch. */
+  .light-row .light ha-icon { margin-top: 18px; --mdc-icon-size: 30px; }
   .light-row .light .name { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 0;
-                            margin: 6px 8px 0; font-size: 15px; font-weight: 600; line-height: 1.15; overflow: hidden; overflow-wrap: anywhere; }
+                            margin: auto 8px 0; font-size: 14.5px; font-weight: 500; line-height: 1.2; overflow: hidden; overflow-wrap: anywhere; }
+  .light-row .light > :nth-last-child(2) { margin-bottom: auto; }
   .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
                            text-overflow: ellipsis; max-width: calc(100% - 16px); }
   .light-row .light .status { max-width: calc(100% - 12px); margin: 3px 6px 0; font-size: 11px; font-weight: 700; line-height: 1.2;
                               letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .light-row .light .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center;
-                                   justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.14);
+                                   justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
                                    border-top: 1px solid rgba(255, 255, 255, 0.1); }
   .switch-zone.inert { pointer-events: none; }
   .switch-zone.inert .toggle { opacity: 0.35; }
@@ -296,22 +299,22 @@ export const CSS = `
   .wheel.color { background: var(--wheel-color); }
   .wheel.white { background: var(--wheel-white); }
   .wheel .paths { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-  .wheel .paths path { fill: none; stroke: rgba(255, 255, 255, 0.7); stroke-width: 2px; vector-effect: non-scaling-stroke;
+  .wheel .paths path { fill: none; stroke: rgba(0, 0, 0, 0.55); stroke-width: 1px; vector-effect: non-scaling-stroke;
                        stroke-linecap: round; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)); }
-  .wheel .paths path.selected { stroke: #fff; stroke-width: 2.5px; }
+  .wheel .paths path.selected { stroke: rgba(0, 0, 0, 0.8); stroke-width: 1.5px; }
   .pin { position: absolute; width: 42px; height: 42px; margin: -48px 0 0 -21px; cursor: grab; touch-action: none; z-index: 1;
-         filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45)); transition: transform 0.2s var(--spring), left 0.35s var(--ease), top 0.35s var(--ease), opacity 0.25s; }
+         filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35)); transition: transform 0.2s var(--spring), left 0.35s var(--ease), top 0.35s var(--ease), opacity 0.25s; }
   .pin::before { content: ""; position: absolute; inset: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-                 background: var(--pin); border: 2.5px solid #fff; box-sizing: border-box; transition: background 0.2s; }
+                 background: var(--pin); box-sizing: border-box; transition: background 0.2s; }
   .pin::after { content: ""; position: absolute; inset: -6px; }
   .pin ha-icon { position: relative; height: 100%; align-items: center; justify-content: center; --mdc-icon-size: 20px;
-                 color: rgba(28, 28, 30, 0.82); pointer-events: none; }
+                 color: #fff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); pointer-events: none; }
   .pin.off { opacity: 0.5; }
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   /* Pins with one color: one pin with their count; a tap spreads them around a disc (the Hue app's). */
   .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 18px;
-                      font-weight: 600; color: rgba(28, 28, 30, 0.85); pointer-events: none; }
+                      font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); pointer-events: none; }
   .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
   .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
                  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
@@ -583,6 +586,16 @@ export const CSS = `
   .sync-note { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px;
                line-height: 1.4; color: var(--text-2); background: rgba(10, 98, 255, 0.14); }
   .sync-note svg { flex: none; width: 18px; height: 18px; color: #6c9dff; }
+  /* Phones: a room's scenes scroll sideways in two rows, cards as wide as the light cards (the Hue app's). */
+  @media (max-width: 600px) {
+    .grid.scene-row { grid-template-columns: none; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: 104px;
+                      gap: 12px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none;
+                      scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+    .grid.scene-row::-webkit-scrollbar { display: none; }
+    .grid.scene-row .scene { box-sizing: border-box; aspect-ratio: auto; height: 116px; scroll-snap-align: start; }
+    .grid.scene-row .scene .dot { width: 48px; height: 48px; }
+    .grid.scene-row .scene .name { font-size: 14.5px; font-weight: 500; }
+  }
   .grid.locked .scene { opacity: 0.45; cursor: default; }
   .grid.locked .scene:active { transform: none; }
   .sync-meta svg { width: 14px; height: 14px; }

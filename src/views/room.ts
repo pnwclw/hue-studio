@@ -67,7 +67,7 @@ export class RoomView extends StudioView {
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
       ${this.syncNote(g)}
-      <div class=${classMap({ grid: true, locked: syncingIn(ctx.boxes, g).length > 0 })}>
+      <div class=${classMap({ grid: true, "scene-row": true, locked: syncingIn(ctx.boxes, g).length > 0 })}>
         ${this.autoTile(g)} ${g.scenes.map((s) => this.scene(g, s))}
         <button class="scene add-scene" @click=${() => this.openNew()}>
           <div class="dot">${icon("plus")}</div>
