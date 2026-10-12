@@ -30,6 +30,8 @@ export class RoomView extends StudioView {
 
   /** The "New scene" sheet is open. */
   @state() private accessor adding = false;
+  /** Brightness while the header's slider is dragged: the header shows just the percentage. */
+  @state() private accessor dragging: number | null = null;
 
   protected override render() {
     const { ctx } = this;
@@ -45,10 +47,15 @@ export class RoomView extends StudioView {
     // The room's colored header stays; scenes and lights scroll below it.
     return html`<div class="screen-head hero-head">
       <div class=${classMap({ hero: true, ...surface.classes })} style=${styleMap(surface.style)}>
-        <div class="inner">
-          <div class="topbar">
+        <div
+          class="inner"
+          @value-input=${(e: CustomEvent<number>) => (this.dragging = e.detail)}
+          @value-change=${() => (this.dragging = null)}
+          @value-cancel=${() => (this.dragging = null)}
+        >
+          <div class=${classMap({ topbar: true, adjusting: this.dragging !== null })}>
             <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("")}>${icon("back")}</button>
-            <div class="title">${g.name}</div>
+            <div class="title">${this.dragging !== null ? `${this.dragging}%` : g.name}</div>
             <button class="round add" aria-label=${t("room.gallery")} @click=${() => ctx.go(`/gallery?room=${room}`)}>
               ${icon("plus")}
             </button>

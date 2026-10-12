@@ -92,18 +92,18 @@ export const CSS = `
   .toggle.on:active span { transform: translateX(14px); }
   .lit .toggle.on { background: rgba(0, 0, 0, 0.22); }
 
-  /* brightness slider */
-  .slider { position: relative; height: 8px; margin: 16px 2px 2px; border-radius: 4px; cursor: pointer; touch-action: pan-y;
+  /* brightness slider: a thin track and a small knob (the Hue app's, measured at 430pt) */
+  .slider { position: relative; height: 6px; margin: 16px 2px 2px; border-radius: 3px; cursor: pointer; touch-action: pan-y;
             background: rgba(255, 255, 255, 0.14); }
-  .slider::before { content: ""; position: absolute; inset: -14px 0; }
-  .slider .fill { position: absolute; inset: 0 auto 0 0; width: var(--value); border-radius: 4px;
+  .slider::before { content: ""; position: absolute; inset: -16px 0; }
+  .slider .fill { position: absolute; inset: 0 auto 0 0; width: var(--value); border-radius: 3px;
                   background: linear-gradient(90deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.75));
                   transition: width 0.25s var(--ease), opacity 0.25s; }
-  .slider .knob { position: absolute; top: 50%; left: var(--value); width: 22px; height: 22px; border-radius: 50%; background: #fff;
-                  transform: translate(-50%, -50%); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  .slider .knob { position: absolute; top: 50%; left: var(--value); width: 16px; height: 16px; border-radius: 50%; background: #fff;
+                  transform: translate(-50%, -50%); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
                   transition: left 0.25s var(--ease), opacity 0.25s, transform 0.15s var(--ease); }
   .slider.dragging .fill, .slider.dragging .knob { transition: none; }
-  .slider.dragging .knob { transform: translate(-50%, -50%) scale(1.12); }
+  .slider.dragging .knob { transform: translate(-50%, -50%) scale(1.15); }
   .off .slider .fill, .off .slider .knob, .slider[disabled] .fill, .slider[disabled] .knob { opacity: 0; }
   .slider[disabled] { cursor: inherit; }
   .dark-text .slider { background: rgba(0, 0, 0, 0.12); }
@@ -151,6 +151,10 @@ export const CSS = `
   /* room */
   .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 22px 22px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }
   .hero .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Dragging the brightness: the bar shows just the percentage (the Hue app's). */
+  .hero .topbar > :not(.title) { transition: opacity 0.2s var(--ease); }
+  .hero .topbar.adjusting > :not(.title) { opacity: 0; pointer-events: none; }
+  .hero .topbar.adjusting .title { font-variant-numeric: tabular-nums; }
   .hero .inner { max-width: 960px; margin: 0 auto; }
   .hero .meta { margin: 2px 2px 0; }
   .sensor-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
@@ -618,6 +622,16 @@ export const CSS = `
   .notice .grow { flex: 1; min-width: 0; }
   .notice .go { flex: none; font-weight: 600; color: #6c9dff; }
   .notice:active { transform: scale(0.99); }
+  /* A Sync Box drives lights: the Hue app's "Hue Sync is active" bar with its Stop button. */
+  .sync-banner { display: flex; align-items: center; gap: 14px; margin: 14px 0 0; padding: 10px 10px 10px 18px; border-radius: 28px;
+                 cursor: pointer; background: rgba(120, 120, 128, 0.24); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+                 transition: transform 0.15s var(--ease); }
+  .sync-banner:active { transform: scale(0.99); }
+  .sync-banner > svg { flex: none; width: 24px; height: 24px; }
+  .sync-banner .grow { flex: 1; min-width: 0; }
+  .sync-banner .title { font-size: 14px; font-weight: 500; line-height: 1.3; }
+  .sync-banner .sub { font-size: 14px; line-height: 1.3; color: var(--text-2); }
+  .sync-banner .pill { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; background: rgba(255, 255, 255, 0.14); }
   .lead { margin: 0 2px 10px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
   .lead.small { margin-top: 12px; font-size: 13px; }
   .text-link { display: inline; margin-left: 4px; padding: 0; border: none; background: none; cursor: pointer; color: #6c9dff; font-size: inherit; }

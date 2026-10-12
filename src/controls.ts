@@ -117,8 +117,8 @@ const TAP_MS = 350;
 
 /**
  * Horizontal slider (brightness 1-100 by default, or any integer range). Fires
- * `value-input` while dragging and `value-change` on release; ignores `value` from
- * outside while the user drags it.
+ * `value-input` while dragging and `value-change` on release (`value-cancel` when a drag
+ * is dropped); ignores `value` from outside while the user drags it.
  *
  * Touch: the page keeps vertical scrolling (`touch-action: pan-y`) and the slider waits
  * for the finger to move sideways before it takes over, so scrolling across a card never
@@ -203,6 +203,7 @@ export class StudioSlider extends LightElement {
     this.classList.remove("dragging");
     this.shown = this.value;
     this.requestUpdate();
+    this.dispatchEvent(new CustomEvent("value-cancel", { bubbles: true }));
   }
 
   private onDown = (e: PointerEvent): void => {
