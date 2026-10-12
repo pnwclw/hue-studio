@@ -173,7 +173,7 @@ export class HueStudioPanel extends LitElement {
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;
     return html`
-      <main class=${classMap({ colorview: route.name === "color", "under-footer": top })}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
+      <main class=${classMap({ colorview: route.name === "color", "under-footer": top, wide: !ctx.narrow })}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
       <nav class=${classMap({ tabs: true, top })} ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) => html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(to)}>${icon(name)}${label}</button>`,

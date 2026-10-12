@@ -49,9 +49,13 @@ export const CSS = `
   .tab-head .bar-title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                          opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .screen-head.scrolled .bar-title { opacity: 1; transform: none; }
-  /* Desktop: one row as tall as the HA sidebar's header. */
-  .screen-head:has(> .tab-head.wide) { padding-top: var(--safe-top, 0px); padding-bottom: 0; }
-  .tab-head.wide { display: flex; align-items: center; gap: 12px; height: calc(var(--header-height, 56px) - 1px); }
+  /* Desktop (HA's sidebar shown): every screen's header is one row as tall as the sidebar's
+     header (its line included), the content centered in it. */
+  main.wide { --bar-h: calc(var(--header-height, 56px) - 1px); }
+  main.wide .screen-head:not(.hero-head) { padding-top: var(--safe-top, 0px); padding-bottom: 0; }
+  main.wide .screen-head > .bar, main.wide .screen-head > .cv-bar { height: var(--bar-h); min-height: 0; }
+  main.wide .hero .topbar { min-height: var(--bar-h); padding-top: var(--safe-top, 0px); }
+  .tab-head.wide { display: flex; align-items: center; gap: 12px; height: var(--bar-h, calc(var(--header-height, 56px) - 1px)); }
   .tab-head.wide h1.big { margin: 0; font-size: 24px; }
   /* The room's colored header is its fixed header. */
   .screen-head.hero-head { padding: 0; background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
