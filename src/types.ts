@@ -134,8 +134,10 @@ export interface LightInfo {
   effects?: string[];
   /** The running effect and its parameters, or null. */
   effect?: RunningEffect | null;
-  /** Hue product archetype (e.g. "hue_signe"), for the light's icon. */
+  /** Hue archetype (e.g. "hue_signe": the shape chosen in the Hue app), for the light's icon. */
   archetype?: string | null;
+  /** Product name (e.g. "Signe gradient table"): one archetype can be several products. */
+  product?: string | null;
 }
 
 export interface RunningEffect {

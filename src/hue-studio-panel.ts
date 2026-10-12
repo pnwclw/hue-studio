@@ -46,6 +46,10 @@ import "./views/settings.ts";
 import "./views/space.ts";
 import "./views/scene.ts";
 import "./views/sync.ts";
+import { registerHueIcons } from "./hue-icons.ts";
+
+// Also registered by the extra JS on every page; the panel may load first.
+registerHueIcons();
 
 type Route =
   | { name: "home" }

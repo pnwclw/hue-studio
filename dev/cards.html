@@ -32,6 +32,17 @@
     customElements.define("ha-icon", class extends HTMLElement {
       static observedAttributes = ["icon"];
       attributeChangedCallback() {
+        // Custom icon sets (ours: hue-studio:) the way HA's <ha-icon> resolves them.
+        const [prefix, icon] = (this.getAttribute("icon") || "").split(":");
+        const custom = window.customIconsets?.[prefix];
+        if (custom && icon) {
+          custom(icon).then((i) => {
+            if (!i) return;
+            const size = "var(--mdc-icon-size, 24px)";
+            this.innerHTML = `<svg viewBox="${i.viewBox || "0 0 24 24"}" style="width:${size};height:${size};fill:currentColor"><path d="${i.path}"/></svg>`;
+          });
+          return;
+        }
         const name = (this.getAttribute("icon") || "").replace("mdi:", "");
         fetch(`https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/${name}.svg`)
           .then((r) => r.text())

@@ -257,22 +257,79 @@ export function needsDarkText(colors: string[]): boolean {
 }
 
 // Hue product archetypes -> MDI icons (what the Hue app draws on light tiles and pins).
-const ARCHETYPE_ICONS: [RegExp, string][] = [
-  [/lightstrip|light_bar|bollard|wall_lantern/, "mdi:led-strip-variant"],
-  [/^hue_play$/, "mdi:television-ambient-light"],
-  [/signe|floor/, "mdi:floor-lamp-torchiere-variant"],
-  [/string_globe|string_light|festavia/, "mdi:string-lights"],
-  [/christmas_tree/, "mdi:pine-tree"],
-  [/candle/, "mdi:candle"],
-  [/pendant|ceiling|recessed|spot/, "mdi:ceiling-light"],
-  [/table|hue_go|iris|bloom|desk|flexible/, "mdi:lamp"],
-  [/bulb/, "mdi:lightbulb"],
+/**
+ * Icons of the Hue app for each light archetype (CLIP v2 `metadata.archetype`: the shape
+ * chosen for the light in the Hue app), from elax46/custom-brand-icons (MIT, see NOTICE).
+ * Bundled as the `hue-studio:` icon set (`hue-icons.ts`); `scripts/build_hue_icons.py`
+ * extracts exactly the icons named here.
+ */
+export const ARCHETYPE_ICONS: Record<string, string> = {
+  classic_bulb: "hue-studio:bulb-sultan-v2",
+  sultan_bulb: "hue-studio:bulb-sultan-v2",
+  flood_bulb: "hue-studio:bulb-flood",
+  spot_bulb: "hue-studio:hue-spot-v2",
+  candle_bulb: "hue-studio:bulb-candle",
+  luster_bulb: "hue-studio:bulb-golfball-e14",
+  vintage_bulb: "hue-studio:bulbs-filament",
+  edison_bulb: "hue-studio:bulb-filament-alt",
+  vintage_candle_bulb: "hue-studio:bulb-filament-candle",
+  ellipse_bulb: "hue-studio:bulb-lightguide-oval",
+  triangle_bulb: "hue-studio:bulb-lightguide-flask",
+  small_globe_bulb: "hue-studio:bulb-lightguide-round",
+  large_globe_bulb: "hue-studio:bulb-lightguide-round",
+  pendant_round: "hue-studio:pendant-round",
+  pendant_long: "hue-studio:pendant-long",
+  pendant_tube: "hue-studio:pendant-long",
+  ceiling_round: "hue-studio:ceiling-round",
+  ceiling_square: "hue-studio:ceiling-square",
+  floor_shade: "hue-studio:floor-shade",
+  floor_lantern: "hue-studio:floor-lantern",
+  table_shade: "hue-studio:table-shade",
+  table_wash: "hue-studio:table-wash",
+  recessed_ceiling: "hue-studio:recessed-ceiling",
+  recessed_floor: "hue-studio:recessed-floor",
+  single_spot: "hue-studio:single-spot",
+  double_spot: "hue-studio:double-spot",
+  ground_spot: "hue-studio:lily",
+  wall_lantern: "hue-studio:wall-lantern",
+  wall_shade: "hue-studio:wall-shade",
+  wall_spot: "hue-studio:wall-spot",
+  wall_washer: "hue-studio:wall-flood",
+  flexible_lamp: "hue-studio:desk-lamp",
+  bollard: "hue-studio:bollard",
+  hue_go: "hue-studio:go",
+  hue_go_xxl: "hue-studio:go",
+  hue_iris: "hue-studio:iris",
+  hue_bloom: "hue-studio:bloom",
+  hue_play: "hue-studio:play",
+  hue_play_wallwasher: "hue-studio:wall-flood",
+  hue_centris: "hue-studio:centris",
+  hue_tube: "hue-studio:gradient-tube-short",
+  hue_signe: "hue-studio:signe",
+  hue_lightstrip: "hue-studio:light-strip",
+  hue_lightstrip_tv: "hue-studio:lightstrip-tv",
+  hue_lightstrip_pc: "hue-studio:hue-sync-strip",
+  hue_omniglow: "hue-studio:light-strip",
+  hue_neon: "hue-studio:light-strip",
+  christmas_tree: "hue-studio:christmas-tree",
+  string_light: "hue-studio:festavia",
+  string_globe: "hue-studio:light-string",
+  string_permanent: "hue-studio:light-string",
+  string_icicle: "hue-studio:christmas-lights",
+  string_grid: "hue-studio:christmas-lights",
+  string_net: "hue-studio:christmas-lights",
+};
+
+/** One archetype, several products: the Hue app draws them apart (matched on the product name). */
+export const PRODUCT_ICONS: [RegExp, string][] = [
+  [/signe.*table/i, "hue-studio:signe-gradient-table"],
+  [/signe.*floor/i, "hue-studio:signe-gradient-floor"],
 ];
 
-/** Icon of a light: the user's own (entity registry), else its Hue product, else a bulb. */
+/** Icon of a light: the user's own (entity registry), else the Hue app's for its product and shape, else a bulb. */
 export function lightIcon(hass: HassData, id: string, info?: LightInfo | null): string {
   const own = hass.entities?.[id]?.icon;
   if (own) return own;
-  const archetype = info?.archetype || "";
-  return ARCHETYPE_ICONS.find(([re]) => re.test(archetype))?.[1] || "mdi:lightbulb";
+  const product = info?.product || "";
+  return PRODUCT_ICONS.find(([re]) => re.test(product))?.[1] || ARCHETYPE_ICONS[info?.archetype || ""] || "mdi:lightbulb";
 }

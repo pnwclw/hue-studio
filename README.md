@@ -242,12 +242,15 @@ Releases: publishing a GitHub release `vX.Y.Z-alpha.N` (matching `version` in
 `manifest.json`, marked as a pre-release) builds the frontend and attaches `hue_studio.zip`,
 which HACS installs. Everything is alpha for now: enable "Show beta versions" in HACS.
 
-Rebuild the bundled scene gallery: `uv run python scripts/build_gallery.py`; the icon
+Rebuild the bundled light icons: `uv run python scripts/build_hue_icons.py`; the scene
+gallery: `uv run python scripts/build_gallery.py`; the icon
 and logo (`custom_components/hue_studio/brand/`, shown by Home Assistant 2026.3+):
 `uv run python scripts/build_icon.py`.
 
 ## License
 
 [MIT](LICENSE). The bundled scene gallery is derived from
-[Hypfer/hass-scene_presets](https://github.com/Hypfer/hass-scene_presets) (Apache-2.0), see
+[Hypfer/hass-scene_presets](https://github.com/Hypfer/hass-scene_presets) (Apache-2.0); the
+light icons (the Hue app's, as the `hue-studio:` icon set) come from
+[elax46/custom-brand-icons](https://github.com/elax46/custom-brand-icons) (MIT). See
 [NOTICE](NOTICE).

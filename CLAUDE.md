@@ -173,6 +173,9 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
   matched to gallery pictures by that id (`metadata.image`), not by name.
 - The scene gallery is built from [Hypfer/hass-scene_presets](https://github.com/Hypfer/hass-scene_presets)
   (Apache-2.0; 142 scenes, 480x270 thumbnails bundled, attribution in `NOTICE`).
+- Light icons are the Hue app's, from [elax46/custom-brand-icons](https://github.com/elax46/custom-brand-icons)
+  (MIT, attribution in `NOTICE`): a light's CLIP v2 archetype (the shape picked in the Hue app),
+  refined by its product name, picks the icon; an icon set in HA's entity settings wins.
 
 ## Plan
 
@@ -245,9 +248,12 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
   ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
   i18n.ts                       UI strings (en is the source; same keys in every locale)
-  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing)
+  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets)
+  hue-icons.ts, hue-icons-data.ts   the Hue app's light icons as the `hue-studio:` icon set (data generated,
+                                do not edit), matched to lights by archetype and product in model.ts
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
+scripts/build_hue_icons.py      rebuilds hue-icons-data.ts from elax46/custom-brand-icons (pinned release)
 scripts/hue_public_images.json  Hue app scene name -> picture id (`public_image`), from real bridges
 scripts/build_icon.py           renders brand/ (icon, logo, dark variants)
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
@@ -257,7 +263,7 @@ tests/                          pytest + pytest-homeassistant-custom-component
 tests/js/                       node:test (TypeScript, run by Node directly) for the pure modules
 package.json, tsconfig.json     frontend toolchain (Lit, esbuild, TypeScript)
 hacs.json                       HACS metadata
-NOTICE                          third-party attribution (gallery, Apache-2.0)
+NOTICE                          third-party attribution (gallery, Apache-2.0; light icons, MIT)
 .github/workflows/              HACS validation, hassfest, ruff, pytest, frontend; release zip
 ```
 

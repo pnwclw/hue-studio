@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from aiohue import HueBridgeV2
 from aiohue.v2.controllers.events import EventType
 from aiohue.v2.models.light import Light
 from aiohue.v2.models.scene import Scene
@@ -53,6 +54,7 @@ from .lights import (
     async_all_lights,
     async_bridges,
     light_info,
+    light_product,
 )
 from .options import (
     async_frontend_config,
@@ -146,28 +148,38 @@ def ws_subscribe_lights(
     """
     lights = async_all_lights(hass)
     sent: dict[str, dict[str, Any]] = {
-        light.entity_id: light_info(light.resource) for light in lights
+        light.entity_id: light_info(
+            light.resource, light_product(light.bridge, light.resource)
+        )
+        for light in lights
     }
     registry = er.async_get(hass)
 
-    @callback
-    def on_light_update(event_type: EventType, resource: Light | None) -> None:
-        if resource is None:
-            return
-        entity_id = registry.async_get_entity_id(LIGHT_DOMAIN, HUE_DOMAIN, resource.id)
-        if entity_id is None:
-            return
-        info = light_info(resource)
-        if sent.get(entity_id) == info:
-            return
-        sent[entity_id] = info
-        connection.send_message(
-            websocket_api.event_message(msg["id"], {"lights": {entity_id: info}})
-        )
+    def on_light_update(
+        bridge: HueBridgeV2,
+    ) -> Callable[[EventType, Light | None], None]:
+        @callback
+        def update(event_type: EventType, resource: Light | None) -> None:
+            if resource is None:
+                return
+            entity_id = registry.async_get_entity_id(
+                LIGHT_DOMAIN, HUE_DOMAIN, resource.id
+            )
+            if entity_id is None:
+                return
+            info = light_info(resource, light_product(bridge, resource))
+            if sent.get(entity_id) == info:
+                return
+            sent[entity_id] = info
+            connection.send_message(
+                websocket_api.event_message(msg["id"], {"lights": {entity_id: info}})
+            )
+
+        return update
 
     unsubscribers: list[Callable[[], None]] = [
         bridge.lights.subscribe(
-            on_light_update, event_filter=EventType.RESOURCE_UPDATED
+            on_light_update(bridge), event_filter=EventType.RESOURCE_UPDATED
         )
         for bridge in {id(light.bridge): light.bridge for light in lights}.values()
     ]

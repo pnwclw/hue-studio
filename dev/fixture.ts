@@ -98,6 +98,8 @@ const ARCHETYPES: Record<string, string> = {
   reading_lamp: "table_shade",
   hall_spot: "single_spot",
 };
+/** Product names where one archetype covers several products (the icon tells them apart). */
+const PRODUCTS: Record<string, string> = { desk_lamp: "Signe gradient table" };
 
 const EFFECTS = ["candle", "fire", "prism", "sparkle", "opal", "glisten", "underwater", "cosmos", "sunbeam", "enchant"];
 
@@ -234,6 +236,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       effects: EFFECTS,
       effect: null,
       archetype: ARCHETYPES[id],
+      product: PRODUCTS[id] ?? null,
     };
   }
 

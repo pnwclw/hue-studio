@@ -13,6 +13,9 @@ async def test_subscribe_lights(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hue_lights: MagicMock
 ) -> None:
     """The first event has every light; bridge updates push only changes."""
+    hue_lights.lights.get_device.return_value = MagicMock(
+        product_data=MagicMock(product_name="Hue lightstrip plus")
+    )
     client = await hass_ws_client(hass)
     await client.send_json_auto_id({"type": "hue_studio/lights/subscribe"})
     assert (await client.receive_json())["success"]
@@ -28,6 +31,7 @@ async def test_subscribe_lights(
     assert lights["light.strip"]["effects"] == ["candle", "fire"]
     assert lights["light.strip"]["effect"] is None
     assert lights["light.strip"]["archetype"] == "hue_lightstrip"
+    assert lights["light.strip"]["product"] == "Hue lightstrip plus"
 
     on_update = hue_lights.lights.subscribe.call_args.args[0]
     # Unchanged info is not re-sent; a new gradient is.

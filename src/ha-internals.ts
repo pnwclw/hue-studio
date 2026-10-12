@@ -6,9 +6,32 @@
 //   <ha-icon icon="mdi:...">               – area and entity icons
 //   hass.callService / hass.connection     – documented frontend API
 //   "hass-more-info" event                 – how every card opens more-info
+//   window.customIconsets / customIcons    – how custom icon sets plug into <ha-icon>
 
 import type { Hass } from "./types.ts";
 import { focusedElement, opensKeyboard } from "./ui.ts";
+
+/** An icon of a custom icon set: what `<ha-icon icon="prefix:name">` draws. */
+export interface CustomIcon {
+  path: string;
+  viewBox?: string;
+}
+
+/**
+ * Register an icon set for `<ha-icon icon="<prefix>:<name>">` and HA's icon pickers, the
+ * way custom icon sets from HACS do (`window.customIconsets` / `window.customIcons`).
+ * Another set already under the same prefix is left alone.
+ */
+export function registerIconset(prefix: string, getIcon: (name: string) => Promise<CustomIcon | undefined>, names: string[]): void {
+  const w = window as Window & {
+    customIconsets?: Record<string, (name: string) => Promise<CustomIcon | undefined>>;
+    customIcons?: Record<string, { getIcon: typeof getIcon; getIconList: () => Promise<{ name: string }[]> }>;
+  };
+  w.customIconsets ??= {};
+  w.customIconsets[prefix] ??= getIcon;
+  w.customIcons ??= {};
+  w.customIcons[prefix] ??= { getIcon, getIconList: async () => names.map((name) => ({ name })) };
+}
 
 /** Open/close the HA sidebar (what the stock `ha-menu-button` does). */
 export function toggleSidebar(fromElement: EventTarget): void {

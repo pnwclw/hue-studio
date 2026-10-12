@@ -131,11 +131,12 @@ def _effect_info(resource: Light) -> dict[str, Any] | None:
     return None
 
 
-def light_info(resource: Light) -> dict[str, Any]:
+def light_info(resource: Light, product: str | None = None) -> dict[str, Any]:
     """Describe what the frontend needs and HA does not expose.
 
     Gamut, white range, gradient (points the light shows and how many it can show),
-    supported and running effects, and the product archetype (for its icon).
+    supported and running effects, the archetype (the shape chosen in the Hue app) and
+    the product name (both for its icon: one archetype can be several products).
     """
     info: dict[str, Any] = {"gamut": None, "gamut_type": None, "mirek": None}
     if resource.color is not None:
@@ -163,4 +164,12 @@ def light_info(resource: Light) -> dict[str, Any]:
     info["effect"] = _effect_info(resource)
     archetype = resource.metadata.archetype if resource.metadata else None
     info["archetype"] = archetype
+    info["product"] = product
     return info
+
+
+def light_product(bridge: HueBridgeV2, resource: Light) -> str | None:
+    """Product name of the device a light belongs to (e.g. "Signe gradient table")."""
+    device = bridge.lights.get_device(resource.id)
+    name = device.product_data.product_name if device and device.product_data else None
+    return name if isinstance(name, str) else None
