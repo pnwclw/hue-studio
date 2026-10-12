@@ -78,7 +78,7 @@ export class RoomView extends StudioView {
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
-      ${g.kind === "area" ? roomAutomations(ctx, g.key.slice("area.".length)) : nothing}
+      ${roomAutomations(ctx, g)}
     </div></div>
     ${this.adding
       ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-add-sheet>`

@@ -1,5 +1,6 @@
 """Tests for automations: blueprints, apply_light, living light, WebSocket API."""
 
+import asyncio
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -71,8 +72,12 @@ INPUTS: dict[str, dict[str, Any]] = {
     "wake_up": {"rooms": ["living_room"], "time": "06:30:00", "fade": 20},
     "go_to_sleep": {"rooms": ["living_room"], "days": ["mon", "fri"]},
     "coming_home": {"rooms": ["living_room"], "only_dark": True},
-    "leaving_home": {"rooms": ["living_room"]},
-    "mimic_presence": {"rooms": ["living_room"], "start_kind": "time"},
+    "leaving_home": {"zones": ["light.example_zone"]},
+    "mimic_presence": {
+        "rooms": ["living_room"],
+        "zones": ["light.example_zone"],
+        "start_kind": "time",
+    },
     "schedule": {
         "rooms": ["living_room"],
         "start_kind": "sunset",
@@ -128,6 +133,55 @@ async def test_changed_blueprint_reloads_automations(
     assert await async_install_blueprints(hass) == ["leaving_home"]
     assert "Old" not in target.read_text()
     assert len(reload) == 1
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_zones_are_targets(
+    hass: HomeAssistant, config_dir: Path, hue_lights: MagicMock
+) -> None:
+    """A Hue room/zone (group light) works like an area, also picked at random."""
+    turn_off = async_mock_service(hass, "light", "turn_off")
+    await async_install_blueprints(hass)
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {
+            "automation": [
+                _automation("leaving_home", {"zones": ["light.room"]}),
+                _automation(
+                    "mimic_presence",
+                    {
+                        "zones": ["light.room"],
+                        "only_away": False,
+                        "start_kind": "time",
+                        "end_time": "00:00:00",
+                    },
+                ),
+            ]
+        },
+    )
+    await hass.async_block_till_done()
+    lights = ["light.strip", "light.bulb"]
+    for runs, entity_id in enumerate(
+        ("automation.leaving_home_a", "automation.mimic_presence_a"), start=1
+    ):
+        # Not blocking: mimic presence keeps waiting until its end.
+        await hass.services.async_call(
+            "automation", "trigger", {"entity_id": entity_id, "skip_condition": True}
+        )
+        for _ in range(100):
+            if len(turn_off) == runs:
+                break
+            await asyncio.sleep(0.01)
+        # Both lights are on, so mimic presence toggles them off.
+        assert sorted(turn_off[-1].data["entity_id"]) == sorted(lights), entity_id
+    assert len(turn_off) == 2
+    await hass.services.async_call(
+        "automation",
+        "turn_off",
+        {"entity_id": "automation.mimic_presence_a"},
+        blocking=True,
+    )
 
 
 async def test_apply_light_white_from_dark(
@@ -284,18 +338,28 @@ async def test_subscribe_and_organize(
 ) -> None:
     """Our automations (blueprint or taken over) and others touching Hue lights."""
     area = ar.async_get(hass).async_create("Living room")
+    hass.states.async_set("light.example_zone", "on", {"is_hue_group": True})
     await async_install_blueprints(hass)
     assert await async_setup_component(
         hass,
         "automation",
         {
             "automation": [
-                _automation("leaving_home", {"rooms": [area.id]}),
+                _automation(
+                    "leaving_home",
+                    {"rooms": [area.id], "zones": ["light.example_zone"]},
+                ),
                 {
                     "id": "hue_studio_schedule_taken",
                     "alias": "taken",
                     "triggers": [],
-                    "actions": [],
+                    "actions": [
+                        {
+                            "action": "hue_studio.apply_light",
+                            "target": {"area_id": area.id},
+                            "data": {"light": "off"},
+                        }
+                    ],
                 },
                 {
                     "id": "other",
@@ -321,11 +385,15 @@ async def test_subscribe_and_organize(
             "type": "leaving_home",
             "custom": False,
             "id": "hue_studio_leaving_home_a",
+            "areas": [area.id],
+            "groups": ["light.example_zone"],
         },
         "automation.taken": {
             "id": "hue_studio_schedule_taken",
             "type": "schedule",
             "custom": True,
+            "areas": [area.id],
+            "groups": [],
         },
     }
     assert event["related"] == ["automation.other"]

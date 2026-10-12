@@ -93,7 +93,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "rooms") return { name: "rooms" };
   if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return { name: "automation", id: null, type: parts[2], room: params.get("room"), preset: params.get("preset") };
   if (parts[0] === "automations" && parts[1] === "new") return { name: "automationNew", room: params.get("room") };
-  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: null, preset: null };
+  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: params.get("room"), preset: null };
   if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };

@@ -1,15 +1,16 @@
-// Automations (a tab, like the Hue app's): Hue Studio's automations with their switch, the
-// other Home Assistant automations that touch Hue lights, and "+" with the Hue app's types.
+// Automations (a tab, like the Hue app's): Hue Studio's automations with their switch, by
+// room and zone (one in several rooms shows in each), the other Home Assistant automations
+// that touch Hue lights, and "+" with the Hue app's types.
 // Every automation is a Home Assistant automation (a blueprint of ours, see automations.ts):
 // HA stores and runs it, and its own editor stays one tap away.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import { type AutomationDraft, fromConfig, roomsLine, TYPE_ICONS, TYPES, whenLine } from "../automations.ts";
+import { type AutomationDraft, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES, whenLine } from "../automations.ts";
 import type { StudioContext } from "../context.ts";
 import type { StringKey } from "../i18n.ts";
-import { friendlyName } from "../model.ts";
+import { allGroups, friendlyName, type Group } from "../model.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -19,6 +20,8 @@ interface Listed {
   draft: AutomationDraft | null;
   custom: boolean;
   type: string | null;
+  /** What HA reports it controls (areas, Hue rooms/zones). */
+  controls: Controls;
 }
 
 function ours(ctx: StudioContext): Listed[] {
@@ -26,7 +29,7 @@ function ours(ctx: StudioContext): Listed[] {
   return Object.entries(ctx.automations?.automations || {})
     .map(([entityId, a]) => {
       const config = ctx.automationConfigs[entityId];
-      return { entityId, draft: config ? fromConfig(config) : null, custom: a.custom, type: a.type };
+      return { entityId, draft: config ? fromConfig(config) : null, custom: a.custom, type: a.type, controls: { areas: a.areas, groups: a.groups } };
     })
     .sort((a, b) => name(a).localeCompare(name(b)));
 }
@@ -37,7 +40,11 @@ const haEditor = (ctx: StudioContext, entityId: string | null): void => {
   ctx.openHa(id ? `/config/automation/edit/${encodeURIComponent(id)}` : "/config/automation/edit/new");
 };
 
-function row(ctx: StudioContext, l: Listed): TemplateResult {
+/** The automations of one room or zone. */
+const ofGroup = (list: Listed[], g: Group): Listed[] => list.filter((l) => controlsGroup(l.controls, g.key, g.group));
+
+/** One of ours; `inGroup`: listed under its room, so other rooms are named only if it has any. */
+function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null = null): TemplateResult {
   const { t } = ctx;
   const state = ctx.hass.states[l.entityId];
   const on = state?.state === "on";
@@ -46,9 +53,12 @@ function row(ctx: StudioContext, l: Listed): TemplateResult {
   const sub = l.custom
     ? t("automations.custom_sub")
     : draft
-      ? [whenLine(draft, t), roomsLine(ctx.hass, draft.input.rooms)].filter(Boolean).join(" · ")
+      ? [whenLine(draft, t), !inGroup || placesOf(draft.input).length > 1 ? roomsLine(ctx.hass, draft.input) : ""].filter(Boolean).join(" · ")
       : "";
-  const open = () => (l.custom || !draft ? haEditor(ctx, l.entityId) : ctx.go(`/automations/${encodeURIComponent(draft.id)}`));
+  const id = ctx.automations?.automations[l.entityId]?.id;
+  const room = from ? `?room=${encodeURIComponent(from.key)}` : "";
+  // Ours open here (one whose config can't be read says so there); taken over in HA: HA's editor.
+  const open = () => (l.custom || !id ? haEditor(ctx, l.entityId) : ctx.go(`/automations/${encodeURIComponent(id)}${room}`));
   const glyph = l.type && l.type in TYPE_ICONS ? TYPE_ICONS[l.type as keyof typeof TYPE_ICONS] : "mdi:robot-outline";
   return html`<div class="item automation">
     <button class="plain grow row-open" @click=${open}>
@@ -59,12 +69,29 @@ function row(ctx: StudioContext, l: Listed): TemplateResult {
   </div>`;
 }
 
-/** The automations of a room (an area), for its screen (nothing without any: its "+" adds them). */
-export function roomAutomations(ctx: StudioContext, area: string): TemplateResult | typeof nothing {
-  const list = ours(ctx).filter((l) => l.draft?.input.rooms.includes(area));
+/** The automations of a room or zone, for its screen (nothing without any: its "+" adds them). */
+export function roomAutomations(ctx: StudioContext, g: Group): TemplateResult | typeof nothing {
+  const list = ofGroup(ours(ctx), g);
   if (!list.length) return nothing;
   return html`<h2 class="label">${ctx.t("automations.title")}</h2>
-    <div class="rows automations">${list.map((l) => row(ctx, l))}</div>`;
+    <div class="rows automations">${list.map((l) => row(ctx, l, true, g))}</div>`;
+}
+
+/** Ours by room and zone (the home's order), then those of no room or zone known here. */
+function byGroup(ctx: StudioContext, list: Listed[]): TemplateResult[] {
+  const groups = allGroups(ctx.home);
+  const sections = groups
+    .map((g) => ({ g, items: ofGroup(list, g) }))
+    .filter((s) => s.items.length)
+    .map(
+      ({ g, items }) => html`<h2 class="label">${g.name}</h2>
+        <div class="rows automations">${items.map((l) => row(ctx, l, true))}</div>`,
+    );
+  const rest = list.filter((l) => !groups.some((g) => controlsGroup(l.controls, g.key, g.group)));
+  if (rest.length)
+    sections.push(html`<h2 class="label">${ctx.t("automations.no_room")}</h2>
+      <div class="rows automations">${rest.map((l) => row(ctx, l))}</div>`);
+  return sections;
 }
 
 @customElement("hue-studio-automations-view")
@@ -80,7 +107,7 @@ export class AutomationsView extends StudioView {
     return this.tabScreen(
       t("automations.title"),
       html`${list.length
-          ? html`<div class="rows automations">${list.map((l) => row(ctx, l))}</div>`
+          ? byGroup(ctx, list)
           : html`<div class="automations-empty">
               <p class="lead">${t("automations.empty")}</p>
               <button class="pill apply" @click=${() => ctx.go("/automations/new")}>${t("automations.add")}</button>

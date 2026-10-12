@@ -1,7 +1,7 @@
 // "+" of a room or zone, like the Hue app's: what to add. A scene (from the Hue scene
 // gallery, from what the lights show now, or an all-day scene: a schedule showing the scene
 // of the day), an automation of the room, or a device (the device setup in the settings).
-// Automations belong to HA areas, so a zone is offered scenes and devices only. Fires `close`.
+// Fires `close`.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -28,7 +28,7 @@ export class AddSheet extends StudioView {
     const { t } = ctx;
     if (!g) return nothing;
     if (this.step === "current") return html`<hue-studio-new-scene .ctx=${ctx} .rev=${this.rev} .group=${g} @close=${this.close}></hue-studio-new-scene>`;
-    const area = g.kind === "area" ? encodeURIComponent(g.key.slice("area.".length)) : null;
+    const room = encodeURIComponent(g.key);
     const go = (path: string) => {
       this.close();
       ctx.go(path);
@@ -57,11 +57,9 @@ export class AddSheet extends StudioView {
           ${scene
             ? html`${row("mdi:image-multiple-outline", "add.gallery", "add.gallery_sub", () => go(`/gallery?room=${encodeURIComponent(g.key)}`))}
               ${row("mdi:palette-outline", "add.current", "add.current_sub", () => next("current"))}
-              ${area
-                ? row("mdi:weather-sunset", "add.all_day", "add.all_day_sub", () => go(`/automations/new/schedule?room=${area}&preset=all_day`))
-                : nothing}`
+              ${row("mdi:weather-sunset", "add.all_day", "add.all_day_sub", () => go(`/automations/new/schedule?room=${room}&preset=all_day`))}`
             : html`${row("mdi:palette-swatch-outline", "add.scene", "add.scene_sub", () => next("scene"))}
-              ${area ? row("mdi:robot-outline", "add.automation", "add.automation_sub", () => go(`/automations/new?room=${area}`)) : nothing}
+              ${row("mdi:robot-outline", "add.automation", "add.automation_sub", () => go(`/automations/new?room=${room}`))}
               ${row("mdi:lightbulb-on-outline", "add.device", "add.device_sub", () => go("/settings/devices"))}`}
         </div>
       </div>

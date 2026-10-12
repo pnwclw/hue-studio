@@ -11,14 +11,14 @@ import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { fromConfig, TYPE_ICONS, whenLine } from "./automations.ts";
+import { fromConfig, isType, TYPE_ICONS, whenLine } from "./automations.ts";
 import { paletteArt } from "./color.ts";
 import { PANEL_PATH, StudioContext } from "./context.ts";
 import { groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
 import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { currentHass, navigate } from "./ha-internals.ts";
 import { localize, type StringKey } from "./i18n.ts";
-import { findGroup, type Group, type Scene } from "./model.ts";
+import { findGroup, friendlyName, type Group, type Scene } from "./model.ts";
 import { gallerySeasons, shownCategories } from "./seasons.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
@@ -296,24 +296,28 @@ class HueStudioAutomationsCard extends StudioCard {
     const area = this.config.area;
     if (!ctx.automations) return html`<ha-card><div class="body warn">${t("rooms.loading")}</div></ha-card>`;
     const list = Object.entries(ctx.automations.automations)
-      .map(([entityId]) => ({ entityId, draft: ctx.automationConfigs[entityId] ? fromConfig(ctx.automationConfigs[entityId]) : null }))
-      .filter((a) => a.draft && (!area || a.draft.input.rooms.includes(area)))
-      .sort((a, b) => a.draft!.alias.localeCompare(b.draft!.alias));
+      .filter(([, a]) => !area || a.areas?.includes(area))
+      .map(([entityId, a]) => {
+        const config = ctx.automationConfigs[entityId];
+        const draft = config ? fromConfig(config) : null;
+        return { entityId, id: a.id, type: a.type, draft, name: draft?.alias || friendlyName(ctx.hass, entityId) };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
     const title = area ? `${ctx.hass.areas?.[area]?.name || area} · ${t("automations.title")}` : t("automations.title");
     const room = area ? `?room=${encodeURIComponent(area)}` : "";
     return html`<ha-card>
       <div class="body">
         <div class="cat">${title}</div>
         ${list.length ? nothing : html`<div class="warn">${t("automations.empty")}</div>`}
-        ${list.map(({ entityId, draft }) => {
+        ${list.map(({ entityId, id, type, draft, name }) => {
           const on = ctx.hass.states[entityId]?.state === "on";
           return html`<div class="row auto-row">
-            <ha-icon icon=${TYPE_ICONS[draft!.type]}></ha-icon>
-            <button class="grow link" @click=${() => this.panel(`/automations/${encodeURIComponent(draft!.id)}`)}>
-              <div class="name">${draft!.alias}</div>
-              <div class="sub">${whenLine(draft!, t)}</div>
+            <ha-icon icon=${type && isType(type) ? TYPE_ICONS[type] : "mdi:robot-outline"}></ha-icon>
+            <button class="grow link" ?disabled=${!id} @click=${() => id && this.panel(`/automations/${encodeURIComponent(id)}${room}`)}>
+              <div class="name">${name}</div>
+              ${draft ? html`<div class="sub">${whenLine(draft, t)}</div>` : nothing}
             </button>
-            ${toggle(on, draft!.alias, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }))}
+            ${toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }))}
           </div>`;
         })}
         <div class="actions"><button class="pill" @click=${() => this.panel(`/automations/new${room}`)}>${t("automations.add")}</button></div>

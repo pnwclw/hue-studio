@@ -424,7 +424,7 @@ export interface DayPreview {
 /** hue_studio/automations/subscribe. */
 export interface AutomationsMessage {
   /** Our automations: from a Hue Studio blueprint, or taken over in HA (custom). */
-  automations: Record<string, { id: string | null; type: string | null; custom: boolean }>;
+  automations: Record<string, { id: string | null; type: string | null; custom: boolean; areas?: string[]; groups?: string[] }>;
   /** Other automations that touch Hue lights or their areas. */
   related: string[];
   types: string[];

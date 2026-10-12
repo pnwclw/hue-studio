@@ -53,7 +53,11 @@ touching anything outside this repository.
      of the day (pools, phases, holidays, brightness) are an input of the automation;
      `hue_studio.apply_light` shows them and keeps them up with the day while nobody
      changes the lights (memory only). Our automations have ids `hue_studio_<type>_…` and
-     get the "Hue Studio" label and category and the area of their one room;
+     get the "Hue Studio" label and category and the area of their one room. Their places
+     are areas (`rooms`) and Hue rooms/zones no area holds (`zones`, group lights); the
+     panel lists them by room/zone from what HA reports they control (public
+     `automations_with_area`/`_entity`) and reads their inputs through HA's automation
+     config API (`automation/config` gives a blueprint automation expanded);
    - **GUI first, no YAML.** Every setting has a GUI path (panel or options flow) and is
      read/written through the WS API and services, never by editing files. No YAML
      configuration layer.

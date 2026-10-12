@@ -57,6 +57,7 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import (
+    area_registry as ar,
     category_registry as cr,
     config_validation as cv,
     device_registry as dr,
@@ -536,10 +537,12 @@ def blueprint_path(kind: str) -> str:
 
 
 def our_automations(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
-    """Automations made with Hue Studio: entity id -> id, type, custom.
+    """Automations made with Hue Studio: entity id -> id, type, custom, areas, groups.
 
     Those using one of our blueprints, and those whose id says they were made by Hue
-    Studio and were taken over in HA's editor since ("custom").
+    Studio and were taken over in HA's editor since ("custom"). `areas` and `groups`
+    are the areas and Hue rooms/zones (group light entities) they control, as HA sees
+    their targets, so the panel can list them by room without reading their configs.
     """
     found: dict[str, dict[str, Any]] = {}
     for kind in TYPES:
@@ -554,6 +557,18 @@ def our_automations(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
                 (k for k in TYPES if config_id.startswith(f"{ID_PREFIX}{k}_")), None
             )
             found[state.entity_id] = {"id": config_id, "type": kind, "custom": True}
+    for info in found.values():
+        info["areas"] = []
+        info["groups"] = []
+    for area in ar.async_get(hass).async_list_areas():
+        for entity_id in automations_with_area(hass, area.id):
+            if entity_id in found:
+                found[entity_id]["areas"].append(area.id)
+    for state in hass.states.async_all(LIGHT_DOMAIN):
+        if state.attributes.get(ATTR_IS_HUE_GROUP):
+            for entity_id in automations_with_entity(hass, state.entity_id):
+                if entity_id in found:
+                    found[entity_id]["groups"].append(state.entity_id)
     return found
 
 
@@ -697,10 +712,11 @@ def ws_subscribe_automations(
 ) -> None:
     """Our automations and the others that touch Hue lights, now and on changes.
 
-    Event payload: {"automations": {entity_id: {"id", "type", "custom"}},
-                    "related": [entity_id], "types": [type], "reloads": n}
-    Configs are read with HA's own `automation/config` command, again whenever
-    `reloads` changes (an automation was saved here or in HA's editor).
+    Event payload: {"automations": {entity_id: {"id", "type", "custom", "areas",
+                    "groups"}}, "related": [entity_id], "types": [type], "reloads": n}
+    The panel reads the stored configs through HA's automation config API (what HA's
+    editor reads), again whenever `reloads` changes (an automation was saved here or
+    in HA's editor).
     """
     last: dict[str, Any] = {}
     reloads = [0]

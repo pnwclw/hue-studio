@@ -27,7 +27,10 @@ export interface Duration {
 
 /** The inputs of our blueprints: one shape for all, each type uses its own keys. */
 export interface AutomationInput {
+  /** HA areas. */
   rooms: string[];
+  /** Hue rooms/zones (group light entities) no area holds, e.g. a zone across rooms. */
+  zones?: string[];
   time?: string;
   days?: Weekday[];
   fade?: number;
@@ -64,13 +67,13 @@ const LIGHT_KEYS = ["light", "scenes", "kelvin", "brightness", "scene_of_the_day
 
 /** The inputs each blueprint has (anything else is left out of the config). */
 export const INPUT_KEYS: Record<AutomationType, readonly (keyof AutomationInput)[]> = {
-  wake_up: ["rooms", "time", "days", "fade", "off_after", ...LIGHT_KEYS],
-  go_to_sleep: ["rooms", "time", "days", "fade"],
-  coming_home: ["rooms", "zone", "only_dark", ...LIGHT_KEYS],
-  leaving_home: ["rooms", "zone"],
-  mimic_presence: ["rooms", "start_kind", "start_time", "start_offset", "end_time", "days", "zone", "only_away", ...LIGHT_KEYS],
-  schedule: ["rooms", "start_kind", "start_time", "start_offset", "end_kind", "end_time", "end_offset", "days", "fade", ...LIGHT_KEYS],
-  motion: ["rooms", "motion", "lux_sensor", "lux_below", "off_after", ...LIGHT_KEYS],
+  wake_up: ["rooms", "zones", "time", "days", "fade", "off_after", ...LIGHT_KEYS],
+  go_to_sleep: ["rooms", "zones", "time", "days", "fade"],
+  coming_home: ["rooms", "zones", "zone", "only_dark", ...LIGHT_KEYS],
+  leaving_home: ["rooms", "zones", "zone"],
+  mimic_presence: ["rooms", "zones", "start_kind", "start_time", "start_offset", "end_time", "days", "zone", "only_away", ...LIGHT_KEYS],
+  schedule: ["rooms", "zones", "start_kind", "start_time", "start_offset", "end_kind", "end_time", "end_offset", "days", "fade", ...LIGHT_KEYS],
+  motion: ["rooms", "zones", "motion", "lux_sensor", "lux_below", "off_after", ...LIGHT_KEYS],
 };
 
 /** Which light kinds a type offers (none: it only turns lights off). */
@@ -98,7 +101,11 @@ const EVERY_DAY: Weekday[] = [...WEEKDAYS];
 const NO_OFFSET: Duration = { hours: 0, minutes: 0, seconds: 0 };
 
 /** The blueprints' defaults (what HA uses for an input that is not set). */
-export function defaultInput(type: AutomationType, rooms: string[] = []): AutomationInput {
+export function defaultInput(type: AutomationType, rooms: string[] = [], zones: string[] = []): AutomationInput {
+  return { ...typeDefaults(type, rooms), zones };
+}
+
+function typeDefaults(type: AutomationType, rooms: string[]): AutomationInput {
   const light = { light: LIGHT_KINDS[type][0], scenes: [], kelvin: 2700, brightness: null, scene_of_the_day: {} };
   switch (type) {
     case "wake_up":
@@ -122,16 +129,40 @@ export function defaultInput(type: AutomationType, rooms: string[] = []): Automa
  * An all-day scene, like the Hue app's: a schedule from sunrise whose light is the scene of
  * the day, which keeps up with the day until the lights are changed.
  */
-export function allDayDraft(alias: string, rooms: string[] = [], now = Date.now()): AutomationDraft {
-  const draft = newDraft("schedule", alias, rooms, now);
+export function allDayDraft(alias: string, places: string[] = [], now = Date.now()): AutomationDraft {
+  const draft = newDraft("schedule", alias, places, now);
   return { ...draft, input: { ...draft.input, start_kind: "sunrise", light: "auto" } };
 }
 
 export const isType = (value: unknown): value is AutomationType => TYPES.includes(value as AutomationType);
 
-/** A new automation of a type (its id stays when it is taken over in HA). */
-export function newDraft(type: AutomationType, alias: string, rooms: string[] = [], now = Date.now()): AutomationDraft {
-  return { id: `${ID_PREFIX}${type}_${now.toString(36)}`, type, alias, input: defaultInput(type, rooms) };
+/** A new automation of a type for rooms/zones (group keys, see placesOf); its id stays when it is taken over in HA. */
+export function newDraft(type: AutomationType, alias: string, places: string[] = [], now = Date.now()): AutomationDraft {
+  const { rooms, zones } = splitPlaces(places);
+  return { id: `${ID_PREFIX}${type}_${now.toString(36)}`, type, alias, input: defaultInput(type, rooms, zones) };
+}
+
+const AREA = "area.";
+const HUE = "hue.";
+
+/** Rooms and zones of an automation as the panel's group keys (`area.<id>`, `hue.<entity>`). */
+export const placesOf = (input: Pick<AutomationInput, "rooms" | "zones">): string[] => [
+  ...input.rooms.map((a) => AREA + a),
+  ...(input.zones || []).map((z) => HUE + z),
+];
+
+/** Group keys back to the blueprint inputs. */
+export function splitPlaces(places: string[]): { rooms: string[]; zones: string[] } {
+  return {
+    rooms: places.filter((k) => k.startsWith(AREA)).map((k) => k.slice(AREA.length)),
+    zones: places.filter((k) => k.startsWith(HUE)).map((k) => k.slice(HUE.length)),
+  };
+}
+
+/** Add or remove a room/zone (a group key). */
+export function withPlace(input: AutomationInput, key: string): Pick<AutomationInput, "rooms" | "zones"> {
+  const places = placesOf(input);
+  return splitPlaces(places.includes(key) ? places.filter((k) => k !== key) : [...places, key]);
 }
 
 /** The type of a blueprint path, or null when it is not ours. */
@@ -146,6 +177,7 @@ export function fromConfig(config: AutomationConfig): AutomationDraft | null {
   if (!type || !config.id) return null;
   const input = { ...defaultInput(type), ...(config.use_blueprint?.input as Partial<AutomationInput>) };
   input.rooms = toList(input.rooms);
+  input.zones = toList(input.zones);
   if (input.motion !== undefined) input.motion = toList(input.motion);
   if (input.scenes !== undefined) input.scenes = toList(input.scenes);
   return { id: config.id, type, alias: config.alias || "", input };
@@ -171,7 +203,7 @@ export function toConfig(draft: AutomationDraft, description: string): Automatio
 /** What a draft still needs before it can be saved, or null. */
 export function missing(draft: AutomationDraft): "name" | "rooms" | "scenes" | "motion" | null {
   if (!draft.alias.trim()) return "name";
-  if (!draft.input.rooms.length) return "rooms";
+  if (!placesOf(draft.input).length) return "rooms";
   if (draft.type === "motion" && !draft.input.motion?.length) return "motion";
   if (LIGHT_KINDS[draft.type].length && draft.input.light === "scene" && !draft.input.scenes?.length) return "scenes";
   return null;
@@ -229,10 +261,27 @@ export function whenLine(draft: AutomationDraft, t: Translate): string {
   }
 }
 
-/** Names of the rooms (areas) an automation uses. */
-export function roomsLine(hass: HassData, rooms: string[]): string {
-  return rooms.map((id) => hass.areas?.[id]?.name || id).join(", ");
+/** Names of the rooms (areas) and zones an automation uses. */
+export function roomsLine(hass: HassData, input: Pick<AutomationInput, "rooms" | "zones">): string {
+  return [
+    ...input.rooms.map((id) => hass.areas?.[id]?.name || id),
+    ...(input.zones || []).map((id) => hass.states[id]?.attributes.friendly_name || id),
+  ].join(", ");
 }
 
-/** The area an automation gets in HA: that of its one room, else none. */
-export const areaFor = (draft: AutomationDraft): string | null => (draft.input.rooms.length === 1 ? draft.input.rooms[0] : null);
+/** The area an automation gets in HA: that of its one room (and no zone), else none. */
+export const areaFor = (draft: AutomationDraft): string | null =>
+  draft.input.rooms.length === 1 && !draft.input.zones?.length ? draft.input.rooms[0] : null;
+
+/** What HA reports an automation controls (hue_studio/automations/subscribe). */
+export interface Controls {
+  areas?: string[];
+  groups?: string[];
+}
+
+/**
+ * Whether an automation belongs on the screen of a room or zone (a group key and its Hue
+ * group entity): it controls that area or that Hue room/zone.
+ */
+export const controlsGroup = (c: Controls, key: string, group: string | null): boolean =>
+  (key.startsWith(AREA) && !!c.areas?.includes(key.slice(AREA.length))) || (!!group && !!c.groups?.includes(group));

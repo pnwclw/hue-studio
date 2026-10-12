@@ -366,6 +366,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         input: { rooms: ["balcony"], start_kind: "sunset", start_offset: { hours: 0, minutes: -20, seconds: 0 }, end_kind: "time", end_time: "23:00:00", light: "natural" },
       },
     },
+    "automation.film_night": {
+      id: "hue_studio_schedule_demo4",
+      alias: "Film night",
+      use_blueprint: {
+        path: "hue_studio/schedule.yaml",
+        input: { rooms: [], zones: ["light.tv_area"], start_kind: "time", start_time: "20:30:00", days: ["fri", "sat"], light: "white", kelvin: 2200, brightness: 30 },
+      },
+    },
     "automation.tv_dim": { id: "1712345678901", alias: "Dim the TV area when a film starts", triggers: [], actions: [] },
   };
   let automationReloads = 0;
@@ -378,7 +386,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     const ours: AutomationsMessage["automations"] = {};
     for (const [entityId, config] of Object.entries(automationConfigs)) {
       const type = /^hue_studio\/([a-z_]+)\.yaml$/.exec(config.use_blueprint?.path || "")?.[1] || null;
-      if (type || config.id?.startsWith("hue_studio_")) ours[entityId] = { id: config.id || null, type, custom: !type };
+      // HA reports what an automation controls from its targets (here: straight from the inputs).
+      const input = (config.use_blueprint?.input || {}) as { rooms?: string[]; zones?: string[] };
+      if (type || config.id?.startsWith("hue_studio_"))
+        ours[entityId] = { id: config.id || null, type, custom: !type, areas: [...(input.rooms || [])], groups: [...(input.zones || [])] };
     }
     const related = Object.keys(automationConfigs).filter((id) => !ours[id]);
     return { automations: ours, related, types: ["wake_up", "go_to_sleep", "coming_home", "leaving_home", "mimic_presence", "schedule", "motion"], reloads: automationReloads };
@@ -745,6 +756,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       await new Promise((r) => setTimeout(r, 120));
       const id = decodeURIComponent(path.replace("config/automation/config/", ""));
       const entityId = Object.keys(automationConfigs).find((e) => automationConfigs[e].id === id);
+      if (method === "GET") {
+        if (!entityId) throw new Error("Resource not found");
+        return structuredClone(automationConfigs[entityId]) as T;
+      }
       if (method === "DELETE" && entityId) {
         delete automationConfigs[entityId];
         delete states[entityId];
@@ -763,9 +778,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       console.info("callWS", JSON.stringify(msg));
       const area = String(msg.area_id);
       if (msg.type === "automation/config") {
+        // Like HA: a blueprint automation comes back expanded, without its inputs.
         const config = automationConfigs[String(msg.entity_id)];
         if (!config) throw new Error("not found");
-        return { config: structuredClone(config) } as T;
+        return { config: { id: config.id, alias: config.alias, triggers: [], actions: [] } } as T;
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
       if (msg.type === "hue_studio/automations/preview") return preview(msg.scene_of_the_day as DayConfig, !!msg.natural) as T;

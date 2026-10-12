@@ -86,6 +86,8 @@ export class StudioContext {
   automations: AutomationsMessage | null = null;
   /** Configs of our automations by entity id (HA's automation/config), read on every message. */
   automationConfigs: Record<string, AutomationConfig> = {};
+  /** The message whose configs `automationConfigs` holds (null: still reading). */
+  automationConfigsRead: AutomationsMessage | null = null;
   /** Sync Boxes by config entry id, with pending predictions applied. */
   boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
@@ -317,17 +319,30 @@ export class StudioContext {
     }
   }
 
-  /** Read the configs of our automations (HA's own automation/config command). */
+  /**
+   * Read the stored configs of our automations through HA's automation config API, as HA's
+   * editor does (HA's `automation/config` command gives a blueprint automation already
+   * expanded, without its inputs). Admins only; for others the list stays without them.
+   */
   private async loadAutomationConfigs(msg: AutomationsMessage): Promise<void> {
     const configs: Record<string, AutomationConfig> = {};
-    await Promise.all(
-      Object.keys(msg.automations).map(async (entityId) => {
-        const result = await this.query<{ config: AutomationConfig }>({ type: "automation/config", entity_id: entityId }, { quiet: true });
-        if (result?.config) configs[entityId] = result.config;
-      }),
-    );
+    const api = this.raw?.callApi?.bind(this.raw);
+    if (api) {
+      await Promise.all(
+        Object.entries(msg.automations).map(async ([entityId, a]) => {
+          if (!a.id) return;
+          try {
+            const config = await api<AutomationConfig>("GET", `config/automation/config/${encodeURIComponent(a.id)}`);
+            if (config) configs[entityId] = config;
+          } catch {
+            // Not an admin, or the automation lives outside automations.yaml: no editor here.
+          }
+        }),
+      );
+    }
     if (this.automations !== msg) return;
     this.automationConfigs = configs;
+    this.automationConfigsRead = msg;
     this.onChange();
   }
 

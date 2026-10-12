@@ -56,7 +56,10 @@ while). Each one is a **Home Assistant automation** made from a blueprint that H
 Studio puts in place (`blueprints/automation/hue_studio/`): Home Assistant stores and
 runs it, lists it in Settings → Automations and edits it with a form; "Open in Home
 Assistant" is one tap away, and the panel lists your other automations that use Hue
-lights. A room's screen shows its automations too.
+lights. An automation works in rooms (Home Assistant areas) and zones (Hue rooms and
+zones that no area holds); the tab lists them by room and zone, and each room's or
+zone's screen shows its own with their switches. Editing them in the panel needs a Home
+Assistant administrator; everyone can switch them on and off.
 
 The light of an automation is a scene per room, a white, **natural light** (a white per
 phase of the day, cool in the morning, warm in the evening, like the Hue app's) or the

@@ -1,4 +1,4 @@
-// One automation, edited like in the Hue app: its name, when (per type), rooms and light.
+// One automation, edited like in the Hue app: its name, when (per type), rooms/zones and light.
 // Natural light and the scene of the day have a second page with their settings (pools by
 // phase, season and weather, phases, brightness, weather and sensors, holidays, excluded
 // scenes); everything stays a draft until "Save" writes the automation into Home Assistant
@@ -23,12 +23,14 @@ import {
   missing,
   newDraft,
   offsetDuration,
+  placesOf,
   offsetMinutes,
   type StartKind,
   toConfig,
   TYPE_ICONS,
   WEEKDAYS,
   type Weekday,
+  withPlace,
 } from "../automations.ts";
 import { whiteArt } from "../color.ts";
 import {
@@ -96,7 +98,7 @@ export class AutomationEditView extends StudioView {
   /** The config id of the automation, or null for a new one (`newType`). */
   @property() accessor automationId: string | null = null;
   @property() accessor newType: string | null = null;
-  /** The room a new automation starts with (an area id). */
+  /** The room or zone a new automation starts with (a group key, or an area id), from its screen. */
   @property() accessor room: string | null = null;
   /** `all_day`: a new all-day scene (a schedule showing the scene of the day). */
   @property() accessor preset: string | null = null;
@@ -117,15 +119,27 @@ export class AutomationEditView extends StudioView {
     return !this.automationId;
   }
 
+  /** The group key of `room` (dashboards' cards pass a bare area id). */
+  private get roomKey(): string | null {
+    return this.room ? (this.room.includes(".") ? this.room : `area.${this.room}`) : null;
+  }
+
+  /** Where "back" and saving lead: the room or zone it came from, else the tab. */
+  private leave(): void {
+    const key = this.roomKey;
+    this.ctx.go(key && findGroup(this.ctx.home, key) ? `/room/${encodeURIComponent(key)}` : "/automations");
+  }
+
   protected override willUpdate(): void {
     if (this.draft) return;
     const { ctx } = this;
     if (this.newType && isType(this.newType)) {
-      const rooms = this.room && ctx.hass.areas?.[this.room] ? [this.room] : [];
+      const key = this.roomKey;
+      const places = key && findGroup(ctx.home, key) ? [key] : [];
       this.draft =
         this.preset === "all_day" && this.newType === "schedule"
-          ? allDayDraft(ctx.t("add.all_day"), rooms)
-          : newDraft(this.newType, ctx.t(`automations.type_${this.newType}` as StringKey), rooms);
+          ? allDayDraft(ctx.t("add.all_day"), places)
+          : newDraft(this.newType, ctx.t(`automations.type_${this.newType}` as StringKey), places);
     } else if (this.automationId) {
       const entity = ctx.automationEntity(this.automationId);
       const config = entity ? ctx.automationConfigs[entity] : undefined;
@@ -157,10 +171,20 @@ export class AutomationEditView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const d = this.draft;
-    const back = () => (this.page === "day" ? this.leaveDay() : ctx.go("/automations"));
+    const back = () => (this.page === "day" ? this.leaveDay() : this.leave());
     if (!d) {
-      const loading = !ctx.automations || (this.automationId && ctx.automationEntity(this.automationId) && !this.draft);
-      return this.screen(this.subHead(t("automations.title"), back), html`<p class="empty">${t(loading ? "rooms.loading" : "automations.not_found")}</p>`);
+      const entity = this.automationId ? ctx.automationEntity(this.automationId) : null;
+      const loading = !ctx.automations || (entity && ctx.automationConfigsRead !== ctx.automations);
+      if (loading || !entity || !this.automationId)
+        return this.screen(this.subHead(t("automations.title"), back), html`<p class="empty">${t(loading ? "rooms.loading" : "automations.not_found")}</p>`);
+      // It exists, but its config can't be read here (not an admin, or kept outside HA's automations.yaml).
+      const id = this.automationId;
+      return this.screen(
+        this.subHead(friendlyName(ctx.hass, entity), back),
+        html`<p class="empty">${t("automations.not_readable")}</p>
+          <div class="center"><button class="pill" @click=${() => ctx.openHa(`/config/automation/edit/${encodeURIComponent(id)}`)}>${t("automations.open_ha")}</button></div>`,
+        "settings-page automation-page",
+      );
     }
     if (this.page === "day") {
       const natural = d.input.light === "natural";
@@ -179,7 +203,7 @@ export class AutomationEditView extends StudioView {
           @input=${(e: InputEvent) => (this.draft = { ...d, alias: (e.target as HTMLInputElement).value })} />
         <h2 class="label">${t("automations.when")}</h2>
         ${this.when(d)}
-        <h2 class="label">${t("automations.rooms")}</h2>
+        <h2 class="label">${t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms")}</h2>
         ${this.rooms(d)}
         ${LIGHT_KINDS[d.type].length ? html`<h2 class="label">${t("automations.light")}</h2>${this.light(d)}` : nothing}
         <div class="center stack">
@@ -213,7 +237,7 @@ export class AutomationEditView extends StudioView {
     this.saving = false;
     if (ok) {
       haptic("success");
-      ctx.go("/automations");
+      this.leave();
     }
   }
 
@@ -449,19 +473,18 @@ export class AutomationEditView extends StudioView {
 
   // ---- rooms and light ----
 
+  /** Rooms (HA areas) and zones (Hue rooms/zones no area holds), as on the home screen. */
   private rooms(d: AutomationDraft) {
     const { ctx } = this;
-    const rooms = ctx.home.rooms.filter((g) => g.kind === "area");
-    const area = (key: string) => key.slice("area.".length);
-    const flip = (id: string) => {
+    const places = placesOf(d.input);
+    const flip = (key: string) => {
       haptic("selection");
-      const current = d.input.rooms;
-      this.set({ rooms: current.includes(id) ? current.filter((r) => r !== id) : [...current, id] });
+      this.set(withPlace(d.input, key));
     };
     return html`<div class="chips wrap rooms-pick">
-      ${rooms.map((g) => {
-        const on = d.input.rooms.includes(area(g.key));
-        return html`<button class=${classMap({ chip: true, on })} aria-pressed=${on} @click=${() => flip(area(g.key))}>
+      ${[...ctx.home.rooms, ...ctx.home.zones].map((g) => {
+        const on = places.includes(g.key);
+        return html`<button class=${classMap({ chip: true, on })} aria-pressed=${on} @click=${() => flip(g.key)}>
           <ha-icon icon=${g.icon}></ha-icon>${g.name}
         </button>`;
       })}
@@ -483,8 +506,9 @@ export class AutomationEditView extends StudioView {
     const scenes = d.input.scenes || [];
     const brightness = d.input.brightness ?? null;
     return html`<div class="rows">
-      ${d.input.rooms.map((area) => {
-        const group = findGroup(ctx.home, `area.${area}`);
+      ${placesOf(d.input).map((key) => {
+        const group = findGroup(ctx.home, key);
+        const area = group?.name || key;
         const own = group?.scenes || [];
         const current = own.find((s) => scenes.includes(s.entity_id))?.entity_id || "";
         const pick = (value: string) => {
@@ -627,7 +651,7 @@ export class AutomationEditView extends StudioView {
       ctx.call(
         "hue_studio",
         "apply_light",
-        { area_id: d.input.rooms, light: natural ? "natural" : "auto", scene_of_the_day: this.day, transition: 2 },
+        { area_id: d.input.rooms, entity_id: d.input.zones || [], light: natural ? "natural" : "auto", scene_of_the_day: this.day, transition: 2 },
         { optimistic: false },
       );
     if (p?.kelvin) {
@@ -638,7 +662,7 @@ export class AutomationEditView extends StudioView {
           <div class="name">${t("auto.style_natural")} · ${p.kelvin} K</div>
           <div class="dim small">${this.stateLine(p)}</div>
         </div>
-        <div class="today-actions"><button class="pill" ?disabled=${!d.input.rooms.length} @click=${show}>${t("auto.show_now")}</button></div>
+        <div class="today-actions"><button class="pill" ?disabled=${!placesOf(d.input).length} @click=${show}>${t("auto.show_now")}</button></div>
       </div>`;
     }
     if (!p?.scene) return html`<div class="today empty-today"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon><span>${t("auto.no_scene")}</span></div>`;
@@ -651,7 +675,7 @@ export class AutomationEditView extends StudioView {
         <div class="dim small">${this.stateLine(p)}</div>
       </div>
       <div class="today-actions">
-        <button class="pill" ?disabled=${!d.input.rooms.length} @click=${show}>${t("auto.show_now")}</button>
+        <button class="pill" ?disabled=${!placesOf(d.input).length} @click=${show}>${t("auto.show_now")}</button>
         <button class="pill" @click=${() => this.setDay(withExcluded(this.day, scene, true))}>${t("auto.never")}</button>
       </div>
     </div>`;
