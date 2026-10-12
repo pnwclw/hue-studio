@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from homeassistant.helpers.service import _SERVICES_SCHEMA
+from homeassistant.util.yaml import load_yaml
 import pytest
 
 TRANSLATIONS = (
@@ -25,3 +27,9 @@ def test_same_keys_as_english(path: Path) -> None:
     """A translation file mirrors en.json."""
     english = _keys(json.loads((TRANSLATIONS / "en.json").read_text()))
     assert _keys(json.loads(path.read_text())) == english
+
+
+def test_services_yaml_is_valid() -> None:
+    """services.yaml passes HA's schema (a bad file is only a warning in HA)."""
+    path = TRANSLATIONS.parent / "services.yaml"
+    _SERVICES_SCHEMA(load_yaml(str(path)))

@@ -407,7 +407,6 @@ delete_zone:
 
 apply_light:
   target:
-    area:
     entity:
       integration: hue
       domain: light

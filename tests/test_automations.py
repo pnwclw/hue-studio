@@ -438,10 +438,16 @@ async def test_old_auto_light_devices_removed(
     keep = devices.async_get_or_create(
         config_entry_id=studio_entry.entry_id, identifiers={(DOMAIN, BRIDGE_ID)}
     )
+    # Old integrations left identifiers with three parts.
+    legacy = devices.async_get_or_create(
+        config_entry_id=studio_entry.entry_id,
+        identifiers={("other", "a", "b")},  # type: ignore[arg-type]
+    )
     assert await hass.config_entries.async_setup(studio_entry.entry_id)
     await hass.async_block_till_done()
     assert devices.async_get(device.id) is None
     assert devices.async_get(keep.id) is not None
+    assert devices.async_get(legacy.id) is not None
     assert not [
         e
         for e in er.async_get(hass).entities.values()

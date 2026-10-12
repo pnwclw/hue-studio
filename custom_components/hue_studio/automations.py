@@ -618,10 +618,13 @@ def async_organize(
 def _async_remove_auto_light_devices(hass: HomeAssistant) -> None:
     """The old auto light's devices and entities (per area) are gone for good."""
     devices = dr.async_get(hass)
-    for device in list(devices.devices.values()):
+    for device in list(devices.devices):
+        # Identifiers are (domain, id), or longer in devices of some old integrations.
         if any(
-            domain == DOMAIN and str(key).startswith("auto_light_")
-            for domain, key in device.identifiers
+            len(ident) > 1
+            and ident[0] == DOMAIN
+            and str(ident[1]).startswith("auto_light_")
+            for ident in device.identifiers
         ):
             devices.async_remove_device(device.id)
     entities = er.async_get(hass)
