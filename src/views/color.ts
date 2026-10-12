@@ -95,7 +95,7 @@ export class ColorView extends StudioView {
   @property() accessor backPath: string | null = null;
   /** Where "Done" leaves the panel for (a page outside it, e.g. the dashboard the dialog was on). */
   @property() accessor exitPath: string | null = null;
-  /** Inside the more-info dialog: the body scrolls between the bar and a fixed dock, the bar drags the sheet. */
+  /** Inside the more-info dialog: the body scrolls between the bar and a fixed dock. */
   @property({ type: Boolean }) accessor embedded = false;
   /** What "Done" does instead of going back (the dialog closes). */
   @property({ attribute: false }) accessor done: (() => void) | null = null;
@@ -267,7 +267,7 @@ export class ColorView extends StudioView {
     const target = picked ? { ...live, key: `${live.key}:${picked}`, lights: [picked], target: [picked], group: null } : live;
 
     const fx = idle && mode === "effects";
-    const bar = html`<div class=${classMap({ "cv-bar": true, grip: this.embedded, scrolled: fx && this.scrolled })}>
+    const bar = html`<div class=${classMap({ "cv-bar": true, scrolled: fx && this.scrolled })}>
       <button class="round more" aria-label=${t("more.menu")} aria-haspopup="menu" aria-expanded=${this.menuOpen} @click=${() => (this.menuOpen = !this.menuOpen)}>
         ${icon("dots")}
       </button>

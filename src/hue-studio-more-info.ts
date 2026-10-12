@@ -18,18 +18,15 @@ import "./views/color.ts";
 import type { ColorView, MenuItem } from "./views/color.ts";
 
 const DIALOG_CSS = css`
-  /* A bottom sheet like HA's more-info on phones (slides up; drag the head down to close), centered on wide screens. */
+  /* Phones: the whole screen, sliding up (like the Hue app's color screen); wide screens: a centered card. */
   :host { position: fixed; inset: 0; z-index: 8; height: auto; flex-direction: row; align-items: flex-end; justify-content: center;
-          background: rgba(0, 0, 0, calc(0.5 * var(--scrim, 1))); animation: scrim-in 0.35s ease; transition: background-color 0.3s ease; }
+          background: rgba(0, 0, 0, 0.5); animation: scrim-in 0.35s ease; transition: background-color 0.3s ease; }
   :host(.closing) { background-color: rgba(0, 0, 0, 0); pointer-events: none; }
   .dlg { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 440px; overflow: hidden;
-         height: calc(100dvh - max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), 12px) - 8px);
-         border-radius: 22px 22px 0 0; background: var(--bg); box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+         height: 100dvh; box-sizing: border-box; padding-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+         background: var(--bg);
          animation: sheet-in 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
   :host(.closing) .dlg { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1); }
-  .grip { touch-action: none; cursor: grab; }
-  .handle { width: 36px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.35); margin: 0 auto; }
-  .handle-zone { flex: none; padding: 8px 0 0; }
   .colorbody .cv-bar { flex: none; position: relative; z-index: 3; padding: 4px 16px 0; }
   hue-studio-color-view.colorbody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   /* The wheel sits in the middle of the free space, its glow spreading under the bar and the dock; effects scroll. */
@@ -44,7 +41,7 @@ const DIALOG_CSS = css`
   .colorbody .wheel-wrap { padding-top: 44px; }
   .colorbody .effects { display: block; padding-bottom: 8px; }
   /* The dock floats over the end of the body: it fades in over what scrolls under it. */
-  .colorbody .dock { flex: none; position: relative; z-index: 2; padding: 0 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  .colorbody .dock { flex: none; position: relative; z-index: 2; padding: 0 16px calc(10px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
                      pointer-events: none; }
   .colorbody .dock.over { margin-top: -28px; padding-top: 28px; background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 28px); }
   .colorbody .dock > * { pointer-events: auto; }
@@ -57,10 +54,10 @@ const DIALOG_CSS = css`
   @keyframes pop-in { from { transform: translateY(16px) scale(0.96); opacity: 0; } }
   @media (min-width: 600px) {
     :host { align-items: center; }
-    .dlg { border-radius: 22px; height: min(880px, 92dvh); animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
+    .dlg { border-radius: 22px; height: min(880px, 92dvh); padding-top: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+           animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
     :host(.closing) .dlg { transform: translateY(12px) scale(0.97); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
     .colorbody .dock { padding-bottom: 14px; }
-    .handle-zone { visibility: hidden; }
   }
 `;
 
@@ -105,8 +102,6 @@ class HueStudioLightDialog extends LitElement {
   /** Bumped on every change, so the color view re-renders too. */
   private rev = 0;
   private stopWatch?: () => void;
-  /** Dragging the sheet down by its head (phones), like HA's bottom sheet. */
-  private drag: { id: number; y: number; t: number; dy: number; v: number } | null = null;
 
   /**
    * Build and render the dialog synchronously (the element must be connected); throws if
@@ -166,16 +161,7 @@ class HueStudioLightDialog extends LitElement {
       },
     };
 
-    return html`<div
-        class="dlg"
-        role="dialog"
-        aria-label=${group.name}
-        @pointerdown=${this.onDragStart}
-        @pointermove=${this.onDragMove}
-        @pointerup=${this.onDragEnd}
-        @pointercancel=${this.onDragEnd}
-      >
-        <div class="grip handle-zone"><div class="handle"></div></div>
+    return html`<div class="dlg" role="dialog" aria-modal="true" aria-label=${group.name}>
         <hue-studio-color-view
           embedded
           .ctx=${ctx}
@@ -188,55 +174,6 @@ class HueStudioLightDialog extends LitElement {
       </div>
       <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>`;
   }
-
-  private get sheet(): HTMLElement | null {
-    return this.renderRoot.querySelector<HTMLElement>(".dlg");
-  }
-
-  private onDragStart = (e: PointerEvent): void => {
-    const target = e.target as Element;
-    // Only the handle and the title row; buttons, the toggle and the slider keep their own gestures.
-    if (e.button !== 0 || !target.closest(".grip") || target.closest("button, input, hue-studio-slider, .slider")) return;
-    const sheet = this.sheet;
-    if (!sheet || matchMedia("(min-width: 600px)").matches) return;
-    this.drag = { id: e.pointerId, y: e.clientY, t: e.timeStamp, dy: 0, v: 0 };
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      // A pointer that is already gone: the move/up handlers simply never match.
-    }
-    sheet.style.animation = "none";
-    sheet.style.transition = "none";
-  };
-
-  private onDragMove = (e: PointerEvent): void => {
-    const { drag, sheet } = this;
-    if (!drag || drag.id !== e.pointerId || !sheet) return;
-    const dy = e.clientY - drag.y;
-    const dt = e.timeStamp - drag.t;
-    if (dt > 0) drag.v = (dy - drag.dy) / dt;
-    drag.dy = dy;
-    drag.t = e.timeStamp;
-    // Down follows the finger; up only gives a little.
-    const shift = dy > 0 ? dy : -Math.min(24, Math.sqrt(-dy) * 2);
-    sheet.style.transform = `translateY(${shift}px)`;
-    this.style.setProperty("--scrim", String(Math.max(0, 1 - Math.max(0, dy) / sheet.offsetHeight)));
-  };
-
-  private onDragEnd = (e: PointerEvent): void => {
-    const { drag, sheet } = this;
-    if (!drag || drag.id !== e.pointerId || !sheet) return;
-    this.drag = null;
-    const dismiss = e.type === "pointerup" && (drag.dy > Math.min(140, sheet.offsetHeight * 0.3) || (drag.dy > 20 && drag.v > 0.5));
-    sheet.style.transition = "transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1)";
-    if (dismiss) {
-      sheet.style.transform = "translateY(100%)";
-      this.close();
-      return;
-    }
-    sheet.style.transform = "";
-    this.style.removeProperty("--scrim");
-  };
 
   close(): void {
     if (!this.ctx) return;

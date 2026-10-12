@@ -181,22 +181,26 @@ export const CSS = `
                margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
-  /* Tall cards: icon and name on top, the switch in a zone of its own below (the Hue app's). */
-  .light-row .light { scroll-snap-align: start; height: 157px; box-sizing: border-box; justify-content: flex-start; gap: 0;
-                      padding: 0; border-radius: 16px; overflow: visible; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
-  .light-row .light ha-icon { margin-top: 20px; --mdc-icon-size: 30px; }
-  .light-row .light .name { flex: none; align-items: flex-start; justify-content: center; min-height: 0; margin: 8px 8px 0; font-size: 15px;
-                            font-weight: 600; line-height: 1.15; overflow: hidden; }
-  .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                           max-width: calc(100% - 16px); }
-  .light-row .light::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 52px; border-radius: 0 0 16px 16px;
-                             background: rgba(0, 0, 0, 0.14); border-top: 1px solid rgba(255, 255, 255, 0.1); pointer-events: none; }
-  .light-row .light .toggle, .light-row .light .busy-tag { position: relative; z-index: 1; flex: none; margin: auto 0 12px; }
+  /* Tall cards: icon, name, room and status on top, the switch in a zone of its own below (the Hue app's). The row
+     stretches every card to the tallest, so a status line never squeezes the switch. */
+  .light-row .light { scroll-snap-align: start; min-height: 157px; box-sizing: border-box; justify-content: flex-start; gap: 0;
+                      padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); }
+  .light-row .light ha-icon { margin-top: 16px; --mdc-icon-size: 30px; }
+  .light-row .light .name { flex: none; align-items: flex-start; justify-content: center; min-height: 0; margin: 6px 8px 0; font-size: 15px;
+                            font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+  .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
+                           text-overflow: ellipsis; max-width: calc(100% - 16px); }
+  .light-row .light .status { max-width: calc(100% - 12px); margin: 3px 6px 0; font-size: 11px; font-weight: 700; line-height: 1.2;
+                              letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .light-row .light .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center;
+                                   justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.14);
+                                   border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .switch-zone.inert { pointer-events: none; }
+  .switch-zone.inert .toggle { opacity: 0.35; }
   .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
-  .busy-tag { display: flex; align-items: center; gap: 4px; height: 28px; font-size: 11px; font-weight: 600; opacity: 0.8; }
-  .busy-tag svg { width: 14px; height: 14px; }
+  .light .status { font-size: 12px; font-weight: 600; opacity: 0.85; }
 
   /* The color screen's bar, like the Hue app: "...", Save; Done. Transparent over the screen's glow. */
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }

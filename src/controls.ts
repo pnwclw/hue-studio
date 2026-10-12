@@ -8,7 +8,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import type { StudioContext } from "./context.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
-import { icon, LightElement, type Throttled, throttle, toggle } from "./ui.ts";
+import { LightElement, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -68,16 +68,23 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
 export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false, sub = "" } = {}): TemplateResult {
   const state = ctx.hass.states[id];
   const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
-  const surface = surfaceOf({ on: colors.length > 0, colors, available: !!state && state.state !== "unavailable" });
-  // Busy: a Sync Box drives it; shown as such, nothing to tap.
+  const unreachable = !state || state.state === "unavailable";
+  const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable });
   const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
+  // Busy: a Sync Box drives it; unreachable: the bridge lost it. Either is said, and the switch rests.
+  const status = busy
+    ? html`<div class="status">${ctx.t("sync.syncing")}</div>`
+    : unreachable
+      ? html`<div class="status">${ctx.t("light.unreachable")}</div>`
+      : nothing;
   return html`<div class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })} style=${styleMap(style)} @click=${busy ? null : open}>
     <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
     <div class="name">${friendlyName(ctx.hass, id)}</div>
     ${sub ? html`<div class="sub">${sub}</div>` : nothing}
-    ${busy
-      ? html`<div class="busy-tag">${icon("sync")}${ctx.t("sync.syncing")}</div>`
-      : toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
+    ${status}
+    <div class=${classMap({ "switch-zone": true, inert: busy || unreachable })}>
+      ${toggle(state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
+    </div>
   </div>`;
 }
 
