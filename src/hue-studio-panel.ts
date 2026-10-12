@@ -8,16 +8,18 @@
 //   /room/<key>/scene/<scene>  scene editor
 //   /room/<key>/space          arrange the room's lights (positions)
 //   /gallery?room=<key>        scene gallery of a room or zone (its "+"), full screen
+//   /automations               automations (tab): ours, and the other HA ones touching Hue lights
+//   /automations/new[?room=]   the types of the Hue app (+ a custom one in HA's editor)
+//   /automations/new/<type>[?room=<area>]   a new automation
+//   /automations/<id>          an automation (its config id)
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
-//   /settings/auto/<area>      auto light of an area
 //   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
 //   /settings/devices          Hue devices by area; add new ones (search, name, area, Hue room)
 //   /settings/bridges          bridges and Sync Boxes
 //   /settings/motionaware      MotionAware areas
 //   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
-//   /settings/auto             areas with auto light
 //   /settings/integration      the integration's options
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
 
@@ -32,7 +34,8 @@ import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
 import { icon, type IconName, keepTouchInside } from "./ui.ts";
-import "./views/auto-light.ts";
+import "./views/automation-edit.ts";
+import "./views/automations.ts";
 import "./views/bridges.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
@@ -68,9 +71,10 @@ type Route =
   | { name: "devices" }
   | { name: "bridges"; mode: "bridges" | "motion" }
   | { name: "entertainment"; area: string | null; arrange: boolean }
-  | { name: "autolist" }
   | { name: "integration" }
-  | { name: "auto"; area: string };
+  | { name: "automations" }
+  | { name: "automationNew"; room: string | null }
+  | { name: "automation"; id: string | null; type: string | null; room: string | null };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -87,14 +91,16 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
-  if (parts[0] === "settings" && parts[1] === "auto" && parts[2]) return { name: "auto", area: parts[2] };
+  if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return { name: "automation", id: null, type: parts[2], room: params.get("room") };
+  if (parts[0] === "automations" && parts[1] === "new") return { name: "automationNew", room: params.get("room") };
+  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: null };
+  if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges" };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion" };
   if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
-  if (parts[0] === "settings" && parts[1] === "auto" && !parts[2]) return { name: "autolist" };
   if (parts[0] === "settings" && parts[1] === "integration") return { name: "integration" };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "home" };
@@ -147,17 +153,19 @@ export class HueStudioPanel extends LitElement {
     const route = parseRoute(this.route?.path ?? location.pathname.replace(PANEL_PATH, ""), location.search);
     const tab =
       route.name === "sync"
-          ? "sync"
-          : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental" || route.name === "gallerySettings" ||
+        ? "sync"
+        : route.name === "automations" || route.name === "automationNew" || route.name === "automation"
+          ? "automations"
+          : route.name === "settings" || route.name === "rooms" || route.name === "experimental" || route.name === "gallerySettings" ||
               route.name === "devices" ||
               route.name === "bridges" ||
               route.name === "entertainment" ||
-              route.name === "autolist" ||
               route.name === "integration"
             ? "settings"
             : "home";
     const tabs: [string, string, IconName, string][] = [
       ["home", "", "home", ctx.t("nav.home")],
+      ["automations", "/automations", "clock", ctx.t("nav.automations")],
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
@@ -196,8 +204,18 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":
         return html`<hue-studio-sync-view .ctx=${ctx} .rev=${rev} .box=${route.box}></hue-studio-sync-view>`;
-      case "auto":
-        return html`<hue-studio-auto-light-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-auto-light-view>`;
+      case "automations":
+        return html`<hue-studio-automations-view .ctx=${ctx} .rev=${rev}></hue-studio-automations-view>`;
+      case "automationNew":
+        return html`<hue-studio-automation-new-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-automation-new-view>`;
+      case "automation":
+        return html`<hue-studio-automation-edit-view
+          .ctx=${ctx}
+          .rev=${rev}
+          .automationId=${route.id}
+          .newType=${route.type}
+          .room=${route.room}
+        ></hue-studio-automation-edit-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "bridges":
@@ -206,8 +224,6 @@ export class HueStudioPanel extends LitElement {
         return route.arrange && route.area
           ? html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .entertainment=${route.area}></hue-studio-space-view>`
           : html`<hue-studio-entertainment-view .ctx=${ctx} .rev=${rev} .area=${route.area}></hue-studio-entertainment-view>`;
-      case "autolist":
-        return html`<hue-studio-auto-list-view .ctx=${ctx} .rev=${rev}></hue-studio-auto-list-view>`;
       case "integration":
         return html`<hue-studio-integration-view .ctx=${ctx} .rev=${rev}></hue-studio-integration-view>`;
       case "devices":

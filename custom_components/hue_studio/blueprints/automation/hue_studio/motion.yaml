@@ -1,0 +1,169 @@
+blueprint:
+  name: "Hue Studio: Motion sensor"
+  description: >-
+    Like a Hue motion sensor: motion turns the lights on (when it is dark enough), and they go off when nobody moved for a while. Made for Hue Studio: create and edit it in the Hue Studio panel
+    ([Automations](/hue/automations)); this form edits it too.
+  domain: automation
+  author: Hue Studio
+  source_url: https://github.com/pnwclw/hue-studio/blob/main/custom_components/hue_studio/blueprints/automation/hue_studio/motion.yaml
+  homeassistant:
+    min_version: 2026.10.0
+  input:
+    when_section:
+      name: When
+      icon: mdi:motion-sensor
+      input:
+        motion:
+          name: Motion sensors
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+                  device_class: [motion, occupancy, presence]
+              multiple: true
+        lux_sensor:
+          name: Light sensor
+          description: Optional; with it, lights go on only below the light level.
+          default: ""
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: illuminance
+        lux_below:
+          name: Only below
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 2000
+              unit_of_measurement: lx
+        off_after:
+          name: Turn off after
+          description: Minutes without motion (0 keeps them on).
+          default: 15
+          selector:
+            number:
+              min: 0
+              max: 120
+              unit_of_measurement: min
+    rooms_section:
+      name: Rooms
+      icon: mdi:sofa-outline
+      input:
+        rooms:
+          name: Rooms
+          description: Home Assistant areas; only their Hue lights are used.
+          selector:
+            area:
+              multiple: true
+              entity:
+                - integration: hue
+                  domain: light
+    light_section:
+      name: Light
+      icon: mdi:lightbulb-on-outline
+      input:
+        light:
+          name: Light
+          description: >-
+            A scene of each room, a white, natural light (a white that follows the
+            day) or the scene of the day (gallery scenes by time of day, season and
+            weather, set up in Hue Studio).
+          default: auto
+          selector:
+            select:
+              options:
+                - label: Scene of the day
+                  value: auto
+                - label: Natural light
+                  value: natural
+                - label: Scene
+                  value: scene
+                - label: White
+                  value: white
+        scenes:
+          name: Scenes
+          description: For "Scene", one scene per room.
+          default: []
+          selector:
+            entity:
+              filter:
+                - integration: hue
+                  domain: scene
+              multiple: true
+        kelvin:
+          name: White
+          description: For "White".
+          default: 2700
+          selector:
+            color_temp:
+              unit: kelvin
+              min: 2000
+              max: 6500
+        brightness:
+          name: Brightness
+          description: For "White", and for "Scene" instead of the scene's own.
+          default:
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        scene_of_the_day:
+          name: Natural light and scene of the day
+          description: >-
+            Phases of the day, scene pools by phase, season and weather, holidays and
+            brightness. Easiest to edit in Hue Studio.
+          default: {}
+          selector:
+            object:
+
+mode: restart
+triggers:
+  - trigger: state
+    entity_id: !input motion
+    to: "on"
+    id: motion
+  - trigger: state
+    entity_id: !input motion
+    to: "off"
+    for:
+      minutes: !input off_after
+    id: clear
+variables:
+  motion: !input motion
+  lux_sensor: !input lux_sensor
+  lux_below: !input lux_below
+  off_after: !input off_after
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id == 'motion' }}"
+    then:
+      - condition: template
+        value_template: >-
+          {{ not lux_sensor or lux_below | float(0) <= 0
+             or states(lux_sensor) | float(0) < lux_below | float(0) }}
+      - action: hue_studio.apply_light
+        target:
+          area_id: !input rooms
+        data:
+          light: !input light
+          scenes: !input scenes
+          kelvin: !input kelvin
+          brightness: !input brightness
+          scene_of_the_day: !input scene_of_the_day
+          transition: 1
+          only_if_off: true
+    else:
+      - condition: template
+        value_template: >-
+          {{ off_after | int(0) > 0
+             and expand(motion) | selectattr('state', 'eq', 'on') | list | count == 0 }}
+      - action: hue_studio.apply_light
+        target:
+          area_id: !input rooms
+        data:
+          light: "off"
+          transition: 3

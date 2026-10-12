@@ -219,7 +219,6 @@ recall_scene:
       domain: scene
   fields:
     dynamic:
-      required: true
       selector:
         boolean:
     brightness:
@@ -228,6 +227,12 @@ recall_scene:
           min: 1
           max: 100
           unit_of_measurement: "%"
+    transition:
+      selector:
+        number:
+          min: 0
+          max: 6000
+          unit_of_measurement: s
 
 set_sync:
   target:
@@ -354,82 +359,6 @@ delete_sync_ir_code:
       selector:
         text:
 
-auto_light_exclude:
-  fields:
-    area:
-      required: true
-      selector:
-        area:
-    scene:
-      required: true
-      example: ocean_dawn
-      selector:
-        text:
-    excluded:
-      default: true
-      selector:
-        boolean:
-
-auto_light_pool:
-  fields:
-    area:
-      required: true
-      selector:
-        area:
-    phase:
-      required: true
-      selector:
-        select:
-          translation_key: phase
-          options: [morning, day, golden, evening, night]
-    season:
-      required: true
-      selector:
-        select:
-          translation_key: season
-          options: [all, winter, spring, summer, autumn]
-    step:
-      required: true
-      example: clear
-      selector:
-        text:
-    scenes:
-      required: true
-      example: "[ocean_dawn, blossom]"
-      selector:
-        object:
-
-auto_light_offset:
-  fields:
-    area:
-      required: true
-      selector:
-        area:
-    phase:
-      required: true
-      selector:
-        select:
-          translation_key: phase
-          options: [morning, day, golden, evening, night]
-    delta:
-      required: true
-      selector:
-        number:
-          min: -100
-          max: 100
-          unit_of_measurement: "%"
-
-import_legacy:
-  fields:
-    path:
-      default: lights.json
-      selector:
-        text:
-    overwrite:
-      default: false
-      selector:
-        boolean:
-
 align_rooms:
   target:
     entity:
@@ -476,24 +405,59 @@ delete_zone:
       integration: hue
       domain: light
 
-apply_auto_light:
-  fields:
+apply_light:
+  target:
     area:
-      required: true
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    light:
+      default: scene
       selector:
-        area:
+        select:
+          translation_key: light
+          options: [scene, white, natural, auto, "off"]
+    scenes:
+      selector:
+        entity:
+          integration: hue
+          domain: scene
           multiple: true
+    kelvin:
+      selector:
+        color_temp:
+          unit: kelvin
+          min: 2000
+          max: 6500
+    brightness:
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
     transition:
       selector:
         number:
           min: 0
-          max: 600
+          max: 6000
           unit_of_measurement: s
-    force:
+    scene_of_the_day:
+      selector:
+        object:
+    from_dark:
       default: false
       selector:
         boolean:
-    resume:
+    only_if_off:
       default: false
+      selector:
+        boolean:
+    toggle:
+      default: false
+      selector:
+        boolean:
+    follow:
+      default: true
       selector:
         boolean:

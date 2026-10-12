@@ -9,7 +9,8 @@ import { adaptiveFor, buildHome, findGroup, type Group, type Home } from "./mode
 import { Optimistic, predict } from "./optimistic.ts";
 import { confirmed, predictSync, type SyncMemo, syncMemo } from "./sync.ts";
 import type {
-  AutoLightMessage,
+  AutomationConfig,
+  AutomationsMessage,
   Gallery,
   Hass,
   LightInfo,
@@ -45,6 +46,8 @@ const SYNC_PREDICTION_MS = 5000;
 const SYNC_MEMO_KEY = "hue_studio.sync_memo";
 /** How long (x 300 ms) a new zone may take to show up in HA. */
 const ZONE_WAIT_TRIES = 40;
+/** How long (x 300 ms) a saved automation may take to show up in HA. */
+const AUTOMATION_WAIT_TRIES = 40;
 
 /** Sync Boxes' switches and lights, for HA's more-info before any WebSocket answer (per browser). */
 export function loadSyncMemo(): SyncMemo {
@@ -79,8 +82,10 @@ export class StudioContext {
   roomsUnavailable = false;
   /** Where the Hue lights of each area stand (null until known). */
   positions: PositionsMessage | null = null;
-  /** Auto light settings and state of the areas (null until known). */
-  autoLight: AutoLightMessage | null = null;
+  /** Automations made with Hue Studio and the others touching Hue lights (null until known). */
+  automations: AutomationsMessage | null = null;
+  /** Configs of our automations by entity id (HA's automation/config), read on every message. */
+  automationConfigs: Record<string, AutomationConfig> = {};
   /** Sync Boxes by config entry id, with pending predictions applied. */
   boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
@@ -176,8 +181,9 @@ export class StudioContext {
     sub<PositionsMessage>("hue_studio/positions/subscribe", (msg) => {
       this.positions = msg;
     });
-    sub<AutoLightMessage>("hue_studio/auto_light/subscribe", (msg) => {
-      this.autoLight = msg;
+    sub<AutomationsMessage>("hue_studio/automations/subscribe", (msg) => {
+      this.automations = msg;
+      void this.loadAutomationConfigs(msg);
     });
     sub<RoomsPlan>(
       "hue_studio/rooms/subscribe",
@@ -298,6 +304,80 @@ export class StudioContext {
       this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
       return false;
     }
+  }
+
+  /** One WebSocket command and its result; failures show a toast and give null. */
+  async query<T>(msg: { type: string } & Record<string, unknown>, { quiet = false } = {}): Promise<T | null> {
+    if (!this.raw?.callWS) return null;
+    try {
+      return await this.raw.callWS<T>(msg);
+    } catch (err) {
+      if (!quiet) this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return null;
+    }
+  }
+
+  /** Read the configs of our automations (HA's own automation/config command). */
+  private async loadAutomationConfigs(msg: AutomationsMessage): Promise<void> {
+    const configs: Record<string, AutomationConfig> = {};
+    await Promise.all(
+      Object.keys(msg.automations).map(async (entityId) => {
+        const result = await this.query<{ config: AutomationConfig }>({ type: "automation/config", entity_id: entityId }, { quiet: true });
+        if (result?.config) configs[entityId] = result.config;
+      }),
+    );
+    if (this.automations !== msg) return;
+    this.automationConfigs = configs;
+    this.onChange();
+  }
+
+  /** The automation entity of a config id, or null. */
+  automationEntity(id: string): string | null {
+    return Object.entries(this.automations?.automations || {}).find(([, a]) => a.id === id)?.[0] || null;
+  }
+
+  /**
+   * Write an automation through HA's automation config API (what HA's editor uses); HA
+   * reloads it. Then label, category and area (`area`: its one room) once its entity exists.
+   */
+  async saveAutomation(config: AutomationConfig, area: string | null): Promise<boolean> {
+    if (!this.raw?.callApi || !config.id) return false;
+    try {
+      await this.raw.callApi("POST", `config/automation/config/${encodeURIComponent(config.id)}`, config);
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
+    void this.organizeAutomation(config.id, area);
+    return true;
+  }
+
+  private async organizeAutomation(id: string, area: string | null): Promise<void> {
+    for (let i = 0; i < AUTOMATION_WAIT_TRIES; i++) {
+      const entityId = Object.keys(this.raw?.states || {}).find((e) => e.startsWith("automation.") && this.raw?.states[e].attributes.id === id);
+      if (entityId) {
+        await this.query({ type: "hue_studio/automations/organize", entity_id: entityId, area_id: area }, { quiet: true });
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+  }
+
+  /** Remove an automation from HA (its config and entity). */
+  async deleteAutomation(id: string): Promise<boolean> {
+    if (!this.raw?.callApi) return false;
+    try {
+      await this.raw.callApi("DELETE", `config/automation/config/${encodeURIComponent(id)}`);
+      return true;
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
+  }
+
+  /** A page of HA itself (e.g. its automation editor). */
+  openHa(path: string): void {
+    navigate(path);
   }
 
   /** Put a Hue light into an HA area (null: no area). Resolves to true on success. */

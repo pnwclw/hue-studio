@@ -1,0 +1,238 @@
+blueprint:
+  name: "Hue Studio: Schedule"
+  description: >-
+    Like the Hue app's timers and schedules: the lights go on at a time or at sunrise or sunset, and optionally off later. Made for Hue Studio: create and edit it in the Hue Studio panel
+    ([Automations](/hue/automations)); this form edits it too.
+  domain: automation
+  author: Hue Studio
+  source_url: https://github.com/pnwclw/hue-studio/blob/main/custom_components/hue_studio/blueprints/automation/hue_studio/schedule.yaml
+  homeassistant:
+    min_version: 2026.10.0
+  input:
+    when_section:
+      name: When
+      icon: mdi:calendar-clock
+      input:
+        start_kind:
+          name: Start
+          default: time
+          selector:
+            select:
+              options:
+                - label: At a time
+                  value: time
+                - label: At sunrise
+                  value: sunrise
+                - label: At sunset
+                  value: sunset
+        start_time:
+          name: Start time
+          default: "07:00:00"
+          selector:
+            time:
+        start_offset:
+          name: Start offset from sunrise or sunset
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 0
+          selector:
+            duration:
+              allow_negative: true
+        end_kind:
+          name: End
+          default: none
+          selector:
+            select:
+              options:
+                - label: Never
+                  value: none
+                - label: At a time
+                  value: time
+                - label: At sunrise
+                  value: sunrise
+                - label: At sunset
+                  value: sunset
+        end_time:
+          name: End time
+          default: "23:00:00"
+          selector:
+            time:
+        end_offset:
+          name: End offset from sunrise or sunset
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 0
+          selector:
+            duration:
+              allow_negative: true
+        days:
+          name: Days
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Monday
+                  value: mon
+                - label: Tuesday
+                  value: tue
+                - label: Wednesday
+                  value: wed
+                - label: Thursday
+                  value: thu
+                - label: Friday
+                  value: fri
+                - label: Saturday
+                  value: sat
+                - label: Sunday
+                  value: sun
+        fade:
+          name: Fade
+          description: Minutes the lights take to change, at the start and the end.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 90
+              step: 1
+              unit_of_measurement: min
+    rooms_section:
+      name: Rooms
+      icon: mdi:sofa-outline
+      input:
+        rooms:
+          name: Rooms
+          description: Home Assistant areas; only their Hue lights are used.
+          selector:
+            area:
+              multiple: true
+              entity:
+                - integration: hue
+                  domain: light
+    light_section:
+      name: Light
+      icon: mdi:lightbulb-on-outline
+      input:
+        light:
+          name: Light
+          description: >-
+            A scene of each room, a white, natural light (a white that follows the
+            day) or the scene of the day (gallery scenes by time of day, season and
+            weather, set up in Hue Studio).
+          default: scene
+          selector:
+            select:
+              options:
+                - label: Scene
+                  value: scene
+                - label: White
+                  value: white
+                - label: Natural light
+                  value: natural
+                - label: Scene of the day
+                  value: auto
+        scenes:
+          name: Scenes
+          description: For "Scene", one scene per room.
+          default: []
+          selector:
+            entity:
+              filter:
+                - integration: hue
+                  domain: scene
+              multiple: true
+        kelvin:
+          name: White
+          description: For "White".
+          default: 2700
+          selector:
+            color_temp:
+              unit: kelvin
+              min: 2000
+              max: 6500
+        brightness:
+          name: Brightness
+          description: For "White", and for "Scene" instead of the scene's own.
+          default:
+          selector:
+            number:
+              min: 1
+              max: 100
+              unit_of_measurement: "%"
+        scene_of_the_day:
+          name: Natural light and scene of the day
+          description: >-
+            Phases of the day, scene pools by phase, season and weather, holidays and
+            brightness. Easiest to edit in Hue Studio.
+          default: {}
+          selector:
+            object:
+
+mode: single
+triggers:
+  - trigger: time
+    at: !input start_time
+    id: start_time
+  - trigger: sun
+    event: sunrise
+    offset: !input start_offset
+    id: start_sunrise
+  - trigger: sun
+    event: sunset
+    offset: !input start_offset
+    id: start_sunset
+  - trigger: time
+    at: !input end_time
+    id: end_time
+  - trigger: sun
+    event: sunrise
+    offset: !input end_offset
+    id: end_sunrise
+  - trigger: sun
+    event: sunset
+    offset: !input end_offset
+    id: end_sunset
+variables:
+  start_kind: !input start_kind
+  end_kind: !input end_kind
+  start_time: !input start_time
+  days: !input days
+  fade: !input fade
+  # Roughly when the start is, to tell an end after midnight from one the same day.
+  start_hm: >-
+    {{ start_time[:5] if start_kind == 'time'
+       else '06:00' if start_kind == 'sunrise' else '18:00' }}
+conditions:
+  - condition: template
+    value_template: "{{ trigger.id in ['start_' ~ start_kind, 'end_' ~ end_kind] }}"
+  - condition: template
+    value_template: >-
+      {% set ref = now() %}
+      {% if trigger.id.startswith('end_') and now().strftime('%H:%M') < start_hm %}
+        {% set ref = now() - timedelta(days=1) %}
+      {% endif %}
+      {{ ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][ref.weekday()] in days }}
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id.startswith('start_') }}"
+    then:
+      - action: hue_studio.apply_light
+        target:
+          area_id: !input rooms
+        data:
+          light: !input light
+          scenes: !input scenes
+          kelvin: !input kelvin
+          brightness: !input brightness
+          scene_of_the_day: !input scene_of_the_day
+          transition: "{{ fade | int(0) * 60 }}"
+    else:
+      - action: hue_studio.apply_light
+        target:
+          area_id: !input rooms
+        data:
+          light: "off"
+          transition: "{{ fade | int(0) * 60 }}"

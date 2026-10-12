@@ -1,6 +1,7 @@
 // Dashboard cards (loaded on every HA page with the more-info override):
-//   custom:hue-studio-room-card        a room: toggle, brightness, sensors, its scenes and auto light
-//   custom:hue-studio-auto-light-card  auto light of an area: today's scene, who controls the lights
+//   custom:hue-studio-room-card        a room: toggle, brightness, sensors, its scenes
+//   custom:hue-studio-automations-card Hue Studio's automations (of an area) with their switches
+//     (custom:hue-studio-auto-light-card, the auto light card of before, now shows the same)
 //   custom:hue-studio-gallery-card     gallery scenes to set once in a room
 // All cards of a page share one StudioContext (one set of WebSocket subscriptions). They
 // use HA's theme colors; everything else (scenes, colors, commands) is the panel's.
@@ -10,6 +11,7 @@ import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
+import { fromConfig, TYPE_ICONS, whenLine } from "./automations.ts";
 import { paletteArt } from "./color.ts";
 import { PANEL_PATH, StudioContext } from "./context.ts";
 import { groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
@@ -19,9 +21,8 @@ import { localize, type StringKey } from "./i18n.ts";
 import { findGroup, type Group, type Scene } from "./model.ts";
 import { gallerySeasons, shownCategories } from "./seasons.ts";
 import { CSS } from "./styles.ts";
-import type { Hass, LightControl } from "./types.ts";
-import { icon } from "./ui.ts";
-import { whiteArt } from "./views/auto-light.ts";
+import type { Hass } from "./types.ts";
+import { icon, toggle } from "./ui.ts";
 import { sceneArt, since } from "./views/room.ts";
 
 // ---------- one context for every card of the page ----------
@@ -112,6 +113,9 @@ const CARD_CSS = css`
                        font-size: 28px; color: #fff; background: rgba(0, 0, 0, 0.35); }
   .cat { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
   .warn { color: var(--text-2); font-size: 13px; }
+  .auto-row { min-height: 48px; }
+  .auto-row + .auto-row { border-top: 1px solid var(--surface); }
+  .auto-row ha-icon { color: var(--text-2); }
 `;
 
 /** Base of the cards: shared context, HA's `hass`, a re-render on every change. */
@@ -236,21 +240,10 @@ class HueStudioRoomCard extends StudioCard {
     </ha-card>`;
   }
 
-  /** Auto light first (when the area has it), then the room's Hue scenes. */
+  /** The room's Hue scenes. */
   private scenes(g: Group) {
-    const ctx = this.ctx!;
-    const { t } = ctx;
-    const area = g.kind === "area" ? g.key.slice("area.".length) : null;
-    const auto = area ? ctx.autoLight?.state[area] : undefined;
-    const autoDot =
-      auto && auto.control !== "off" && (auto.kelvin || auto.scene)
-        ? html`<button class="dot-btn" @click=${() => ctx.call("hue_studio", "apply_auto_light", { area, resume: true, transition: 1 }, { optimistic: false })}>
-            <div class="dot" style=${styleMap({ background: auto.kelvin ? whiteArt(auto.kelvin) : `url("${thumbUrl(auto.scene!)}") center / cover` })}></div>
-            <span>${t(auto.kelvin ? "auto.style_natural" : "room.auto_light")}</span>
-          </button>`
-        : nothing;
-    if (!g.scenes.length && autoDot === nothing) return nothing;
-    return html`<div class="dots">${autoDot}${g.scenes.map((s) => this.sceneDot(g, s))}</div>`;
+    if (!g.scenes.length) return nothing;
+    return html`<div class="dots">${g.scenes.map((s) => this.sceneDot(g, s))}</div>`;
   }
 
   private sceneDot(g: Group, s: Scene) {
@@ -268,29 +261,27 @@ class HueStudioRoomCard extends StudioCard {
   }
 }
 
-// ---------- auto light ----------
+// ---------- automations ----------
 
-interface AutoConfig {
+interface AutomationsCardConfig {
+  /** Only the automations of this area (else all of Hue Studio's). */
   area?: string;
 }
 
-const CONTROLS: LightControl[] = ["auto", "manual", "off"];
+class HueStudioAutomationsCard extends StudioCard {
+  @property({ attribute: false }) accessor config: AutomationsCardConfig = {};
 
-class HueStudioAutoLightCard extends StudioCard {
-  @property({ attribute: false }) accessor config: AutoConfig = {};
-
-  setConfig(config: AutoConfig): void {
-    if (!config.area) throw new Error("hue-studio-auto-light-card: set an area");
+  setConfig(config: AutomationsCardConfig): void {
     this.config = config;
   }
 
-  static getStubConfig(): AutoConfig {
-    return { area: shared?.ctx.autoLight ? Object.keys(shared.ctx.autoLight.areas)[0] : undefined };
+  static getStubConfig(): AutomationsCardConfig {
+    return {};
   }
 
   static getConfigForm() {
     return {
-      schema: [{ name: "area", required: true, selector: { area: {} } }],
+      schema: [{ name: "area", selector: { area: {} } }],
       computeLabel: (s: { name: string }) => cardLabel(`card.field_${s.name}`),
     };
   }
@@ -302,54 +293,37 @@ class HueStudioAutoLightCard extends StudioCard {
   protected override render() {
     const ctx = this.ctx!;
     const { t } = ctx;
-    const area = this.config.area!;
-    if (!ctx.autoLight) return html`<ha-card><div class="body warn">${t("rooms.loading")}</div></ha-card>`;
-    const now = ctx.autoLight.state[area];
-    if (!ctx.autoLight.areas[area] || !now) return this.missing("card.no_auto_light");
-    const entities = ctx.autoLight.entities[area] || {};
-    const name = ctx.hass.areas?.[area]?.name || area;
-    const pic = now.kelvin ? whiteArt(now.kelvin) : now.scene ? `url("${thumbUrl(now.scene)}") center / cover` : "var(--surface)";
-    const title = now.kelvin ? `${t("auto.style_natural")} · ${now.kelvin} K` : now.scene_name || t("auto.no_scene");
-    const line = [
-      // The phase the scene comes from: an evening-only area shows "Evening" all day.
-      (now.pool_phase || now.phase) ? t(`auto.phase_${now.pool_phase || now.phase}` as StringKey) : "",
-      now.season && !now.kelvin ? t(`auto.season_${now.season}` as StringKey) : "",
-      now.mood ? t(`auto.mood_${now.mood}` as StringKey) : "",
-      now.brightness !== undefined ? `${now.brightness} %` : "",
-    ].filter(Boolean);
-    const choose = (option: LightControl) => {
-      if (entities.light_control && option !== now.control) {
-        ctx.call("select", "select_option", { entity_id: entities.light_control, option }, { optimistic: false });
-      }
-    };
+    const area = this.config.area;
+    if (!ctx.automations) return html`<ha-card><div class="body warn">${t("rooms.loading")}</div></ha-card>`;
+    const list = Object.entries(ctx.automations.automations)
+      .map(([entityId]) => ({ entityId, draft: ctx.automationConfigs[entityId] ? fromConfig(ctx.automationConfigs[entityId]) : null }))
+      .filter((a) => a.draft && (!area || a.draft.input.rooms.includes(area)))
+      .sort((a, b) => a.draft!.alias.localeCompare(b.draft!.alias));
+    const title = area ? `${ctx.hass.areas?.[area]?.name || area} · ${t("automations.title")}` : t("automations.title");
+    const room = area ? `?room=${encodeURIComponent(area)}` : "";
     return html`<ha-card>
       <div class="body">
-        <div class="row">
-          <button class="pic link" style=${styleMap({ background: pic })} aria-label=${t("auto.settings")}
-            @click=${() => this.panel(`/settings/auto/${encodeURIComponent(area)}`)}></button>
-          <div class="grow">
-            <div class="sub">${name} · ${t("room.auto_light")}</div>
-            <div class="name">${title}</div>
-            <div class="sub">${line.join(" · ")}</div>
-          </div>
-        </div>
-        <div class="seg three" role="radiogroup" aria-label=${t("auto.control")}>
-          ${CONTROLS.map(
-            (c) => html`<button role="radio" aria-checked=${c === now.control} class=${classMap({ on: c === now.control })}
-              ?disabled=${!entities.light_control} @click=${() => choose(c)}>${t(`auto.control_${c}` as StringKey)}</button>`,
-          )}
-        </div>
-        <div class="actions">
-          ${!now.kelvin && entities.next_light_scene
-            ? html`<button class="pill" @click=${() => ctx.call("button", "press", { entity_id: entities.next_light_scene }, { optimistic: false })}>${t("auto.next")}</button>`
-            : nothing}
-          <button class="pill" ?disabled=${now.control === "off"}
-            @click=${() => ctx.call("hue_studio", "apply_auto_light", { area, resume: true, transition: 2 }, { optimistic: false })}>${t("auto.show_now")}</button>
-        </div>
+        <div class="cat">${title}</div>
+        ${list.length ? nothing : html`<div class="warn">${t("automations.empty")}</div>`}
+        ${list.map(({ entityId, draft }) => {
+          const on = ctx.hass.states[entityId]?.state === "on";
+          return html`<div class="row auto-row">
+            <ha-icon icon=${TYPE_ICONS[draft!.type]}></ha-icon>
+            <button class="grow link" @click=${() => this.panel(`/automations/${encodeURIComponent(draft!.id)}`)}>
+              <div class="name">${draft!.alias}</div>
+              <div class="sub">${whenLine(draft!, t)}</div>
+            </button>
+            ${toggle(on, draft!.alias, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }))}
+          </div>`;
+        })}
+        <div class="actions"><button class="pill" @click=${() => this.panel(`/automations/new${room}`)}>${t("automations.add")}</button></div>
       </div>
     </ha-card>`;
   }
 }
+
+/** The card dashboards had before automations: now the area's automations. */
+class HueStudioAutoLightCard extends HueStudioAutomationsCard {}
 
 // ---------- gallery ----------
 
@@ -457,9 +431,12 @@ function cardLabel(key: string): string {
 
 const CARDS: [string, CustomElementConstructor, string][] = [
   ["hue-studio-room-card", HueStudioRoomCard, "room"],
-  ["hue-studio-auto-light-card", HueStudioAutoLightCard, "auto"],
+  ["hue-studio-automations-card", HueStudioAutomationsCard, "automations"],
   ["hue-studio-gallery-card", HueStudioGalleryCard, "gallery"],
 ];
+
+// Dashboards made with the old auto light card keep working (not offered in the picker).
+if (!customElements.get("hue-studio-auto-light-card")) customElements.define("hue-studio-auto-light-card", HueStudioAutoLightCard);
 
 const w = window as Window & { customCards?: { type: string; name: string; description: string; preview?: boolean }[] };
 w.customCards ??= [];

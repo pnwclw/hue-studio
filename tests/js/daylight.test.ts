@@ -1,20 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { autoAreas, candidateAreas, isMonthDay, phaseCounts, poolOf, stepsOf } from "../../src/auto-light.ts";
-import type { AutoLightConfig, AutoLightMessage, HassData } from "../../src/types.ts";
+import { dayConfig, isMonthDay, phaseCounts, poolOf, stepsOf, withExcluded, withOffset, withPool, withSettings } from "../../src/daylight.ts";
+import type { DayConfig } from "../../src/types.ts";
 
-const config: AutoLightConfig = {
+const config: DayConfig = {
   pools: {
     day: { all: { clear: [["a"], ["b"], ["c", "d"], ["e"]], gloomy: [["a"], ["b"], ["c", "d"], ["e"]] } },
     evening: { all: { clear: ["x", "y"], gloomy: ["z"] }, winter: { clear: ["w"] } },
   },
   holidays: [],
-  names: {},
   excluded: [],
   offsets: {},
   settings: {},
-  control: "auto",
 };
 
 test("pools by phase, season and step", () => {
@@ -28,15 +26,18 @@ test("pools by phase, season and step", () => {
   assert.deepEqual(phaseCounts(config), { morning: 0, day: 5, golden: 0, evening: 4, night: 0 });
 });
 
-test("areas with and without auto light", () => {
-  const hass: HassData = {
-    areas: { office: { name: "Office" }, kitchen: { name: "Kitchen" }, hall: { name: "Hall" } },
-    entities: { "light.a": { platform: "hue", area_id: "office" }, "light.b": { platform: "hue", area_id: "kitchen" } },
-    states: { "light.a": { state: "on", attributes: {} }, "light.b": { state: "on", attributes: {} } },
-  };
-  const msg = { areas: { office: config }, state: {}, entities: {} } as AutoLightMessage;
-  assert.deepEqual(autoAreas(hass, msg), ["office"]);
-  assert.deepEqual(candidateAreas(hass, msg), ["kitchen"]);
+test("editing pools, exclusions, offsets and settings", () => {
+  const empty = dayConfig(null);
+  const day = withPool(empty, { phase: "day", season: "all", step: "1" }, ["a", "a", "b"]);
+  assert.deepEqual(day.pools.day.all, { clear: [[], ["a", "b"], [], []], gloomy: [[], ["a", "b"], [], []] });
+  assert.deepEqual(empty.pools, {}, "the original stays as it was");
+  const evening = withPool(day, { phase: "evening", season: "winter", step: "gloomy" }, ["w"]);
+  assert.deepEqual(poolOf(evening, { phase: "evening", season: "winter", step: "gloomy" }), ["w"]);
+  assert.deepEqual(withExcluded(withExcluded(empty, "a", true), "a", false).excluded, []);
+  assert.deepEqual(withOffset(empty, "night", 80).offsets, { night: 60 });
+  assert.deepEqual(withOffset(withOffset(empty, "night", 10), "night", 0).offsets, {});
+  const s = withSettings(withSettings(empty, { weather: "weather.home", night_from: "22:00" }), { weather: null });
+  assert.deepEqual(s.settings, { night_from: "22:00" });
 });
 
 test("month-day values", () => {

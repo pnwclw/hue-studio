@@ -18,7 +18,7 @@ export const CSS = `
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; }
-  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-auto-light-view, hue-studio-space-view, hue-studio-effects,
+  hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-automations-view, hue-studio-automation-new-view, hue-studio-automation-edit-view, hue-studio-space-view, hue-studio-effects,
   hue-studio-experimental-view, hue-studio-devices-view, hue-studio-slider { display: block; }
   svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   ha-icon { --mdc-icon-size: 22px; display: flex; flex: none; }
@@ -707,7 +707,23 @@ export const CSS = `
   .check svg { width: 16px; height: 16px; opacity: 0; }
   .on > .check { border-color: var(--accent); background: var(--accent); }
   .on > .check svg { opacity: 1; }
-  /* auto light */
+  /* automations */
+  .rows .item .row-open { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: none; background: none;
+                          cursor: pointer; text-align: left; font: inherit; color: inherit; }
+  .rows .item .row-open .grow { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .rows .item .row-open .dim.small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
+  .automation-type { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; font-size: 13px; color: var(--text-2); }
+  .automation-type ha-icon { --mdc-icon-size: 18px; }
+  .automation-page h3.sublabel { margin: 14px 2px 8px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .automation-page .seg + .rows { margin-top: 10px; }
+  .automation-page .seg.kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .automation-page .chips.wrap { flex-wrap: wrap; overflow: visible; }
+  .automation-page .chips.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 10px; overflow: visible; }
+  .automation-page .chips.days .chip { min-width: 0; padding: 0; justify-content: center; }
+  .automation-page .center .pill.apply { min-width: 200px; }
+  .automation-page .rows.pick .item .check { margin-left: auto; }
+  /* light of the day (natural light, scene of the day) */
   .rows .item .thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
   .rows .item.wrap { flex-wrap: wrap; }
   .rows .item.wrap .grow { min-width: 140px; }

@@ -204,3 +204,6 @@ export function smoothPath(pins: XY[]): string {
   }
   return d;
 }
+
+/** A round swatch of a white (K). */
+export const whiteArt = (kelvin: number): string => paletteArt({ kind: "white", mirek: Math.round(1e6 / kelvin) });

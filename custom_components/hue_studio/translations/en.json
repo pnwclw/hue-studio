@@ -153,12 +153,6 @@
     "scene_name_taken": {
       "message": "There already is a scene named {name} in this room or zone."
     },
-    "auto_light_bad_step": {
-      "message": "Unknown pool {step}: use clear or gloomy, or 0-3 for the day phase."
-    },
-    "legacy_unreadable": {
-      "message": "Cannot read {path}."
-    },
     "unknown_ha_area": {
       "message": "Unknown area: {area}."
     },
@@ -176,9 +170,6 @@
     },
     "room_change_failed": {
       "message": "Could not change the Hue room {name}: the bridge refused the change or is unreachable."
-    },
-    "no_auto_light": {
-      "message": "The area {area} has no auto light settings."
     },
     "positions_streaming": {
       "message": "The entertainment area {name} is syncing right now; positions can be changed once it stops."
@@ -218,6 +209,9 @@
     },
     "area_taken": {
       "message": "Another Hue room or zone already belongs to the area {area}."
+    },
+    "no_scene_of_the_day": {
+      "message": "The scene of the day has no scene for now: add scenes to its pools."
     }
   },
   "services": {
@@ -377,15 +371,19 @@
     },
     "recall_scene": {
       "name": "Play scene",
-      "description": "Activates a Hue scene dynamically (colors keep changing) or statically, regardless of its auto-play setting.",
+      "description": "Activates a Hue scene dynamically (colors keep changing), statically, or as it is set up.",
       "fields": {
         "dynamic": {
           "name": "Dynamic",
-          "description": "Play the scene's palette dynamically; off shows it statically."
+          "description": "On: the palette keeps changing; off: static; unset: as the scene is set up."
         },
         "brightness": {
           "name": "Brightness",
           "description": "Brightness in percent instead of the scene's own."
+        },
+        "transition": {
+          "name": "Transition",
+          "description": "Seconds the lights take to reach the scene."
         }
       }
     },
@@ -435,82 +433,6 @@
         }
       }
     },
-    "auto_light_exclude": {
-      "name": "Auto light: exclude scene",
-      "description": "Never (or again) pick a gallery scene in an area's auto light.",
-      "fields": {
-        "area": {
-          "name": "Area",
-          "description": "Area whose auto light changes."
-        },
-        "scene": {
-          "name": "Gallery scene",
-          "description": "Id of a gallery scene."
-        },
-        "excluded": {
-          "name": "Excluded",
-          "description": "Off to pick the scene again."
-        }
-      }
-    },
-    "auto_light_pool": {
-      "name": "Auto light: set pool",
-      "description": "Sets the gallery scenes of one pool of an area's auto light.",
-      "fields": {
-        "area": {
-          "name": "Area",
-          "description": "Area whose auto light changes."
-        },
-        "phase": {
-          "name": "Phase",
-          "description": "Time of day."
-        },
-        "season": {
-          "name": "Season",
-          "description": "Season, or all of them."
-        },
-        "step": {
-          "name": "Pool",
-          "description": "clear or gloomy; for the day phase the brightness step 0-3."
-        },
-        "scenes": {
-          "name": "Scenes",
-          "description": "Ids of gallery scenes."
-        }
-      }
-    },
-    "auto_light_offset": {
-      "name": "Auto light: brightness offset",
-      "description": "Shifts the brightness of a phase by the given percent; 0 resets it. Returns the new offset.",
-      "fields": {
-        "area": {
-          "name": "Area",
-          "description": "Area whose auto light changes."
-        },
-        "phase": {
-          "name": "Phase",
-          "description": "Time of day."
-        },
-        "delta": {
-          "name": "Change",
-          "description": "Percent to add; 0 resets the offset."
-        }
-      }
-    },
-    "import_legacy": {
-      "name": "Import legacy settings",
-      "description": "Imports the auto light of rooms from a legacy lights.json; rooms are matched to areas by id or name. Returns what was imported.",
-      "fields": {
-        "path": {
-          "name": "File",
-          "description": "Path relative to the config directory."
-        },
-        "overwrite": {
-          "name": "Overwrite",
-          "description": "Replace areas that already have auto light settings."
-        }
-      }
-    },
     "align_rooms": {
       "name": "Align rooms with areas",
       "description": "Brings the Hue rooms on the bridge in line with the Home Assistant areas: every area with Hue lights gets a Hue room of its name with exactly those lights. Returns the plan; with a target, only the targeted lights are moved.",
@@ -550,28 +472,6 @@
     "delete_zone": {
       "name": "Delete zone",
       "description": "Deletes Hue zones from the bridge, together with their scenes."
-    },
-    "apply_auto_light": {
-      "name": "Apply auto light",
-      "description": "Shows the area's scene of the day at its auto brightness on the area's Hue lights. Does nothing while someone controls the lights by hand or auto light is off, unless forced.",
-      "fields": {
-        "area": {
-          "name": "Area",
-          "description": "Areas with auto light settings."
-        },
-        "transition": {
-          "name": "Transition",
-          "description": "Seconds to fade into the scene."
-        },
-        "force": {
-          "name": "Force",
-          "description": "Apply even while the lights are under manual control or auto light is off."
-        },
-        "resume": {
-          "name": "Resume",
-          "description": "Hand lights under manual control back to auto light first (e.g. when someone enters the room)."
-        }
-      }
     },
     "save_sync_preset": {
       "name": "Save Sync Box preset",
@@ -624,6 +524,52 @@
           "description": "The button's code (hex)."
         }
       }
+    },
+    "apply_light": {
+      "name": "Show light",
+      "description": "What Hue Studio's automations show: a scene of each room, a white, natural light, the scene of the day, or off. Only the Hue lights of the target are used; natural light and the scene of the day keep up with the day until the lights are changed.",
+      "fields": {
+        "light": {
+          "name": "Light",
+          "description": "What to show."
+        },
+        "scenes": {
+          "name": "Scenes",
+          "description": "For a scene: one Hue scene per room."
+        },
+        "kelvin": {
+          "name": "White",
+          "description": "For a white: its color temperature."
+        },
+        "brightness": {
+          "name": "Brightness",
+          "description": "For a white, and for a scene instead of its own brightness."
+        },
+        "transition": {
+          "name": "Transition",
+          "description": "Seconds the lights take to change."
+        },
+        "scene_of_the_day": {
+          "name": "Natural light and scene of the day",
+          "description": "Phases, scene pools by phase, season and weather, holidays and brightness (as Hue Studio's automation editor writes them)."
+        },
+        "from_dark": {
+          "name": "From dark",
+          "description": "Lights that are off start at the lowest brightness, so the transition fades them in."
+        },
+        "only_if_off": {
+          "name": "Only if off",
+          "description": "Do nothing while any of the lights is on."
+        },
+        "toggle": {
+          "name": "Toggle",
+          "description": "Lights that are on go off instead."
+        },
+        "follow": {
+          "name": "Keep up with the day",
+          "description": "Natural light and the scene of the day follow the phase, season and weather while nobody changes the lights."
+        }
+      }
     }
   },
   "selector": {
@@ -665,24 +611,6 @@
         "intense": "Intense"
       }
     },
-    "phase": {
-      "options": {
-        "morning": "Morning",
-        "day": "Day",
-        "golden": "Golden hour",
-        "evening": "Evening",
-        "night": "Night"
-      }
-    },
-    "season": {
-      "options": {
-        "all": "All seasons",
-        "winter": "Winter",
-        "spring": "Spring",
-        "summer": "Summer",
-        "autumn": "Autumn"
-      }
-    },
     "palette_layout": {
       "options": {
         "classic": "Classic",
@@ -696,6 +624,15 @@
         "melancholic_calm": "Melancholic, calm",
         "melancholic_energetic": "Melancholic, energetic",
         "neutral": "Neutral"
+      }
+    },
+    "light": {
+      "options": {
+        "scene": "Scene",
+        "white": "White",
+        "natural": "Natural light",
+        "auto": "Scene of the day",
+        "off": "Off"
       }
     }
   },
@@ -785,22 +722,11 @@
           "normal": "Normal",
           "dimmed": "Dimmed"
         }
-      },
-      "light_control": {
-        "name": "Light control",
-        "state": {
-          "auto": "Auto light",
-          "manual": "Manual",
-          "off": "Off"
-        }
       }
     },
     "number": {
       "brightness": {
         "name": "Brightness"
-      },
-      "light_offset": {
-        "name": "Brightness offset"
       }
     },
     "sensor": {
@@ -865,76 +791,7 @@
           "good": "Good",
           "excellent": "Excellent"
         }
-      },
-      "light_phase": {
-        "name": "Light phase",
-        "state": {
-          "morning": "Morning",
-          "day": "Day",
-          "golden": "Golden hour",
-          "evening": "Evening",
-          "night": "Night"
-        }
-      },
-      "light_scene": {
-        "name": "Scene of the day",
-        "state_attributes": {
-          "scene_id": {
-            "name": "Scene id"
-          },
-          "pool": {
-            "name": "Pool"
-          },
-          "pool_phase": {
-            "name": "Pool phase",
-            "state": {
-              "morning": "Morning",
-              "day": "Day",
-              "golden": "Golden hour",
-              "evening": "Evening",
-              "night": "Night"
-            }
-          },
-          "season": {
-            "name": "Season",
-            "state": {
-              "winter": "Winter",
-              "spring": "Spring",
-              "summer": "Summer",
-              "autumn": "Autumn"
-            }
-          },
-          "mood": {
-            "name": "Weather",
-            "state": {
-              "clear": "Clear",
-              "gloomy": "Gloomy"
-            }
-          },
-          "holiday": {
-            "name": "Holiday"
-          },
-          "step": {
-            "name": "Day step"
-          },
-          "kelvin": {
-            "name": "Color temperature"
-          }
-        }
-      },
-      "light_brightness": {
-        "name": "Auto brightness"
       }
-    },
-    "button": {
-      "next_light_scene": {
-        "name": "Next scene"
-      }
-    }
-  },
-  "device": {
-    "auto_light": {
-      "name": "{area}"
     }
   }
 }

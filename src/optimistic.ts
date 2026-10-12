@@ -47,6 +47,10 @@ export function predict(hass: HassData, domain: string, service: string, data: S
     ids.forEach((id) => patches.set(id, { state: "on", attributes }));
   }
   if (domain === "hue_studio") ids.forEach((id) => patches.set(id, { state: "on" }));
+  // An automation's switch.
+  if (domain === "automation" && (service === "turn_on" || service === "turn_off")) {
+    ids.forEach((id) => patches.set(id, { state: service === "turn_on" ? "on" : "off" }));
+  }
   return patches;
 }
 

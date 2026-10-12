@@ -153,12 +153,6 @@
     "scene_name_taken": {
       "message": "W tym pomieszczeniu lub strefie jest już scena o nazwie {name}."
     },
-    "auto_light_bad_step": {
-      "message": "Nieznana pula {step}: użyj clear lub gloomy albo 0-3 dla pory „day”."
-    },
-    "legacy_unreadable": {
-      "message": "Nie można odczytać {path}."
-    },
     "unknown_ha_area": {
       "message": "Nieznany obszar: {area}."
     },
@@ -176,9 +170,6 @@
     },
     "room_change_failed": {
       "message": "Nie udało się zmienić pokoju Hue {name}: mostek odrzucił zmianę lub jest nieosiągalny."
-    },
-    "no_auto_light": {
-      "message": "Obszar {area} nie ma ustawień automatycznego światła."
     },
     "positions_streaming": {
       "message": "Obszar rozrywki {name} właśnie synchronizuje; pozycje można zmienić, gdy skończy."
@@ -218,6 +209,9 @@
     },
     "area_taken": {
       "message": "Inny pokój lub strefa Hue należy już do obszaru {area}."
+    },
+    "no_scene_of_the_day": {
+      "message": "Scena dnia nie ma teraz żadnej sceny: dodaj sceny do jej pul."
     }
   },
   "services": {
@@ -377,15 +371,19 @@
     },
     "recall_scene": {
       "name": "Odtwórz scenę",
-      "description": "Aktywuje scenę Hue dynamicznie (kolory się zmieniają) lub statycznie, niezależnie od autoodtwarzania.",
+      "description": "Włącza scenę Hue dynamicznie (kolory się zmieniają), statycznie lub tak, jak jest ustawiona.",
       "fields": {
         "dynamic": {
           "name": "Dynamicznie",
-          "description": "Odtwarzaj paletę sceny dynamicznie; wyłączone pokazuje ją statycznie."
+          "description": "Włączone: paleta się zmienia; wyłączone: statycznie; nieustawione: jak w ustawieniach sceny."
         },
         "brightness": {
           "name": "Jasność",
           "description": "Jasność w procentach zamiast jasności sceny."
+        },
+        "transition": {
+          "name": "Przejście",
+          "description": "Ile sekund światła dochodzą do sceny."
         }
       }
     },
@@ -435,82 +433,6 @@
         }
       }
     },
-    "auto_light_exclude": {
-      "name": "Automatyczne światło: wyklucz scenę",
-      "description": "Nigdy (lub znowu) nie wybieraj sceny z galerii w automatycznym świetle obszaru.",
-      "fields": {
-        "area": {
-          "name": "Obszar",
-          "description": "Obszar, którego automatyczne światło się zmienia."
-        },
-        "scene": {
-          "name": "Scena z galerii",
-          "description": "Identyfikator sceny z galerii."
-        },
-        "excluded": {
-          "name": "Wykluczona",
-          "description": "Wyłącz, aby scena znowu mogła być wybierana."
-        }
-      }
-    },
-    "auto_light_pool": {
-      "name": "Automatyczne światło: ustaw pulę",
-      "description": "Ustawia sceny z galerii jednej puli automatycznego światła obszaru.",
-      "fields": {
-        "area": {
-          "name": "Obszar",
-          "description": "Obszar, którego automatyczne światło się zmienia."
-        },
-        "phase": {
-          "name": "Pora",
-          "description": "Pora dnia."
-        },
-        "season": {
-          "name": "Pora roku",
-          "description": "Pora roku albo wszystkie."
-        },
-        "step": {
-          "name": "Pula",
-          "description": "clear lub gloomy; dla pory dnia „day” stopień jasności 0-3."
-        },
-        "scenes": {
-          "name": "Sceny",
-          "description": "Identyfikatory scen z galerii."
-        }
-      }
-    },
-    "auto_light_offset": {
-      "name": "Automatyczne światło: korekta jasności",
-      "description": "Przesuwa jasność pory dnia o podany procent; 0 ją zeruje. Zwraca nową korektę.",
-      "fields": {
-        "area": {
-          "name": "Obszar",
-          "description": "Obszar, którego automatyczne światło się zmienia."
-        },
-        "phase": {
-          "name": "Pora",
-          "description": "Pora dnia."
-        },
-        "delta": {
-          "name": "Zmiana",
-          "description": "Procent do dodania; 0 zeruje korektę."
-        }
-      }
-    },
-    "import_legacy": {
-      "name": "Importuj stare ustawienia",
-      "description": "Importuje automatyczne światło pokoi ze starego lights.json; pokoje są dopasowywane do obszarów po identyfikatorze lub nazwie. Zwraca, co zaimportowano.",
-      "fields": {
-        "path": {
-          "name": "Plik",
-          "description": "Ścieżka względem katalogu konfiguracji."
-        },
-        "overwrite": {
-          "name": "Nadpisz",
-          "description": "Zastąp obszary, które już mają ustawienia automatycznego światła."
-        }
-      }
-    },
     "align_rooms": {
       "name": "Wyrównaj pokoje z obszarami",
       "description": "Dopasowuje pokoje Hue na mostku do obszarów Home Assistant: każdy obszar ze światłami Hue dostaje pokój Hue o swojej nazwie z dokładnie tymi światłami. Zwraca plan; z celem przenoszone są tylko wskazane światła.",
@@ -550,28 +472,6 @@
     "delete_zone": {
       "name": "Usuń strefę",
       "description": "Usuwa strefy Hue z mostka razem z ich scenami."
-    },
-    "apply_auto_light": {
-      "name": "Zastosuj automatyczne światło",
-      "description": "Pokazuje scenę dnia obszaru z automatyczną jasnością na jego światłach Hue. Nic nie robi, gdy ktoś steruje światłem ręcznie lub automatyczne światło jest wyłączone, chyba że wymuszono.",
-      "fields": {
-        "area": {
-          "name": "Obszar",
-          "description": "Obszary z ustawieniami automatycznego światła."
-        },
-        "transition": {
-          "name": "Przejście",
-          "description": "Czas przejścia do sceny w sekundach."
-        },
-        "force": {
-          "name": "Wymuś",
-          "description": "Zastosuj także przy sterowaniu ręcznym lub wyłączonym automatycznym świetle."
-        },
-        "resume": {
-          "name": "Wznów",
-          "description": "Najpierw oddaj ręcznie sterowane światła automatycznemu światłu (np. gdy ktoś wchodzi do pokoju)."
-        }
-      }
     },
     "save_sync_preset": {
       "name": "Zapisz preset Sync Box",
@@ -624,6 +524,52 @@
           "description": "Kod przycisku (hex)."
         }
       }
+    },
+    "apply_light": {
+      "name": "Pokaż światło",
+      "description": "To, co pokazują automatyzacje Hue Studio: scena każdego pomieszczenia, biel, naturalne światło, scena dnia lub wyłączenie. Używane są tylko światła Hue celu; naturalne światło i scena dnia nadążają za porą dnia, dopóki nikt nie zmieni świateł.",
+      "fields": {
+        "light": {
+          "name": "Światło",
+          "description": "Co pokazać."
+        },
+        "scenes": {
+          "name": "Sceny",
+          "description": "Dla sceny: jedna scena Hue na pomieszczenie."
+        },
+        "kelvin": {
+          "name": "Biel",
+          "description": "Dla bieli: jej temperatura barwowa."
+        },
+        "brightness": {
+          "name": "Jasność",
+          "description": "Dla bieli, a dla sceny zamiast jej własnej jasności."
+        },
+        "transition": {
+          "name": "Przejście",
+          "description": "Ile sekund światła się zmieniają."
+        },
+        "scene_of_the_day": {
+          "name": "Naturalne światło i scena dnia",
+          "description": "Pory dnia, pule scen według pory, sezonu i pogody, święta i jasność (tak, jak zapisuje je edytor automatyzacji Hue Studio)."
+        },
+        "from_dark": {
+          "name": "Od ciemności",
+          "description": "Wyłączone światła zaczynają od najniższej jasności, więc przejście je rozjaśnia."
+        },
+        "only_if_off": {
+          "name": "Tylko gdy wyłączone",
+          "description": "Nic nie rób, gdy któreś ze świateł jest włączone."
+        },
+        "toggle": {
+          "name": "Przełącz",
+          "description": "Włączone światła zamiast tego się wyłączają."
+        },
+        "follow": {
+          "name": "Nadążaj za porą dnia",
+          "description": "Naturalne światło i scena dnia podążają za porą dnia, sezonem i pogodą, dopóki nikt nie zmieni świateł."
+        }
+      }
     }
   },
   "selector": {
@@ -665,24 +611,6 @@
         "intense": "Intensywna"
       }
     },
-    "phase": {
-      "options": {
-        "morning": "Rano",
-        "day": "Dzień",
-        "golden": "Złota godzina",
-        "evening": "Wieczór",
-        "night": "Noc"
-      }
-    },
-    "season": {
-      "options": {
-        "all": "Wszystkie pory roku",
-        "winter": "Zima",
-        "spring": "Wiosna",
-        "summer": "Lato",
-        "autumn": "Jesień"
-      }
-    },
     "palette_layout": {
       "options": {
         "classic": "Klasyczny",
@@ -696,6 +624,15 @@
         "melancholic_calm": "Melancholijna, spokojna",
         "melancholic_energetic": "Melancholijna, energiczna",
         "neutral": "Neutralna"
+      }
+    },
+    "light": {
+      "options": {
+        "scene": "Scena",
+        "white": "Biel",
+        "natural": "Naturalne światło",
+        "auto": "Scena dnia",
+        "off": "Wyłączone"
       }
     }
   },
@@ -785,22 +722,11 @@
           "normal": "Normalny",
           "dimmed": "Przyciemniony"
         }
-      },
-      "light_control": {
-        "name": "Sterowanie światłem",
-        "state": {
-          "auto": "Automatyczne",
-          "manual": "Ręcznie",
-          "off": "Wyłączone"
-        }
       }
     },
     "number": {
       "brightness": {
         "name": "Jasność"
-      },
-      "light_offset": {
-        "name": "Poprawka jasności"
       }
     },
     "sensor": {
@@ -865,76 +791,7 @@
           "good": "Dobra",
           "excellent": "Doskonała"
         }
-      },
-      "light_phase": {
-        "name": "Faza światła",
-        "state": {
-          "morning": "Rano",
-          "day": "Dzień",
-          "golden": "Złota godzina",
-          "evening": "Wieczór",
-          "night": "Noc"
-        }
-      },
-      "light_scene": {
-        "name": "Scena dnia",
-        "state_attributes": {
-          "scene_id": {
-            "name": "Id sceny"
-          },
-          "pool": {
-            "name": "Pula"
-          },
-          "pool_phase": {
-            "name": "Faza puli",
-            "state": {
-              "morning": "Rano",
-              "day": "Dzień",
-              "golden": "Złota godzina",
-              "evening": "Wieczór",
-              "night": "Noc"
-            }
-          },
-          "season": {
-            "name": "Pora roku",
-            "state": {
-              "winter": "Zima",
-              "spring": "Wiosna",
-              "summer": "Lato",
-              "autumn": "Jesień"
-            }
-          },
-          "mood": {
-            "name": "Pogoda",
-            "state": {
-              "clear": "Pogodnie",
-              "gloomy": "Pochmurno"
-            }
-          },
-          "holiday": {
-            "name": "Święto"
-          },
-          "step": {
-            "name": "Stopień dnia"
-          },
-          "kelvin": {
-            "name": "Barwa światła"
-          }
-        }
-      },
-      "light_brightness": {
-        "name": "Automatyczna jasność"
       }
-    },
-    "button": {
-      "next_light_scene": {
-        "name": "Inna scena"
-      }
-    }
-  },
-  "device": {
-    "auto_light": {
-      "name": "{area}"
     }
   }
 }

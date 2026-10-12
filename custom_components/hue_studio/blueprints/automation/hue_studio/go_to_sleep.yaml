@@ -1,0 +1,81 @@
+blueprint:
+  name: "Hue Studio: Go to sleep"
+  description: >-
+    Like the Hue app's go to sleep: from the set time the lights slowly dim to off. Made for Hue Studio: create and edit it in the Hue Studio panel
+    ([Automations](/hue/automations)); this form edits it too.
+  domain: automation
+  author: Hue Studio
+  source_url: https://github.com/pnwclw/hue-studio/blob/main/custom_components/hue_studio/blueprints/automation/hue_studio/go_to_sleep.yaml
+  homeassistant:
+    min_version: 2026.10.0
+  input:
+    when_section:
+      name: When
+      icon: mdi:sleep
+      input:
+        time:
+          name: Time
+          default: "23:00:00"
+          selector:
+            time:
+        days:
+          name: Days
+          default: [mon, tue, wed, thu, fri, sat, sun]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Monday
+                  value: mon
+                - label: Tuesday
+                  value: tue
+                - label: Wednesday
+                  value: wed
+                - label: Thursday
+                  value: thu
+                - label: Friday
+                  value: fri
+                - label: Saturday
+                  value: sat
+                - label: Sunday
+                  value: sun
+        fade:
+          name: Fade out
+          description: Minutes the lights take to go off.
+          default: 30
+          selector:
+            number:
+              min: 0
+              max: 90
+              step: 5
+              unit_of_measurement: min
+    rooms_section:
+      name: Rooms
+      icon: mdi:sofa-outline
+      input:
+        rooms:
+          name: Rooms
+          description: Home Assistant areas; only their Hue lights are used.
+          selector:
+            area:
+              multiple: true
+              entity:
+                - integration: hue
+                  domain: light
+
+mode: single
+triggers:
+  - trigger: time
+    at: !input time
+variables:
+  fade: !input fade
+conditions:
+  - condition: time
+    weekday: !input days
+actions:
+  - action: hue_studio.apply_light
+    target:
+      area_id: !input rooms
+    data:
+      light: "off"
+      transition: "{{ fade | int(0) * 60 }}"

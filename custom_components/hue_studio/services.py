@@ -285,8 +285,10 @@ RESET_SCENE_SCHEMA = cv.make_entity_service_schema(
 
 RECALL_SCENE_SCHEMA = cv.make_entity_service_schema(
     {
-        vol.Required(ATTR_DYNAMIC): cv.boolean,
+        # Unset: as the scene is set up (its own auto-play).
+        vol.Optional(ATTR_DYNAMIC): cv.boolean,
         vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+        vol.Optional(ATTR_TRANSITION): TRANSITION,
     }
 )
 
@@ -351,7 +353,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     """Register the integration services."""
 
     async def apply_palette(call: ServiceCall) -> None:
-        lights = await _async_target_lights(hass, call)
+        lights = await async_target_lights(hass, call)
         palette = await _async_palette(hass, call.data)
         brightness = call.data.get(ATTR_BRIGHTNESS, palette.get("brightness"))
         transition = call.data.get(ATTR_TRANSITION)
@@ -374,7 +376,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         await async_mark_manual(hass, _touched(call, lights))
 
     async def set_gradient(call: ServiceCall) -> None:
-        lights = await _async_target_lights(hass, call)
+        lights = await async_target_lights(hass, call)
         points = call.data[ATTR_POINTS]
         for light in lights:
             if light.resource.gradient is None:
@@ -390,7 +392,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         await async_mark_manual(hass, _touched(call, lights))
 
     async def set_effect(call: ServiceCall) -> None:
-        lights = await _async_target_lights(hass, call)
+        lights = await async_target_lights(hass, call)
         effect = EffectStatus(call.data[ATTR_EFFECT])
         if effect != EffectStatus.NO_EFFECT:
             for light in lights:
@@ -466,7 +468,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         Scenes live in Hue rooms and zones; an area without one gets a zone, which then
         matches the area automatically (same lights) and shows up in the Hue app.
         """
-        lights = await _async_target_lights(hass, call, skip_streaming=False)
+        lights = await async_target_lights(hass, call, skip_streaming=False)
         bridges = {id(light.bridge): light.bridge for light in lights}
         if len(bridges) != 1:
             raise ServiceValidationError(
@@ -531,7 +533,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         """Bring the bridge's rooms in line with the HA areas (or show the plan)."""
         only: set[str] | None = None
         if set(call.data) & set(cv.ENTITY_SERVICE_FIELDS):
-            lights = await _async_target_lights(hass, call, skip_streaming=False)
+            lights = await async_target_lights(hass, call, skip_streaming=False)
             only = {light.entity_id for light in lights}
         return await async_align(
             hass,
@@ -581,13 +583,21 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 )
 
     async def recall_scene(call: ServiceCall) -> None:
-        """Play a scene dynamically or statically (ignoring its auto-play)."""
-        dynamic = call.data[ATTR_DYNAMIC]
-        action = RecallAction.DYNAMIC_PALETTE if dynamic else RecallAction.STATIC
+        """Play a scene dynamically or statically, or as it is set up."""
+        dynamic = call.data.get(ATTR_DYNAMIC)
+        action = (
+            RecallAction.ACTIVE
+            if dynamic is None
+            else RecallAction.DYNAMIC_PALETTE
+            if dynamic
+            else RecallAction.STATIC
+        )
         for scene in await _async_target_scenes(hass, call):
             recall = RecallFeature(action=action)
             if (brightness := call.data.get(ATTR_BRIGHTNESS)) is not None:
                 recall.dimming = DimmingFeaturePut(brightness=brightness)
+            if (transition := call.data.get(ATTR_TRANSITION)) is not None:
+                recall.duration = round(transition * 1000)
             await _async_update_scene(scene, ScenePut(recall=recall))
             await async_mark_manual(hass, light_entity_ids(hass, scene_lights(scene)))
 
@@ -715,7 +725,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
 
 
-async def _async_target_lights(
+async def async_target_lights(
     hass: HomeAssistant, call: ServiceCall, *, skip_streaming: bool = True
 ) -> list[HueLight]:
     """Resolve the service target; explicitly listed entities keep their order.

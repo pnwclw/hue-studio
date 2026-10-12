@@ -29,7 +29,7 @@ touching anything outside this repository.
 
 1. **Extend the native `hue`, don't replace it.** `light.*`, `scene.*` and sensors stay
    with it. We add what it can't do — palettes, multi-color gradients, a scene gallery,
-   "auto light" — and a good UI for it.
+   automations like the Hue app's — and a good UI for it.
 2. **Backend** — `custom_components/hue_studio/`:
    - its own CLIP v2 connection to the bridge (aiohue). **Host and app key are read from
      the `hue` config entry** — no second pairing with the bridge button. We never reach
@@ -45,8 +45,15 @@ touching anything outside this repository.
      `palette` in that room's Hue room/zone (with the gallery's `public_image` id in
      `metadata.image`), so the Hue app sees and edits it; changes from either side reach
      the other through the bridge, there is no copy to sync. Only what the bridge can't
-     hold (auto-light pools, holidays, offsets, light positions outside entertainment
-     areas) goes to `helpers.storage.Store`;
+     hold (light positions outside entertainment areas) goes to `helpers.storage.Store`;
+   - **automations are HA automations**: Hue Studio ships blueprints, one per Hue app type
+     (`blueprints/automation/hue_studio/`, copied into HA's blueprint folder on setup); the
+     panel writes automations that use them through HA's automation config API, HA stores
+     and runs them. No automation engine of our own. Settings of natural light and the scene
+     of the day (pools, phases, holidays, brightness) are an input of the automation;
+     `hue_studio.apply_light` shows them and keeps them up with the day while nobody
+     changes the lights (memory only). Our automations have ids `hue_studio_<type>_…` and
+     get the "Hue Studio" label and category and the area of their one room;
    - **GUI first, no YAML.** Every setting has a GUI path (panel or options flow) and is
      read/written through the WS API and services, never by editing files. No YAML
      configuration layer.
@@ -54,7 +61,7 @@ touching anything outside this repository.
    `custom_components/hue_studio/frontend/`; registered by the integration itself via
    `frontend.add_extra_js_url` (no manual Lovelace resources):
    - **panel** (`panel_custom`, `/hue`): a full-screen "Hue app" — rooms, color wheel with
-     draggable light dots, gallery, palettes, auto-light settings. It copies the Hue app's
+     draggable light dots, gallery, palettes, automations. It copies the Hue app's
      look but is **built on HA's model**, read from the frontend `hass` object:
      - **Rooms = HA areas** that contain Hue lights (area name/icon, device or entity area).
        If a Hue room/zone light group covers exactly the same lights, it is the room's
@@ -152,8 +159,8 @@ touching anything outside this repository.
 ## Data model
 
 Legacy prototype format (`lights.json`), imported once into Hue Studio: room light lists
-are replaced by HA areas, palettes by bridge scenes, and `auto` goes to the Store keyed by
-area id:
+are replaced by HA areas, palettes by bridge scenes, and `auto` is offered as the scene of
+the day settings of a new automation (`hue_studio/automations/legacy_auto_light`):
 
 ```
 palettes: [{"id": "sunset", "name": "Sunset", "kind": "gradient", "points": [[x, y], ...2-5],
@@ -187,8 +194,9 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
    be fully switched over to Hue Studio services (details in `CLAUDE.local.md`).
 2. **`/hue` panel** with the color wheel (gamut, throttle, light dots), gallery, palettes.
 3. **More-info override** for Hue lights + fallback.
-4. **Auto light** — phases, seasons, weather, holidays and offsets in Python, with UI in the
-   panel.
+4. **Automations** — the Hue app's types as HA automations from our blueprints, natural
+   light and the scene of the day (phases, seasons, weather, holidays, offsets) as their
+   light, with UI in the panel.
 5. Publish in the HACS default repository list.
 
 ## Layout
@@ -208,16 +216,16 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   devices.py                    adding devices: Zigbee search (serials), all devices, name + area + Hue room
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    bridge facts and MotionAware areas (health, on/off) for the settings
-  auto_light.py                 auto light settings per area in a Store: pool/exclude/offset services,
-                                import of the legacy lights.json
-  auto_select.py                pure: phase, season, weather, pool, scene of the day, brightness; manual-change tolerance
-  auto_control.py               selections and who controls each area (auto/manual/off), apply_auto_light,
-                                hue_studio/auto_light/subscribe|settings|update|remove
-  auto_entity.py, button.py     per-area auto light entities (phase, scene, brightness, control, offset, next scene)
+  automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
+                                (keeps up with the day until changed), label/category/area of our automations,
+                                hue_studio/automations/subscribe|organize|preview|legacy_auto_light
+  blueprints/automation/hue_studio/   one blueprint per Hue app type (wake up, go to sleep, coming/leaving home,
+                                mimic presence, schedule, motion sensor), validated in tests by HA itself
+  daylight.py                   pure: phase, season, weather, pool, scene of the day, natural light, brightness; change tolerance
   positions.py                  light positions (entertainment areas + Store), editor saves, spatial palette layout
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
-  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities (select/number/sensor: auto light too)
+  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
   config_flow.py                setup (menu: pick a `hue` entry; Sync Box: pair or use `huesyncbox`) + options: Hue room/zone -> HA area,
                                 motion/temperature sensors per room, rooms follow areas (Roborock-style menu)
@@ -231,18 +239,20 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   hue-studio-panel.ts           panel shell: routing, tab bar; owns the StudioContext
   hue-studio-extra.ts           extra JS on every HA page: loads more-info, cards and footer, each on its own
   hue-studio-more-info.ts       more-info override + Hue-style dialog
-  cards.ts                      dashboard cards (room, auto light, gallery) sharing one StudioContext
+  cards.ts                      dashboard cards (room, automations, gallery) sharing one StudioContext
   footer.ts, footer-model.ts    experimental Liquid Glass footer (element; pure: tabs, active tab, visibility)
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                auto-light (per area, and the list), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area),
+                                automations (the tab, "+" and a room's list), automation-edit (one automation;
+                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area),
                                 experimental, devices, bridges (and MotionAware), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule)
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
   space.ts                      pure: placed lights, top-view coordinate mapping
-  auto-light.ts                 pure: pools of the auto light editor, areas with/without auto light
+  automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows
+  daylight.ts                   pure: editing natural light / scene of the day settings (pools, offsets, …)
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
   seasons.ts                    pure: seasonal gallery (a rule per category: seasons and/or dates; season source)

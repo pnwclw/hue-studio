@@ -64,10 +64,10 @@
     root.hass = hass;
     const configs = [
       ["hue-studio-room-card", { area: "office" }],
-      ["hue-studio-auto-light-card", { area: "office" }],
+      ["hue-studio-automations-card", { area: "office" }],
       ["hue-studio-gallery-card", {}],
       ["hue-studio-room-card", { area: "living_room" }],
-      ["hue-studio-auto-light-card", { area: "kitchen" }],
+      ["hue-studio-automations-card", {}],
     ];
     for (const [tag, config] of configs) {
       await customElements.whenDefined(tag);

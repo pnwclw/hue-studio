@@ -1,0 +1,54 @@
+blueprint:
+  name: "Hue Studio: Leaving home"
+  description: >-
+    Like the Hue app's leaving home: the lights go off when the last person leaves. Made for Hue Studio: create and edit it in the Hue Studio panel
+    ([Automations](/hue/automations)); this form edits it too.
+  domain: automation
+  author: Hue Studio
+  source_url: https://github.com/pnwclw/hue-studio/blob/main/custom_components/hue_studio/blueprints/automation/hue_studio/leaving_home.yaml
+  homeassistant:
+    min_version: 2026.10.0
+  input:
+    when_section:
+      name: When
+      icon: mdi:home-export-outline
+      input:
+        zone:
+          name: Home
+          description: The zone whose people count (the home by default).
+          default: zone.home
+          selector:
+            entity:
+              filter:
+                - domain: zone
+    rooms_section:
+      name: Rooms
+      icon: mdi:sofa-outline
+      input:
+        rooms:
+          name: Rooms
+          description: Home Assistant areas; only their Hue lights are used.
+          selector:
+            area:
+              multiple: true
+              entity:
+                - integration: hue
+                  domain: light
+
+mode: single
+triggers:
+  - trigger: state
+    entity_id: !input zone
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none and trigger.to_state is not none
+         and trigger.from_state.state | int(0) > 0
+         and trigger.to_state.state | int(0) == 0 }}
+actions:
+  - action: hue_studio.apply_light
+    target:
+      area_id: !input rooms
+    data:
+      light: "off"
+      transition: 2

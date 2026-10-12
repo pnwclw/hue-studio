@@ -38,12 +38,8 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 | `hue_studio.align_rooms` | Bring the Hue rooms on the bridge in line with your HA areas: each area with Hue lights gets a Hue room of its name with exactly those lights (created, renamed or refilled as needed). `dry_run` only returns the plan; `complete_scenes` (default on) gives a room's scenes settings for lights that joined it; `delete_empty_rooms` removes rooms left without lights; `keep_split_scenes` first copies the scenes of a room split over several areas into a new zone over all of the room's lights, so they keep every light. With a target, only the targeted lights are moved. Returns the plan. |
 | `hue_studio.save_scene` | Store what a Hue scene's lights show now in the scene; optionally rename it and set its dynamic `speed` and `auto_dynamic` (auto-play). |
 | `hue_studio.reset_scene` | Rebuild a Hue scene's light settings from its palette (optionally `shuffle`d) and activate it. |
-| `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), regardless of its auto-play setting. |
-| `hue_studio.apply_auto_light` | Show an area's auto light (scene of the day at its brightness) on its Hue lights, with an optional `transition`. Does nothing while the area is under manual control or auto light is off, unless `force`; `resume` hands manual control back first (e.g. when someone enters). |
-| `hue_studio.auto_light_pool` | Set the gallery scenes of one auto light pool of an area (`phase`, `season`, `step`: clear/gloomy, or 0-3 for the day). |
-| `hue_studio.auto_light_exclude` | Never (or again, `excluded: false`) pick a gallery scene in an area's auto light. |
-| `hue_studio.auto_light_offset` | Shift an area's brightness in one phase by `delta` percent (0 resets); returns the offset. |
-| `hue_studio.import_legacy` | Import the auto light of rooms from a legacy `lights.json` into Hue Studio. |
+| `hue_studio.recall_scene` | Play a Hue scene dynamically or statically (`dynamic`), or as it is set up, with an optional `transition`. |
+| `hue_studio.apply_light` | What Hue Studio's automations show in some rooms: `light` = a `scene` (one per room), a `white` (`kelvin`, `brightness`), `natural` light, the scene of the day (`auto`, settings in `scene_of_the_day`) or `off`; `transition`, `from_dark` (fade in from off), `only_if_off`, `toggle`. Natural light and the scene of the day keep up with the day until the lights are changed (`follow`). |
 | `hue_studio.set_sync` | Change a Sync Box in one command: `power`, `sync`, `mode` (video/music/game), `intensity`, `input` (id or name), `entertainment_area` (id or name), `brightness`; paired directly also `palette` (music), `background_lighting`, `preset` (name or id). |
 | `hue_studio.save_sync_preset`, `delete_sync_preset` | Save what a directly paired box does now as a preset of the box (`name`), or delete one. |
 | `hue_studio.learn_sync_ir_code`, `set_sync_ir_code`, `delete_sync_ir_code` | Remote buttons of a directly paired box: listen for one, make one do something (`code`, `name`, `action`: `toggle_sync`, `mode_game`, `input:input2`, `preset:Movie night`, …), forget one. |
@@ -51,30 +47,28 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
 
-## Auto light
+## Automations
 
-Hue Studio works out what each area with auto light settings should show — the phase
-of the day (from the sun), a scene of the day from pools by phase, season, weather and
-holidays, and a brightness — and gives every such area a device with entities for
-dashboards and automations. An area can use **natural light** instead of scenes, like
-the Hue app's Natural light: a white per phase (cool in the morning and during the day,
-warm in the evening and at night) with the same brightness rules; its scene sensor then
-shows the color temperature (`2900 K`, attribute `kelvin`).
+The panel's **Automations** tab has the Hue app's automations: wake up, go to sleep,
+coming home, leaving home, mimic presence, schedule (at a time, sunrise or sunset, with
+an optional end) and a motion sensor (on with motion when it is dark enough, off after a
+while). Each one is a **Home Assistant automation** made from a blueprint that Hue
+Studio puts in place (`blueprints/automation/hue_studio/`): Home Assistant stores and
+runs it, lists it in Settings → Automations and edits it with a form; "Open in Home
+Assistant" is one tap away, and the panel lists your other automations that use Hue
+lights. A room's screen shows its automations too.
 
-| Entity | |
-|---|---|
-| `select.<area>_light_control` | Who controls the lights: `auto`, `manual` (someone changed them by hand: a dashboard, the Hue app, a switch), `off`. Back to `auto` shows the auto scene at once. |
-| `sensor.<area>_light_phase` | morning, day, golden, evening, night |
-| `sensor.<area>_light_scene` | The scene of the day, with its gallery picture (Mushroom and Bubble Card show it) |
-| `sensor.<area>_light_brightness` | The brightness auto light shows now |
-| `number.<area>_light_offset` | Your brightness offset for the current phase |
-| `button.<area>_next_light_scene` | Another scene for the rest of the day |
+The light of an automation is a scene per room, a white, **natural light** (a white per
+phase of the day, cool in the morning, warm in the evening, like the Hue app's) or the
+**scene of the day**: a gallery scene picked from pools by phase of the day, season,
+weather and holidays, with a brightness that follows the light outside. Their settings
+belong to the automation (one of its inputs) and are edited on its second page in the
+panel. Once shown, natural light and the scene of the day keep up with the day until
+someone changes the lights or turns them off.
 
-Pools (or color temperatures), holidays, phases, brightness and inputs are edited in
-the panel (Settings → Auto light); a room with auto light also gets an "Auto light" (or
-"Natural light") tile among its scenes that shows it and hands the lights back to it. *When* to show it stays with your automations: call `hue_studio.apply_auto_light` (for
-example on presence, with `resume: true`, and again when the scene or brightness
-sensor changes).
+Automations made in Hue Studio get the "Hue Studio" label and automation category and
+the area of their room (your own choices are kept); their description links back to the
+panel.
 
 ## Space
 
@@ -102,7 +96,7 @@ The panel's Settings tab is laid out like the Hue app's. **In this home**: Devic
 Hue device by area, and adding new ones), Bridges (and Sync Boxes), MotionAware areas
 (health, on/off) and Entertainment areas (create, rename, change type and lights, arrange
 where the lights stand, delete — they are not rooms or zones). **Hue Studio**: Rooms and
-zones, Auto light, Integration settings (rooms follow areas, which area each Hue room or
+zones, Scene gallery, Integration settings (rooms follow areas, which area each Hue room or
 zone belongs to, the sensors of each room — the integration's options, without leaving
 the panel) and Experimental.
 
@@ -120,8 +114,8 @@ Three cards for regular dashboards (in the card picker, with a visual editor):
 
 | Card | |
 |---|---|
-| `custom:hue-studio-room-card` | A room (`area`): toggle, brightness, sensors, its Hue scenes and auto light |
-| `custom:hue-studio-auto-light-card` | Auto light of an area: today's scene, auto / manual / off, another scene, show now |
+| `custom:hue-studio-room-card` | A room (`area`): toggle, brightness, sensors, its Hue scenes |
+| `custom:hue-studio-automations-card` | Hue Studio's automations (of an `area`) with their switches; "+" adds one |
 | `custom:hue-studio-gallery-card` | Gallery scenes to show once in a room (`area`, or room chips limited by `rooms`; `categories`) |
 
 They follow your theme's colors; a Hue light's more-info opens Hue Studio's dialog from
@@ -217,8 +211,9 @@ Assistant.
    `set_gradient`, scenes created on the bridge, effects) and a WebSocket API.
 2. **`/hue` panel** — rooms, gamut-aware color wheel, scene gallery, palettes.
 3. **More-info override** for Hue lights, with a safe fallback to the stock dialog.
-4. **Auto light** — scene and brightness picked by time-of-day phase, season, weather and
-   holidays.
+4. **Automations** — the Hue app's automation types as Home Assistant automations, with
+   natural light and the scene of the day (by time-of-day phase, season, weather and
+   holidays).
 5. Dashboard cards.
 
 ## Development

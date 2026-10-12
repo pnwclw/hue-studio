@@ -12,10 +12,10 @@ import type {
   LightInfo,
   LightsMessage,
   Palette,
-  AutoLightConfig,
-  AutoLightSettings,
-  AutoLightState,
-  Holiday,
+  AutomationConfig,
+  AutomationsMessage,
+  DayConfig,
+  DayPreview,
   Phase,
   PositionsMessage,
   RoomPoint,
@@ -330,61 +330,90 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
   showSync();
 
-  // Auto light: the office follows the sun; settings and state as the backend sends them.
-  const autoListeners = new Set<(msg: unknown) => void>();
-  const autoAreas: Record<string, AutoLightConfig> = {
-    office: {
-      pools: {
-        day: { all: { clear: [["sunday_morning"], ["cool_bright"], ["sunday_morning", "fairfax"], ["arctic_aurora"]] } },
-        golden: { all: { clear: ["golden_star", "honolulu"] } },
-        evening: { all: { clear: ["dreamy_dusk", "rolling_hills", "unwind"], gloomy: ["amber_bloom"] }, winter: { clear: ["silent_night"] } },
-        night: { all: { clear: ["nightlight"] } },
-      },
-      holidays: [{ from: "12-20", to: "01-06", phases: ["evening"], pool: ["silent_night", "snow_capped"] }],
-      names: {},
-      excluded: ["unwind"],
-      offsets: { evening: 10 },
-      settings: { weather: "weather.home", light_sensor: "sensor.office_motion_illuminance" },
-      control: "auto",
+  // Automations: HA's automation configs (ours use the blueprints) and their entities.
+  const automationListeners = new Set<(msg: unknown) => void>();
+  const OFFICE_DAY: DayConfig = {
+    pools: {
+      day: { all: { clear: [["sunday_morning"], ["cool_bright"], ["sunday_morning", "fairfax"], ["arctic_aurora"]] } },
+      golden: { all: { clear: ["golden_star", "honolulu"] } },
+      evening: { all: { clear: ["dreamy_dusk", "rolling_hills", "unwind"], gloomy: ["amber_bloom"] }, winter: { clear: ["silent_night"] } },
+      night: { all: { clear: ["nightlight"] } },
     },
+    holidays: [{ from: "12-20", to: "01-06", phases: ["evening"], pool: ["silent_night", "snow_capped"] }],
+    excluded: ["unwind"],
+    offsets: { evening: 10 },
+    settings: { weather: "weather.home", light_sensor: "sensor.office_motion_illuminance" },
   };
-  let manualAreas = new Set<string>();
-  const skips: Record<string, number> = {};
-  /** A rough copy of auto_select.select: enough to click through the screen. */
-  const autoState = (area: string): AutoLightState => {
-    const config = autoAreas[area];
+  const automationConfigs: Record<string, AutomationConfig> = {
+    "automation.office_light": {
+      id: "hue_studio_motion_demo1",
+      alias: "Office light",
+      use_blueprint: {
+        path: "hue_studio/motion.yaml",
+        input: { rooms: ["office"], motion: ["binary_sensor.office_motion"], off_after: 10, light: "auto", scene_of_the_day: OFFICE_DAY },
+      },
+    },
+    "automation.wake_up": {
+      id: "hue_studio_wake_up_demo2",
+      alias: "Wake up",
+      use_blueprint: { path: "hue_studio/wake_up.yaml", input: { rooms: ["bedroom"], time: "06:45:00", days: ["mon", "tue", "wed", "thu", "fri"], fade: 30, light: "white", kelvin: 4000 } },
+    },
+    "automation.balcony_evening": {
+      id: "hue_studio_schedule_demo3",
+      alias: "Balcony evening",
+      use_blueprint: {
+        path: "hue_studio/schedule.yaml",
+        input: { rooms: ["balcony"], start_kind: "sunset", start_offset: { hours: 0, minutes: -20, seconds: 0 }, end_kind: "time", end_time: "23:00:00", light: "natural" },
+      },
+    },
+    "automation.tv_dim": { id: "1712345678901", alias: "Dim the TV area when a film starts", triggers: [], actions: [] },
+  };
+  let automationReloads = 0;
+  const automationState = (entityId: string, on = true) => {
+    const config = automationConfigs[entityId];
+    states[entityId] = { entity_id: entityId, state: on ? "on" : "off", attributes: { id: config.id, friendly_name: config.alias, last_triggered: null } };
+  };
+  for (const id of Object.keys(automationConfigs)) automationState(id, id !== "automation.balcony_evening");
+  const automationsMessage = (): AutomationsMessage => {
+    const ours: AutomationsMessage["automations"] = {};
+    for (const [entityId, config] of Object.entries(automationConfigs)) {
+      const type = /^hue_studio\/([a-z_]+)\.yaml$/.exec(config.use_blueprint?.path || "")?.[1] || null;
+      if (type || config.id?.startsWith("hue_studio_")) ours[entityId] = { id: config.id || null, type, custom: !type };
+    }
+    const related = Object.keys(automationConfigs).filter((id) => !ours[id]);
+    return { automations: ours, related, types: ["wake_up", "go_to_sleep", "coming_home", "leaving_home", "mimic_presence", "schedule", "motion"], reloads: automationReloads };
+  };
+  const pushAutomations = () => {
+    automationReloads++;
+    setTimeout(() => automationListeners.forEach((cb) => cb(structuredClone(automationsMessage()))), 60);
+  };
+  /** A rough copy of daylight.select: enough to click through the editor. */
+  const preview = (config: DayConfig, natural: boolean): DayPreview => {
     const hour = new Date().getHours();
     const phase: Phase = hour >= 23 || hour < 6 ? "night" : hour < 8 ? "morning" : hour < 17 ? "day" : hour < 18 ? "golden" : "evening";
     const order: Phase[] = ["morning", "day", "golden", "evening", "night"];
+    const base = { phase, season: "autumn" as const, mood: "gloomy" as const, holiday: false };
+    if (natural) {
+      const kelvin = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000, ...config.settings?.kelvin }[phase];
+      return { ...base, pool_phase: phase, scene: null, pool: [], brightness: config.settings?.brightness?.[phase] ?? 70, step: null, kelvin };
+    }
     let pool: string[] = [];
     let poolPhase = phase;
     for (let back = 0; back < order.length && !pool.length; back++) {
       poolPhase = order[(order.indexOf(phase) - back + order.length) % order.length];
-      const moods = config.pools[poolPhase]?.all || {};
+      const moods = config.pools?.[poolPhase]?.all || {};
       const raw = (moods.gloomy || moods.clear || []) as string[] | string[][];
       pool = poolPhase === "day" ? ((raw as string[][])[2] || []) : (raw as string[]);
     }
-    pool = pool.filter((s) => !config.excluded.includes(s));
-    const scene = pool.length ? pool[(new Date().getDate() + (skips[area] || 0)) % pool.length] : null;
-    const control = config.control === "off" ? "off" : manualAreas.has(area) ? "manual" : "auto";
-    if (config.settings.style === "natural") {
-      const kelvin = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000, ...config.settings.kelvin }[phase];
-      const level = config.settings.brightness?.[phase] ?? 70;
-      return { control, phase, pool_phase: phase, season: "autumn", mood: "gloomy", holiday: false, scene: null, scene_name: null, brightness: level, step: null, pool: [], kelvin };
-    }
-    const fixed = config.settings.brightness?.[poolPhase];
+    pool = pool.filter((id) => !(config.excluded || []).includes(id));
+    const scene = pool.length ? pool[new Date().getDate() % pool.length] : null;
+    const fixed = config.settings?.brightness?.[poolPhase];
     return {
-      control, phase, pool_phase: poolPhase, season: "autumn", mood: "gloomy", holiday: false, scene,
-      scene_name: scene ? gallery?.scenes.find((s) => s.id === scene)?.name || scene : null,
-      brightness: Math.min(100, Math.max(1, (fixed ?? 70) + (config.offsets[poolPhase] || 0))), step: poolPhase === "day" ? 2 : null, pool,
+      ...base, pool_phase: poolPhase, scene, pool, step: poolPhase === "day" ? 2 : null, kelvin: null,
+      scene_name: scene ? gallery?.scenes.find((g) => g.id === scene)?.name || scene : null,
+      brightness: Math.min(100, Math.max(1, (fixed ?? 70) + (config.offsets?.[poolPhase] || 0))),
     };
   };
-  const autoMessage = () => ({
-    areas: autoAreas,
-    state: Object.fromEntries(Object.keys(autoAreas).map((a) => [a, autoState(a)])),
-    entities: Object.fromEntries(Object.keys(autoAreas).map((a) => [a, { light_control: `select.${a}_light_control`, next_light_scene: `button.${a}_next_light_scene` }])),
-  });
-  const pushAuto = () => setTimeout(() => autoListeners.forEach((cb) => cb(structuredClone(autoMessage()))), 60);
   // Positions: the TV area (an entertainment area) places the living room's TV lights;
   // the office lamp is placed by Hue Studio; the candle is not placed yet.
   const positionListeners = new Set<(msg: unknown) => void>();
@@ -620,51 +649,16 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         if (d.lights) zone[2] = d.lights.map((l) => l.replace("light.", ""));
       }
       if (domain === "hue_studio" && service === "delete_zone") delete GROUPS[one.replace("light.", "")];
-      const auto = data as ServiceData & { area?: string; phase?: Phase; season?: string; step?: string; scenes?: string[]; scene?: string; excluded?: boolean; delta?: number; option?: string };
-      if (domain === "hue_studio" && service === "auto_light_pool") {
-        const config = autoAreas[auto.area!];
-        const moods = ((config.pools[auto.phase!] ??= {})[auto.season!] ??= {});
-        if (auto.phase === "day") {
-          for (const mood of ["clear", "gloomy"]) {
-            const steps = ((moods[mood] as string[][]) ??= [[], [], [], []]);
-            steps[Number(auto.step)] = auto.scenes!;
-          }
-        } else moods[auto.step!] = auto.scenes!;
-        pushAuto();
+      if (domain === "automation" && (service === "turn_on" || service === "turn_off")) {
+        for (const id of [data.entity_id].flat()) if (id && automationConfigs[id]) automationState(id, service === "turn_on");
       }
-      if (domain === "hue_studio" && service === "auto_light_exclude") {
-        const config = autoAreas[auto.area!];
-        config.excluded = config.excluded.filter((s) => s !== auto.scene);
-        if (auto.excluded) config.excluded.push(auto.scene!);
-        pushAuto();
-      }
-      if (domain === "hue_studio" && service === "auto_light_offset") {
-        const offsets = autoAreas[auto.area!].offsets;
-        offsets[auto.phase!] = auto.delta === 0 ? 0 : (offsets[auto.phase!] || 0) + auto.delta!;
-        pushAuto();
-      }
-      if (domain === "hue_studio" && service === "apply_auto_light") {
-        if ((auto as { resume?: boolean }).resume) manualAreas.delete(auto.area!);
-        const s = autoState(auto.area!);
-        if (s.control === "auto" && s.kelvin) {
-          applyPalette(["light.desk_lamp"], { kind: "white", mirek: Math.round(1e6 / s.kelvin), brightness: s.brightness });
-        } else if (s.control === "auto" && s.scene) {
-          const scene = gallery?.scenes.find((g) => g.id === s.scene);
-          if (scene) applyPalette(["light.desk_lamp"], { ...scene, brightness: s.brightness });
-        }
-        pushAuto();
-      }
-      if (domain === "select" && one.endsWith("_light_control")) {
-        const area = one.replace("select.", "").replace("_light_control", "");
-        autoAreas[area].control = auto.option === "off" ? "off" : "auto";
-        manualAreas = new Set([...manualAreas].filter((a) => a !== area || auto.option === "manual"));
-        if (auto.option === "manual") manualAreas.add(area);
-        pushAuto();
-      }
-      if (domain === "button" && one.endsWith("_next_light_scene")) {
-        const area = one.replace("button.", "").replace("_next_light_scene", "");
-        skips[area] = (skips[area] || 0) + 1;
-        pushAuto();
+      if (domain === "hue_studio" && service === "apply_light") {
+        const a = data as ServiceData & { area_id?: string[]; light?: string; scene_of_the_day?: DayConfig };
+        const lights = Object.keys(LIGHTS).filter((l) => (a.area_id || []).includes(devices[`dev_${l}`].area_id || "")).map((l) => `light.${l}`);
+        const p = preview(a.scene_of_the_day || ({} as DayConfig), a.light === "natural");
+        const scene = p.scene ? gallery?.scenes.find((g) => g.id === p.scene) : null;
+        if (p.kelvin) applyPalette(lights, { kind: "white", mirek: Math.round(1e6 / p.kelvin), brightness: p.brightness });
+        else if (scene) applyPalette(lights, { ...scene, brightness: p.brightness });
       }
       if (domain === "hue_studio" && service === "align_rooms") {
         const opts = data as { delete_empty_rooms?: boolean; keep_split_scenes?: boolean };
@@ -745,26 +739,38 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       refreshGroups();
       onChange({ ...hass, states: { ...states } });
     },
+    // HA's automation config API: write or delete an automation, then HA reloads it.
+    async callApi<T>(method: "GET" | "POST" | "DELETE", path: string, data?: Record<string, unknown>): Promise<T> {
+      console.info("callApi", method, path, JSON.stringify(data));
+      await new Promise((r) => setTimeout(r, 120));
+      const id = decodeURIComponent(path.replace("config/automation/config/", ""));
+      const entityId = Object.keys(automationConfigs).find((e) => automationConfigs[e].id === id);
+      if (method === "DELETE" && entityId) {
+        delete automationConfigs[entityId];
+        delete states[entityId];
+      }
+      if (method === "POST") {
+        const config = data as AutomationConfig;
+        const target = entityId || `automation.${String(config.alias || id).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+        automationConfigs[target] = config;
+        automationState(target, states[target]?.state !== "off");
+      }
+      pushAutomations();
+      onChange({ ...hass, states: { ...states } });
+      return null as T;
+    },
     async callWS<T>(msg: { type: string } & Record<string, unknown>): Promise<T> {
       console.info("callWS", JSON.stringify(msg));
       const area = String(msg.area_id);
-      if (msg.type === "hue_studio/auto_light/settings") {
-        autoAreas[area] ??= { pools: {}, holidays: [], names: {}, excluded: [], offsets: {}, settings: {}, control: "auto" };
-        const merged = { ...autoAreas[area].settings, ...(msg.settings as AutoLightSettings) } as Record<string, unknown>;
-        autoAreas[area].settings = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== null));
-        pushAuto();
-        return null as T;
+      if (msg.type === "automation/config") {
+        const config = automationConfigs[String(msg.entity_id)];
+        if (!config) throw new Error("not found");
+        return { config: structuredClone(config) } as T;
       }
-      if (msg.type === "hue_studio/auto_light/update") {
-        if (msg.holidays) autoAreas[area].holidays = msg.holidays as Holiday[];
-        if (msg.excluded) autoAreas[area].excluded = msg.excluded as string[];
-        pushAuto();
-        return null as T;
-      }
-      if (msg.type === "hue_studio/auto_light/remove") {
-        delete autoAreas[area];
-        pushAuto();
-        return null as T;
+      if (msg.type === "hue_studio/automations/organize") return null as T;
+      if (msg.type === "hue_studio/automations/preview") return preview(msg.scene_of_the_day as DayConfig, !!msg.natural) as T;
+      if (msg.type === "hue_studio/automations/legacy_auto_light") {
+        return { office: { natural: false, config: OFFICE_DAY } } as T;
       }
       if (msg.type === "hue_studio/positions/set") {
         for (const [entity, points] of Object.entries(msg.positions as Record<string, RoomPoint[]>)) {
@@ -836,11 +842,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             positionListeners.delete(send);
           };
         }
-        if (msg.type === "hue_studio/auto_light/subscribe") {
-          autoListeners.add(send);
-          setTimeout(() => send(structuredClone(autoMessage())), 55);
+        if (msg.type === "hue_studio/automations/subscribe") {
+          automationListeners.add(send);
+          setTimeout(() => send(structuredClone(automationsMessage())), 55);
           return () => {
-            autoListeners.delete(send);
+            automationListeners.delete(send);
           };
         }
         if (msg.type === "hue_studio/rooms/subscribe") {

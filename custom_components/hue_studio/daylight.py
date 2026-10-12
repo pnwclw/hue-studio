@@ -1,8 +1,10 @@
-"""Auto light: what an area should show now (pure, no Home Assistant).
+"""Light of the day: what lights should show now (pure, no Home Assistant).
 
-Phase of the day from the sun, a scene pool by phase, season, weather and holidays,
-the scene of the day from it, and a brightness. The rules are those of the legacy
-templates this replaces, generalized:
+Behind two kinds of light of `hue_studio.apply_light` (automations.py): the scene of
+the day and natural light. Their settings travel with the automation that shows them
+(a blueprint input), nothing is stored here. Phase of the day from the sun, a scene
+pool by phase, season, weather and holidays, the scene of the day from it, and a
+brightness. The rules:
 
 - Phases: night from a set time until sunrise + a shift; morning until sunrise + a
   shift; day until sunset - a shift; golden until sunset + a shift; then evening.
@@ -15,8 +17,8 @@ templates this replaces, generalized:
   skipped unless nothing else is left. A phase without a pool behaves like the phase
   before it: its pool, brightness and offset (an evening garland keeps its evening
   scenes and brightness at night).
-- Scene of the day: the pool cycled by the day number (+ "next scene" presses); the
-  light day starts with the morning, so the scene does not change at midnight.
+- Scene of the day: the pool cycled by the day number; the light day starts with the
+  morning, so the scene does not change at midnight.
 - Brightness: fixed per phase, or the curve (day: the darker outside, the brighter;
   morning and evening follow the sun), plus the personal offset of the phase.
 - Natural light (style "natural", the Hue app's Natural light): no scenes, a white of
@@ -209,14 +211,8 @@ def _brightness(config: dict[str, Any], phase: str, mood: str, inputs: Inputs) -
     return min(max(math.floor(value + 0.5), 1), 100)
 
 
-def select(
-    config: dict[str, Any], inputs: Inputs, skip: dict[str, Any] | None = None
-) -> Selection:
-    """What an area with these auto light settings should show now.
-
-    `skip` is {"date": "YYYY-MM-DD", "phase": pool phase, "n": presses of "next
-    scene"}; it counts only on that light day and in that pool phase.
-    """
+def select(config: dict[str, Any], inputs: Inputs) -> Selection:
+    """What lights with these settings should show now."""
     settings = config.get("settings") or {}
     phase = phase_of(settings, inputs)
     day = light_day(phase, inputs.now)
@@ -253,11 +249,8 @@ def select(
     excluded = set(config.get("excluded") or [])
     pool = [s for s in pool if s not in excluded] or pool
 
-    presses = 0
-    if skip and skip.get("date") == day.isoformat() and skip.get("phase") == pool_phase:
-        presses = int(skip.get("n") or 0)
     number = day.year * 366 + day.timetuple().tm_yday
-    scene = pool[(number + presses) % len(pool)] if pool else None
+    scene = pool[number % len(pool)] if pool else None
 
     return Selection(
         phase=phase,

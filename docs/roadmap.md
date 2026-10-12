@@ -154,6 +154,11 @@ Sync Box (done); TV and PC sync apps stay outside.
 
 ### D. Phase 4 — auto light as building blocks (the main difference from the Hue app)
 
+**Superseded by G (2026-10-12).** The Store, the per-area entities, light control and
+`apply_auto_light` are gone. The selection (`daylight.py`) lives on as natural light and
+the scene of the day, the light of an automation; its settings are an input of that
+automation. The history below is kept for reference.
+
 Hue Studio decides *what* to show; *when* stays with Home Assistant automations (no
 presence or time-window logic in the integration). Since G, the panel can set up that
 *when* too, as HA automations from our blueprints. What matters are
@@ -240,6 +245,33 @@ directly. Per HA area with auto light settings:
   its own; tabs have a large title, other screens a compact back + title bar.
 
 ### G. Automations like the Hue app, HA-first (2026-10-11)
+
+**Done (2026-10-12):**
+- seven blueprints: wake up, go to sleep, coming home, leaving home, mimic presence,
+  schedule, plus a motion sensor (the Hue app's accessory behaviour). They are put in
+  place on setup, rewritten and reloaded when they change, and validated in tests by
+  HA itself;
+- `hue_studio.apply_light`: a scene per room, a white, natural light, the scene of the
+  day, or off. Natural light and the scene of the day keep up with the day until the
+  lights are changed (in memory only);
+- the Automations tab with Home – Automations – Sync – Settings. The Explore tab went
+  away earlier: the gallery belongs to a room now;
+- a Hue-style editor per type, with a second page for natural light and the scene of
+  the day (the old auto light editor);
+- a room's automations on its screen, and an automations card that replaces the auto
+  light card (the old tag still works);
+- G2 for automations: ids `hue_studio_<type>_…`, the "Hue Studio" label and category,
+  the area of the one room, a description linking back.
+
+Answers to the open questions below:
+- the random intervals of mimic presence use `random` and `wait_template` timeouts
+  inside the blueprint;
+- a fade that ends at a time uses a template trigger;
+- blueprints keep their inputs compatible and are reloaded when they change.
+
+Still open:
+- G2's automation sheet in the more-info override;
+- the live switch-over (item 5): the user sets up the automations anew.
 
 The Hue app's Automations tab in the panel, with every automation a **real HA automation**:
 stored by HA (`automations.yaml`, through HA's own automation config API, the one its editor
@@ -427,7 +459,7 @@ Plans, after research:
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (scenes) -> G (with
 G2 for automations) -> I -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
-for later) and F. Next: G2 for scenes, then G.
+for later) and F. Next: G2 for scenes; G is done (2026-10-12).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

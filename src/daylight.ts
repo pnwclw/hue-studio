@@ -1,8 +1,8 @@
-// Auto light in the panel: pools and areas derived from the settings
-// (hue_studio/auto_light/subscribe) and `hass`. Pure functions, no DOM.
+// Natural light and the scene of the day: their settings (`scene_of_the_day`, an input of
+// an automation's blueprint) edited in the panel. Pure functions, no DOM; every change
+// returns a new settings object, written when the automation is saved.
 
-import { areaOf, isHueLight } from "./model.ts";
-import type { AutoLightConfig, AutoLightMessage, HassData, Phase, Season } from "./types.ts";
+import type { DayConfig, DaySettings, Phase, Season } from "./types.ts";
 
 export const PHASES: Phase[] = ["morning", "day", "golden", "evening", "night"];
 export const SEASONS: ("all" | Season)[] = ["all", "winter", "spring", "summer", "autumn"];
@@ -15,10 +15,22 @@ export const DEFAULT_NIGHT_FROM = "23:00";
 export const NATURAL_KELVIN: Record<Phase, number> = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000 };
 export const KELVIN_RANGE = [2000, 6500] as const;
 export const GRADIENT_MODES = ["interpolated_palette", "interpolated_palette_mirrored", "random_pixelated", "segmented_palette"];
+export const MAX_OFFSET = 60;
+
+/** Settings with every list and map present (what the backend fills in too). */
+export function dayConfig(config: Partial<DayConfig> | null | undefined): DayConfig {
+  return {
+    pools: config?.pools || {},
+    holidays: config?.holidays || [],
+    excluded: config?.excluded || [],
+    offsets: config?.offsets || {},
+    settings: config?.settings || {},
+  };
+}
 
 /**
  * Which pool the editor shows: a phase, a season (or "all") and, for the day phase, a
- * brightness step (0-3) or otherwise a mood. Mirrors `auto_light_pool`.
+ * brightness step (0-3) or otherwise a mood.
  */
 export interface PoolKey {
   phase: Phase;
@@ -28,7 +40,7 @@ export interface PoolKey {
 }
 
 /** The scenes of one pool as stored (an empty list when there is none). */
-export function poolOf(config: AutoLightConfig | undefined, key: PoolKey): string[] {
+export function poolOf(config: DayConfig | undefined, key: PoolKey): string[] {
   const moods = config?.pools?.[key.phase]?.[key.season];
   if (!moods) return [];
   if (key.phase === "day") {
@@ -38,11 +50,49 @@ export function poolOf(config: AutoLightConfig | undefined, key: PoolKey): strin
   return (moods[key.step] as string[] | undefined) || [];
 }
 
+/** Settings with one pool replaced; the day's steps are shared by both moods. */
+export function withPool(config: DayConfig, key: PoolKey, scenes: string[]): DayConfig {
+  const pools = structuredClone(config.pools);
+  const moods = ((pools[key.phase] ??= {})[key.season] ??= {});
+  const unique = [...new Set(scenes)];
+  if (key.phase === "day") {
+    for (const mood of MOODS) {
+      const steps = ((moods[mood] as string[][] | undefined) || []).slice();
+      while (steps.length < DAY_STEPS.length) steps.push([]);
+      steps[Number(key.step)] = unique;
+      moods[mood] = steps;
+    }
+  } else moods[key.step] = unique;
+  return { ...config, pools };
+}
+
+/** Settings with a scene excluded (or allowed again). */
+export function withExcluded(config: DayConfig, scene: string, excluded: boolean): DayConfig {
+  const rest = config.excluded.filter((s) => s !== scene);
+  return { ...config, excluded: excluded ? [...rest, scene] : rest };
+}
+
+/** Settings with a phase's brightness offset (0 removes it). */
+export function withOffset(config: DayConfig, phase: Phase, value: number): DayConfig {
+  const offsets = { ...config.offsets };
+  const clamped = Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, value));
+  if (clamped) offsets[phase] = clamped;
+  else delete offsets[phase];
+  return { ...config, offsets };
+}
+
+/** Settings merged with a patch; a key set to null goes back to its default. */
+export function withSettings(config: DayConfig, patch: Partial<Record<keyof DaySettings, unknown>>): DayConfig {
+  const merged: Record<string, unknown> = { ...config.settings, ...patch };
+  for (const key of Object.keys(merged)) if (merged[key] === null || merged[key] === undefined) delete merged[key];
+  return { ...config, settings: merged as DaySettings };
+}
+
 /** The step values of a phase's pools. */
 export const stepsOf = (phase: Phase): string[] => (phase === "day" ? DAY_STEPS.map(String) : [...MOODS]);
 
 /** How many scenes each phase has (all seasons and steps), for the editor's chips. */
-export function phaseCounts(config: AutoLightConfig | undefined): Record<Phase, number> {
+export function phaseCounts(config: DayConfig | undefined): Record<Phase, number> {
   const counts = Object.fromEntries(PHASES.map((p) => [p, 0])) as Record<Phase, number>;
   for (const phase of PHASES) {
     for (const moods of Object.values(config?.pools?.[phase] || {})) {
@@ -51,21 +101,6 @@ export function phaseCounts(config: AutoLightConfig | undefined): Record<Phase, 
     }
   }
   return counts;
-}
-
-/** Areas with auto light, by name. */
-export function autoAreas(hass: HassData, msg: AutoLightMessage | null): string[] {
-  const name = (id: string) => hass.areas?.[id]?.name || id;
-  return Object.keys(msg?.areas || {}).sort((a, b) => name(a).localeCompare(name(b)));
-}
-
-/** Areas with Hue lights that have no auto light yet, by name. */
-export function candidateAreas(hass: HassData, msg: AutoLightMessage | null): string[] {
-  const used = new Set(Object.keys(hass.states).filter((id) => isHueLight(hass, id)).map((id) => areaOf(hass, id)));
-  return Object.entries(hass.areas || {})
-    .filter(([id]) => used.has(id) && !msg?.areas?.[id])
-    .sort(([, a], [, b]) => a.name.localeCompare(b.name))
-    .map(([id]) => id);
 }
 
 /** "12-24" -> a short local date ("24 Dec"); bad input is returned as it is. */

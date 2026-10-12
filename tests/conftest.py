@@ -72,6 +72,16 @@ def mock_native_hue_setup() -> Generator[None]:
         yield
 
 
+@pytest.fixture(autouse=True)
+def no_blueprint_install() -> Generator[None]:
+    """Setup leaves the test config folder alone (test_automations installs them)."""
+    with patch(
+        "custom_components.hue_studio.automations.async_install_blueprints",
+        AsyncMock(return_value=[]),
+    ):
+        yield
+
+
 @pytest.fixture
 def hue_entry(hass: HomeAssistant) -> MockConfigEntry:
     """A native Hue config entry using CLIP v2."""

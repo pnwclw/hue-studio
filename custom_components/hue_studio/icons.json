@@ -21,9 +21,6 @@
     "set_sync": {
       "service": "mdi:television-ambient-light"
     },
-    "apply_auto_light": {
-      "service": "mdi:lightbulb-auto"
-    },
     "save_sync_preset": {
       "service": "mdi:content-save-outline"
     },
@@ -38,6 +35,9 @@
     },
     "delete_sync_ir_code": {
       "service": "mdi:remote-off"
+    },
+    "apply_light": {
+      "service": "mdi:lightbulb-auto"
     }
   },
   "entity": {
@@ -72,21 +72,10 @@
       },
       "led_indicator": {
         "default": "mdi:led-on"
-      },
-      "light_control": {
-        "default": "mdi:lightbulb-auto",
-        "state": {
-          "auto": "mdi:lightbulb-auto",
-          "manual": "mdi:hand-back-right",
-          "off": "mdi:lightbulb-off-outline"
-        }
       }
     },
     "number": {
       "brightness": {
-        "default": "mdi:brightness-6"
-      },
-      "light_offset": {
         "default": "mdi:brightness-6"
       }
     },
@@ -111,27 +100,6 @@
       },
       "wifi_quality": {
         "default": "mdi:wifi"
-      },
-      "light_phase": {
-        "default": "mdi:theme-light-dark",
-        "state": {
-          "morning": "mdi:weather-sunset-up",
-          "day": "mdi:white-balance-sunny",
-          "golden": "mdi:weather-sunset",
-          "evening": "mdi:weather-sunset-down",
-          "night": "mdi:weather-night"
-        }
-      },
-      "light_scene": {
-        "default": "mdi:palette-swatch-variant"
-      },
-      "light_brightness": {
-        "default": "mdi:brightness-percent"
-      }
-    },
-    "button": {
-      "next_light_scene": {
-        "default": "mdi:skip-next"
       }
     }
   }

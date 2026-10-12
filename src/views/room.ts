@@ -1,8 +1,7 @@
 // Room: header with toggle, brightness and Adaptive Lighting; the room's sensors (motion,
-// temperature, light level); auto light (or natural light) when the area has it; the
-// room's Hue scenes (plus
-// "New scene": what the lights show now, saved as a scene of the room's Hue room/zone on
-// the bridge, so the Hue app has it too); its lights.
+// temperature, light level); the room's Hue scenes (plus "New scene": what the lights show
+// now, saved as a scene of the room's Hue room/zone on the bridge, so the Hue app has it
+// too); its lights; its automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -18,7 +17,7 @@ import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
-import { whiteArt } from "./auto-light.ts";
+import { automationRows } from "./automations.ts";
 import { StudioView } from "./base.ts";
 import "./new-scene.ts";
 
@@ -72,7 +71,7 @@ export class RoomView extends StudioView {
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
       <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>
-        ${this.autoTile(g)} ${g.scenes.map((s) => this.scene(g, s))}
+        ${g.scenes.map((s) => this.scene(g, s))}
         <button class="scene add-scene" @click=${() => this.openNew()}>
           <div class="dot">${icon("plus")}</div>
           <div class="name">${t("room.new_scene")}</div>
@@ -86,6 +85,7 @@ export class RoomView extends StudioView {
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
+      ${g.kind === "area" ? html`<h2 class="label">${t("automations.title")}</h2>${automationRows(ctx, g.key.slice("area.".length))}` : nothing}
     </div></div>
     ${this.adding
       ? html`<hue-studio-new-scene .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-new-scene>`
@@ -174,35 +174,6 @@ export class RoomView extends StudioView {
     return html`<button class=${classMap({ badge: true, on: al.on && !al.manual.length })} @click=${click}>
       ${icon("sun")}${label}
     </button>`;
-  }
-
-  /**
-   * Auto light of the area as a scene tile (natural light like the Hue app's): shows what
-   * auto light picks now and hands the lights back to it.
-   */
-  private autoTile(g: Group) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const area = g.kind === "area" ? g.key.slice("area.".length) : null;
-    const now = area ? ctx.autoLight?.state[area] : undefined;
-    if (!area || !now || now.control === "off" || (!now.kelvin && !now.scene)) return nothing;
-    const dot = now.kelvin ? whiteArt(now.kelvin) : `url("${thumbUrl(now.scene!)}") center / cover`;
-    const apply = (e: Event) => {
-      if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
-      ctx.call("hue_studio", "apply_auto_light", { area, resume: true, transition: 1 }, { optimistic: false });
-    };
-    const settings = (e: Event) => {
-      e.stopPropagation();
-      ctx.go(`/settings/auto/${encodeURIComponent(area)}`);
-    };
-    return html`<div class=${classMap({ scene: true, "auto-scene": true, surface: true, off: true })} role="button" tabindex="0" @click=${apply}>
-      <div class="dot" style=${styleMap({ background: dot })}></div>
-      <div class="name">${t(now.kelvin ? "auto.style_natural" : "room.auto_light")}</div>
-      <div class="sub">${now.kelvin ? `${now.kelvin} K` : now.scene_name || ""}${now.control === "manual" ? ` · ${t("auto.control_manual")}` : ""}</div>
-      <div class="scene-actions">
-        <button class="round mini edit" aria-label=${t("auto.settings")} @click=${settings}>${icon("cog")}</button>
-      </div>
-    </div>`;
   }
 
   /**

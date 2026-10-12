@@ -1,6 +1,6 @@
 // Settings (a tab of the panel), laid out like the Hue app's: the home (devices, bridges,
-// MotionAware and entertainment areas), then Hue Studio's own (rooms and zones, auto
-// light, integration settings, experimental). Every row opens a screen of its own.
+// MotionAware and entertainment areas), then Hue Studio's own (rooms and zones, scene
+// gallery, integration settings, experimental). Every row opens a screen of its own.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement } from "lit/decorators.js";
@@ -14,7 +14,6 @@ export class SettingsView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const plan = ctx.rooms;
-    const autoAreas = Object.keys(ctx.autoLight?.areas || {}).length;
     const boxes = Object.keys(ctx.boxes).length;
     const row = (glyph: string, title: string, to: string, sub = "", badge = false): TemplateResult =>
       html`<button class="item" @click=${() => ctx.go(to)}>
@@ -40,7 +39,6 @@ export class SettingsView extends StudioView {
         <h2 class="label">Hue Studio</h2>
         <div class="rows">
           ${row("mdi:floor-plan", t("rooms.title"), "/rooms", roomsSub, planHasNews(plan))}
-          ${row("mdi:lightbulb-auto-outline", t("settings.auto_light"), "/settings/auto", autoAreas ? t("settings.auto_areas", { count: autoAreas }) : "")}
           ${row("mdi:image-multiple-outline", t("settings.gallery"), "/settings/gallery", t(ctx.config.gallery_seasonal ? "settings.gallery_seasonal" : "settings.gallery_all"))}
           ${row("mdi:cog-outline", t("settings.integration"), "/settings/integration", t("settings.integration_sub"))}
           ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t(ctx.config.footer ? "exp.on" : "exp.sub"))}

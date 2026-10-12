@@ -1,10 +1,10 @@
-"""Tests for the auto light selection (pure)."""
+"""Tests for the light of the day (pure)."""
 
 from datetime import date, datetime
 
 import pytest
 
-from custom_components.hue_studio.auto_select import (
+from custom_components.hue_studio.daylight import (
     Inputs,
     is_real_change,
     phase_of,
@@ -106,14 +106,13 @@ def test_fallback_to_earlier_phase() -> None:
     assert (sel.phase, sel.pool_phase, sel.scene) == ("night", "evening", "g")
 
 
-def test_scene_of_the_day_and_next() -> None:
-    """The pool is cycled by day; "next scene" counts on that day and pool phase."""
-    first = select(CONFIG, _inputs(20)).scene
-    skip = {"date": "2026-03-10", "phase": "evening", "n": 1}
-    second = select(CONFIG, _inputs(20), skip).scene
-    assert {first, second} == {"e1", "e3"}
-    assert select(CONFIG, _inputs(20), {**skip, "phase": "day"}).scene == first
-    assert select(CONFIG, _inputs(20), {**skip, "date": "2026-03-09"}).scene == first
+def test_scene_of_the_day() -> None:
+    """The pool is cycled by day."""
+    today = select(CONFIG, _inputs(20)).scene
+    tomorrow = select(
+        CONFIG, Inputs(datetime(2026, 3, 11, 20), SUNRISE, SUNSET, 20.0)
+    ).scene
+    assert {today, tomorrow} == {"e1", "e3"}
 
 
 def test_light_day_after_midnight() -> None:

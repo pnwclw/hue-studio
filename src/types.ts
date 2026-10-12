@@ -117,6 +117,8 @@ export interface Hass extends HassData {
   callService(domain: string, service: string, data?: ServiceData): Promise<unknown>;
   /** One WebSocket command (HA's frontend API). */
   callWS?<T>(msg: { type: string } & Record<string, unknown>): Promise<T>;
+  /** HA's REST API (e.g. the automation config API its editor uses). */
+  callApi?<T>(method: "GET" | "POST" | "DELETE", path: string, data?: Record<string, unknown>): Promise<T>;
 }
 
 /** Bridge info of one light (hue_studio/lights/subscribe). */
@@ -369,10 +371,9 @@ export interface SyncChange {
 
 export type Phase = "morning" | "day" | "golden" | "evening" | "night";
 export type Season = "winter" | "spring" | "summer" | "autumn";
-export type LightControl = "auto" | "manual" | "off";
 
-/** How an area's phases, season, weather and brightness are worked out. */
-export interface AutoLightSettings {
+/** How the phases, season, weather and brightness of the light of the day are worked out. */
+export interface DaySettings {
   /** "HH:MM". */
   night_from?: string;
   /** Minutes: morning/day from sunrise, golden before and evening after sunset. */
@@ -383,8 +384,6 @@ export interface AutoLightSettings {
   /** Fixed brightness per phase (else the curve). */
   brightness?: Partial<Record<Phase, number>>;
   gradient_mode?: string | null;
-  /** "natural": a white per phase instead of scenes (the Hue app's Natural light). */
-  style?: "scenes" | "natural";
   /** Natural light: color temperature (K) per phase, overriding the defaults. */
   kelvin?: Partial<Record<Phase, number>>;
 }
@@ -397,40 +396,49 @@ export interface Holiday {
   pool: string[];
 }
 
-/** An area's auto light settings (hue_studio/auto_light/subscribe). */
-export interface AutoLightConfig {
+/** Settings of natural light and the scene of the day (the `scene_of_the_day` input). */
+export interface DayConfig {
   /** pools[phase][season | "all"][mood]: gallery ids; the day phase has four lists. */
   pools: Record<string, Record<string, Record<string, string[] | string[][]>>>;
   holidays: Holiday[];
-  names: Record<string, string>;
   excluded: string[];
   offsets: Partial<Record<Phase, number>>;
-  settings: AutoLightSettings;
-  control: "auto" | "off";
+  settings: DaySettings;
 }
 
-/** What auto light shows in an area right now. */
-export interface AutoLightState {
-  control: LightControl;
-  phase?: Phase;
-  pool_phase?: Phase;
-  season?: Season;
-  mood?: "clear" | "gloomy";
-  holiday?: boolean;
-  scene?: string | null;
+/** What natural light or a scene of the day shows now (hue_studio/automations/preview). */
+export interface DayPreview {
+  phase: Phase;
+  pool_phase: Phase;
+  season: Season;
+  mood: "clear" | "gloomy";
+  holiday: boolean;
+  scene: string | null;
   scene_name?: string | null;
-  brightness?: number;
-  step?: number | null;
-  pool?: string[];
-  /** Natural light: the white shown now (K). */
-  kelvin?: number | null;
+  pool: string[];
+  brightness: number;
+  step: number | null;
+  kelvin: number | null;
 }
 
-export interface AutoLightMessage {
-  areas: Record<string, AutoLightConfig>;
-  state: Record<string, AutoLightState>;
-  /** Area -> entity key ("light_control", …) -> entity id. */
-  entities: Record<string, Record<string, string>>;
+/** hue_studio/automations/subscribe. */
+export interface AutomationsMessage {
+  /** Our automations: from a Hue Studio blueprint, or taken over in HA (custom). */
+  automations: Record<string, { id: string | null; type: string | null; custom: boolean }>;
+  /** Other automations that touch Hue lights or their areas. */
+  related: string[];
+  types: string[];
+  /** Counts automation reloads: configs are read again on every message. */
+  reloads: number;
+}
+
+/** An automation as HA's automation config API reads and writes it. */
+export interface AutomationConfig {
+  id?: string;
+  alias?: string;
+  description?: string;
+  use_blueprint?: { path: string; input: Record<string, unknown> };
+  [key: string]: unknown;
 }
 
 /** A light's points in the room: x left→right, y back→front, z floor→ceiling (-1..1). */
