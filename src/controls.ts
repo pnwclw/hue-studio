@@ -42,7 +42,9 @@ export function toggleGroup(ctx: StudioContext, group: Group): void {
 }
 
 /** Classes and the lit background of a surface (card, header) showing a group. */
-export function surfaceOf(state: Pick<GroupState, "on" | "colors"> & { available?: boolean }) {
+export function surfaceOf(state: Pick<GroupState, "on" | "colors"> & { available?: boolean; brightness?: number }) {
+  // Dimmer light, darker and quieter colors (the Hue app's shade on its cards): 0 at full, ~1 at the bottom.
+  const dim = state.on && state.brightness !== undefined ? Math.pow(1 - Math.min(100, Math.max(1, state.brightness)) / 100, 1.4) : 0;
   return {
     classes: {
       surface: true,
@@ -51,7 +53,7 @@ export function surfaceOf(state: Pick<GroupState, "on" | "colors"> & { available
       unavailable: state.available === false,
       "dark-text": state.on && needsDarkText(state.colors),
     },
-    style: { "--lit-bg": colorsCss(state.colors, "var(--surface)") },
+    style: { "--lit-bg": colorsCss(state.colors, "var(--surface)"), "--dim": dim.toFixed(3) },
   };
 }
 
@@ -69,7 +71,8 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   const state = ctx.hass.states[id];
   const colors = lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const unreachable = !state || state.state === "unavailable";
-  const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable });
+  const brightness = state?.state === "on" ? Math.round(((state.attributes.brightness as number | undefined) ?? 255) / 2.55) : undefined;
+  const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable, brightness });
   const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
   // Busy: a Sync Box drives it; unreachable: the bridge lost it. Either is said, and the switch rests.
   const status = busy

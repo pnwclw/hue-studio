@@ -728,10 +728,13 @@ export class ColorView extends StudioView {
     const [x, y] = st.pos;
     const rgb = mode === "white" ? mirekToRgb(wheelYToMirek(y)) : wheelToRgb(x, y);
     const many = st.pins.length > 1;
+    // Once a light is picked, the others shrink to dots (still a tap or a drag away).
+    const dot = !!this.selected && !lights.includes(this.selected) && this.dragging?.key !== st.key;
     return html`<div
       class=${classMap({
         pin: true,
-        stack: many,
+        dot,
+        stack: many && !dot,
         dragging: this.dragging?.key === st.key,
         selected: !!this.selected && lights.includes(this.selected),
         off: !lights.some((id) => ctx.hass.states[id]?.state === "on"),

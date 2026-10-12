@@ -69,10 +69,12 @@ export const CSS = `
      saturated, a light shade towards the bottom, a soft shadow under light text. */
   .surface { position: relative; isolation: isolate; overflow: clip; background: var(--surface); }
   .surface::before { content: ""; position: absolute; inset: -24px; z-index: -1; background: var(--lit-bg);
-                     filter: blur(18px) saturate(0.85); opacity: 0; transition: opacity 0.35s var(--ease); }
+                     filter: blur(18px) saturate(calc(0.85 - var(--dim, 0) * 0.3)); opacity: 0; transition: opacity 0.35s var(--ease); }
+  /* The shade, deeper the dimmer the light (--dim: 0 at full brightness, ~1 at the bottom). */
   .surface::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-                    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.26));
-                    opacity: 0; transition: opacity 0.35s var(--ease); }
+                    background: linear-gradient(rgba(0, 0, 0, calc(var(--dim, 0) * 0.4)), rgba(0, 0, 0, calc(var(--dim, 0) * 0.55))),
+                      linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.26));
+                    opacity: 0; transition: opacity 0.35s var(--ease), background 0.3s var(--ease); }
   .surface.lit::before, .surface.lit::after { opacity: 1; }
   .hero, .card.surface { --lit-angle: 105deg; }
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
@@ -320,6 +322,12 @@ export const CSS = `
   .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
   .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
                  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
+  /* Lights other than the picked one: small dots, the Hue app's (a tap picks the light). */
+  .pin.dot { width: 22px; height: 22px; margin: -11px 0 0 -11px; z-index: 0; }
+  .pin.dot::before { border-radius: 50%; transform: none; border: 2.5px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
+  .pin.dot.off { opacity: 1; }
+  .pin.dot.off::before { background: rgba(28, 28, 30, 0.7); }
+  .pin.dot ha-icon, .pin.dot .count { display: none; }
   .pin.round { width: 50px; height: 50px; margin: -25px 0 0 -25px; z-index: 4; animation: spread-in 0.3s var(--spring); }
   .pin.round::before { border-radius: 50%; transform: none; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.32), 0 0.5px 1.5px rgba(0, 0, 0, 0.42); }
   .pin.round ha-icon { --mdc-icon-size: 30px; }
