@@ -304,20 +304,33 @@ export const CSS = `
   .pin.off { opacity: 0.5; }
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
-  .pin.merged::before { border-width: 3px; }
+  /* Pins with one color: one pin with their count; a tap spreads them around a disc (the Hue app's). */
+  .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 18px;
+                      font-weight: 600; color: rgba(28, 28, 30, 0.85); pointer-events: none; }
+  .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
+  .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
+                 -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
+  .pin.round { width: 50px; height: 50px; margin: -25px 0 0 -25px; z-index: 4; animation: spread-in 0.3s var(--spring); }
+  .pin.round::before { border-radius: 50%; transform: none; }
+  .pin.round ha-icon { --mdc-icon-size: 24px; }
+  @keyframes spread-in { from { transform: scale(0.6); opacity: 0; } }
+  /* The gradient style: a button by the brightness, a sheet with the modes and the direction. */
+  .controls .grow { flex: 1; }
+  .controls .bri { margin-left: 0; }
+  .style-btn { width: 48px; height: 48px; background: rgba(60, 60, 64, 0.7); }
+  .mode-art { width: 26px; height: 26px; fill: currentColor; }
+  .style-sheet .label { margin: 18px 16px 10px; }
+  .style-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+  .style-modes button { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border: none;
+                        border-radius: 14px; background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 12px;
+                        font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+                        transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
+  .style-modes button:active { transform: scale(0.97); }
+  .style-modes button.on { background: #fff; color: #1c1c1e; }
+  .style-sheet .label.sep { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+  .style-flip { padding: 0 16px 18px; }
+  .style-flip .round { width: 40px; height: 40px; }
   .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 18px; }
-  .gmodes { display: flex; gap: 6px; overflow-x: auto; margin: 0 -16px 22px; padding: 0 16px 2px; scrollbar-width: none; }
-  /* Room below for the brightness value floating over its button. */
-  .colorbody .gmodes { margin: 0 0 22px; padding: 0 0 2px; }
-  .gmodes::-webkit-scrollbar { display: none; }
-  .gmodes button { flex: none; display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 6px; border-radius: 16px;
-                   border: 1.5px solid transparent; background: var(--surface); color: inherit; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
-  .gmodes button.on { border-color: #fff; }
-  .gm-art { width: 30px; height: 20px; border-radius: 10px; }
-  .gm-interpolated_palette { background: linear-gradient(90deg, #ff5f6d, #ffc371, #6dd5ed); }
-  .gm-interpolated_palette_mirrored { background: linear-gradient(90deg, #6dd5ed, #ffc371, #ff5f6d, #ffc371, #6dd5ed); }
-  .gm-random_pixelated { background: conic-gradient(from 45deg, #ff5f6d 0 25%, #6dd5ed 0 50%, #ffc371 0 75%, #ff5f6d 0) 0 0 / 10px 10px; }
-  .gm-segmented_palette { background: linear-gradient(90deg, #ff5f6d 0 33%, #ffc371 0 66%, #6dd5ed 0); }
   .modes { display: flex; align-items: center; gap: 6px; height: 48px; box-sizing: border-box; padding: 0 7px; border-radius: 24px;
            background: rgba(60, 60, 64, 0.7); }
   /* A filled disc (a pseudo-element: iOS paints a button's own gradient background square); the selected one gets a ring. */
@@ -334,9 +347,6 @@ export const CSS = `
   .modes .m-effects { display: flex; align-items: center; justify-content: center; }
   .modes .m-effects::before { content: none; }
   .modes .sep { width: 1px; height: 22px; margin: 0 2px; background: rgba(255, 255, 255, 0.2); }
-  .link { width: 48px; height: 48px; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
-          background: rgba(60, 60, 64, 0.7); transition: background 0.2s, color 0.2s; }
-  .link.on { background: #fff; color: #1c1c1e; }
   .bright { flex: 1; min-width: 180px; }
   .bright .value { text-align: right; font-size: 11px; letter-spacing: 1px; color: var(--text-2); margin: 0 2px -10px; min-height: 13px; }
   .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
@@ -451,7 +461,7 @@ export const CSS = `
 
   /* scene sheet / dialogs */
   .sheet { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px;
-           background: rgba(0, 0, 0, 0.55); animation: fade 0.2s ease; }
+           background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade 0.2s ease; }
   .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: 18px; background: var(--surface);
                 box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); animation: pop 0.3s var(--spring); }
   .sheet .pic { position: relative; aspect-ratio: 16 / 10; background: #333 center / cover no-repeat; }

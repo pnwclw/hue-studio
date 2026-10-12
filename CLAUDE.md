@@ -290,5 +290,7 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   full-height panel overflows the screen in the mobile app. Harness: `&inset=59,34` fakes a
   phone's safe areas, `&pad=59,34` additionally pads the slot like HA would.
 - Gradient lights always show `points_capable` pins on the wheel (fixed per device, like the
-  Hue app); a uniform light has them stacked. There is no point-count control.
+  Hue app). Pins with the same color are drawn as one pin with a count (a uniform gradient,
+  or pins merged by dropping one on another); a tap spreads them around a disc to pull one
+  out. There is no point-count control and no "all lights one color" switch.
 - UI, final check: screenshots (phone + desktop) on a live HA instance.
