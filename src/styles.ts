@@ -26,8 +26,8 @@ export const CSS = `
   /* The panel does not scroll; every screen has a fixed header and a body that scrolls on its own. */
   main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   main > * { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .screen-head { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; background: rgba(22, 22, 24, 0.82);
-                 -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.06); z-index: 3; }
+  .screen-head { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; background: rgba(24, 24, 26, 0.62);
+                 -webkit-backdrop-filter: saturate(1.8) blur(24px); backdrop-filter: saturate(1.8) blur(24px); border-bottom: 1px solid rgba(255, 255, 255, 0.06); z-index: 3; }
   .screen-head > * { max-width: 928px; margin-left: auto; margin-right: auto; }
   .screen-head:empty { display: none; }
   .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
@@ -35,8 +35,14 @@ export const CSS = `
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tab-head h1.big { margin: 2px 0 4px; }
-  .tab-head.wide { display: flex; align-items: center; gap: 12px; min-height: 52px; padding-top: 14px; }
-  .tab-head.wide h1.big { margin: 0; }
+  /* A tab's header floats: the body scrolls under its blur. */
+  main > * { position: relative; }
+  .screen-head:has(> .tab-head) { position: absolute; top: 0; left: 0; right: 0; }
+  .screen-head:has(> .tab-head) + .screen-body > .page { padding-top: calc(var(--head-h, 0px) + 10px); }
+  /* Desktop: one row as tall as the HA sidebar's header. */
+  .screen-head:has(> .tab-head.wide) { padding-top: var(--safe-top, 0px); padding-bottom: 0; }
+  .tab-head.wide { display: flex; align-items: center; gap: 12px; height: calc(var(--header-height, 56px) - 1px); }
+  .tab-head.wide h1.big { margin: 0; font-size: 24px; }
   /* The room's colored header is its fixed header. */
   .screen-head.hero-head { padding: 0; background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .screen-head.hero-head > * { max-width: none; }
@@ -46,7 +52,7 @@ export const CSS = `
   /* Bars stay put while the page scrolls under them. */
   .page > .topbar { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding-inline: 16px;
                     background: rgba(28, 28, 30, 0.8); -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
-  .topbar .grow, .head .grow { flex: 1; min-width: 0; }
+  .topbar .grow, .head .grow, .bar .grow, .tab-head .grow { flex: 1; min-width: 0; }
   /* Desktop header of a top-level screen: title and actions in one row, no bar. */
   .head { display: flex; align-items: center; gap: 12px; padding: max(28px, var(--safe-top)) 0 4px; }
   .head h1.big { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -460,10 +466,15 @@ export const CSS = `
   .sheet .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
   /* gallery */
-  .q { display: block; width: 100%; height: 0; box-sizing: border-box; margin: 0; border: none; border-radius: 18px; padding: 0 16px;
-       font: inherit; font-size: 16px; color: var(--text); outline: none; background: var(--surface); opacity: 0;
-       transition: height 0.25s var(--ease), margin 0.25s var(--ease), opacity 0.2s; }
-  .q.on { height: 36px; margin-top: 10px; opacity: 1; }
+  .search-field { display: flex; align-items: center; gap: 7px; height: 0; margin: 0; padding: 0 10px; box-sizing: border-box; overflow: hidden;
+                  border-radius: 10px; background: rgba(120, 120, 128, 0.24); color: var(--text-2); opacity: 0; cursor: text;
+                  transition: height 0.25s var(--ease), margin 0.25s var(--ease), opacity 0.2s; }
+  .search-field.on { height: 36px; margin: 4px 0 6px; opacity: 1; }
+  .search-field svg { width: 18px; height: 18px; flex: none; }
+  .search-field .q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: none; background: none; outline: none;
+                     font: inherit; font-size: 16px; color: var(--text); }
+  .search-field .q::placeholder { color: var(--text-2); }
+  .tab-head.wide .search-field { flex: 0 1 260px; height: 34px; margin: 0; }
   .tiles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 2), auto); gap: 10px;
            grid-auto-columns: calc((100% - 20px) / 2.4); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
            margin: 0 -16px; padding: 0 16px 2px; scroll-padding: 0 16px; overscroll-behavior-x: contain; }

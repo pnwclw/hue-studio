@@ -19,6 +19,24 @@ export class StudioView extends LightElement {
   /** Bumped by the owner whenever the context changed, so the view re-renders. */
   @property({ attribute: false }) accessor rev = 0;
 
+  #headObserver?: ResizeObserver;
+
+  /** A tab's header floats over the body: the body starts below it and scrolls under it. */
+  protected override updated(changed: Map<PropertyKey, unknown>): void {
+    super.updated(changed);
+    const head = this.querySelector<HTMLElement>(":scope > .screen-head");
+    if (!head || head.dataset.observed) return;
+    head.dataset.observed = "1";
+    this.#headObserver?.disconnect();
+    this.#headObserver = new ResizeObserver(() => this.style.setProperty("--head-h", `${head.offsetHeight}px`));
+    this.#headObserver.observe(head);
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.#headObserver?.disconnect();
+  }
+
   /** A screen: the fixed header, then the scrolling body (a `.page` with `cls`). */
   protected screen(head: Slot, body: unknown, cls = ""): TemplateResult {
     return html`<div class="screen-head">${head}</div>
@@ -27,21 +45,27 @@ export class StudioView extends LightElement {
 
   /**
    * Header of a tab: the large title. Phone (HA sidebar hidden): the menu button and the
-   * actions above it; desktop: title and actions in one row.
+   * actions above it, `below` under it; desktop: title and actions in one row as tall as the
+   * HA sidebar's header (no `below`).
    */
-  protected tabHead(title: string, end: Slot = nothing, { start = nothing as Slot, menu = true } = {}): TemplateResult {
+  protected tabHead(
+    title: string,
+    end: Slot = nothing,
+    { start = nothing as Slot, menu = true, below = nothing as Slot } = {},
+  ): TemplateResult {
     const { ctx } = this;
     if (!ctx.narrow) {
       return html`<div class="tab-head wide">${start}<h1 class="big">${title}</h1><div class="grow"></div>${end}</div>`;
     }
     return html`<div class="tab-head">
       <div class="bar">
-        ${menu ? html`<button class="round menu" aria-label=${ctx.t("panel.menu")} @click=${() => ctx.toggleSidebar()}>${icon("menu")}</button>` : nothing}
+        ${menu ? html`<button class="round menu-btn" aria-label=${ctx.t("panel.menu")} @click=${() => ctx.toggleSidebar()}>${icon("menu")}</button>` : nothing}
         ${start}
         <div class="grow"></div>
         ${end}
       </div>
       <h1 class="big">${title}</h1>
+      ${below}
     </div>`;
   }
 

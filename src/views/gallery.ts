@@ -45,20 +45,34 @@ export class GalleryView extends StudioView {
     };
     const q = normalize(this.query);
 
-    const search = html`<button class="round search" aria-label=${t("gallery.search_button")} @click=${toggleSearch}>${icon("search")}</button>`;
+    // The search field lives in the header: always there in the desktop Explore tab, else
+    // under the title (or the bar) while the search button is on.
+    const wide = !this.room && !ctx.narrow;
+    const shown = wide || this.searching;
+    const field = html`<label class=${classMap({ "search-field": true, on: shown })} ?inert=${!shown}>
+      ${icon("search")}
+      <input
+        class="q"
+        type="search"
+        placeholder=${t("gallery.search")}
+        autocomplete="off"
+        .value=${this.query}
+        @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
+        @keydown=${(e: KeyboardEvent) => e.key === "Escape" && (wide ? (this.query = "") : this.searching && toggleSearch())}
+      />
+    </label>`;
+    const toggle = html`<button class="round search" aria-label=${t("gallery.search_button")} aria-pressed=${this.searching} @click=${toggleSearch}>
+      ${icon(this.searching ? "close" : "search")}
+    </button>`;
     // Opened from a room: a screen of its own; else the Explore tab.
-    const head = this.room ? this.subHead(t("gallery.title"), back, search) : this.tabHead(t("gallery.title"), search);
+    const head = this.room
+      ? html`${this.subHead(t("gallery.title"), back, toggle)}${field}`
+      : wide
+        ? this.tabHead(t("gallery.title"), field)
+        : this.tabHead(t("gallery.title"), toggle, { below: field });
     return html`${this.screen(
         head,
-        html`<input
-          class=${classMap({ q: true, on: this.searching })}
-          type="search"
-          placeholder=${t("gallery.search")}
-          autocomplete="off"
-          .value=${this.query}
-          @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
-        />
-        ${groups.length > 1 && !this.room
+        html`        ${groups.length > 1 && !this.room
           ? html`<h2 class="label">${t("gallery.target")}</h2>
               <div class="chips">
                 ${groups.map(
