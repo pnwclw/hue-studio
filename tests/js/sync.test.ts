@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { boxesForGroup, boxSyncing, confirmed, hasFeature, memoBoxFor, predictSync, statusKey, syncedLights, syncingIn, syncMemo } from "../../src/sync.ts";
+import { boxesForGroup, confirmed, hasFeature, memoBoxFor, predictSync, statusKey, syncedLights, syncingIn, syncMemo } from "../../src/sync.ts";
 import type { SyncBoxInfo } from "../../src/types.ts";
 
 const BOX: SyncBoxInfo = {
@@ -80,14 +80,6 @@ test("music palette and background lighting are predicted too", () => {
   assert.deepEqual(predictSync(box, { background_lighting: true }).background_lighting, { video: true, game: false });
   assert.equal(hasFeature(box, "presets"), false);
   assert.equal(hasFeature({ ...box, features: ["presets"] }, "presets"), true);
-});
-
-test("the box that syncs a light or a whole room", () => {
-  const boxes = { tv: { ...BOX, syncing: true } };
-  assert.equal(boxSyncing(boxes, ["light.tv_strip"]), "tv");
-  assert.equal(boxSyncing(boxes, LIVING.lights), null);
-  assert.equal(boxSyncing(boxes, []), null);
-  assert.equal(boxSyncing({ tv: BOX }, ["light.tv_strip"]), null);
 });
 
 test("the sync memo answers more-info from the switch's state", () => {

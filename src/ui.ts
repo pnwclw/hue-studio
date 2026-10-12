@@ -85,6 +85,20 @@ export const toggle = (on: boolean, label: string, onToggle: () => void): Templa
     }}
   ><span></span></button>`;
 
+/** A switch that can't be used now (a Sync Box drives the lights): off, a tap refused. */
+export const lockedToggle = (label: string): TemplateResult =>
+  html`<button
+    class="toggle locked"
+    role="switch"
+    aria-checked="false"
+    aria-disabled="true"
+    aria-label=${label}
+    @click=${(e: Event) => {
+      e.stopPropagation();
+      refuse(e.currentTarget);
+    }}
+  ><span></span></button>`;
+
 export interface Throttled<A extends unknown[]> {
   (...args: A): void;
   /** Deliver a pending call now. */

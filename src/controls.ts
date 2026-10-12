@@ -8,7 +8,10 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import type { StudioContext } from "./context.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
-import { LightElement, refuse, type Throttled, throttle, toggle } from "./ui.ts";
+import { haptic } from "./ha-internals.ts";
+import { syncingIn } from "./sync.ts";
+import type { SyncBoxInfo } from "./types.ts";
+import { icon, LightElement, lockedToggle, refuse, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -39,6 +42,44 @@ export function brightnessSender(ctx: StudioContext, group: Group): Throttled<[n
 export function toggleGroup(ctx: StudioContext, group: Group): void {
   const on = groupState(ctx.hass, group).on;
   ctx.call("light", on ? "turn_off" : "turn_on", { entity_id: group.target });
+}
+
+/** A group as the UI shows it; `syncing`: a Sync Box drives some of its lights. */
+export interface ShownState extends GroupState {
+  syncing: boolean;
+}
+
+/**
+ * A group's state as shown. While a Sync Box drives its lights it counts as off (the Hue
+ * app's): dark, brightness at the bottom, its switch and slider locked.
+ */
+export function shownState(ctx: StudioContext, group: Group): ShownState {
+  const state = groupState(ctx.hass, group, ctx.lightInfo);
+  return syncingIn(ctx.boxes, group).length
+    ? { ...state, on: false, brightness: 0, colors: [], syncing: true }
+    : { ...state, syncing: false };
+}
+
+/** A group's switch; locked (a tap refused) while a Sync Box drives its lights. */
+export const groupToggle = (ctx: StudioContext, group: Group, state: ShownState): TemplateResult =>
+  state.syncing ? lockedToggle(ctx.t("common.toggle")) : toggle(state.on, ctx.t("common.toggle"), () => toggleGroup(ctx, group));
+
+/** A box that syncs: say so and offer to stop it (the Hue app's banner); a tap elsewhere opens the box. */
+export function syncBanner(ctx: StudioContext, id: string, box: SyncBoxInfo): TemplateResult {
+  const { t } = ctx;
+  const stop = (e: Event) => {
+    e.stopPropagation();
+    haptic("light");
+    ctx.setSync(id, { sync: false });
+  };
+  return html`<div class="sync-banner" role="button" tabindex="0" @click=${() => ctx.go(`/sync?box=${encodeURIComponent(id)}`)}>
+    ${icon("sync")}
+    <div class="grow">
+      <div class="title">${t("home.sync_active", { name: box.name || "Sync Box" })}</div>
+      <div class="sub">${t("home.sync_hint")}</div>
+    </div>
+    <button class="pill" @click=${stop}>${t("home.sync_stop")}</button>
+  </div>`;
 }
 
 /** Classes and the lit background of a surface (card, header) showing a group. */
@@ -74,27 +115,30 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   const brightness = state?.state === "on" ? Math.round(((state.attributes.brightness as number | undefined) ?? 255) / 2.55) : undefined;
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable, brightness });
   const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
-  // Busy: a Sync Box drives it (the Hue app's "Sync active": a moving glow, the switch off, a
-  // tap refused); unreachable: the bridge lost it. Either is said, and the switch rests.
-  const status = busy
-    ? html`<div class="status">${ctx.t("light.sync_active")}</div>`
-    : unreachable
-      ? html`<div class="status">${ctx.t("light.unreachable")}</div>`
-      : nothing;
+  // Busy: a Sync Box drives it (the Hue app's "Sync active": white flickering around the
+  // icon, the switch off, a tap refused); unreachable: the bridge lost it. Either is said
+  // in place of the room line, and the switch rests.
+  const status = busy ? ctx.t("light.sync_active") : unreachable ? ctx.t("light.unreachable") : "";
   return html`<div
     class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })}
-    style=${styleMap(style)}
+    style=${styleMap(busy ? { ...style, "--sync-delay": `${-(hash(id) % 3200)}ms` } : style)}
     @click=${busy ? (e: Event) => refuse(e.currentTarget) : open}
   >
     ${busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing}
     <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
     <div class="name">${friendlyName(ctx.hass, id)}</div>
-    ${sub ? html`<div class="sub">${sub}</div>` : nothing}
-    ${status}
+    ${status || sub ? html`<div class="sub">${status || sub}</div>` : nothing}
     <div class=${classMap({ "switch-zone": true, inert: busy || unreachable })}>
       ${toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
     </div>
   </div>`;
+}
+
+/** A small stable number of a string (lights flicker out of step). */
+function hash(text: string): number {
+  let h = 0;
+  for (const c of text) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return h;
 }
 
 /**

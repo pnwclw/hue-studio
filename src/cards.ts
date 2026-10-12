@@ -12,15 +12,15 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt } from "./color.ts";
 import { PANEL_PATH, StudioContext } from "./context.ts";
-import { groupSlider, surfaceOf, toggleGroup } from "./controls.ts";
+import { groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
 import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { currentHass, navigate } from "./ha-internals.ts";
 import { localize, type StringKey } from "./i18n.ts";
-import { findGroup, type Group, groupState, type Scene } from "./model.ts";
+import { findGroup, type Group, type Scene } from "./model.ts";
 import { gallerySeasons, shownCategories } from "./seasons.ts";
 import { CSS } from "./styles.ts";
 import type { Hass, LightControl } from "./types.ts";
-import { icon, toggle } from "./ui.ts";
+import { icon } from "./ui.ts";
 import { whiteArt } from "./views/auto-light.ts";
 import { sceneArt, since } from "./views/room.ts";
 
@@ -205,7 +205,7 @@ class HueStudioRoomCard extends StudioCard {
     const { t } = ctx;
     const g = groupOf(ctx, this.config);
     if (!g) return this.missing("card.no_room");
-    const st = groupState(ctx.hass, g, ctx.lightInfo);
+    const st = shownState(ctx, g);
     const surface = surfaceOf(st);
     const key = encodeURIComponent(g.key);
     const meta = [
@@ -224,9 +224,9 @@ class HueStudioRoomCard extends StudioCard {
             <ha-icon icon=${g.icon}></ha-icon>
             <button class="grow link" @click=${() => this.panel(`/room/${key}`)}>
               <div class="name">${g.name}</div>
-              <div class="sub">${st.on ? `${st.brightness}%` : t("card.off")}</div>
+              <div class="sub">${st.syncing ? t("light.sync_active") : st.on ? `${st.brightness}%` : t("card.off")}</div>
             </button>
-            ${toggle(st.on, t("common.toggle"), () => toggleGroup(ctx, g))}
+            ${groupToggle(ctx, g, st)}
           </div>
           ${groupSlider(ctx, g, st, t("common.brightness"))}
         </div>

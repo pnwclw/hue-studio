@@ -10,10 +10,10 @@ import { classMap } from "lit/directives/class-map.js";
 
 import { loadSyncMemo, PANEL_PATH, StudioContext } from "./context.ts";
 import { currentHass, navigate, openPanelFrom, watchHass } from "./ha-internals.ts";
-import { allGroups, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
+import { allGroups, buildHome, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
-import { boxSyncing, memoBoxFor } from "./sync.ts";
+import { memoBoxFor, syncingIn } from "./sync.ts";
 import { keepTouchInside } from "./ui.ts";
 import "./views/color.ts";
 import type { ColorView, MenuItem } from "./views/color.ts";
@@ -144,12 +144,12 @@ class HueStudioLightDialog extends LitElement {
   private changed(): void {
     const ctx = this.ctx;
     if (ctx?.ready) {
-      // A Sync Box drives what was opened: its page instead of a color picker that can't act.
-      const { group, focus } = subjectOf(ctx.hass, ctx.home, this.entityId);
-      const box = boxSyncing(ctx.boxes, focus ? [focus] : group.lights);
-      if (box) {
+      // A Sync Box drives what was opened: its room instead of a color picker that can't act.
+      const { group, room, focus } = subjectOf(ctx.hass, ctx.home, this.entityId);
+      const synced = focus ? syncingIn(ctx.boxes, { lights: [focus] }) : syncingIn(ctx.boxes, group);
+      if (room && synced.length) {
         this.close();
-        openSyncPage(box);
+        openRoom(room);
         return;
       }
     }
@@ -204,9 +204,9 @@ class HueStudioLightDialog extends LitElement {
 
 if (!customElements.get("hue-studio-light-dialog")) customElements.define("hue-studio-light-dialog", HueStudioLightDialog);
 
-/** The panel's Sync page of a box (HA's back button returns to where more-info was opened). */
-function openSyncPage(box: string): void {
-  navigate(`${PANEL_PATH}/sync?box=${encodeURIComponent(box)}`);
+/** The panel's page of a room or zone (HA's back button returns to where more-info was opened). */
+function openRoom(room: Group): void {
+  navigate(`${PANEL_PATH}/room/${encodeURIComponent(room.key)}`);
 }
 
 function isHueLight(hass: Hass | undefined, id: unknown): id is string {
@@ -225,12 +225,21 @@ function onMoreInfo(ev: Event): void {
     return;
   }
   if (!hass || !isHueLight(hass, id)) return;
-  // A light a Sync Box drives now (known from an earlier visit): straight to the box's page.
-  const box = memoBoxFor(loadSyncMemo(), hass.states, id);
-  if (box) {
-    ev.stopImmediatePropagation();
-    openSyncPage(box);
-    return;
+  // A light (or a Hue room/zone with a light) a Sync Box drives now, known from an earlier
+  // visit: straight to its room, which shows the sync and its lights as busy.
+  try {
+    const memo = loadSyncMemo();
+    const lights = hass.states[id]?.attributes.is_hue_group ? ((hass.states[id].attributes.entity_id || []) as string[]) : [id];
+    if (lights.some((light) => memoBoxFor(memo, hass.states, light))) {
+      const { room } = subjectOf(hass, buildHome(hass), id);
+      if (room) {
+        ev.stopImmediatePropagation();
+        openRoom(room);
+        return;
+      }
+    }
+  } catch (err) {
+    console.error("hue_studio: sync check failed", err);
   }
   let dialog: HueStudioLightDialog | undefined;
   try {

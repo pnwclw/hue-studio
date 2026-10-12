@@ -25,11 +25,12 @@ from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
     CONF_FOOTER_TABS,
+    CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
-    CONF_GALLERY_WINDOWS,
     CONF_HUE_ENTRY_ID,
     DOMAIN,
     FOOTER_MAX_TABS,
+    GALLERY_SEASONS,
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
@@ -350,7 +351,7 @@ def ws_set_light_area(
     connection.send_result(msg["id"])
 
 
-# "MM-DD": a day of any year (a holiday window of the scene gallery).
+# "MM-DD": a day of any year (a date window of a scene gallery category).
 MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
 
 
@@ -364,8 +365,15 @@ MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
             [cv.string], vol.Length(max=FOOTER_MAX_TABS)
         ),
         vol.Optional(CONF_GALLERY_SEASONAL): bool,
-        vol.Optional(CONF_GALLERY_WINDOWS): {
-            cv.string: vol.All([vol.Match(MONTH_DAY)], vol.Length(min=2, max=2))
+        vol.Optional(CONF_GALLERY_RULES): {
+            cv.string: {
+                vol.Optional("seasons"): vol.All(
+                    [vol.In(GALLERY_SEASONS)], vol.Length(max=len(GALLERY_SEASONS))
+                ),
+                vol.Optional("window"): vol.All(
+                    [vol.Match(MONTH_DAY)], vol.Length(min=2, max=2)
+                ),
+            }
         },
     }
 )
@@ -389,7 +397,7 @@ def ws_set_config(
             CONF_FOOTER,
             CONF_FOOTER_TABS,
             CONF_GALLERY_SEASONAL,
-            CONF_GALLERY_WINDOWS,
+            CONF_GALLERY_RULES,
         )
     }
     for entry in hass.config_entries.async_entries(DOMAIN):

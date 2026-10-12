@@ -392,22 +392,33 @@ async def test_ws_set_gallery_seasons(
     studio_entry: MockConfigEntry,
     hass_ws_client: WebSocketGenerator,
 ) -> None:
-    """The seasonal gallery is a panel option; holiday windows are "MM-DD" pairs."""
+    """The seasonal gallery is a panel option; a rule per category: seasons, dates."""
+    rules = {
+        "halloween": {"window": ["10-15", "11-01"]},
+        "romantic": {"seasons": ["summer"], "window": ["02-10", "02-15"]},
+        "rustic": {},
+    }
     client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
             "type": "hue_studio/config/set",
             "gallery_seasonal": True,
-            "gallery_windows": {"halloween": ["10-15", "11-01"]},
+            "gallery_rules": rules,
         }
     )
     assert (await client.receive_json())["success"]
     config = async_frontend_config(hass)
     assert config["gallery_seasonal"] is True
-    assert config["gallery_windows"] == {"halloween": ["10-15", "11-01"]}
+    assert config["gallery_rules"] == rules
 
-    for bad in (["10-15"], ["13-01", "11-01"], ["10-32", "11-01"], ["1-5", "2-6"]):
+    for bad in (
+        {"window": ["10-15"]},
+        {"window": ["13-01", "11-01"]},
+        {"window": ["1-5", "2-6"]},
+        {"seasons": ["monsoon"]},
+        {"months": [1]},
+    ):
         await client.send_json_auto_id(
-            {"type": "hue_studio/config/set", "gallery_windows": {"halloween": bad}}
+            {"type": "hue_studio/config/set", "gallery_rules": {"halloween": bad}}
         )
         assert not (await client.receive_json())["success"]

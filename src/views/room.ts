@@ -10,10 +10,10 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../color.ts";
-import { groupSlider, lightTile, surfaceOf, toggleGroup } from "../controls.ts";
+import { groupSlider, groupToggle, lightTile, shownState, surfaceOf, syncBanner } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
 import { openStockMoreInfo } from "../ha-internals.ts";
-import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, type GroupState, groupState, type Scene } from "../model.ts";
+import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, type GroupState, type Scene } from "../model.ts";
 import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
@@ -40,7 +40,7 @@ export class RoomView extends StudioView {
     if (!g) {
       return this.screen(this.subHead("", () => ctx.go("")), html`<p class="empty">${t("room.not_found")}</p>`);
     }
-    const state = groupState(ctx.hass, g, ctx.lightInfo);
+    const state = shownState(ctx, g);
     const surface = surfaceOf(state);
     const room = encodeURIComponent(g.key);
     const syncing = syncingIn(ctx.boxes, g);
@@ -60,7 +60,7 @@ export class RoomView extends StudioView {
             <button class="round add" aria-label=${t("room.gallery")} @click=${() => ctx.go(`/gallery?room=${room}`)}>
               ${icon("plus")}
             </button>
-            ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
+            ${groupToggle(ctx, g, state)}
           </div>
           ${groupSlider(ctx, g, state, t("common.brightness"))}
           <div class="badges">${adaptiveFor(ctx.hass, g).map((al) => this.adaptiveBadge(al))}</div>
@@ -71,7 +71,6 @@ export class RoomView extends StudioView {
       ${this.sensors(g, state)}
       ${this.syncCards(g)}
       <h2 class="label">${t("room.scenes")}</h2>
-      ${this.syncNote(g)}
       <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>
         ${this.autoTile(g)} ${g.scenes.map((s) => this.scene(g, s))}
         <button class="scene add-scene" @click=${() => this.openNew()}>
@@ -123,10 +122,16 @@ export class RoomView extends StudioView {
     return chips.length ? html`<div class="sensor-row">${chips}</div>` : nothing;
   }
 
-  /** Sync Boxes whose entertainment area has lights of this room: status, start/stop. */
+  /**
+   * Sync Boxes whose entertainment area has lights of this room: while one syncs, the Hue
+   * app's banner (stop it right there); else a card with status and start.
+   */
   private syncCards(g: Group) {
-    const boxes = boxesForGroup(this.ctx.boxes, g);
+    const { ctx } = this;
+    const boxes = boxesForGroup(ctx.boxes, g);
     if (!boxes.length) return nothing;
+    const syncing = boxes.filter(([, box]) => box.syncing);
+    if (syncing.length) return html`<div class="sync-cards">${syncing.map(([id, box]) => syncBanner(ctx, id, box))}</div>`;
     return html`<div class="sync-cards">${boxes.map(([id, box]) => this.syncCard(id, box))}</div>`;
   }
 
@@ -147,14 +152,6 @@ export class RoomView extends StudioView {
       <div class="text"><div class="name">${box.name || "Sync Box"}</div><div class="status">${line}</div></div>
       ${toggle(!!box.syncing, box.syncing ? t("sync.stop") : t("sync.start"), () => ctx.setSync(id, { sync: !box.syncing }))}
     </div>`;
-  }
-
-  /** While a box drives the room's lights, scenes would be overwritten at once. */
-  private syncNote(g: Group) {
-    const { ctx } = this;
-    if (!syncingIn(ctx.boxes, g).length) return nothing;
-    const name = boxesForGroup(ctx.boxes, g).find(([, b]) => b.syncing)?.[1].name || "Sync Box";
-    return html`<p class="sync-note">${icon("sync")}<span>${ctx.t("sync.room_note", { name })}</span></p>`;
   }
 
   /** Adaptive Lighting badge: toggle the switch, or hand manual lights back to it. */

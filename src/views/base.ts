@@ -28,6 +28,8 @@ export class StudioView extends LightElement {
     const head = this.querySelector<HTMLElement>(":scope > .screen-head");
     if (!head || head.dataset.observed) return;
     head.dataset.observed = "1";
+    // Measured now, before the first paint, so the body never starts under the header.
+    this.style.setProperty("--head-h", `${head.offsetHeight}px`);
     this.#headObserver?.disconnect();
     this.#headObserver = new ResizeObserver(() => this.style.setProperty("--head-h", `${head.offsetHeight}px`));
     this.#headObserver.observe(head);

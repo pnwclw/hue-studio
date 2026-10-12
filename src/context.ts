@@ -311,7 +311,7 @@ export class StudioContext {
   }
 
   /** Change integration options from the panel (hue_studio/config/set); shown at once. */
-  async setConfig(change: Partial<Pick<StudioConfig, "auto_align" | "footer" | "footer_tabs" | "gallery_seasonal" | "gallery_windows">>): Promise<boolean> {
+  async setConfig(change: Partial<Pick<StudioConfig, "auto_align" | "footer" | "footer_tabs" | "gallery_seasonal" | "gallery_rules">>): Promise<boolean> {
     if (!this.raw?.callWS) return false;
     const before = this.config;
     this.config = { ...this.config, ...change };

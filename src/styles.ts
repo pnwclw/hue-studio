@@ -39,12 +39,13 @@ export const CSS = `
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
   main > * { position: relative; }
   .screen-head:has(> .tab-head) { position: absolute; top: 0; left: 0; right: 0; }
-  .screen-head:has(> .tab-head) + .screen-body > .page { padding-top: calc(var(--head-h, 0px) + 10px); }
+  .screen-head:has(> .tab-head) + .screen-body > .page { padding-top: calc(var(--head-h, calc(var(--safe-top, 0px) + var(--header-height, 56px))) + 10px); }
   .screen-head:has(> .tab-head:not(.wide)) { transition: background-color 0.2s, border-color 0.2s; }
   .screen-head:has(> .tab-head:not(.wide)):not(.scrolled):not(:has(.search-field)) {
     background-color: transparent; border-bottom-color: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .screen-head:has(> .tab-head:not(.wide)) + .screen-body > .page { padding-top: var(--head-h, 0px); }
-  h1.big.tab-title { margin: 0 2px 2px; }
+  /* Until measured, the bar's own height (padding, 44px row, border), so the first frame doesn't jump. */
+  .screen-head:has(> .tab-head:not(.wide)) + .screen-body > .page { padding-top: var(--head-h, calc(max(6px, var(--safe-top)) + 51px)); }
+  h1.big.tab-title { margin: 4px 2px 2px; }
   .tab-head .bar-title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                          opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .screen-head.scrolled .bar-title { opacity: 1; transform: none; }
@@ -213,22 +214,24 @@ export const CSS = `
   .light-row .light { scroll-snap-align: start; height: 172px; box-sizing: border-box; justify-content: flex-start; gap: 0;
                       padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
   /* The icon on top, the text centered in what is left above the switch. */
+  .light-row .light { --icon-y: 33px; }
   .light-row .light ha-icon { margin-top: 18px; --mdc-icon-size: 30px; }
   .light-row .light .name { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 0;
                             margin: auto 8px 0; font-size: 14.5px; font-weight: 500; line-height: 1.2; overflow: hidden; overflow-wrap: anywhere; }
   .light-row .light > :nth-last-child(2) { margin-bottom: auto; }
-  .light-row .light .sub { margin: 2px 8px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
-                           text-overflow: ellipsis; max-width: calc(100% - 16px); }
-  .light-row .light .status { max-width: calc(100% - 12px); margin: 3px 6px 0; font-size: 11px; font-weight: 700; line-height: 1.2;
-                              letter-spacing: 0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .light-row .light .sub { margin: 2px 4px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
+                           text-overflow: ellipsis; max-width: calc(100% - 8px); }
   .light-row .light .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center;
                                    justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
                                    border-top: 1px solid rgba(255, 255, 255, 0.1); }
   .switch-zone.inert { pointer-events: none; }
   .switch-zone.inert .toggle { opacity: 0.35; }
+  /* Syncing: the switch reads plainly as off (the Hue app's), it is just out of reach. */
+  .light.busy .switch-zone.inert .toggle { opacity: 1; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
     .light-row .light { height: 146px; padding-bottom: 54px; }
+    .light-row .light { --icon-y: 25px; }
     .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 26px; }
     .light-row .light .name { margin-top: 4px; font-size: 14px; }
     .light-row .light .switch-zone { height: 44px; }
@@ -236,19 +239,18 @@ export const CSS = `
     .controls { margin-bottom: 12px; }
   }
   .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
-  /* A Sync Box drives it (the Hue app's "Sync active"): a soft light drifting over the tile. */
+  /* A Sync Box drives it (the Hue app's "Sync active"): white light flickering out from the icon
+     (--icon-y: the icon's center), each tile out of step (--sync-delay). */
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
-  .light .sync-glow { position: absolute; inset: 0; z-index: -1; overflow: hidden; border-radius: inherit; pointer-events: none;
-                      background: radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 70%); }
-  .light .sync-glow::before { content: ""; position: absolute; left: -50%; top: -30%; width: 200%; height: 160%;
-                              background: radial-gradient(closest-side, rgba(255, 255, 255, 0.16), transparent),
-                                          radial-gradient(closest-side, rgba(255, 255, 255, 0.09), transparent) 70% 80% / 70% 60% no-repeat;
-                              filter: blur(8px); animation: sync-drift 7s ease-in-out infinite alternate; }
-  @keyframes sync-drift {
-    0% { transform: translate(-22%, -12%) scale(0.7); }
-    50% { transform: translate(18%, 4%) scale(0.9); }
-    100% { transform: translate(-6%, 18%) scale(0.75); }
+  .light .sync-glow { position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+                      background: radial-gradient(circle at 50% var(--icon-y, 28px), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07) 72px, transparent 140px); }
+  .light .sync-glow::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+                              background: radial-gradient(circle at 50% var(--icon-y, 28px), rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.14) 48px, transparent 115px);
+                              opacity: 0.4; animation: sync-flicker 3.2s ease-in-out var(--sync-delay, 0s) infinite; }
+  @keyframes sync-flicker {
+    0% { opacity: 0.25; } 7% { opacity: 0.75; } 13% { opacity: 0.4; } 21% { opacity: 0.95; } 31% { opacity: 0.45; }
+    42% { opacity: 0.6; } 53% { opacity: 0.2; } 62% { opacity: 0.85; } 74% { opacity: 0.4; } 86% { opacity: 0.7; } 100% { opacity: 0.25; }
   }
   /* A tap that can't be served: a shake, left and right (with the error haptic). */
   .refused { animation: refuse 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
@@ -256,8 +258,7 @@ export const CSS = `
     15% { transform: translateX(-7px); } 35% { transform: translateX(6px); } 55% { transform: translateX(-4px); }
     75% { transform: translateX(2px); } 100% { transform: none; }
   }
-  @media (prefers-reduced-motion: reduce) { .light .sync-glow::before { animation: none; } }
-  .light .status { font-size: 12px; font-weight: 600; opacity: 0.85; }
+  @media (prefers-reduced-motion: reduce) { .light .sync-glow::before { animation: none; opacity: 0.5; } }
 
   /* The color screen's bar, like the Hue app: "...", Save; Done. Transparent over the screen's glow. */
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -671,9 +672,14 @@ export const CSS = `
   .sync-banner .title { font-size: 14px; font-weight: 500; line-height: 1.3; }
   .sync-banner .sub { font-size: 14px; line-height: 1.3; color: var(--text-2); }
   .sync-banner .pill { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; background: rgba(255, 255, 255, 0.14); }
-  /* Settings → Scene gallery: a holiday's dates under its name; whether a category shows now. */
-  .item.holiday { flex-wrap: wrap; }
-  .item.holiday .dates { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+  /* Settings → Scene gallery: a category's rule opens under its row; whether it shows now. */
+  .rule-row .chevron { flex: none; opacity: 0.5; }
+  .rule-editor { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 4px 16px 14px; }
+  .rule-editor .chips { flex-wrap: wrap; overflow: visible; padding: 0; }
+  .rule-editor .chip:not(.on) { background: rgba(120, 120, 128, 0.24); }
+  .rule-editor .chip ha-icon { --mdc-icon-size: 16px; }
+  .rule-editor .dates { display: flex; flex-wrap: wrap; gap: 10px; }
+  .rule-editor p { margin: 0; }
   .date-field { display: flex; flex-direction: column; gap: 4px; }
   .date-value { position: relative; display: flex; align-items: center; min-width: 76px; height: 36px; padding: 0 12px; box-sizing: border-box;
                 border-radius: 10px; background: rgba(120, 120, 128, 0.24); font-size: 16px; cursor: pointer; }

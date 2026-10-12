@@ -44,7 +44,7 @@ async def test_options_flow_and_config_ws(
         "footer": False,
         "footer_tabs": [],
         "gallery_seasonal": False,
-        "gallery_windows": {},
+        "gallery_rules": {},
     }
 
     flow = hass.config_entries.options

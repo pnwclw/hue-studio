@@ -7,11 +7,9 @@ import { customElement } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { groupSlider, metaOf, surfaceOf, toggleGroup } from "../controls.ts";
-import { haptic } from "../ha-internals.ts";
-import { allGroups, type Group, groupState } from "../model.ts";
+import { groupSlider, groupToggle, metaOf, shownState, surfaceOf, syncBanner } from "../controls.ts";
+import { allGroups, type Group } from "../model.ts";
 import { planHasNews } from "../rooms.ts";
-import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { noRoomRows } from "./rooms.ts";
@@ -22,7 +20,7 @@ export class HomeView extends StudioView {
     const { ctx } = this;
     const { t, home } = ctx;
     const groups = allGroups(home);
-    const anyOn = groups.some((g) => groupState(ctx.hass, g).on);
+    const anyOn = groups.some((g) => shownState(ctx, g).on);
     const section = (title: string, list: Group[]) =>
       list.length ? html`<h2 class="label">${title}</h2><div class="cards">${list.map((g) => this.card(g))}</div>` : nothing;
 
@@ -45,30 +43,15 @@ export class HomeView extends StudioView {
   /** A box that syncs drives its lights: say so and offer to stop it (a tap elsewhere opens the box). */
   private syncBanners() {
     const { ctx } = this;
-    const { t } = ctx;
     return Object.entries(ctx.boxes)
       .filter(([, box]) => box.available && box.syncing)
-      .map(([id, box]) => {
-        const stop = (e: Event) => {
-          e.stopPropagation();
-          haptic("light");
-          ctx.setSync(id, { sync: false });
-        };
-        return html`<div class="sync-banner" role="button" tabindex="0" @click=${() => ctx.go(`/sync?box=${encodeURIComponent(id)}`)}>
-          ${icon("sync")}
-          <div class="grow">
-            <div class="title">${t("home.sync_active", { name: box.name || "Sync Box" })}</div>
-            <div class="sub">${t("home.sync_hint")}</div>
-          </div>
-          <button class="pill" @click=${stop}>${t("home.sync_stop")}</button>
-        </div>`;
-      });
+      .map(([id, box]) => syncBanner(ctx, id, box));
   }
 
   private card(g: Group) {
     const { ctx } = this;
     const { t } = ctx;
-    const state = groupState(ctx.hass, g, ctx.lightInfo);
+    const state = shownState(ctx, g);
     const surface = surfaceOf(state);
     return html`<div
       class=${classMap({ card: true, ...surface.classes })}
@@ -79,16 +62,18 @@ export class HomeView extends StudioView {
         <ha-icon icon=${g.icon}></ha-icon>
         <div class="text">
           <div class="name">${g.name}</div>
-          ${syncingIn(ctx.boxes, g).length ? html`<div class="meta sync-meta">${icon("sync")}${t("sync.syncing")}</div>` : metaOf(state)}
+          ${state.syncing ? html`<div class="meta sync-meta">${icon("sync")}${t("light.sync_active")}</div>` : metaOf(state)}
         </div>
-        ${toggle(state.on, t("common.toggle"), () => toggleGroup(ctx, g))}
+        ${groupToggle(ctx, g, state)}
       </div>
       ${groupSlider(ctx, g, state, t("common.brightness"))}
     </div>`;
   }
 
+  /** Every room and zone, but those a Sync Box drives (they count as off). */
   private toggleAll(anyOn: boolean): void {
-    const targets = [...new Set(allGroups(this.ctx.home).flatMap((g) => g.target))];
+    const free = allGroups(this.ctx.home).filter((g) => !shownState(this.ctx, g).syncing);
+    const targets = [...new Set(free.flatMap((g) => g.target))];
     this.ctx.call("light", anyOn ? "turn_off" : "turn_on", { entity_id: targets });
   }
 }

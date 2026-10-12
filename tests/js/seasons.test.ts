@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { categoryShown, inWindow, isMonthDay, monthDay, seasonEntity, seasonNow, shownCategories } from "../../src/seasons.ts";
+import { categoryShown, inWindow, isMonthDay, monthDay, sameRule, seasonEntity, seasonNow, shownCategories } from "../../src/seasons.ts";
 
 const NO_SEASON = { states: {}, entities: {} };
 const WITH_SEASON = {
@@ -36,7 +36,27 @@ test("seasonal: everyday always, holidays in their window, seasons in season", (
   assert.deepEqual(october, ["defaults", "halloween", "rustic"]);
   const christmas = shownCategories(CATEGORIES, { seasonal: true }, NO_SEASON as never, new Date(2026, 11, 24));
   assert.deepEqual(christmas, ["defaults", "winter_holidays", "winter_whisper"]);
-  // A window of the user's replaces the default one.
-  const late = { seasonal: true, windows: { halloween: ["10-25", "11-01"] as [string, string] } };
-  assert.ok(!categoryShown("halloween", late, "autumn", new Date(2026, 9, 12)));
+});
+
+test("the user's rules replace the defaults: always, seasons, dates, or both", () => {
+  const october = new Date(2026, 9, 12);
+  const rules = {
+    halloween: { window: ["10-25", "11-01"] as [string, string] },
+    rustic: {},
+    defaults: { seasons: ["winter" as const] },
+    romantic: { seasons: ["summer" as const], window: ["02-10", "02-15"] as [string, string] },
+  };
+  const options = { seasonal: true, rules };
+  assert.ok(!categoryShown("halloween", options, "autumn", october));
+  assert.ok(categoryShown("rustic", options, "spring", october));
+  assert.ok(!categoryShown("defaults", options, "autumn", october));
+  assert.ok(categoryShown("romantic", options, "winter", new Date(2026, 1, 14)));
+  assert.ok(categoryShown("romantic", options, "summer", new Date(2026, 6, 1)));
+  assert.ok(!categoryShown("romantic", options, "autumn", october));
+});
+
+test("rules compare by meaning", () => {
+  assert.ok(sameRule({ seasons: ["winter", "spring"] }, { seasons: ["spring", "winter"] }));
+  assert.ok(!sameRule({}, { seasons: ["winter"] }));
+  assert.ok(sameRule({ window: ["10-01", "11-02"] }, { window: ["10-01", "11-02"] }));
 });

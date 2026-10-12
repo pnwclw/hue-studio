@@ -40,12 +40,6 @@ export function syncingIn(boxes: Record<string, SyncBoxInfo>, group: Pick<Group,
   return group.lights.filter((id) => synced.has(id));
 }
 
-/** The box that syncs every one of `lights` right now (a light, or a room fully synced), or null. */
-export function boxSyncing(boxes: Record<string, SyncBoxInfo>, lights: string[]): string | null {
-  if (!lights.length) return null;
-  return Object.entries(boxes).find(([, box]) => lights.every((id) => syncedLights(box).includes(id)))?.[0] ?? null;
-}
-
 /**
  * What HA's more-info needs before our WebSocket answers: each box's sync switch and the
  * lights of its current entertainment area (kept by the page between visits).

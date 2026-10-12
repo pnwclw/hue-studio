@@ -22,8 +22,8 @@ from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
     CONF_FOOTER_TABS,
+    CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
-    CONF_GALLERY_WINDOWS,
     CONF_GROUPS,
     CONF_HUE_ENTRY_ID,
     CONF_ILLUMINANCE,
@@ -186,7 +186,7 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
         CONF_FOOTER: _panel_option(hass, CONF_FOOTER, False),
         CONF_FOOTER_TABS: _panel_option(hass, CONF_FOOTER_TABS, []),
         CONF_GALLERY_SEASONAL: _panel_option(hass, CONF_GALLERY_SEASONAL, False),
-        CONF_GALLERY_WINDOWS: _panel_option(hass, CONF_GALLERY_WINDOWS, {}),
+        CONF_GALLERY_RULES: _panel_option(hass, CONF_GALLERY_RULES, {}),
     }
 
 
