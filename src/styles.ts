@@ -307,22 +307,22 @@ export const CSS = `
   .pin::before { content: ""; position: absolute; inset: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
                  background: var(--pin); box-sizing: border-box; transition: background 0.2s;
                  /* A soft shadow under the drop (offsets turned with it: the shape is rotated -45deg). */
-                 box-shadow: 2.8px 2.8px 12px rgba(0, 0, 0, 0.22), 0.7px 0.7px 2px rgba(0, 0, 0, 0.16); }
+                 box-shadow: 1.4px 1.4px 5px rgba(0, 0, 0, 0.32), 0.4px 0.4px 1.5px rgba(0, 0, 0, 0.42); }
   .pin::after { content: ""; position: absolute; inset: -6px; }
-  .pin ha-icon { position: relative; height: 100%; align-items: center; justify-content: center; --mdc-icon-size: 20px;
+  .pin ha-icon { position: relative; height: 100%; align-items: center; justify-content: center; --mdc-icon-size: 26px;
                  color: #fff; pointer-events: none; }
   .pin.off { opacity: 0.5; }
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   /* Pins with one color: one pin with their count; a tap spreads them around a disc (the Hue app's). */
-  .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 18px;
+  .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 20px;
                       font-weight: 600; color: #fff; pointer-events: none; }
   .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
   .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
                  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
   .pin.round { width: 50px; height: 50px; margin: -25px 0 0 -25px; z-index: 4; animation: spread-in 0.3s var(--spring); }
-  .pin.round::before { border-radius: 50%; transform: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.16); }
-  .pin.round ha-icon { --mdc-icon-size: 24px; }
+  .pin.round::before { border-radius: 50%; transform: none; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.32), 0 0.5px 1.5px rgba(0, 0, 0, 0.42); }
+  .pin.round ha-icon { --mdc-icon-size: 30px; }
   @keyframes spread-in { from { transform: scale(0.6); opacity: 0; } }
   /* The gradient style: a button by the brightness, a sheet with the modes and the direction. */
   .controls .grow { flex: 1; }
