@@ -299,27 +299,29 @@ export const CSS = `
   .wheel.color { background: var(--wheel-color); }
   .wheel.white { background: var(--wheel-white); }
   .wheel .paths { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-  .wheel .paths path { fill: none; stroke: rgba(0, 0, 0, 0.55); stroke-width: 1px; vector-effect: non-scaling-stroke;
-                       stroke-linecap: round; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)); }
-  .wheel .paths path.selected { stroke: rgba(0, 0, 0, 0.8); stroke-width: 1.5px; }
+  .wheel .paths path { fill: none; stroke: rgba(0, 0, 0, 0.5); stroke-width: 0.6px; vector-effect: non-scaling-stroke;
+                       stroke-linecap: round; }
+  .wheel .paths path.selected { stroke: rgba(0, 0, 0, 0.7); stroke-width: 0.9px; }
   .pin { position: absolute; width: 42px; height: 42px; margin: -48px 0 0 -21px; cursor: grab; touch-action: none; z-index: 1;
-         filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35)); transition: transform 0.2s var(--spring), left 0.35s var(--ease), top 0.35s var(--ease), opacity 0.25s; }
+         transition: transform 0.2s var(--spring), left 0.35s var(--ease), top 0.35s var(--ease), opacity 0.25s; }
   .pin::before { content: ""; position: absolute; inset: 0; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-                 background: var(--pin); box-sizing: border-box; transition: background 0.2s; }
+                 background: var(--pin); box-sizing: border-box; transition: background 0.2s;
+                 /* A soft shadow under the drop (offsets turned with it: the shape is rotated -45deg). */
+                 box-shadow: 2.8px 2.8px 12px rgba(0, 0, 0, 0.22), 0.7px 0.7px 2px rgba(0, 0, 0, 0.16); }
   .pin::after { content: ""; position: absolute; inset: -6px; }
   .pin ha-icon { position: relative; height: 100%; align-items: center; justify-content: center; --mdc-icon-size: 20px;
-                 color: #fff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); pointer-events: none; }
+                 color: #fff; pointer-events: none; }
   .pin.off { opacity: 0.5; }
   .pin.selected { z-index: 2; transform: scale(1.1); }
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   /* Pins with one color: one pin with their count; a tap spreads them around a disc (the Hue app's). */
   .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 18px;
-                      font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); pointer-events: none; }
+                      font-weight: 600; color: #fff; pointer-events: none; }
   .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
   .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
                  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
   .pin.round { width: 50px; height: 50px; margin: -25px 0 0 -25px; z-index: 4; animation: spread-in 0.3s var(--spring); }
-  .pin.round::before { border-radius: 50%; transform: none; }
+  .pin.round::before { border-radius: 50%; transform: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.16); }
   .pin.round ha-icon { --mdc-icon-size: 24px; }
   @keyframes spread-in { from { transform: scale(0.6); opacity: 0; } }
   /* The gradient style: a button by the brightness, a sheet with the modes and the direction. */
