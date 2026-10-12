@@ -10,6 +10,6 @@ test("every locale has exactly the English keys", () => {
 
 test("fallback and placeholders", () => {
   const t = localize({ locale: { language: "xx" } });
-  assert.equal(t("gallery.applied", { name: "Office" }), "Applied to Office");
+  assert.equal(t("gallery.saved", { name: "Office" }), "Saved as a scene in Office");
   assert.equal(localize({ locale: { language: "pl" } })("nav.home"), "Dom");
 });

@@ -211,15 +211,15 @@ export const CSS = `
   .light-row::-webkit-scrollbar { display: none; }
   /* Tall cards: icon, name, room and status on top, the switch in a zone of its own below (the Hue app's). The row
      stretches every card to the tallest, so a status line never squeezes the switch. */
-  .light-row .light { scroll-snap-align: start; height: 172px; box-sizing: border-box; justify-content: flex-start; gap: 0;
-                      padding: 0 0 64px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
-  /* The icon on top, the text centered in what is left above the switch. */
-  .light-row .light { --icon-y: 33px; }
-  .light-row .light ha-icon { margin-top: 18px; --mdc-icon-size: 30px; }
+  .light-row .light { scroll-snap-align: start; height: 156px; box-sizing: border-box; justify-content: flex-start; gap: 0;
+                      padding: 0 0 52px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
+  /* The icon on top, the text centered between it and the switch's zone (the Hue app's). */
+  .light-row .light { --icon-y: 32px; }
+  .light-row .light ha-icon { margin-top: 19px; --mdc-icon-size: 26px; }
   .light-row .light .name { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 0;
-                            margin: auto 8px 0; font-size: 14.5px; font-weight: 500; line-height: 1.2; overflow: hidden; overflow-wrap: anywhere; }
+                            margin: auto 8px 0; font-size: 15px; font-weight: 600; line-height: 1.2; overflow: hidden; overflow-wrap: anywhere; }
   .light-row .light > :nth-last-child(2) { margin-bottom: auto; }
-  .light-row .light .sub { margin: 2px 4px 0; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
+  .light-row .light .sub { margin: 2px 4px auto; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
                            text-overflow: ellipsis; max-width: calc(100% - 8px); }
   .light-row .light .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center;
                                    justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
@@ -230,28 +230,25 @@ export const CSS = `
   .light.busy .switch-zone.inert .toggle { opacity: 1; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
-    .light-row .light { height: 146px; padding-bottom: 54px; }
+    .light-row .light { height: 140px; padding-bottom: 44px; }
     .light-row .light { --icon-y: 25px; }
-    .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 26px; }
+    .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 24px; }
     .light-row .light .name { margin-top: 4px; font-size: 14px; }
     .light-row .light .switch-zone { height: 44px; }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
     .controls { margin-bottom: 12px; }
   }
   .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
-  /* A Sync Box drives it (the Hue app's "Sync active"): white light flickering out from the icon
-     (--icon-y: the icon's center), each tile out of step (--sync-delay). */
+  /* A Sync Box drives it (the Hue app's "Sync active"): white light pulsing out from the icon
+     (--icon-y: the icon's center); every tile on the same beat (views align the animations). */
   .light.busy { cursor: default; }
   .light.busy:active { transform: none; }
   .light .sync-glow { position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
                       background: radial-gradient(circle at 50% var(--icon-y, 28px), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.07) 72px, transparent 140px); }
   .light .sync-glow::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
                               background: radial-gradient(circle at 50% var(--icon-y, 28px), rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.14) 48px, transparent 115px);
-                              opacity: 0.4; animation: sync-flicker 3.2s ease-in-out var(--sync-delay, 0s) infinite; }
-  @keyframes sync-flicker {
-    0% { opacity: 0.25; } 7% { opacity: 0.75; } 13% { opacity: 0.4; } 21% { opacity: 0.95; } 31% { opacity: 0.45; }
-    42% { opacity: 0.6; } 53% { opacity: 0.2; } 62% { opacity: 0.85; } 74% { opacity: 0.4; } 86% { opacity: 0.7; } 100% { opacity: 0.25; }
-  }
+                              animation: sync-pulse 1.6s ease-in-out infinite; }
+  @keyframes sync-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.95; } }
   /* A tap that can't be served: a shake, left and right (with the error haptic). */
   .refused { animation: refuse 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
   @keyframes refuse {

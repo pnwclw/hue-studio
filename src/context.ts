@@ -5,7 +5,7 @@
 import { loadGallery } from "./gallery-data.ts";
 import { navigate } from "./ha-internals.ts";
 import { localize, type Translate } from "./i18n.ts";
-import { adaptiveFor, buildHome, type Group, type Home } from "./model.ts";
+import { adaptiveFor, buildHome, findGroup, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
 import { confirmed, predictSync, type SyncMemo, syncMemo } from "./sync.ts";
 import type {
@@ -43,6 +43,8 @@ const TOAST_MS = 3200;
 const SYNC_PREDICTION_MS = 5000;
 
 const SYNC_MEMO_KEY = "hue_studio.sync_memo";
+/** How long (x 300 ms) a new zone may take to show up in HA. */
+const ZONE_WAIT_TRIES = 40;
 
 /** Sync Boxes' switches and lights, for HA's more-info before any WebSocket answer (per browser). */
 export function loadSyncMemo(): SyncMemo {
@@ -324,6 +326,24 @@ export class StudioContext {
       this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
       return false;
     }
+  }
+
+  /**
+   * The Hue room or zone that holds a group's scenes. A group without one (an area whose
+   * lights no Hue room or zone covers exactly) gets a zone of its lights on the bridge,
+   * which then matches the area by itself; null if that fails or takes too long.
+   */
+  async hueGroupOf(group: Group): Promise<string | null> {
+    if (group.group) return group.group;
+    if (!(await this.call("hue_studio", "create_zone", { entity_id: group.lights, name: group.name }, { optimistic: false }))) return null;
+    // The native integration adds the zone's light entity a moment later.
+    for (let i = 0; i < ZONE_WAIT_TRIES; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const found = findGroup(this.home, group.key)?.group;
+      if (found) return found;
+    }
+    this.toast(this.t("gallery.zone_wait", { name: group.name }));
+    return null;
   }
 
   /** Scenes change lights behind HA's back: tell Adaptive Lighting they are manual now. */

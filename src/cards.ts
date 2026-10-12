@@ -399,8 +399,9 @@ class HueStudioGalleryCard extends StudioCard {
     if (!target) return this.missing("card.no_room");
     if (!ctx.gallery) return html`<ha-card><div class="body warn">${t("rooms.loading")}</div></ha-card>`;
     const wanted = this.config.categories;
-    // Without a choice, the first few categories shown now (seasonal gallery); the whole gallery is one tap away.
-    const shown = wanted?.length ? wanted : shownCategories(ctx.gallery.categories, gallerySeasons(ctx.config), ctx.hass);
+    // The chosen categories (else the first few) that show now (seasonal gallery); the whole gallery is one tap away.
+    const now = shownCategories(ctx.gallery.categories, gallerySeasons(ctx.config), ctx.hass);
+    const shown = wanted?.length ? wanted.filter((id) => now.includes(id)) : now;
     const sections = ctx.gallery.categories
       .filter((c) => shown.includes(c.id))
       .map((c) => ({ c, items: ctx.gallery!.scenes.filter((s) => s.category === c.id) }))

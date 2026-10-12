@@ -7,7 +7,7 @@
 //   /room/<key>/color?light=&back=   color wheel (effects too)
 //   /room/<key>/scene/<scene>  scene editor
 //   /room/<key>/space          arrange the room's lights (positions)
-//   /gallery?room=<key>        scene gallery
+//   /gallery?room=<key>        scene gallery of a room or zone (its "+"), full screen
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/auto/<area>      auto light of an area
@@ -146,9 +146,7 @@ export class HueStudioPanel extends LitElement {
     if (!ctx?.ready) return nothing;
     const route = parseRoute(this.route?.path ?? location.pathname.replace(PANEL_PATH, ""), location.search);
     const tab =
-      route.name === "gallery" && !route.room
-        ? "gallery"
-        : route.name === "sync"
+      route.name === "sync"
           ? "sync"
           : route.name === "settings" || route.name === "rooms" || route.name === "auto" || route.name === "experimental" || route.name === "gallerySettings" ||
               route.name === "devices" ||
@@ -160,11 +158,10 @@ export class HueStudioPanel extends LitElement {
             : "home";
     const tabs: [string, string, IconName, string][] = [
       ["home", "", "home", ctx.t("nav.home")],
-      ["gallery", "/gallery", "explore", ctx.t("nav.gallery")],
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
-    const full = route.name === "color" || route.name === "scene";
+    const full = route.name === "color" || route.name === "scene" || route.name === "gallery";
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;
     return html`

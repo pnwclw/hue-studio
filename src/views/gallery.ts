@@ -1,5 +1,7 @@
-// Scene gallery: categories of tiles, search, a scene sheet that applies it to a room or
-// saves it there as a scene (on the bridge, with the gallery picture, like the Hue app).
+// Scene gallery of a room or zone (the "+" in its header), like the Hue app's: a full-screen
+// page with a large title, search and categories of tiles; a scene's sheet sets it once or
+// saves it as a scene of the room (on the bridge, with the gallery picture). The room is
+// implied: nothing to pick.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -9,7 +11,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../color.ts";
 import { thumbUrl } from "../gallery-data.ts";
-import { allGroups, findGroup, type Group } from "../model.ts";
+import { findGroup, type Group } from "../model.ts";
 import { gallerySeasons, shownCategories } from "../seasons.ts";
 import { canSpread } from "../space.ts";
 import type { Gallery, GalleryScene } from "../types.ts";
@@ -18,75 +20,55 @@ import { StudioView } from "./base.ts";
 
 @customElement("hue-studio-gallery-view")
 export class GalleryView extends StudioView {
-  /** Opened from a room or zone: apply there, no target picker. */
+  /** The room or zone (its key) the gallery was opened from. */
   @property() accessor room: string | null = null;
 
   @state() private accessor query = "";
   @state() private accessor searching = false;
-  @state() private accessor targetKey: string | null = null;
   @state() private accessor open: GalleryScene | null = null;
-  /** How "Set once" lays the colors out: in turn (classic) or by where lights stand. */
-  @state() private accessor layout: "classic" | "spatial" = "spatial";
-
-  private get target(): Group | null {
-    const { home } = this.ctx;
-    return findGroup(home, this.room ?? this.targetKey) || allGroups(home)[0] || null;
-  }
+  @state() private accessor saving = false;
 
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
-    const groups = allGroups(ctx.home);
-    const target = this.target;
-    const back = () => ctx.go(`/room/${encodeURIComponent(this.room ?? "")}`);
+    const target = findGroup(ctx.home, this.room);
+    const back = () => ctx.go(this.room ? `/room/${encodeURIComponent(this.room)}` : "");
+    if (!target) return this.screen(this.subHead("", back), html`<p class="empty">${t("room.not_found")}</p>`);
     const toggleSearch = () => {
       this.searching = !this.searching;
       if (this.searching) this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".q")?.focus());
       else this.query = "";
     };
     const q = normalize(this.query);
-    // Seasonal gallery (a setting): holiday and season categories only in their time.
+    // Seasonal gallery (a setting): categories only in their time.
     const shown = ctx.gallery ? shownCategories(ctx.gallery.categories, gallerySeasons(ctx.config), ctx.hass) : [];
 
-    // The search field lives in the header: always there in the desktop Explore tab, else
-    // in the bar instead of the title while the search button is on.
-    const wide = !this.room && !ctx.narrow;
-    const field = wide || this.searching
-      ? html`<label class="search-field">
-          ${icon("search")}
-          <input
-            class="q"
-            type="search"
-            placeholder=${t("gallery.search")}
-            autocomplete="off"
-            .value=${this.query}
-            @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
-            @keydown=${(e: KeyboardEvent) => e.key === "Escape" && (wide ? (this.query = "") : this.searching && toggleSearch())}
-          />
-        </label>`
-      : nothing;
-    const toggle = wide
+    // Search: always a field on desktop; on phones a button that puts the field in the bar.
+    const wide = !ctx.narrow;
+    const field =
+      wide || this.searching
+        ? html`<label class="search-field">
+            ${icon("search")}
+            <input
+              class="q"
+              type="search"
+              placeholder=${t("gallery.search")}
+              autocomplete="off"
+              .value=${this.query}
+              @input=${(e: InputEvent) => (this.query = (e.target as HTMLInputElement).value)}
+              @keydown=${(e: KeyboardEvent) => e.key === "Escape" && (wide ? (this.query = "") : this.searching && toggleSearch())}
+            />
+          </label>`
+        : nothing;
+    const search = wide
       ? nothing
       : html`<button class="round search" aria-label=${t("gallery.search_button")} aria-pressed=${this.searching} @click=${toggleSearch}>
           ${icon(this.searching ? "close" : "search")}
         </button>`;
-    const body = html`${groups.length > 1 && !this.room
-        ? html`<h2 class="label">${t("gallery.target")}</h2>
-            <div class="chips">
-              ${groups.map(
-                (g) => html`<button class=${classMap({ chip: true, on: g.key === target?.key })} @click=${() => (this.targetKey = g.key)}>
-                  <ha-icon icon=${g.icon}></ha-icon>${g.name}
-                </button>`,
-              )}
-            </div>`
-        : nothing}
-      ${ctx.gallery ? guard([ctx.gallery, q, shown.join()], () => this.body(ctx.gallery!, q, shown)) : nothing}
+    const close = html`<button class="round close" aria-label=${t("common.close")} @click=${back}>${icon("close")}</button>`;
+    const body = html`${ctx.gallery ? guard([ctx.gallery, q, shown.join()], () => this.body(ctx.gallery!, q, shown)) : nothing}
       ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`;
-    // Opened from a room: a screen of its own (the field replaces its title); else the Explore tab.
-    const screen = this.room
-      ? this.screen(this.subHead(t("gallery.title"), back, toggle, field), body)
-      : this.tabScreen(t("gallery.title"), body, { center: field, end: toggle });
-    return html`${screen}
+    return html`${this.tabScreen(t("gallery.title"), body, { lead: close, center: field, end: search })}
       ${this.open ? this.sheet(this.open, target) : nothing}`;
   }
 
@@ -117,28 +99,30 @@ export class GalleryView extends StudioView {
     this.open = this.ctx.gallery?.scenes.find((s) => s.id === id) ?? null;
   };
 
-  /** The scene sheet, like the Hue app's pop-up. */
-  private sheet(scene: GalleryScene, target: Group | null) {
+  /**
+   * The scene sheet, like the Hue app's pop-up: set it once (colors by where the lights
+   * stand when they are placed) or save it as a scene of the room. A room without a Hue
+   * room or zone gets a zone of its lights first: scenes live there.
+   */
+  private sheet(scene: GalleryScene, target: Group) {
     const { ctx } = this;
     const { t } = ctx;
     const close = () => (this.open = null);
-    // Spatial needs two placed lights and colors to spread.
-    const spreadable = !!target && scene.kind === "gradient" && canSpread(ctx.positions, target.lights);
-    const spatial = spreadable && this.layout === "spatial";
+    const spatial = scene.kind === "gradient" && canSpread(ctx.positions, target.lights);
     const apply = async () => {
       close();
-      if (!target) return;
       const data = { entity_id: target.target, gallery_scene: scene.id, ...(spatial ? { layout: "spatial" } : {}) };
-      const ok = await ctx.call("hue_studio", "apply_palette", data);
-      if (ok) ctx.toast(t("gallery.applied", { name: target.name }));
+      await ctx.call("hue_studio", "apply_palette", data);
     };
     const save = async () => {
+      if (this.saving) return;
+      this.saving = true;
+      const group = await ctx.hueGroupOf(target);
+      const ok = !!group && (await ctx.call("hue_studio", "create_scene", { entity_id: group, name: scene.name, gallery_scene: scene.id }, { optimistic: false }));
+      this.saving = false;
+      if (!ok) return;
       close();
-      if (!target?.group) return;
-      const data = { entity_id: target.group, name: scene.name, gallery_scene: scene.id };
-      if (await ctx.call("hue_studio", "create_scene", data, { optimistic: false })) {
-        ctx.toast(t("gallery.saved", { name: target.name }));
-      }
+      ctx.toast(t("gallery.saved", { name: target.name }));
     };
     return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box" role="dialog" aria-label=${scene.name}>
@@ -148,18 +132,8 @@ export class GalleryView extends StudioView {
         </div>
         <div class="dots">${paletteColors(scene).map((c) => html`<i style=${styleMap({ background: c })}></i>`)}</div>
         <div class="actions">
-          ${spreadable
-            ? html`<div class="seg two" role="radiogroup" aria-label=${t("gallery.layout")}>
-                ${(["classic", "spatial"] as const).map(
-                  (l) => html`<button role="radio" aria-checked=${this.layout === l} class=${classMap({ on: this.layout === l })} @click=${() => (this.layout = l)}>
-                    ${t(`gallery.layout_${l}`)}
-                  </button>`,
-                )}
-              </div>`
-            : nothing}
-          <button class="pill apply" ?disabled=${!target} @click=${apply}>${t("gallery.set_once")}</button>
-          ${target?.group ? html`<button class="pill" @click=${save}>${t("gallery.save")}</button>` : nothing}
-          ${target ? html`<div class="target">${t("gallery.target")}: ${target.name}</div>` : nothing}
+          <button class="pill apply" @click=${apply}>${t("gallery.set_once")}</button>
+          <button class="pill" ?disabled=${this.saving} @click=${save}>${t("gallery.save")}</button>
         </div>
       </div>
     </div>`;

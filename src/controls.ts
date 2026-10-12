@@ -115,13 +115,13 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   const brightness = state?.state === "on" ? Math.round(((state.attributes.brightness as number | undefined) ?? 255) / 2.55) : undefined;
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable, brightness });
   const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
-  // Busy: a Sync Box drives it (the Hue app's "Sync active": white flickering around the
-  // icon, the switch off, a tap refused); unreachable: the bridge lost it. Either is said
+  // Busy: a Sync Box drives it (the Hue app's "Sync active": white pulsing around the icon,
+  // the switch off, a tap refused); unreachable: the bridge lost it. Either is said
   // in place of the room line, and the switch rests.
   const status = busy ? ctx.t("light.sync_active") : unreachable ? ctx.t("light.unreachable") : "";
   return html`<div
     class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })}
-    style=${styleMap(busy ? { ...style, "--sync-delay": `${-(hash(id) % 3200)}ms` } : style)}
+    style=${styleMap(style)}
     @click=${busy ? (e: Event) => refuse(e.currentTarget) : open}
   >
     ${busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing}
@@ -132,13 +132,6 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
       ${toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
     </div>
   </div>`;
-}
-
-/** A small stable number of a string (lights flicker out of step). */
-function hash(text: string): number {
-  let h = 0;
-  for (const c of text) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
 }
 
 /**

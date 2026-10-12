@@ -25,6 +25,10 @@ export class StudioView extends LightElement {
   protected override updated(changed: Map<PropertyKey, unknown>): void {
     super.updated(changed);
     this.#syncHead();
+    // Lights a Sync Box drives pulse on one beat: their animations start at the timeline's origin.
+    for (const a of this.getAnimations({ subtree: true })) {
+      if ((a as CSSAnimation).animationName === "sync-pulse" && a.startTime !== 0) a.startTime = 0;
+    }
     const head = this.querySelector<HTMLElement>(":scope > .screen-head");
     if (!head || head.dataset.observed) return;
     head.dataset.observed = "1";
@@ -47,24 +51,27 @@ export class StudioView extends LightElement {
   }
 
   /**
-   * A tab (Home, Explore, Sync, Settings), like an iOS large title. Phone (HA sidebar
-   * hidden): a bar with the menu button and the actions over a large title that scrolls
-   * with the body; once the title went under the bar, it shows in the bar beside the menu
-   * button (`center`, e.g. a search field, takes its place). Desktop: title and actions in
-   * one row as tall as the HA sidebar's header, `center` before the actions.
+   * A tab (Home, Sync, Settings) or a full-screen page (the scene gallery), like an iOS
+   * large title. Phone: a bar with the menu button (or `lead`, e.g. close) and the actions
+   * over a large title that scrolls with the body; once the title went under the bar, it
+   * shows in the bar beside that button (`center`, e.g. a search field, takes its place).
+   * Desktop: `lead`, title and actions in one row as tall as the HA sidebar's header,
+   * `center` before the actions.
    */
   protected tabScreen(
     title: string,
     body: unknown,
-    { end = nothing as Slot, center = nothing as Slot, cls = "" } = {},
+    { end = nothing as Slot, center = nothing as Slot, lead = nothing as Slot, cls = "" } = {},
   ): TemplateResult {
     const { ctx } = this;
     if (!ctx.narrow) {
-      return this.screen(html`<div class="tab-head wide"><h1 class="big">${title}</h1><div class="grow"></div>${center}${end}</div>`, body, cls);
+      return this.screen(html`<div class="tab-head wide">${lead}<h1 class="big">${title}</h1><div class="grow"></div>${center}${end}</div>`, body, cls);
     }
     const head = html`<div class="tab-head">
       <div class="bar">
-        <button class="round menu-btn" aria-label=${ctx.t("panel.menu")} @click=${() => ctx.toggleSidebar()}>${icon("menu")}</button>
+        ${lead === nothing
+          ? html`<button class="round menu-btn" aria-label=${ctx.t("panel.menu")} @click=${() => ctx.toggleSidebar()}>${icon("menu")}</button>`
+          : lead}
         ${center === nothing ? html`<div class="bar-title" aria-hidden="true">${title}</div>` : center}
         ${end}
       </div>
