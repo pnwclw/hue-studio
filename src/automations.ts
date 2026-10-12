@@ -118,6 +118,15 @@ export function defaultInput(type: AutomationType, rooms: string[] = []): Automa
   }
 }
 
+/**
+ * An all-day scene, like the Hue app's: a schedule from sunrise whose light is the scene of
+ * the day, which keeps up with the day until the lights are changed.
+ */
+export function allDayDraft(alias: string, rooms: string[] = [], now = Date.now()): AutomationDraft {
+  const draft = newDraft("schedule", alias, rooms, now);
+  return { ...draft, input: { ...draft.input, start_kind: "sunrise", light: "auto" } };
+}
+
 export const isType = (value: unknown): value is AutomationType => TYPES.includes(value as AutomationType);
 
 /** A new automation of a type (its id stays when it is taken over in HA). */

@@ -9,6 +9,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import {
+  allDayDraft,
   areaFor,
   type AutomationDraft,
   type AutomationInput,
@@ -97,6 +98,8 @@ export class AutomationEditView extends StudioView {
   @property() accessor newType: string | null = null;
   /** The room a new automation starts with (an area id). */
   @property() accessor room: string | null = null;
+  /** `all_day`: a new all-day scene (a schedule showing the scene of the day). */
+  @property() accessor preset: string | null = null;
 
   @state() private accessor draft: AutomationDraft | null = null;
   @state() private accessor page: "main" | "day" = "main";
@@ -119,7 +122,10 @@ export class AutomationEditView extends StudioView {
     const { ctx } = this;
     if (this.newType && isType(this.newType)) {
       const rooms = this.room && ctx.hass.areas?.[this.room] ? [this.room] : [];
-      this.draft = newDraft(this.newType, ctx.t(`automations.type_${this.newType}` as StringKey), rooms);
+      this.draft =
+        this.preset === "all_day" && this.newType === "schedule"
+          ? allDayDraft(ctx.t("add.all_day"), rooms)
+          : newDraft(this.newType, ctx.t(`automations.type_${this.newType}` as StringKey), rooms);
     } else if (this.automationId) {
       const entity = ctx.automationEntity(this.automationId);
       const config = entity ? ctx.automationConfigs[entity] : undefined;

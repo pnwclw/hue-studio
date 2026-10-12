@@ -10,7 +10,7 @@
 //   /gallery?room=<key>        scene gallery of a room or zone (its "+"), full screen
 //   /automations               automations (tab): ours, and the other HA ones touching Hue lights
 //   /automations/new[?room=]   the types of the Hue app (+ a custom one in HA's editor)
-//   /automations/new/<type>[?room=<area>]   a new automation
+//   /automations/new/<type>[?room=<area>][&preset=all_day]   a new automation (all_day: a room's all-day scene)
 //   /automations/<id>          an automation (its config id)
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
@@ -74,7 +74,7 @@ type Route =
   | { name: "integration" }
   | { name: "automations" }
   | { name: "automationNew"; room: string | null }
-  | { name: "automation"; id: string | null; type: string | null; room: string | null };
+  | { name: "automation"; id: string | null; type: string | null; room: string | null; preset: string | null };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -91,9 +91,9 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
-  if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return { name: "automation", id: null, type: parts[2], room: params.get("room") };
+  if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return { name: "automation", id: null, type: parts[2], room: params.get("room"), preset: params.get("preset") };
   if (parts[0] === "automations" && parts[1] === "new") return { name: "automationNew", room: params.get("room") };
-  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: null };
+  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: null, preset: null };
   if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
@@ -215,6 +215,7 @@ export class HueStudioPanel extends LitElement {
           .automationId=${route.id}
           .newType=${route.type}
           .room=${route.room}
+          .preset=${route.preset}
         ></hue-studio-automation-edit-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;

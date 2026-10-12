@@ -1,7 +1,6 @@
-// Room: header with toggle, brightness and Adaptive Lighting; the room's sensors (motion,
-// temperature, light level); the room's Hue scenes (plus "New scene": what the lights show
-// now, saved as a scene of the room's Hue room/zone on the bridge, so the Hue app has it
-// too); its lights; its automations, like the Hue app.
+// Room: header with toggle, brightness, Adaptive Lighting and "+" (add a scene, an automation
+// or a device: add-sheet.ts); the room's sensors (motion, temperature, light level); the
+// room's Hue scenes; its lights; its automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -17,9 +16,9 @@ import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
-import { automationRows } from "./automations.ts";
+import "./add-sheet.ts";
+import { roomAutomations } from "./automations.ts";
 import { StudioView } from "./base.ts";
-import "./new-scene.ts";
 
 const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 
@@ -27,7 +26,7 @@ const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 export class RoomView extends StudioView {
   @property() accessor key = "";
 
-  /** The "New scene" sheet is open. */
+  /** The "+" sheet (what to add) is open. */
   @state() private accessor adding = false;
   /** Brightness while the header's slider is dragged: the header shows just the percentage. */
   @state() private accessor dragging: number | null = null;
@@ -56,9 +55,7 @@ export class RoomView extends StudioView {
           <div class=${classMap({ topbar: true, adjusting: this.dragging !== null })}>
             <button class="round back" aria-label=${t("common.back")} @click=${() => ctx.go("")}>${icon("back")}</button>
             <div class="title">${this.dragging !== null ? `${this.dragging}%` : g.name}</div>
-            <button class="round add" aria-label=${t("room.gallery")} @click=${() => ctx.go(`/gallery?room=${room}`)}>
-              ${icon("plus")}
-            </button>
+            <button class="round add" aria-label=${t("add.title")} @click=${() => (this.adding = true)}>${icon("plus")}</button>
             ${groupToggle(ctx, g, state)}
           </div>
           ${groupSlider(ctx, g, state, t("common.brightness"))}
@@ -69,14 +66,10 @@ export class RoomView extends StudioView {
     <div class="screen-body"><div class="page">
       ${this.sensors(g, state)}
       ${this.syncCards(g)}
-      <h2 class="label">${t("room.scenes")}</h2>
-      <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>
-        ${g.scenes.map((s) => this.scene(g, s))}
-        <button class="scene add-scene" @click=${() => this.openNew()}>
-          <div class="dot">${icon("plus")}</div>
-          <div class="name">${t("room.new_scene")}</div>
-        </button>
-      </div>
+      ${g.scenes.length
+        ? html`<h2 class="label">${t("room.scenes")}</h2>
+            <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>${g.scenes.map((s) => this.scene(g, s))}</div>`
+        : nothing}
       <div class="section-head">
         <h2 class="label">${t("room.lights")}</h2>
         ${g.kind === "area" && g.lights.length > 1
@@ -85,15 +78,11 @@ export class RoomView extends StudioView {
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
-      ${g.kind === "area" ? html`<h2 class="label">${t("automations.title")}</h2>${automationRows(ctx, g.key.slice("area.".length))}` : nothing}
+      ${g.kind === "area" ? roomAutomations(ctx, g.key.slice("area.".length)) : nothing}
     </div></div>
     ${this.adding
-      ? html`<hue-studio-new-scene .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-new-scene>`
+      ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-add-sheet>`
       : nothing}`;
-  }
-
-  private openNew(): void {
-    this.adding = true;
   }
 
   /** Motion, temperature and light level of the room; a tap opens the sensor in HA. */

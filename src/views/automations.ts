@@ -3,7 +3,7 @@
 // Every automation is a Home Assistant automation (a blueprint of ours, see automations.ts):
 // HA stores and runs it, and its own editor stays one tap away.
 
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import { type AutomationDraft, fromConfig, roomsLine, TYPE_ICONS, TYPES, whenLine } from "../automations.ts";
@@ -59,16 +59,12 @@ function row(ctx: StudioContext, l: Listed): TemplateResult {
   </div>`;
 }
 
-/** The automations of a room (an area), for its screen; "+" adds one there. */
-export function automationRows(ctx: StudioContext, area: string): TemplateResult {
-  const { t } = ctx;
+/** The automations of a room (an area), for its screen (nothing without any: its "+" adds them). */
+export function roomAutomations(ctx: StudioContext, area: string): TemplateResult | typeof nothing {
   const list = ours(ctx).filter((l) => l.draft?.input.rooms.includes(area));
-  return html`<div class="rows automations">
-    ${list.map((l) => row(ctx, l))}
-    <button class="item" @click=${() => ctx.go(`/automations/new?room=${encodeURIComponent(area)}`)}>
-      <ha-icon icon="mdi:plus"></ha-icon><div class="grow">${t("automations.add")}</div>
-    </button>
-  </div>`;
+  if (!list.length) return nothing;
+  return html`<h2 class="label">${ctx.t("automations.title")}</h2>
+    <div class="rows automations">${list.map((l) => row(ctx, l))}</div>`;
 }
 
 @customElement("hue-studio-automations-view")

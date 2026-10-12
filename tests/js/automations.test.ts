@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { areaFor, daysLine, fromConfig, missing, momentLine, newDraft, offsetDuration, offsetMinutes, toConfig, typeOfPath, whenLine } from "../../src/automations.ts";
+import { allDayDraft, areaFor, daysLine, fromConfig, missing, momentLine, newDraft, offsetDuration, offsetMinutes, toConfig, typeOfPath, whenLine } from "../../src/automations.ts";
 import { localize } from "../../src/i18n.ts";
 
 const t = localize(null);
@@ -55,4 +55,14 @@ test("when, in words", () => {
   const schedule = newDraft("schedule", "Balcony", ["balcony"]);
   schedule.input = { ...schedule.input, start_kind: "sunset", end_kind: "time", end_time: "23:00:00", days: ["sat", "sun"] };
   assert.equal(whenLine(schedule, t), "Sunset – 23:00 · Weekend");
+});
+
+test("an all-day scene is a schedule from sunrise showing the scene of the day", () => {
+  const draft = allDayDraft("All day", ["office"], 1_000_000);
+  assert.equal(draft.type, "schedule");
+  assert.equal(draft.input.start_kind, "sunrise");
+  assert.equal(draft.input.light, "auto");
+  assert.equal(draft.input.end_kind, "none");
+  assert.equal(missing(draft), null);
+  assert.equal(toConfig(draft, "").use_blueprint?.input?.light, "auto");
 });
