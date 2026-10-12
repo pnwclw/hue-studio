@@ -307,3 +307,42 @@ export interface Controls {
  */
 export const controlsGroup = (c: Controls, key: string, group: string | null): boolean =>
   (key.startsWith(AREA) && !!c.areas?.includes(key.slice(AREA.length))) || (!!group && !!c.groups?.includes(group));
+
+/**
+ * Whether an entity is an automation made with Hue Studio, for the more-info override: its
+ * config id has our prefix (it survives a takeover in HA), or HA reports it uses one of
+ * our blueprints (`known`: hue_studio/automations/subscribe, once it arrived).
+ */
+export function isOurAutomation(entityId: unknown, configId: unknown, known: Record<string, unknown> | null | undefined): entityId is string {
+  if (typeof entityId !== "string" || !entityId.startsWith("automation.")) return false;
+  return (typeof configId === "string" && configId.startsWith(ID_PREFIX)) || !!known?.[entityId];
+}
+
+/** An automation's light in a few words: "Relax", "2700 K · 40%", "Natural light", "Off". */
+export function lightLine(hass: HassData, draft: AutomationDraft, t: Translate): string {
+  if (!LIGHT_KINDS[draft.type].length) return t("automations.light_off");
+  const i = draft.input;
+  const brightness = i.brightness == null ? "" : ` · ${i.brightness}%`;
+  switch (i.light) {
+    case "scene": {
+      const names = (i.scenes || []).map((id) => hass.states[id]?.attributes.friendly_name || id);
+      return (names.length ? names.join(", ") : t("automations.light_scene")) + brightness;
+    }
+    case "white":
+      return `${i.kelvin || 2700} K${brightness}`;
+    case "natural":
+      return t("automations.light_natural") + brightness;
+    default:
+      return t("automations.light_auto") + brightness;
+  }
+}
+
+/** An automation in Hue words, row by row (the more-info sheet): when, where, which light. */
+export function summaryRows(hass: HassData, draft: AutomationDraft, t: Translate): { label: string; value: string }[] {
+  const rows = [
+    { label: t("automations.when"), value: whenLine(draft, t) },
+    { label: t("automations.rooms_zones"), value: roomsLine(hass, draft.input) },
+    { label: t("automations.light"), value: lightLine(hass, draft, t) },
+  ];
+  return rows.filter((r) => r.value);
+}

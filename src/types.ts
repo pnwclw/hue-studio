@@ -152,6 +152,8 @@ export interface HassPanel {
 
 export interface Hass extends HassData {
   connection?: HassConnection;
+  /** The signed-in user (HA's automation config API is for administrators only). */
+  user?: { is_admin?: boolean };
   panels?: Record<string, HassPanel>;
   /** HA's own translations ("panel.map", …). */
   localize?: (key: string) => string;

@@ -1,6 +1,6 @@
 // Loaded on every Home Assistant page (`frontend.add_extra_js_url`). Each part loads on its
 // own: if one fails, the others keep working and HA's own dialogs and pages stay as they are.
-//   more-info  our dialog instead of HA's more-info for Hue lights
+//   more-info  our dialog instead of HA's more-info for Hue lights and Hue Studio's automations
 //   cards      dashboard cards (custom:hue-studio-…)
 //   footer     the experimental "Liquid Glass" footer (only when turned on)
 //   icons      the Hue app's light icons as the `hue-studio:` icon set

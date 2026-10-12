@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allDayDraft, areaFor, cardLines, controlsGroup, daysLine, fromConfig, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
+import { allDayDraft, areaFor, cardLines, controlsGroup, daysLine, fromConfig, isOurAutomation, lightLine, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, summaryRows, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
 import { localize } from "../../src/i18n.ts";
 
 const t = localize(null);
@@ -94,4 +94,45 @@ test("rooms and zones of an automation", () => {
   assert.equal(controlsGroup(controls, "hue.light.tv_area", "light.tv_area"), true);
   assert.equal(controlsGroup(controls, "area.balcony", "light.balcony"), false);
   assert.equal(controlsGroup({}, "area.office", null), false);
+});
+
+test("the more-info sheet opens only for automations made with Hue Studio", () => {
+  // By the id prefix (it survives a takeover in HA) ...
+  assert.equal(isOurAutomation("automation.wake_up", "hue_studio_wake_up_abc", null), true);
+  // ... or because HA reports it uses one of our blueprints (made in HA's editor).
+  assert.equal(isOurAutomation("automation.motion", "1712345678901", { "automation.motion": {} }), true);
+  assert.equal(isOurAutomation("automation.other", "1712345678901", { "automation.motion": {} }), false);
+  assert.equal(isOurAutomation("automation.other", undefined, null), false);
+  // Never anything but an automation.
+  assert.equal(isOurAutomation("light.example_lamp", "hue_studio_x", null), false);
+  assert.equal(isOurAutomation(undefined, "hue_studio_x", null), false);
+});
+
+test("the sheet sums an automation up in Hue words", () => {
+  const hass = {
+    areas: { office: { area_id: "office", name: "Office" } },
+    states: { "scene.office_relax": { entity_id: "scene.office_relax", state: "", attributes: { friendly_name: "Relax" } } },
+  } as never;
+  const wake = newDraft("wake_up", "Wake up", ["area.office"]);
+  assert.equal(lightLine(hass, wake, t), "4000 K · 100%");
+  assert.deepEqual(summaryRows(hass, wake, t), [
+    { label: "When", value: "07:00 · Every day" },
+    { label: "Rooms and zones", value: "Office" },
+    { label: "Light", value: "4000 K · 100%" },
+  ]);
+  const scene = { ...wake, input: { ...wake.input, light: "scene" as const, scenes: ["scene.office_relax"], brightness: null } };
+  assert.equal(lightLine(hass, scene, t), "Relax");
+  assert.equal(lightLine(hass, { ...scene, input: { ...scene.input, scenes: [] } }, t), "Scene");
+  assert.equal(lightLine(hass, { ...wake, input: { ...wake.input, light: "natural" } }, t), "Natural light · 100%");
+  assert.equal(lightLine(hass, { ...wake, input: { ...wake.input, light: "auto", brightness: null } }, t), "Scene of the day");
+  // Types that only turn lights off.
+  assert.equal(lightLine(hass, newDraft("leaving_home", "Away", ["area.office"]), t), "Off");
+  // No rooms: that row is left out.
+  assert.deepEqual(
+    summaryRows(hass, newDraft("motion", "Motion"), t).map((r) => r.label),
+    ["When", "Light"],
+  );
+  // Polish, like the live instance.
+  const pl = localize({ language: "pl" });
+  assert.equal(summaryRows(hass, wake, pl)[0].label, "Kiedy");
 });

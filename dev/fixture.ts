@@ -681,6 +681,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     language,
     locale: { language },
     config: { location_name: "Home" },
+    user: { is_admin: true },
     areas: AREAS,
     // Sidebar panels (the experimental footer's tabs).
     panels: {

@@ -1,13 +1,15 @@
 // Loaded on every HA page (frontend.add_extra_js_url). Opens a Hue-style dialog instead of
-// HA's more-info for Hue lights and Hue rooms/zones.
+// HA's more-info for Hue lights and Hue rooms/zones, and a Hue-style sheet for automations
+// made with Hue Studio (automation-sheet.ts).
 //
 // Fallback rules (CLAUDE.md): the event is only stopped after our dialog was built and
-// rendered successfully; anything that is not a Hue light, any error, and the "Details"
-// button go to HA's own more-info dialog untouched.
+// rendered successfully; anything that is not ours, any error, and the "Details" button go
+// to HA's own more-info dialog untouched.
 
 import { css, html, LitElement, nothing, unsafeCSS } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 
+import { type HueStudioAutomationSheet, opensAutomationSheet, watchOurAutomations } from "./automation-sheet.ts";
 import { loadSyncMemo, PANEL_PATH, StudioContext } from "./context.ts";
 import { currentHass, navigate, openPanelFrom, watchHass } from "./ha-internals.ts";
 import { allGroups, buildHome, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
@@ -224,7 +226,12 @@ function onMoreInfo(ev: Event): void {
   } catch {
     return;
   }
-  if (!hass || !isHueLight(hass, id)) return;
+  if (!hass) return;
+  if (id.startsWith("automation.")) {
+    openAutomation(ev, hass, id);
+    return;
+  }
+  if (!isHueLight(hass, id)) return;
   // A light (or a Hue room/zone with a light) a Sync Box drives now, known from an earlier
   // visit: straight to its room, which shows the sync and its lights as busy.
   try {
@@ -254,9 +261,26 @@ function onMoreInfo(ev: Event): void {
   ev.stopImmediatePropagation();
 }
 
+/** An automation made with Hue Studio: our sheet; anything else, or an error: HA's dialog. */
+function openAutomation(ev: Event, hass: Hass, id: string): void {
+  let sheet: HueStudioAutomationSheet | undefined;
+  try {
+    if (!opensAutomationSheet(hass, id)) return;
+    sheet = document.createElement("hue-studio-automation-sheet") as HueStudioAutomationSheet;
+    document.body.append(sheet);
+    sheet.open(id);
+  } catch (err) {
+    console.error("hue_studio: falling back to the stock more-info dialog", err);
+    sheet?.remove();
+    return;
+  }
+  ev.stopImmediatePropagation();
+}
+
 // Capture phase on window runs before HA's own listener on <home-assistant>.
 const w = window as { __hueStudioMoreInfo?: boolean } & Window;
 if (!w.__hueStudioMoreInfo) {
   w.__hueStudioMoreInfo = true;
   window.addEventListener("hass-more-info", onMoreInfo, true);
+  watchOurAutomations();
 }

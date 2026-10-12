@@ -13,7 +13,7 @@
 //   /automations/new[?room=]   the types of the Hue app (+ a custom one in HA's editor)
 //   /automations/new/<type>[?room=<area>][&preset=all_day][&sensor=&lux=]   a new automation (all_day: a room's
 //                              all-day scene; sensor/lux: a motion one started from a sensor's "Add lights")
-//   /automations/<id>          an automation (its config id)
+//   /automations/<id>[?from=]  an automation (its config id; `from`: the page its more-info sheet was on)
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/experimental     experimental features (the Liquid Glass footer)
@@ -103,6 +103,7 @@ type Route =
       preset: string | null;
       sensor: string | null;
       lux: string | null;
+      exit: string | null;
     };
 
 function parseRoute(path: string, search: string): Route {
@@ -129,9 +130,10 @@ function parseRoute(path: string, search: string): Route {
       preset: params.get("preset"),
       sensor: params.get("sensor"),
       lux: params.get("lux"),
+      exit: null,
     };
   if (parts[0] === "automations" && parts[1] === "new") return { name: "automationNew", room: params.get("room") };
-  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: params.get("room"), preset: null, sensor: null, lux: null };
+  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: params.get("room"), preset: null, sensor: null, lux: null, exit: outsidePath(params.get("from")) };
   if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
@@ -275,6 +277,7 @@ export class HueStudioPanel extends LitElement {
           .preset=${route.preset}
           .sensor=${route.sensor}
           .lux=${route.lux}
+          .exitPath=${route.exit}
         ></hue-studio-automation-edit-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;

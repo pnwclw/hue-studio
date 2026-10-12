@@ -261,6 +261,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   hue-studio-panel.ts           panel shell: routing, tab bar; owns the StudioContext
   hue-studio-extra.ts           extra JS on every HA page: loads more-info, cards and footer, each on its own
   hue-studio-more-info.ts       more-info override + Hue-style dialog
+  automation-sheet.ts           the override's sheet for automations made with Hue Studio
   cards.ts                      dashboard cards (room, automations, gallery) sharing one StudioContext
   footer.ts, footer-model.ts    experimental Liquid Glass footer (element; pure: tabs, active tab, visibility)
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls

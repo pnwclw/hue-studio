@@ -278,7 +278,13 @@ directly. Per HA area with auto light settings:
 - a room's automations on its screen, and an automations card that replaces the auto
   light card (the old tag still works);
 - G2 for automations: ids `hue_studio_<type>_…`, the "Hue Studio" label and category,
-  the area of the one room, a description linking back.
+  the area of the one room, a description linking back;
+- G2's automation sheet (2026-10-12): more-info of an automation made with Hue Studio
+  (id prefix, or one of our blueprints as `hue_studio/automations/subscribe` reports) opens
+  a Hue-style sheet: the switch, when / rooms and zones / light in Hue words, "Edit" (the
+  panel's editor, whose "back" returns to the page) and "Open in Home Assistant". HA's
+  dialog stays for everything else, for non-admins (the config API is admin-only), on
+  `/config/...`, for "Details" and for events with `detail.view`.
 
 Answers to the open questions below:
 - the random intervals of mimic presence use `random` and `wait_template` timeouts
@@ -287,7 +293,6 @@ Answers to the open questions below:
 - blueprints keep their inputs compatible and are reloaded when they change.
 
 Still open:
-- G2's automation sheet in the more-info override;
 - the live switch-over (item 5): the user sets up the automations anew.
 
 The Hue app's Automations tab in the panel, with every automation a **real HA automation**:
@@ -371,9 +376,9 @@ written through HA's public registries and config APIs, never into our Store.
    `detail.view` go to HA.
    - `scene.*` of `hue` opens our scene sheet: picture and colors, activate, edit in the
      panel's scene editor.
-   - `automation.*` recognized as ours (by blueprint path, read through HA's automation
-     config API) opens our automation sheet: the switch, a summary in Hue words, edit in
-     the Hue-style editor, "Open in Home Assistant".
+   - `automation.*` recognized as ours (by the id prefix, or by blueprint path as HA
+     reports it) opens our automation sheet: the switch, a summary in Hue words, edit in
+     the Hue-style editor, "Open in Home Assistant". Done (2026-10-12).
    - Everything else passes through untouched.
 4. **HA's editors stay HA's.** On `/config/...` the automation and scene lists open HA's
    editors, and we don't intercept that: the rule "never touch `/config/...`" holds, and

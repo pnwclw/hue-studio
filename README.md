@@ -153,7 +153,9 @@ Three cards for regular dashboards (in the card picker, with a visual editor):
 | `custom:hue-studio-gallery-card` | Gallery scenes to show once in a room (`area`, or room chips limited by `rooms`; `categories`) |
 
 They follow your theme's colors; a Hue light's more-info opens Hue Studio's dialog from
-any card (tile, Mushroom, Bubble Card, …), everything else opens Home Assistant's.
+any card (tile, Mushroom, Bubble Card, …), and an automation made with Hue Studio opens a
+sheet with its switch, a summary, "Edit" and "Open in Home Assistant" (for administrators);
+everything else opens Home Assistant's.
 
 ## Experimental
 

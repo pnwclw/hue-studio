@@ -51,7 +51,7 @@ import {
   withSettings,
 } from "../daylight.ts";
 import { thumbUrl } from "../gallery-data.ts";
-import { haptic } from "../ha-internals.ts";
+import { haptic, leavePanel } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup, friendlyName } from "../model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../types.ts";
@@ -76,6 +76,8 @@ export class AutomationEditView extends StudioView {
   /** A new motion automation started from a sensor's settings: its motion and light level sensors. */
   @property() accessor sensor: string | null = null;
   @property() accessor lux: string | null = null;
+  /** Where "back" and saving leave the panel for (the page its more-info sheet was on). */
+  @property() accessor exitPath: string | null = null;
 
   @state() private accessor draft: AutomationDraft | null = null;
   @state() private accessor page: "main" | "day" = "main";
@@ -96,8 +98,9 @@ export class AutomationEditView extends StudioView {
     return this.room ? (this.room.includes(".") ? this.room : `area.${this.room}`) : null;
   }
 
-  /** Where "back" and saving lead: the room or zone it came from, else the tab. */
+  /** Where "back" and saving lead: the page or the room or zone it came from, else the tab. */
   private leave(): void {
+    if (this.exitPath) return leavePanel(this.exitPath);
     const key = this.roomKey;
     this.ctx.go(key && findGroup(this.ctx.home, key) ? `/room/${encodeURIComponent(key)}` : "/automations");
   }
@@ -228,7 +231,9 @@ export class AutomationEditView extends StudioView {
       haptic("warning");
       return;
     }
-    if (await this.ctx.deleteAutomation(this.draft!.id)) this.ctx.go("/automations");
+    if (!(await this.ctx.deleteAutomation(this.draft!.id))) return;
+    if (this.exitPath) leavePanel(this.exitPath);
+    else this.ctx.go("/automations");
   }
 
   // ---- controls ----
