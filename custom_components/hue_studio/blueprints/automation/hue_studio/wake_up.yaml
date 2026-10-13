@@ -138,7 +138,8 @@ blueprint:
         scene_of_the_day:
           name: Natural light and scene of the day
           description: >-
-            Phases of the day, scene pools by phase, season and weather, holidays and
+            What this automation adds to Hue Studio's light of the day (its scene pool,
+            phases, weather and mood): extra or skipped scenes, its own phase times,
             brightness. Easiest to edit in Hue Studio.
           default: {}
           selector:

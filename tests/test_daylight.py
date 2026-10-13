@@ -5,10 +5,15 @@ from datetime import date, datetime
 import pytest
 
 from custom_components.hue_studio.daylight import (
+    PHASES,
     Inputs,
+    global_tags,
+    is_legacy,
     is_real_change,
     phase_of,
+    resolve,
     select,
+    tags_from_pools,
 )
 
 SUNRISE = datetime(2026, 3, 10, 6, 30)
@@ -55,53 +60,57 @@ def test_phase_settings() -> None:
     assert phase_of(settings, _inputs(18, 20)) == "golden"
 
 
-CONFIG = {
-    "pools": {
-        "day": {"all": {"clear": [["d0"], ["d1"], ["d2a", "d2b"], ["d3"]]}},
-        "golden": {"all": {"clear": ["gold"]}},
-        "evening": {"winter": {"clear": ["w1"]}, "all": {"clear": ["e1", "e2", "e3"]}},
-        "night": {"all": {"clear": ["n1"], "gloomy": ["g1"]}},
-    },
-    "holidays": [
-        {"from": "12-20", "to": "01-06", "phases": ["evening"], "pool": ["xmas"]}
-    ],
-    "excluded": ["e2"],
-    "offsets": {"evening": 10},
+TAGS = {
+    "m1": {"phases": ["morning"]},
+    "d1": {"phases": ["day"], "weather": ["clear"]},
+    "d2": {"phases": ["day"], "weather": ["gloomy"]},
+    "d3": {"phases": ["day"], "seasons": ["summer"]},
+    "g1": {"phases": ["golden"]},
+    "e1": {"phases": ["evening"]},
+    "e2": {"phases": ["evening"], "moods": ["cozy"]},
+    "e3": {"phases": ["evening"], "seasons": ["winter"]},
+    "n1": {"phases": ["night"]},
+    "party": {"moods": ["party"]},
+    "party_winter": {"moods": ["party"], "seasons": ["winter"]},
 }
+CONFIG = {"tags": TAGS, "offsets": {"evening": 10}}
 
 
-def test_day_steps_and_weather() -> None:
-    """The day pool is picked by sun elevation; gloomy weather is a step brighter."""
-    assert select(CONFIG, _inputs(12, elevation=5)).pool == ("d1",)
-    sel = select(CONFIG, _inputs(12, elevation=20, condition="rainy"))
-    assert (sel.mood, sel.step, sel.pool) == ("gloomy", 3, ("d3",))
-    assert select(CONFIG, _inputs(12, elevation=20, cloud=85)).pool == ("d3",)
-    sel = select(CONFIG, _inputs(12, elevation=20, cloud=10))
-    assert sel.scene in ("d2a", "d2b")
-
-
-def test_season_holiday_exclusions() -> None:
-    """A season pool wins over "all"; a holiday replaces the pool; excluded skipped."""
+def test_pool_by_phase_season_weather() -> None:
+    """The phase's scenes, narrowed to the season and weather while any are left."""
+    sel = select(CONFIG, _inputs(12, cloud=10))
+    assert (sel.weather, sel.pool) == ("clear", ("d1",))
+    assert select(CONFIG, _inputs(12, condition="rainy")).pool == ("d2",)
+    # Narrowing to the season would leave nothing for the day in March: skipped.
+    assert select(CONFIG, _inputs(12, cloud=85)).pool == ("d2",)
     march = select(CONFIG, _inputs(20))
-    assert march.season == "spring"
-    assert march.pool == ("e1", "e3")
+    assert (march.season, march.pool, march.mood) == ("spring", ("e1", "e2"), None)
     winter = select(CONFIG, _inputs(20, season_state="winter"))
-    assert winter.pool == ("w1",)
-    xmas = Inputs(
-        now=datetime(2026, 12, 24, 20, 0),
-        sunrise=SUNRISE,
-        sunset=datetime(2026, 12, 24, 15, 40),
-        elevation=-20,
-    )
-    sel = select(CONFIG, xmas)
-    assert (sel.holiday, sel.scene, sel.season) == (True, "xmas", "winter")
+    assert winter.pool == ("e1", "e2", "e3")
+    # Scenes of moods only never show by the day.
+    assert "party" not in winter.pool
+
+
+def test_mood() -> None:
+    """A mood takes its scenes, narrowed to season, phase and weather if possible."""
+    sel = select(CONFIG, _inputs(20, mood="party"))
+    assert (sel.mood, sel.pool_phase) == ("party", "evening")
+    sel = select(CONFIG, _inputs(20, mood="party", season_state="summer"))
+    assert sel.pool == ("party",)
+    sel = select(CONFIG, _inputs(20, mood="party", season_state="winter"))
+    assert sel.pool == ("party", "party_winter")
+    assert select(CONFIG, _inputs(20, mood="cozy")).pool == ("e2",)
+    # A mood without scenes: the day decides.
+    sel = select(CONFIG, _inputs(20, mood="festive"))
+    assert (sel.mood, sel.pool) == (None, ("e1", "e2"))
 
 
 def test_fallback_to_earlier_phase() -> None:
-    """A phase without a pool behaves like the phase before it (pool, brightness)."""
-    sel = select(CONFIG, _inputs(7, elevation=2))
+    """A phase without scenes behaves like the phase before it (pool, brightness)."""
+    config = {"tags": {"n1": {"phases": ["night"]}, "e": {"phases": ["evening"]}}}
+    sel = select(config, _inputs(7, elevation=2))
     assert (sel.phase, sel.pool_phase, sel.pool) == ("morning", "night", ("n1",))
-    garland = {"pools": {"evening": {"all": {"clear": ["g"]}}}}
+    garland = {"tags": {"g": {"phases": ["evening"]}}}
     sel = select(garland, _inputs(23, 30))
     assert (sel.phase, sel.pool_phase, sel.scene) == ("night", "evening", "g")
 
@@ -112,7 +121,76 @@ def test_scene_of_the_day() -> None:
     tomorrow = select(
         CONFIG, Inputs(datetime(2026, 3, 11, 20), SUNRISE, SUNSET, 20.0)
     ).scene
-    assert {today, tomorrow} == {"e1", "e3"}
+    assert {today, tomorrow} == {"e1", "e2"}
+
+
+def test_global_tags() -> None:
+    """The user's tags replace the ready-made ones; empty ones take a scene out."""
+    defaults = {"a": {"phases": ["day"]}, "b": {"phases": ["night"]}}
+    user = {"b": {}, "c": {"moods": ["party", "nonsense"]}}
+    assert global_tags(defaults, user) == {
+        "a": {"phases": ["day"]},
+        "c": {"moods": ["party"]},
+    }
+    assert global_tags(defaults, user, use_defaults=False) == {
+        "c": {"moods": ["party"]}
+    }
+
+
+def test_resolve() -> None:
+    """Global settings plus an automation's own: phase times, extra and skipped."""
+    defaults = {"a": {"phases": ["day"]}, "b": {"moods": ["party"]}, "x": {}}
+    glob = {"night_from": "22:00", "weather": "weather.home", "tags": {"a": {}}}
+    local = {
+        "include": ["a", "b", "z"],
+        "exclude": ["b"],
+        "settings": {"shifts": {"day": 10}, "brightness": {"day": 50}},
+    }
+    config = resolve(glob, local, defaults)
+    assert config["settings"] == {
+        "night_from": "22:00",
+        "weather": "weather.home",
+        "shifts": {"day": 10},
+        "brightness": {"day": 50},
+    }
+    # "a" was taken out globally: this automation adds it back with its ready-made
+    # tags; "z" has none, so it fits every phase.
+    assert config["tags"] == {"a": {"phases": ["day"]}, "z": {"phases": list(PHASES)}}
+    own = resolve(glob, {"settings": {"night_from": "21:00"}}, defaults)
+    assert own["settings"]["night_from"] == "21:00"
+
+
+def test_legacy_pools() -> None:
+    """Pools of an automation before 0.10 become tags putting scenes where they were."""
+    pools = {
+        "day": {"all": {"clear": [["d0"], ["d1"], [], ["d0"]]}},
+        "evening": {
+            "winter": {"clear": ["w1"]},
+            "all": {"clear": ["e1"], "gloomy": ["g1"]},
+        },
+    }
+    holidays = [{"from": "12-20", "to": "01-06", "phases": ["evening"], "pool": ["x"]}]
+    tags = tags_from_pools(pools, holidays)
+    assert tags == {
+        "d0": {"phases": ["day"]},
+        "d1": {"phases": ["day"]},
+        "w1": {"phases": ["evening"], "seasons": ["winter"]},
+        "e1": {
+            "phases": ["evening"],
+            "seasons": ["spring", "summer", "autumn"],
+            "weather": ["clear"],
+        },
+        "g1": {
+            "phases": ["evening"],
+            "seasons": ["spring", "summer", "autumn"],
+            "weather": ["gloomy"],
+        },
+        "x": {"moods": ["festive"]},
+    }
+    old = {"pools": pools, "excluded": ["d1"]}
+    assert is_legacy(old)
+    config = resolve({"tags": {"other": {"phases": ["day"]}}}, old, {})
+    assert set(config["tags"]) == {"d0", "w1", "e1", "g1"}
 
 
 def test_light_day_after_midnight() -> None:
@@ -129,7 +207,7 @@ def test_light_day_after_midnight() -> None:
         (_inputs(12, lux=100), 65),
         (_inputs(12, lux=1000), 60),
         (_inputs(12), 88),  # no light sensor: 75 + 0.25 * 50 (default cloud)
-        (_inputs(7, elevation=0), 30),  # morning uses the night pool: night = 30
+        (_inputs(7, elevation=0), 30),  # morning has no scenes: the night's 30
         (_inputs(17, 30), 75),  # golden
         (_inputs(17, 30, condition="fog"), 80),
         (_inputs(20, elevation=-1), 80),  # evening 70 + offset 10
@@ -139,14 +217,15 @@ def test_light_day_after_midnight() -> None:
 )
 def test_brightness(inputs: Inputs, brightness: int) -> None:
     """The brightness curve of the legacy templates, plus offsets."""
-    assert select(CONFIG, inputs).brightness == brightness
+    config = {**CONFIG, "tags": {k: v for k, v in TAGS.items() if k != "m1"}}
+    assert select(config, inputs).brightness == brightness
 
 
 def test_fixed_brightness_and_morning_curve() -> None:
     """A fixed brightness per phase replaces the curve; the morning follows the sun."""
     config = {**CONFIG, "settings": {"brightness": {"evening": 80}}}
     assert select(config, _inputs(20)).brightness == 90  # 80 + offset 10
-    morning = {"pools": {"morning": {"all": {"clear": ["m"]}}}}
+    morning = {"tags": {"m": {"phases": ["morning"]}}}
     assert select(morning, _inputs(7, elevation=0)).brightness == 55
     assert select(morning, _inputs(7, elevation=0, condition="snowy")).brightness == 65
 

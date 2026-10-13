@@ -420,39 +420,55 @@ export interface SyncChange {
 
 export type Phase = "morning" | "day" | "golden" | "evening" | "night";
 export type Season = "winter" | "spring" | "summer" | "autumn";
+export type Weather = "clear" | "gloomy";
+export type Mood = "relax" | "cozy" | "focus" | "romantic" | "party" | "festive";
 
-/** How the phases, season, weather and brightness of the light of the day are worked out. */
-export interface DaySettings {
-  /** "HH:MM". */
+/** What a scene of the pool fits; a missing or empty list: any. */
+export interface SceneTags {
+  phases?: Phase[];
+  seasons?: Season[];
+  weather?: Weather[];
+  moods?: Mood[];
+}
+
+/** Phase times: minutes (morning/day from sunrise, golden before and evening after sunset), night from "HH:MM". */
+export interface PhaseTimes {
   night_from?: string;
-  /** Minutes: morning/day from sunrise, golden before and evening after sunset. */
   shifts?: Partial<Record<"morning" | "day" | "golden" | "evening", number>>;
-  weather?: string | null;
-  light_sensor?: string | null;
-  season?: string | null;
+}
+
+/** An automation's own settings of the light of the day (else the global ones). */
+export interface DaySettings extends PhaseTimes {
   /** Fixed brightness per phase (else the curve). */
   brightness?: Partial<Record<Phase, number>>;
   gradient_mode?: string | null;
   /** Natural light: color temperature (K) per phase, overriding the defaults. */
   kelvin?: Partial<Record<Phase, number>>;
+  /** Before 0.10: sources of its own (now global). */
+  weather?: string | null;
+  light_sensor?: string | null;
+  season?: string | null;
 }
 
+/** Before 0.10: a holiday of an automation's own pools. */
 export interface Holiday {
-  /** "MM-DD". */
   from: string;
   to: string;
   phases: Phase[];
   pool: string[];
 }
 
-/** Settings of natural light and the scene of the day (the `scene_of_the_day` input). */
+/** An automation's settings of natural light and the scene of the day (the `scene_of_the_day` input). */
 export interface DayConfig {
-  /** pools[phase][season | "all"][mood]: gallery ids; the day phase has four lists. */
-  pools: Record<string, Record<string, Record<string, string[] | string[][]>>>;
-  holidays: Holiday[];
-  excluded: string[];
+  /** Scenes it adds to the global pool, and skips. */
+  include: string[];
+  exclude: string[];
   offsets: Partial<Record<Phase, number>>;
   settings: DaySettings;
+  /** Before 0.10: pools of its own (moved into the global pool by the panel). */
+  pools?: Record<string, Record<string, Record<string, string[] | string[][]>>>;
+  holidays?: Holiday[];
+  excluded?: string[];
 }
 
 /** What natural light or a scene of the day shows now (hue_studio/automations/preview). */
@@ -460,14 +476,31 @@ export interface DayPreview {
   phase: Phase;
   pool_phase: Phase;
   season: Season;
-  mood: "clear" | "gloomy";
-  holiday: boolean;
+  weather: Weather;
+  /** The mood the scene came from (null: the day decided). */
+  mood: Mood | null;
   scene: string | null;
   scene_name?: string | null;
   pool: string[];
   brightness: number;
-  step: number | null;
   kelvin: number | null;
+}
+
+/** The global light of the day (hue_studio/daylight/subscribe). */
+export interface DaylightMessage {
+  settings: PhaseTimes & { weather?: string; season?: string; light_sensor?: string; defaults: boolean };
+  /** The user's tags of single scenes ({}: out of the pool). */
+  user_tags: Record<string, SceneTags>;
+  /** Hue Studio's ready-made tags. */
+  defaults: Record<string, SceneTags>;
+  /** The pool: every scene in it with its tags. */
+  tags: Record<string, SceneTags>;
+  /** What is read: the chosen entities, else found ones. */
+  sources: { weather: string | null; season: string | null; light_sensor: string | null };
+  now: DayPreview;
+  moods: Mood[];
+  mood_entity: string | null;
+  phase_entity: string | null;
 }
 
 /** hue_studio/automations/subscribe. */

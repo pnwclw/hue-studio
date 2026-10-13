@@ -878,6 +878,22 @@ export const CSS = `
   .scene-tiles .tile { border: none; padding: 0; text-align: left; font: inherit; color: inherit; }
   .scene-tiles .tile .remove { position: absolute; top: 6px; right: 6px; z-index: 2; }
   .scene-tiles .tile.dimmed { opacity: 0.55; }
+  .scene-tiles .tile .tile-open { position: absolute; inset: 0; z-index: 1; padding: 0; border: none; background: none; cursor: pointer; }
+  .scene-tiles .tile .tile-open ~ span { pointer-events: none; }
+  /* Settings → Light of the day */
+  .daylight-page .chips.pool-views { margin-top: 10px; padding-bottom: 0; }
+  .daylight-page .chips.pool-views + .chips.pool-views { margin-top: 8px; }
+  .daylight-page .pill.small-pill { flex: none; height: 32px; padding: 0 14px; font-size: 13px; text-transform: none; letter-spacing: 0; }
+  .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 8px; vertical-align: 1px; font-size: 11px; font-weight: 600;
+             background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
+  .sheet .box.tag-editor { width: min(100%, 560px); }
+  .tag-editor .sheet-bar { gap: 12px; }
+  .tag-editor .tag-pic { width: 44px; height: 44px; flex: none; border-radius: 50%; object-fit: cover; }
+  .tag-editor h3.sublabel { margin: 14px 2px 8px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+  .tag-editor h3.sublabel:first-child { margin-top: 4px; }
+  .tag-editor .chips { padding: 0; }
+  .tag-editor .chip:not(.on) { background: rgba(120, 120, 128, 0.24); }
+  .tag-editor .hint { margin: 6px 2px 0; }
   .add-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: transparent !important;
               box-shadow: inset 0 0 0 1.5px rgba(120, 120, 128, 0.45) !important; color: var(--text-2); }
   .add-tile::after { display: none; }
@@ -886,7 +902,7 @@ export const CSS = `
   .picker-grid .tile .check { position: absolute; top: 6px; right: 6px; z-index: 2; width: 22px; height: 22px; background: rgba(0, 0, 0, 0.35);
                               border-color: rgba(255, 255, 255, 0.7); }
   .picker-grid .tile.on { box-shadow: 0 0 0 2px #fff; }
-  .sheet .box.picker, .sheet .box.holiday-editor { width: min(100%, 560px); }
+  .sheet .box.picker { width: min(100%, 560px); }
   .stepper { display: flex; align-items: center; gap: 6px; flex: none; }
   .stepper .value { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
   .round.mini-step { width: 30px; height: 30px; font-size: 17px; line-height: 1; }
@@ -895,9 +911,6 @@ export const CSS = `
   .select.time { max-width: 120px; color-scheme: dark; }
   /* Below 16px iOS zooms the page in when a field or picker gets focus. */
   @media (pointer: coarse) { .select { font-size: 16px; } }
-  .md-row { display: flex; align-items: center; gap: 10px; }
-  .sheet .field.md { width: 110px; text-align: center; font-variant-numeric: tabular-nums; }
-  .holiday-editor .chips { margin-top: 12px; flex-wrap: wrap; }
 
   /* arrange lights */
   .room { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 14px auto 0; border-radius: 18px; touch-action: none;

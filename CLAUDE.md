@@ -53,10 +53,15 @@ touching anything outside this repository.
    - **automations are HA automations**: Hue Studio ships blueprints, one per Hue app type
      (`blueprints/automation/hue_studio/`, copied into HA's blueprint folder on setup); the
      panel writes automations that use them through HA's automation config API, HA stores
-     and runs them. No automation engine of our own. Settings of natural light and the scene
-     of the day (pools, phases, holidays, brightness) are an input of the automation;
-     `hue_studio.apply_light` shows them and keeps them up with the day while nobody
-     changes the lights (memory only). Our automations have ids `hue_studio_<type>_…` and
+     and runs them. No automation engine of our own. Natural light and the scene of the
+     day start from the global **light of the day** (`pool.py`, the entry's options): one
+     scene pool as tags of scenes (phases, seasons, weather, moods; ready-made tags of the
+     gallery in `scene_tags.json`, the user's replace them), phase times and sources
+     (weather, season, light sensor; missing core integrations are offered), and the mood
+     (`select.hue_studio_mood`; `sensor.hue_studio_phase` shows the phase). An automation's
+     input only adds its own (extra/skipped scenes, own phase times, brightness);
+     `hue_studio.apply_light` shows them and keeps them up with the day — and with the
+     mood and the global settings — while nobody changes the lights (memory only). Our automations have ids `hue_studio_<type>_…` and
      get the "Hue Studio" label and category and the area of their one room. Their places
      are areas (`rooms`) and Hue rooms/zones no area holds (`zones`, group lights); the
      panel lists them by room/zone from what HA reports they control (public
@@ -170,7 +175,8 @@ touching anything outside this repository.
 
 Legacy prototype format (`lights.json`), imported once into Hue Studio: room light lists
 are replaced by HA areas, palettes by bridge scenes, and `auto` is offered as the scene of
-the day settings of a new automation (`hue_studio/automations/legacy_auto_light`):
+the day of a new automation (`hue_studio/automations/legacy_auto_light`; its pools are
+merged into the global pool like the pools of automations from before 0.10):
 
 ```
 palettes: [{"id": "sunset", "name": "Sunset", "kind": "gradient", "points": [[x, y], ...2-5],
@@ -231,11 +237,15 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/automations/subscribe|organize|preview|legacy_auto_light
   blueprints/automation/hue_studio/   one blueprint per Hue app type (wake up, go to sleep, coming/leaving home,
                                 mimic presence, schedule, motion sensor), validated in tests by HA itself
-  daylight.py                   pure: phase, season, weather, pool, scene of the day, natural light, brightness; change tolerance
+  daylight.py                   pure: phase, season, weather, mood, scene tags -> pool, scene of the day, natural light, brightness;
+                                global + an automation's own settings (resolve), old pools -> tags; change tolerance
+  pool.py                       the global light of the day: settings in the entry's options, ready-made tags, mood, sources,
+                                hue_studio/daylight/subscribe|set|tags|merge
+  scene_tags.json               ready-made tags of every gallery scene (hand-made: phases, seasons, weather, moods)
   positions.py                  light positions (entertainment areas + Store), editor saves, spatial palette layout
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV), link to bridge entertainment areas
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
-  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
+  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities; the Hue Studio entry's phase sensor and mood select
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
   config_flow.py                setup (menu: Hue Studio once, for every `hue` bridge; Sync Box: pair or use `huesyncbox`); no options flow
   connections.py                the Hue Studio entry: one connection per `hue` bridge, following its entry; bridges as service devices
@@ -260,11 +270,13 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
                                 experimental, devices, device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), entertainment, integration (options),
-                                gallery-settings (all scenes, or each category by its rule)
+                                gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
+                                phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
   space.ts                      pure: placed lights, top-view coordinate mapping
   automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows
-  daylight.ts                   pure: editing natural light / scene of the day settings (pools, offsets, …)
+  daylight.ts                   pure: scene tags and pool views, an automation's own settings (extra/skipped, own phases, offsets),
+                                splitting settings from before 0.10
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
   devices.ts                    pure: adding devices (serial numbers, search progress, found devices), Bridge Pro, Wi-Fi

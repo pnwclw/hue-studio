@@ -34,6 +34,7 @@ from custom_components.hue_studio.automations import (
     living_lights,
 )
 from custom_components.hue_studio.const import DOMAIN
+from custom_components.hue_studio.pool import async_update_settings
 
 from .conftest import BRIDGE_ID
 
@@ -266,7 +267,8 @@ async def test_apply_light_off_only_if_off_and_toggle(
 async def test_scene_of_the_day_without_scenes(
     hass: HomeAssistant, hue_lights: MagicMock
 ) -> None:
-    """A scene of the day with empty pools is an error the automation trace shows."""
+    """A scene of the day with an empty pool is an error the automation trace shows."""
+    async_update_settings(hass, {"defaults": False})
     with pytest.raises(ServiceValidationError) as err:
         await hass.services.async_call(
             DOMAIN,
@@ -275,6 +277,31 @@ async def test_scene_of_the_day_without_scenes(
             blocking=True,
         )
     assert err.value.translation_key == "no_scene_of_the_day"
+
+
+async def test_scene_of_the_day_from_the_global_pool(
+    hass: HomeAssistant, hue_lights: MagicMock
+) -> None:
+    """The ready-made pool works without settings; the mood changes it at once."""
+    await hass.services.async_call(
+        DOMAIN,
+        "apply_light",
+        {"entity_id": "light.bulb", "light": "auto"},
+        blocking=True,
+    )
+    group = living_lights(hass).by_light["light.bulb"]
+    assert group.selection.scene is not None
+    assert group.selection.mood is None
+    hue_lights.lights.update.reset_mock()
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": "select.hue_studio_mood", "option": "party"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert group.selection.mood == "party"
+    assert _sent(hue_lights)[-1][1].dynamics.duration == 2000
 
 
 async def test_living_light(hass: HomeAssistant, hue_lights: MagicMock) -> None:
@@ -297,7 +324,7 @@ async def test_living_light(hass: HomeAssistant, hue_lights: MagicMock) -> None:
 
     # The selection changes: shown again, with the living transition.
     group = living.by_light["light.bulb"]
-    group.config["settings"]["kelvin"] = {p: 2000 for p in daylight.PHASES}
+    group.local["settings"]["kelvin"] = {p: 2000 for p in daylight.PHASES}
     hue_lights.lights.update.reset_mock()
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=2))
     await hass.async_block_till_done()

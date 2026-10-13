@@ -37,6 +37,12 @@ FOOTER_MAX_TABS: Final = 5
 CONF_GALLERY_SEASONAL: Final = "gallery_seasonal"
 CONF_GALLERY_RULES: Final = "gallery_rules"
 GALLERY_SEASONS: Final = ("winter", "spring", "summer", "autumn")
+# The global light of the day (pool.py): sources, phase times, scene tags.
+# {"weather", "season", "light_sensor": entity_id, "night_from": "HH:MM",
+#  "shifts": {phase: minutes}, "defaults": bool (ready-made tags),
+#  "tags": {scene: {"phases", "seasons", "weather", "moods": [value]}},
+#  "merged": bool (automations' own pools were moved in)}
+CONF_DAYLIGHT: Final = "daylight"
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
 # A bridge connected or went away, or its MotionAware areas changed.

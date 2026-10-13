@@ -1,4 +1,5 @@
-"""Sync Box selects: sync mode, intensity, HDMI input, entertainment area, LED.
+"""Selects: the mood (Hue Studio entry); a Sync Box's sync mode, intensity, HDMI
+input, entertainment area and LED.
 
 Options are the same strings the popular HACS Sync Box integration uses (input and
 area names as the user gave them), so existing automations keep working.
@@ -12,10 +13,13 @@ from dataclasses import dataclass
 from aiohuesyncbox import ExecutionMode, HdmiSource
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
-from . import HueStudioConfigEntry
+from . import HueStudioConfigEntry, daylight, pool
+from .connections import is_studio
 from .entity import SyncBoxEntity
 from .sync import (
     INTENSITIES,
@@ -112,7 +116,10 @@ async def async_setup_entry(
     entry: HueStudioConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the selects of a Sync Box."""
+    """Add the mood, or the selects of a Sync Box."""
+    if is_studio(entry):
+        async_add_entities([MoodSelect()])
+        return
     coordinator = entry.runtime_data.sync
     assert coordinator is not None
     async_add_entities(SyncBoxSelect(coordinator, d) for d in DESCRIPTIONS)
@@ -145,3 +152,42 @@ class SyncBoxSelect(SyncBoxEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Send the choice to the box."""
         await self.entity_description.select_fn(self.coordinator, option)
+
+
+class MoodSelect(SelectEntity, RestoreEntity):
+    """The mood of the light of the day ("auto": the day decides)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "mood"
+    _attr_unique_id = pool.MOOD_UNIQUE_ID
+    _attr_should_poll = False
+
+    def __init__(self) -> None:
+        """Attach to Hue Studio's own device."""
+        # Only a suggestion; not derived from the translated name.
+        self.entity_id = "select.hue_studio_mood"
+        self._attr_options = [pool.MOOD_AUTO, *daylight.MOODS]
+        self._attr_device_info = pool.device_info()
+
+    async def async_added_to_hass(self) -> None:
+        """Take the mood from before a restart; follow changes."""
+        if (last := await self.async_get_last_state()) is not None:
+            pool.async_set_mood(self.hass, last.state)
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, pool.SIGNAL_MOOD_UPDATED, self._async_changed
+            )
+        )
+
+    @callback
+    def _async_changed(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def current_option(self) -> str:
+        """The mood now."""
+        return pool.async_mood(self.hass) or pool.MOOD_AUTO
+
+    async def async_select_option(self, option: str) -> None:
+        """Set the mood; living lights follow."""
+        pool.async_set_mood(self.hass, None if option == pool.MOOD_AUTO else option)

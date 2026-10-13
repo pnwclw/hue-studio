@@ -66,11 +66,33 @@ Assistant administrator; everyone can switch them on and off.
 
 The light of an automation is a scene per room, a white, **natural light** (a white per
 phase of the day, cool in the morning, warm in the evening, like the Hue app's) or the
-**scene of the day**: a gallery scene picked from pools by phase of the day, season,
-weather and holidays, with a brightness that follows the light outside. Their settings
-belong to the automation (one of its inputs) and are edited on its second page in the
-panel. Once shown, natural light and the scene of the day keep up with the day until
-someone changes the lights or turns them off.
+**scene of the day**: a gallery scene picked by phase of the day, season, weather and
+mood, with a brightness that follows the light outside. Once shown, natural light and
+the scene of the day keep up with the day until someone changes the lights or turns
+them off.
+
+Both start from the **light of the day** (Settings → Light of the day), shared by every
+automation:
+
+- **the scene pool**: every gallery scene has tags — the phases of the day, seasons,
+  weather (clear or gloomy) and moods it fits. Hue Studio ships ready-made tags for the
+  whole gallery, so the scene of the day works out of the box; change any scene's tags,
+  take it out of the pool, or turn the ready-made tags off and build your own pool;
+- **the mood** (relax, cozy, focus, romantic, party, festive, or "by the day"): a mood
+  picks from its own scenes instead, in every automation at once. It is an entity
+  (`select.hue_studio_mood`), so dashboards and automations can set it too;
+- **the phases of the day**: when morning, day, golden hour and evening start (minutes
+  from sunrise and sunset) and when the night starts. `sensor.hue_studio_phase` shows the
+  phase, with the season and weather as attributes;
+- **weather, season and a light sensor**: picked automatically when Home Assistant has
+  them. Without a weather entity the panel offers to add Met.no, without the Season
+  integration to add it (until then the month decides).
+
+An automation only adds what is its own (on its second page in the panel): extra or
+skipped scenes, its own phase times, brightness per phase and the white of natural
+light. Automations from before 0.10 had pools of their own: the panel moves them into
+the shared pool once (the ready-made tags are then off, so the pool is what you had put
+together) and saves the automations without them.
 
 Automations made in Hue Studio get the "Hue Studio" label and automation category and
 the area of their room (your own choices are kept); their description links back to the
@@ -226,7 +248,7 @@ Assistant.
 3. **More-info override** for Hue lights, with a safe fallback to the stock dialog.
 4. **Automations** — the Hue app's automation types as Home Assistant automations, with
    natural light and the scene of the day (by time-of-day phase, season, weather and
-   holidays).
+   mood, from one shared scene pool).
 5. Dashboard cards.
 
 ## Development

@@ -16,10 +16,13 @@ import type {
   AutomationConfig,
   AutomationsMessage,
   DayConfig,
+  DaylightMessage,
   DayPreview,
+  Mood,
   Phase,
   PositionsMessage,
   RoomPoint,
+  SceneTags,
   RoomsPlan,
   StudioConfig,
   SceneInfo,
@@ -223,6 +226,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   sensor("binary_sensor.office_grouped_motion", "hue", "dev_office_room", "off", { device_class: "motion", friendly_name: "Office" });
   sensor("weather.home", "met", "", "cloudy", { friendly_name: "Home", cloud_coverage: 85 });
   sensor("sensor.season", "season", "", "autumn", { device_class: "enum", friendly_name: "Season" });
+  // Hue Studio's own: the phase of the day and the mood (the light of the day).
+  sensor("sensor.hue_studio_phase", "hue_studio", "", "evening", { device_class: "enum", friendly_name: "Hue Studio Phase of the day" });
+  sensor("select.hue_studio_mood", "hue_studio", "", "auto", {
+    friendly_name: "Hue Studio Mood",
+    options: ["auto", "relax", "cozy", "focus", "romantic", "party", "festive"],
+  });
   // Adaptive Lighting for the office lamp.
   entities["switch.adaptive_lighting_office"] = { platform: "adaptive_lighting" };
   states["switch.adaptive_lighting_office"] = {
@@ -342,7 +351,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
 
   // Automations: HA's automation configs (ours use the blueprints) and their entities.
   const automationListeners = new Set<(msg: unknown) => void>();
-  const OFFICE_DAY: DayConfig = {
+  // From before 0.10 (pools of its own): the panel moves them into the global pool.
+  const OFFICE_DAY: Partial<DayConfig> = {
     pools: {
       day: { all: { clear: [["sunday_morning"], ["cool_bright"], ["sunday_morning", "fairfax"], ["arctic_aurora"]] } },
       golden: { all: { clear: ["golden_star", "honolulu"] } },
@@ -408,33 +418,84 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     automationReloads++;
     setTimeout(() => automationListeners.forEach((cb) => cb(structuredClone(automationsMessage()))), 60);
   };
-  /** A rough copy of daylight.select: enough to click through the editor. */
-  const preview = (config: DayConfig, natural: boolean): DayPreview => {
+  // The global light of the day: ready-made tags (scene_tags.json), the user's tags, settings.
+  const daylightListeners = new Set<(msg: unknown) => void>();
+  let readyTags: Record<string, SceneTags> = {};
+  fetch(new URL("../custom_components/hue_studio/scene_tags.json", location.href))
+    .then((r) => r.json())
+    .then((t: { scenes: Record<string, SceneTags> }) => {
+      readyTags = t.scenes;
+      pushDaylight();
+    });
+  const day = { settings: { defaults: true } as DaylightMessage["settings"], user: {} as Record<string, SceneTags>, merged: false };
+  const PHASE_ORDER: Phase[] = ["morning", "day", "golden", "evening", "night"];
+  const phaseNow = (): Phase => {
     const hour = new Date().getHours();
-    const phase: Phase = hour >= 23 || hour < 6 ? "night" : hour < 8 ? "morning" : hour < 17 ? "day" : hour < 18 ? "golden" : "evening";
-    const order: Phase[] = ["morning", "day", "golden", "evening", "night"];
-    const base = { phase, season: "autumn" as const, mood: "gloomy" as const, holiday: false };
+    return hour >= 23 || hour < 6 ? "night" : hour < 8 ? "morning" : hour < 17 ? "day" : hour < 18 ? "golden" : "evening";
+  };
+  const poolTags = (): Record<string, SceneTags> => {
+    const tags: Record<string, SceneTags> = {};
+    for (const id of [...(day.settings.defaults ? Object.keys(readyTags) : []), ...Object.keys(day.user)]) {
+      const t = day.user[id] ?? readyTags[id];
+      if (t && Object.keys(t).length) tags[id] = t;
+      else delete tags[id];
+    }
+    return tags;
+  };
+  /** A rough copy of daylight.select (autumn, gloomy): enough to click through the screens. */
+  const preview = (config: Partial<DayConfig>, natural: boolean): DayPreview => {
+    const phase = phaseNow();
+    const mood = (states["select.hue_studio_mood"]?.state || "auto") as Mood | "auto";
+    const base = { phase, season: "autumn" as const, weather: "gloomy" as const };
     if (natural) {
       const kelvin = { morning: 5000, day: 4300, golden: 2900, evening: 2200, night: 2000, ...config.settings?.kelvin }[phase];
-      return { ...base, pool_phase: phase, scene: null, pool: [], brightness: config.settings?.brightness?.[phase] ?? 70, step: null, kelvin };
+      return { ...base, mood: null, pool_phase: phase, scene: null, pool: [], brightness: config.settings?.brightness?.[phase] ?? 70, kelvin };
     }
+    const tags = poolTags();
+    for (const id of config.include || []) tags[id] ??= { ...readyTags[id], phases: readyTags[id]?.phases || PHASE_ORDER };
+    for (const id of [...(config.exclude || []), ...(config.excluded || [])]) delete tags[id];
+    const fit = (id: string, key: keyof SceneTags, value: string) => !tags[id][key]?.length || (tags[id][key] as string[]).includes(value);
+    const narrow = (pool: string[], steps: [keyof SceneTags, string][]) => {
+      for (const [key, value] of steps) {
+        const next = pool.filter((id) => fit(id, key, value));
+        if (next.length) pool = next;
+      }
+      return pool;
+    };
     let pool: string[] = [];
     let poolPhase = phase;
-    for (let back = 0; back < order.length && !pool.length; back++) {
-      poolPhase = order[(order.indexOf(phase) - back + order.length) % order.length];
-      const moods = config.pools?.[poolPhase]?.all || {};
-      const raw = (moods.gloomy || moods.clear || []) as string[] | string[][];
-      pool = poolPhase === "day" ? ((raw as string[][])[2] || []) : (raw as string[]);
+    let from: Mood | null = null;
+    const moody = mood === "auto" ? [] : Object.keys(tags).filter((id) => tags[id].moods?.includes(mood));
+    if (moody.length) {
+      pool = narrow(moody, [["seasons", "autumn"], ["phases", phase], ["weather", "gloomy"]]);
+      from = mood as Mood;
+    } else {
+      for (let back = 0; back < PHASE_ORDER.length && !pool.length; back++) {
+        poolPhase = PHASE_ORDER[(PHASE_ORDER.indexOf(phase) - back + PHASE_ORDER.length) % PHASE_ORDER.length];
+        pool = Object.keys(tags).filter((id) => tags[id].phases?.includes(poolPhase));
+      }
+      pool = narrow(pool, [["seasons", "autumn"], ["weather", "gloomy"]]);
     }
-    pool = pool.filter((id) => !(config.excluded || []).includes(id));
     const scene = pool.length ? pool[new Date().getDate() % pool.length] : null;
     const fixed = config.settings?.brightness?.[poolPhase];
     return {
-      ...base, pool_phase: poolPhase, scene, pool, step: poolPhase === "day" ? 2 : null, kelvin: null,
+      ...base, mood: from, pool_phase: poolPhase, scene, pool, kelvin: null,
       scene_name: scene ? gallery?.scenes.find((g) => g.id === scene)?.name || scene : null,
       brightness: Math.min(100, Math.max(1, (fixed ?? 70) + (config.offsets?.[poolPhase] || 0))),
     };
   };
+  const daylightMessage = (): DaylightMessage => ({
+    settings: { ...day.settings },
+    user_tags: { ...day.user },
+    defaults: readyTags,
+    tags: poolTags(),
+    sources: { weather: day.settings.weather || "weather.home", season: day.settings.season || "sensor.season", light_sensor: day.settings.light_sensor || null },
+    now: preview({}, false),
+    moods: ["relax", "cozy", "focus", "romantic", "party", "festive"],
+    mood_entity: "select.hue_studio_mood",
+    phase_entity: "sensor.hue_studio_phase",
+  });
+  const pushDaylight = () => setTimeout(() => daylightListeners.forEach((cb) => cb(structuredClone(daylightMessage()))), 60);
   // Positions: the TV area (an entertainment area) places the living room's TV lights;
   // the office lamp is placed by Hue Studio; the candle is not placed yet.
   const positionListeners = new Set<(msg: unknown) => void>();
@@ -687,6 +748,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (domain === "automation" && (service === "turn_on" || service === "turn_off")) {
         for (const id of [data.entity_id].flat()) if (id && automationConfigs[id]) automationState(id, service === "turn_on");
       }
+      if (domain === "select" && service === "select_option" && data.entity_id === "select.hue_studio_mood") {
+        states["select.hue_studio_mood"] = { ...states["select.hue_studio_mood"], state: String(d.option) };
+        pushDaylight();
+      }
       if (domain === "hue_studio" && service === "apply_light") {
         const a = data as ServiceData & { area_id?: string[]; light?: string; scene_of_the_day?: DayConfig };
         const lights = Object.keys(LIGHTS).filter((l) => (a.area_id || []).includes(devices[`dev_${l}`].area_id || "")).map((l) => `light.${l}`);
@@ -808,6 +873,33 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         return { config: { id: config.id, alias: config.alias, triggers: [], actions: [] } } as T;
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
+      if (msg.type === "hue_studio/daylight/set") {
+        const { type: _type, ...change } = msg;
+        const settings = day.settings as unknown as Record<string, unknown>;
+        for (const [key, value] of Object.entries(change)) {
+          if (value === null) delete settings[key];
+          else settings[key] = value;
+        }
+        pushDaylight();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/daylight/tags") {
+        if (msg.tags === null) delete day.user[String(msg.scene)];
+        else day.user[String(msg.scene)] = msg.tags as SceneTags;
+        pushDaylight();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/daylight/merge") {
+        // Roughly daylight.tags_from_pools: the phases each scene was in.
+        const found: Record<string, Set<Phase>> = {};
+        for (const [phase, seasons] of Object.entries((msg.pools || {}) as NonNullable<DayConfig["pools"]>))
+          for (const lists of Object.values(seasons)) for (const list of Object.values(lists)) for (const id of list.flat()) (found[id] ??= new Set()).add(phase as Phase);
+        for (const [id, phases] of Object.entries(found)) day.user[id] = { phases: PHASE_ORDER.filter((p) => phases.has(p)) };
+        if (!day.merged) day.settings.defaults = false;
+        day.merged = true;
+        pushDaylight();
+        return { scenes: Object.keys(found).length } as T;
+      }
       if (msg.type === "hue_studio/automations/preview") return preview(msg.scene_of_the_day as DayConfig, !!msg.natural) as T;
       if (msg.type === "hue_studio/automations/legacy_auto_light") {
         return { office: { natural: false, config: OFFICE_DAY } } as T;
@@ -941,6 +1033,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     connection: {
       async subscribeMessage<T>(cb: (msg: T) => void, msg: { type: string }) {
         const send = cb as unknown as (m: unknown) => void;
+        if (msg.type === "hue_studio/daylight/subscribe") {
+          daylightListeners.add(send);
+          setTimeout(() => send(structuredClone(daylightMessage())), 45);
+          return () => {
+            daylightListeners.delete(send);
+          };
+        }
         if (msg.type === "hue_studio/positions/subscribe") {
           positionListeners.add(send);
           setTimeout(() => send(positionsMessage()), 50);

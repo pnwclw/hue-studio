@@ -1,12 +1,13 @@
 // Settings (a tab of the panel), laid out like the Hue app's: the home (devices, bridges and
 // Sync Boxes, MotionAware areas with a Hue Bridge Pro, entertainment areas), then Hue
-// Studio's own (rooms and zones, scene gallery, integration settings, experimental). Every
-// row opens a screen of its own.
+// Studio's own (rooms and zones, light of the day, scene gallery, integration settings,
+// experimental). Every row opens a screen of its own.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import { hasPro } from "../devices.ts";
+import type { StringKey } from "../i18n.ts";
 import { hueZones, planHasNews } from "../rooms.ts";
 import type { BridgesMessage } from "../types.ts";
 import { StudioView } from "./base.ts";
@@ -57,12 +58,27 @@ export class SettingsView extends StudioView {
         <h2 class="label">Hue Studio</h2>
         <div class="rows">
           ${row("mdi:floor-plan", t("rooms.title"), "/rooms", roomsSub, planHasNews(plan))}
+          ${row("mdi:palette-swatch-variant", t("daylight.title"), "/settings/daylight", this.daylightSub())}
           ${row("mdi:image-multiple-outline", t("settings.gallery"), "/settings/gallery", t(ctx.config.gallery_seasonal ? "settings.gallery_seasonal" : "settings.gallery_all"))}
           ${row("mdi:cog-outline", t("settings.integration"), "/settings/integration", t("settings.integration_sub"))}
           ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t(ctx.config.footer ? "exp.on" : "exp.sub"))}
         </div>`,
       { cls: "settings-page" },
     );
+  }
+
+  /** "Evening · Cozy · 38 scenes". */
+  private daylightSub(): string {
+    const { t, daylight } = this.ctx;
+    if (!daylight) return t("daylight.sub");
+    const { now } = daylight;
+    return [
+      t(`auto.phase_${now.phase}` as StringKey),
+      now.mood ? t(`auto.mood_${now.mood}` as StringKey) : "",
+      t("daylight.pool_count", { count: Object.keys(daylight.tags).length }),
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 }
 

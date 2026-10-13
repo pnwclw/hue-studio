@@ -18,6 +18,7 @@
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
+//   /settings/daylight         light of the day: mood, phase times, sources, scene pool
 //   /settings/devices          Hue devices by area (name, area, identify, delete)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
@@ -40,6 +41,7 @@ import type { Hass } from "./types.ts";
 import { icon, type IconName, keepTouchInside } from "./ui.ts";
 import "./views/automation-edit.ts";
 import "./views/automations.ts";
+import "./views/daylight-settings.ts";
 import "./views/bridges.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
@@ -78,6 +80,7 @@ type Route =
   | { name: "settings" }
   | { name: "experimental" }
   | { name: "gallerySettings" }
+  | { name: "daylight" }
   | { name: "devices" }
   | { name: "deviceAdd"; room: string | null }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
@@ -126,6 +129,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "add") return { name: "deviceAdd", room: params.get("room") };
+  if (parts[0] === "settings" && parts[1] === "daylight") return { name: "daylight" };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
@@ -187,6 +191,7 @@ export class HueStudioPanel extends LitElement {
         : route.name === "automations" || route.name === "automationNew" || route.name === "automation"
           ? "automations"
           : route.name === "settings" || route.name === "rooms" || route.name === "experimental" || route.name === "gallerySettings" ||
+              route.name === "daylight" ||
               route.name === "devices" ||
               route.name === "deviceAdd" ||
               route.name === "bridges" ||
@@ -272,6 +277,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-experimental-view .ctx=${ctx} .rev=${rev}></hue-studio-experimental-view>`;
       case "gallerySettings":
         return html`<hue-studio-gallery-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-gallery-settings-view>`;
+      case "daylight":
+        return html`<hue-studio-daylight-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-daylight-settings-view>`;
       case "rooms":
         return html`<hue-studio-rooms-view .ctx=${ctx} .rev=${rev}></hue-studio-rooms-view>`;
       case "gallery":

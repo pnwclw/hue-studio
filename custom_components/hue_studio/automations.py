@@ -7,12 +7,14 @@ so HA stores, runs and edits them (Settings → Automations shows a form for eac
 What the blueprints call is `hue_studio.apply_light`: a scene, a white, natural light,
 the scene of the day or off, for the Hue lights of some rooms (HA areas).
 
-Natural light and the scene of the day get their settings (pools, phases, holidays,
-brightness) from the automation itself (`scene_of_the_day`, see daylight.py), so
-nothing about them is stored here. Once shown, they keep up with the day ("living"
-light): every minute the selection is worked out again and shown when it changed,
-until someone changes the lights, they go off, or another `apply_light` takes them
-over. That is kept in memory only; after a restart the next run starts it again.
+Natural light and the scene of the day start from the global light of the day
+(pool.py: scene pool, phase times, sources, mood); the automation adds its own
+(`scene_of_the_day`: extra and skipped scenes, its own phase times, brightness, see
+daylight.py). Once shown, they keep up with the day ("living" light): every minute,
+and at once when the mood or the global settings change, the selection is worked out
+again and shown when it changed, until someone changes the lights, they go off, or
+another `apply_light` takes them over. That is kept in memory only; after a restart
+the next run starts it again.
 
 Markers: our automations use a blueprint under `hue_studio/` and an id
 `hue_studio_<type>_<suffix>` (the id stays when an automation is taken over in HA's
@@ -24,7 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 import filecmp
 import logging
 from pathlib import Path
@@ -32,7 +34,6 @@ import shutil
 import time
 from typing import Any
 
-from astral import sun as astral_sun
 from homeassistant.components import websocket_api
 from homeassistant.components.automation import (
     DOMAIN as AUTOMATION_DOMAIN,
@@ -64,15 +65,14 @@ from homeassistant.helpers import (
     entity_registry as er,
     label_registry as lr,
 )
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.sun import get_astral_event_date, get_astral_observer
-from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
-from . import daylight
-from .const import DOMAIN
+from . import daylight, pool
+from .const import DOMAIN, SIGNAL_CONFIG_UPDATED
 from .gallery import async_gallery_scenes
 from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
 from .rooms import light_area
@@ -109,9 +109,9 @@ KELVIN = vol.All(
     vol.Coerce(int), vol.Range(min=daylight.KELVIN_MIN, max=daylight.KELVIN_MAX)
 )
 
-# Living light: how often it is worked out again and how fast a change is shown.
-LIVING_INTERVAL = timedelta(minutes=1)
+# Living light: how fast a change of the day is shown, and one of the mood.
 LIVING_TRANSITION = 60.0
+MOOD_TRANSITION = 2.0
 # Changes within this long after our own command, plus its transition (the bridge
 # reports the brightness on the way every ~10 s), are its own.
 QUIET_SECONDS = 15
@@ -122,19 +122,23 @@ COMPARED = ("brightness", "xy_color", "color_mode", "color_temp_kelvin")
 LEGACY_STORAGE_KEY = f"{DOMAIN}.auto_light"
 
 PHASES = daylight.PHASES
-SHIFTS = ("morning", "day", "golden", "evening")
 SEASON_KEYS = ("all", *daylight.SEASONS)
 MAX_OFFSET = 60
-MAX_SHIFT = 240
 IDS = vol.All(cv.ensure_list, [cv.string])
 
-# Settings of the scene of the day and natural light (daylight.py).
+# An automation's own settings of the scene of the day and natural light, on top of
+# the global ones (pool.py, daylight.resolve).
 DAY_CONFIG = vol.Schema(
     {
-        vol.Optional("pools", default=dict): {
-            vol.In(PHASES): {vol.In(SEASON_KEYS): {vol.In(daylight.MOODS): list}}
+        # Scenes this automation adds to the pool, and skips.
+        vol.Optional("include", default=list): IDS,
+        vol.Optional("exclude", default=list): IDS,
+        # Before 0.10 every automation had pools of its own; until the panel moves
+        # them into the global pool they are used as they are.
+        vol.Optional("pools"): {
+            vol.In(PHASES): {vol.In(SEASON_KEYS): {vol.In(daylight.WEATHER): list}}
         },
-        vol.Optional("holidays", default=list): [
+        vol.Optional("holidays"): [
             vol.Schema(
                 {
                     vol.Required("from"): cv.matches_regex(r"^\d\d-\d\d$"),
@@ -145,7 +149,7 @@ DAY_CONFIG = vol.Schema(
                 extra=vol.REMOVE_EXTRA,
             )
         ],
-        vol.Optional("excluded", default=list): IDS,
+        vol.Optional("excluded"): IDS,
         vol.Optional("offsets", default=dict): {
             vol.In(PHASES): vol.All(
                 vol.Coerce(int), vol.Range(min=-MAX_OFFSET, max=MAX_OFFSET)
@@ -153,12 +157,10 @@ DAY_CONFIG = vol.Schema(
         },
         vol.Optional("settings", default=dict): vol.Schema(
             {
+                # Phase times of its own (else the global ones).
                 vol.Optional("night_from"): cv.matches_regex(r"^\d\d:\d\d$"),
-                vol.Optional("shifts"): {
-                    vol.In(SHIFTS): vol.All(
-                        vol.Coerce(int), vol.Range(min=-MAX_SHIFT, max=MAX_SHIFT)
-                    )
-                },
+                vol.Optional("shifts"): pool.SHIFTS,
+                # Before 0.10: sources of its own (now global).
                 vol.Optional("weather"): vol.Any(None, cv.entity_id),
                 vol.Optional("light_sensor"): vol.Any(None, cv.entity_id),
                 vol.Optional("season"): vol.Any(None, cv.entity_id),
@@ -208,61 +210,21 @@ APPLY_LIGHT_SCHEMA = cv.make_entity_service_schema(
 # ---- the light of the day ----
 
 
-def daylight_inputs(
-    hass: HomeAssistant, settings: dict[str, Any], now: datetime | None = None
-) -> daylight.Inputs:
-    """What the light of the day depends on, right now."""
-    now = dt_util.as_local(now or dt_util.now())
-    sunrise = get_astral_event_date(hass, "sunrise", now.date())
-    sunset = get_astral_event_date(hass, "sunset", now.date())
-    weather = hass.states.get(settings.get("weather") or "")
-    season = hass.states.get(settings.get("season") or "")
-    return daylight.Inputs(
-        now=now,
-        sunrise=dt_util.as_local(sunrise) if sunrise else None,
-        sunset=dt_util.as_local(sunset) if sunset else None,
-        elevation=astral_sun.elevation(get_astral_observer(hass), now),
-        season_state=season.state if season else None,
-        condition=weather.state if weather else None,
-        cloud=_number(weather.attributes.get("cloud_coverage")) if weather else None,
-        lux=_number(_state(hass, settings.get("light_sensor"))),
-    )
-
-
-def _state(hass: HomeAssistant, entity_id: str | None) -> str | None:
-    state = hass.states.get(entity_id) if entity_id else None
-    return state.state if state else None
-
-
-def _number(value: Any) -> float | None:
-    try:
-        return float(value)
-    except TypeError, ValueError:
-        return None
-
-
 def day_config(config: dict[str, Any], natural: bool) -> dict[str, Any]:
-    """Validated settings; natural light is the "natural" style of daylight.py."""
+    """An automation's validated settings; natural light is the "natural" style."""
     config = DAY_CONFIG(config)
     if natural:
         config["settings"]["style"] = daylight.STYLE_NATURAL
     return config
 
 
-def selection_info(selection: daylight.Selection) -> dict[str, Any]:
-    """A selection for the panel."""
-    return {
-        "phase": selection.phase,
-        "pool_phase": selection.pool_phase,
-        "season": selection.season,
-        "mood": selection.mood,
-        "holiday": selection.holiday,
-        "scene": selection.scene,
-        "pool": list(selection.pool),
-        "brightness": selection.brightness,
-        "step": selection.step,
-        "kelvin": selection.kelvin,
-    }
+async def async_day_selection(
+    hass: HomeAssistant, local: dict[str, Any]
+) -> tuple[daylight.Selection, dict[str, Any]]:
+    """What an automation's light of the day shows now, and the settings behind it."""
+    config = await pool.async_config(hass, local)
+    inputs = pool.daylight_inputs(hass, config["settings"])
+    return daylight.select(config, inputs), config
 
 
 async def _async_show(
@@ -298,6 +260,8 @@ class Living:
     """Lights that keep up with the day."""
 
     lights: tuple[str, ...]
+    # The automation's own settings (the global ones are read every time).
+    local: dict[str, Any]
     config: dict[str, Any]
     selection: daylight.Selection
     # time.monotonic() until which light changes are our own command settling.
@@ -321,8 +285,17 @@ class LivingLights:
     def async_start(self) -> None:
         """Follow the clock and the lights."""
         self._unsubs.append(
-            async_track_time_interval(self.hass, self._async_tick, LIVING_INTERVAL)
+            async_track_time_interval(self.hass, self._async_tick, pool.TICK)
         )
+        for signal, transition in (
+            (SIGNAL_CONFIG_UPDATED, LIVING_TRANSITION),
+            (pool.SIGNAL_MOOD_UPDATED, MOOD_TRANSITION),
+        ):
+            self._unsubs.append(
+                async_dispatcher_connect(
+                    self.hass, signal, self._async_later(transition)
+                )
+            )
         self._unsubs.append(
             self.hass.bus.async_listen(
                 EVENT_STATE_CHANGED, self._async_state_changed, self._watched
@@ -358,12 +331,23 @@ class LivingLights:
                 if self.by_light.get(light) is living:
                     del self.by_light[light]
 
-    async def _async_tick(self, _: datetime) -> None:
-        for living in self.groups():
-            settings = living.config["settings"]
-            selection = daylight.select(
-                living.config, daylight_inputs(self.hass, settings)
+    def _async_later(self, transition: float) -> Callable[[], None]:
+        @callback
+        def update() -> None:
+            self.hass.async_create_task(
+                self.async_update(transition), "hue_studio_living_light"
             )
+
+        return update
+
+    async def _async_tick(self, _: datetime) -> None:
+        await self.async_update(LIVING_TRANSITION)
+
+    async def async_update(self, transition: float) -> None:
+        """Show what changed since the last time."""
+        for living in self.groups():
+            selection, config = await async_day_selection(self.hass, living.local)
+            living.config = config
             old = living.selection
             if (selection.scene, selection.kelvin, selection.brightness) == (
                 old.scene,
@@ -372,18 +356,18 @@ class LivingLights:
             ):
                 continue
             living.selection = selection
-            living.quiet(LIVING_TRANSITION)
+            living.quiet(transition)
             try:
                 await _async_show(
                     self.hass,
                     list(living.lights),
                     selection,
-                    living.config,
-                    transition=LIVING_TRANSITION,
+                    config,
+                    transition=transition,
                 )
             except HomeAssistantError as err:
                 _LOGGER.warning("Light of the day not shown: %s", err)
-            living.quiet(LIVING_TRANSITION)
+            living.quiet(transition)
 
     @callback
     def _watched(self, data: EventStateChangedData) -> bool:
@@ -484,13 +468,13 @@ async def _async_apply_light(hass: HomeAssistant, call: ServiceCall) -> None:
         )
         return
 
-    config = day_config(data["scene_of_the_day"], kind == LIGHT_NATURAL)
-    selection = daylight.select(config, daylight_inputs(hass, config["settings"]))
+    local = day_config(data["scene_of_the_day"], kind == LIGHT_NATURAL)
+    selection, config = await async_day_selection(hass, local)
     if selection.kelvin is None and selection.scene is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="no_scene_of_the_day"
         )
-    group = Living(tuple(lights), config, selection)
+    group = Living(tuple(lights), local, config, selection)
     group.quiet(transition)
     if from_dark:
         await _async_show(hass, dark, selection, config, brightness=1, transition=0)
@@ -795,14 +779,15 @@ async def ws_preview(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """What natural light or a scene of the day with these settings shows now."""
+    """What natural light or a scene of the day with these settings (an automation's
+    own, on top of the global ones) shows now."""
     try:
-        config = day_config(msg["scene_of_the_day"], msg["natural"])
+        local = day_config(msg["scene_of_the_day"], msg["natural"])
     except vol.Invalid as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
-    selection = daylight.select(config, daylight_inputs(hass, config["settings"]))
-    info = selection_info(selection)
+    selection, _ = await async_day_selection(hass, local)
+    info = pool.selection_info(selection)
     if selection.scene:
         gallery = await async_gallery_scenes(hass)
         info["scene_name"] = (gallery.get(selection.scene) or {}).get("name")

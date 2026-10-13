@@ -210,7 +210,7 @@
       "message": "Inny pokój lub strefa Hue należy już do obszaru {area}."
     },
     "no_scene_of_the_day": {
-      "message": "Scena dnia nie ma teraz żadnej sceny: dodaj sceny do jej pul."
+      "message": "Scena dnia nie ma teraz żadnej sceny: dodaj sceny do puli w Hue Studio (Ustawienia → Światło dnia)."
     }
   },
   "services": {
@@ -550,7 +550,7 @@
         },
         "scene_of_the_day": {
           "name": "Naturalne światło i scena dnia",
-          "description": "Pory dnia, pule scen według pory, sezonu i pogody, święta i jasność (tak, jak zapisuje je edytor automatyzacji Hue Studio)."
+          "description": "Co automatyzacja dodaje do światła dnia Hue Studio: dodatkowe lub pominięte sceny, własne pory dnia i jasność (tak, jak zapisuje je edytor automatyzacji Hue Studio)."
         },
         "from_dark": {
           "name": "Od ciemności",
@@ -675,6 +675,18 @@
           "normal": "Normalny",
           "dimmed": "Przyciemniony"
         }
+      },
+      "mood": {
+        "name": "Nastrój",
+        "state": {
+          "auto": "Według pory dnia",
+          "relax": "Relaks",
+          "cozy": "Przytulnie",
+          "focus": "Skupienie",
+          "romantic": "Romantycznie",
+          "party": "Impreza",
+          "festive": "Świątecznie"
+        }
       }
     },
     "number": {
@@ -743,6 +755,34 @@
           "fair": "Średnia",
           "good": "Dobra",
           "excellent": "Doskonała"
+        }
+      },
+      "phase": {
+        "name": "Pora dnia",
+        "state": {
+          "morning": "Rano",
+          "day": "Dzień",
+          "golden": "Złota godzina",
+          "evening": "Wieczór",
+          "night": "Noc"
+        },
+        "state_attributes": {
+          "season": {
+            "name": "Pora roku",
+            "state": {
+              "winter": "Zima",
+              "spring": "Wiosna",
+              "summer": "Lato",
+              "autumn": "Jesień"
+            }
+          },
+          "weather": {
+            "name": "Pogoda",
+            "state": {
+              "clear": "Pogodnie",
+              "gloomy": "Pochmurno"
+            }
+          }
         }
       }
     }

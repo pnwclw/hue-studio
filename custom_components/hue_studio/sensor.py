@@ -1,4 +1,5 @@
-"""Sync Box sensors: HDMI ports, content, bridge connection, Wi-Fi."""
+"""Sensors: the phase of the day (Hue Studio entry); a Sync Box's HDMI ports,
+content, bridge connection and Wi-Fi."""
 
 from __future__ import annotations
 
@@ -12,10 +13,11 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.const import EntityCategory, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import HueStudioConfigEntry
+from . import HueStudioConfigEntry, daylight, pool
+from .connections import is_studio
 from .entity import SyncBoxEntity
 from .sync import INPUTS, SyncBoxCoordinator, inputs
 
@@ -92,7 +94,10 @@ async def async_setup_entry(
     entry: HueStudioConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the sensors of a Sync Box."""
+    """Add the phase of the day, or the sensors of a Sync Box."""
+    if is_studio(entry):
+        async_add_entities([PhaseSensor()])
+        return
     coordinator = entry.runtime_data.sync
     assert coordinator is not None
     async_add_entities(
@@ -120,3 +125,45 @@ class SyncBoxSensor(SyncBoxEntity, SensorEntity):
     def native_value(self) -> str | None:
         """Current value."""
         return self.entity_description.value_fn(self.coordinator.api)
+
+
+class PhaseSensor(SensorEntity):
+    """The phase of the day of the global light of the day, with season and weather."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "phase"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_unique_id = pool.PHASE_UNIQUE_ID
+    _attr_should_poll = False
+
+    def __init__(self) -> None:
+        """Attach to Hue Studio's own device."""
+        # Only a suggestion; not derived from the translated name.
+        self.entity_id = "sensor.hue_studio_phase"
+        self._attr_options = list(daylight.PHASES)
+        self._attr_native_value = None
+        self._attr_extra_state_attributes = {}
+        self._attr_device_info = pool.device_info()
+
+    async def async_added_to_hass(self) -> None:
+        """Follow the clock, the settings and the mood."""
+        self.async_on_remove(
+            pool.async_track_light_of_the_day(self.hass, self._async_changed)
+        )
+        await self._async_refresh()
+
+    @callback
+    def _async_changed(self) -> None:
+        self.hass.async_create_task(self._async_refresh(), "hue_studio_phase")
+
+    async def _async_refresh(self) -> None:
+        selection = await pool.async_selection(self.hass)
+        attributes = {"season": selection.season, "weather": selection.weather}
+        if (selection.phase, attributes) == (
+            self._attr_native_value,
+            self._attr_extra_state_attributes,
+        ):
+            return
+        self._attr_native_value = selection.phase
+        self._attr_extra_state_attributes = attributes
+        self.async_write_ha_state()

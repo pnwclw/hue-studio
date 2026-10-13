@@ -456,6 +456,30 @@ Decided:
   "dashboard", name, description})`. HA 2026.10's new dashboard dialog lists those
   entries. No internals are involved; the settings button is just a shortcut.
 
+### J. The light of the day: one scene pool for every automation (2026-10-13)
+
+**Done (2026-10-13):** natural light and the scene of the day no longer carry pools per
+automation. One global light of the day (the Hue Studio entry's options, Settings →
+Light of the day):
+
+- **scene tags** instead of pools: every scene names the phases, seasons, weather and
+  moods it fits (none: any). Hue Studio ships hand-made tags for the whole gallery
+  (`scene_tags.json`); the user's tags of a scene replace them, empty ones take it out,
+  and the ready-made tags can be turned off;
+- **mood**, a fourth criterion next to phase, season and weather: scenes such as party or
+  festive ones fit no time of day but a mood. `select.hue_studio_mood` ("auto": by the
+  day) switches every living scene of the day at once;
+- **phase times**, weather, season and light sensor are global; `sensor.hue_studio_phase`
+  shows the phase (season and weather as attributes). Missing sources are offered as
+  core integrations to add (Met.no, Season);
+- an automation keeps only its own: extra and skipped scenes, phase times of its own
+  (off by default), brightness, the white of natural light, gradient layout;
+- day steps (pools by sun elevation) and holidays are gone: brightness follows the curve
+  anyway, holiday scenes became the festive mood. Old pools are moved into the global
+  pool by the panel once (ready-made tags off then), and are used as they are until then.
+
+Not done on purpose: a calendar of holidays.
+
 ### H. Later: Hue Secure
 
 Plans, after research:

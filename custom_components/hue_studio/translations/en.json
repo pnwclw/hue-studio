@@ -210,7 +210,7 @@
       "message": "Another Hue room or zone already belongs to the area {area}."
     },
     "no_scene_of_the_day": {
-      "message": "The scene of the day has no scene for now: add scenes to its pools."
+      "message": "The scene of the day has no scene for now: add scenes to the pool in Hue Studio (Settings → Light of the day)."
     }
   },
   "services": {
@@ -550,7 +550,7 @@
         },
         "scene_of_the_day": {
           "name": "Natural light and scene of the day",
-          "description": "Phases, scene pools by phase, season and weather, holidays and brightness (as Hue Studio's automation editor writes them)."
+          "description": "What the automation adds to Hue Studio's light of the day: extra or skipped scenes, its own phase times and brightness (as Hue Studio's automation editor writes them)."
         },
         "from_dark": {
           "name": "From dark",
@@ -675,6 +675,18 @@
           "normal": "Normal",
           "dimmed": "Dimmed"
         }
+      },
+      "mood": {
+        "name": "Mood",
+        "state": {
+          "auto": "By the day",
+          "relax": "Relax",
+          "cozy": "Cozy",
+          "focus": "Focus",
+          "romantic": "Romantic",
+          "party": "Party",
+          "festive": "Festive"
+        }
       }
     },
     "number": {
@@ -743,6 +755,34 @@
           "fair": "Fair",
           "good": "Good",
           "excellent": "Excellent"
+        }
+      },
+      "phase": {
+        "name": "Phase of the day",
+        "state": {
+          "morning": "Morning",
+          "day": "Day",
+          "golden": "Golden hour",
+          "evening": "Evening",
+          "night": "Night"
+        },
+        "state_attributes": {
+          "season": {
+            "name": "Season",
+            "state": {
+              "winter": "Winter",
+              "spring": "Spring",
+              "summer": "Summer",
+              "autumn": "Autumn"
+            }
+          },
+          "weather": {
+            "name": "Weather",
+            "state": {
+              "clear": "Clear",
+              "gloomy": "Gloomy"
+            }
+          }
         }
       }
     }

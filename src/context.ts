@@ -4,6 +4,7 @@
 
 import { loadGallery } from "./gallery-data.ts";
 import { navigate } from "./ha-internals.ts";
+import { isLegacy, splitLegacy } from "./daylight.ts";
 import { localize, type Translate } from "./i18n.ts";
 import { adaptiveFor, buildHome, findGroup, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
@@ -11,6 +12,8 @@ import { confirmed, predictSync, type SyncMemo, syncMemo } from "./sync.ts";
 import type {
   AutomationConfig,
   AutomationsMessage,
+  DayConfig,
+  DaylightMessage,
   Gallery,
   Hass,
   LightInfo,
@@ -88,6 +91,8 @@ export class StudioContext {
   automationConfigs: Record<string, AutomationConfig> = {};
   /** The message whose configs `automationConfigs` holds (null: still reading). */
   automationConfigsRead: AutomationsMessage | null = null;
+  /** The global light of the day: pool, phase times, sources, mood (null until known). */
+  daylight: DaylightMessage | null = null;
   /** Sync Boxes by config entry id, with pending predictions applied. */
   boxes: Record<string, SyncBoxInfo> = {};
   gallery: Gallery | null = null;
@@ -109,6 +114,8 @@ export class StudioContext {
   private toastTimer?: ReturnType<typeof setTimeout>;
   private rawBoxes: Record<string, SyncBoxInfo> = {};
   private syncPredictions = new Map<string, { box: SyncBoxInfo; until: number }>();
+  /** Automations whose own pools are being moved into the global pool. */
+  private migrating = new Set<string>();
 
   /** @param onChange called when anything shown may have changed */
   constructor(onChange: () => void) {
@@ -179,6 +186,10 @@ export class StudioContext {
     sub<SyncMessage>("hue_studio/sync/subscribe", (msg) => {
       this.rawBoxes = msg.boxes;
       saveSyncMemo(syncMemo(msg.boxes));
+    });
+    sub<DaylightMessage>("hue_studio/daylight/subscribe", (msg) => {
+      this.daylight = msg;
+      void this.migrateDayPools();
     });
     sub<PositionsMessage>("hue_studio/positions/subscribe", (msg) => {
       this.positions = msg;
@@ -344,6 +355,94 @@ export class StudioContext {
     this.automationConfigs = configs;
     this.automationConfigsRead = msg;
     this.onChange();
+    void this.migrateDayPools();
+  }
+
+  /**
+   * Automations from before 0.10 have scene pools of their own: move them into the global
+   * pool (hue_studio/daylight/merge), and their weather, season and light sensor and phase
+   * times into the global settings while those are not set, then save the automation
+   * without them. Until then the backend still uses its pools as they are.
+   */
+  private async migrateDayPools(): Promise<void> {
+    const daylight = this.daylight;
+    if (!daylight || !this.raw?.callApi) return;
+    for (const config of Object.values(this.automationConfigs)) {
+      const input = config.use_blueprint?.input;
+      const old = input?.scene_of_the_day as Partial<DayConfig> | undefined;
+      if (!config.id || !input || !isLegacy(old) || this.migrating.has(config.id)) continue;
+      this.migrating.add(config.id);
+      const { local, pools, holidays, sources } = splitLegacy(old!);
+      const merged = await this.query({ type: "hue_studio/daylight/merge", pools, holidays }, { quiet: true });
+      if (!merged) continue;
+      const global: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(sources)) if (!daylight.settings[key as keyof typeof sources]) global[key] = value;
+      const own = local.settings;
+      const sameTimes = JSON.stringify([own.night_from, own.shifts]) === JSON.stringify([daylight.settings.night_from, daylight.settings.shifts]);
+      if (own.night_from !== undefined || own.shifts !== undefined) {
+        if (daylight.settings.night_from === undefined && daylight.settings.shifts === undefined) {
+          // The first automation's phase times become everybody's.
+          Object.assign(global, { night_from: own.night_from, shifts: own.shifts });
+          daylight.settings = { ...daylight.settings, night_from: own.night_from, shifts: own.shifts };
+          delete own.night_from;
+          delete own.shifts;
+        } else if (sameTimes) {
+          delete own.night_from;
+          delete own.shifts;
+        }
+      }
+      if (Object.keys(global).length) await this.query({ type: "hue_studio/daylight/set", ...global }, { quiet: true });
+      try {
+        await this.raw.callApi("POST", `config/automation/config/${encodeURIComponent(config.id)}`, {
+          ...config,
+          use_blueprint: { ...config.use_blueprint!, input: { ...input, scene_of_the_day: local } },
+        });
+      } catch (err) {
+        console.warn("hue_studio: automation not saved after moving its pools", err);
+      }
+    }
+  }
+
+  /** Change global settings of the light of the day (hue_studio/daylight/set); shown at once. */
+  async setDaylight(change: Record<string, unknown>): Promise<boolean> {
+    const before = this.daylight;
+    if (before) {
+      const settings: Record<string, unknown> = { ...before.settings };
+      for (const [key, value] of Object.entries(change)) {
+        if (value === null) delete settings[key];
+        else settings[key] = value;
+      }
+      this.daylight = { ...before, settings: settings as unknown as DaylightMessage["settings"] };
+      this.onChange();
+    }
+    const ok = await this.ws({ type: "hue_studio/daylight/set", ...change });
+    if (!ok && before) {
+      this.daylight = before;
+      this.onChange();
+    }
+    return ok;
+  }
+
+  /** A scene's tags in the global pool ({}: out of it; null: back to the ready-made ones). */
+  async setSceneTags(scene: string, tags: DaylightMessage["tags"][string] | null): Promise<boolean> {
+    const before = this.daylight;
+    if (before) {
+      const user = { ...before.user_tags };
+      if (tags === null) delete user[scene];
+      else user[scene] = tags;
+      const effective = { ...before.tags };
+      const now = tags ?? (before.settings.defaults ? before.defaults[scene] : undefined);
+      if (now && Object.keys(now).length) effective[scene] = now;
+      else delete effective[scene];
+      this.daylight = { ...before, user_tags: user, tags: effective };
+      this.onChange();
+    }
+    const ok = await this.ws({ type: "hue_studio/daylight/tags", scene, tags });
+    if (!ok && before) {
+      this.daylight = before;
+      this.onChange();
+    }
+    return ok;
   }
 
   /** The automation entity of a config id, or null. */

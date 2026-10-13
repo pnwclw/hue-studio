@@ -55,6 +55,7 @@ from .const import (
     SYNC_BOX_INTEGRATION,
 )
 from .panel import async_register_panel, async_unregister_panel
+from .pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
 from .positions import async_setup_positions
 from .rooms import async_align, async_track_areas
 from .services import async_setup_services
@@ -68,6 +69,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 STUDIO_TITLE = "Hue Studio"
 
+# The Hue Studio entry's own entities: phase of the day and mood.
+STUDIO_PLATFORMS = [Platform.SELECT, Platform.SENSOR]
 SYNC_BOX_PLATFORMS = [
     Platform.NUMBER,
     Platform.SELECT,
@@ -98,6 +101,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await _async_merge_bridge_entries(hass)
     async_setup_services(hass)
     async_setup_websocket(hass)
+    async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
     await async_setup_automations(hass)
     return True
@@ -179,6 +183,7 @@ async def _async_setup_studio(hass: HomeAssistant, entry: HueStudioConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     entry.async_on_unload(_async_track_auto_align(hass, entry))
     await async_register_panel(hass)
+    await hass.config_entries.async_forward_entry_setups(entry, STUDIO_PLATFORMS)
     return True
 
 
@@ -280,6 +285,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -
         )
     if not is_studio(entry):
         return True
+    if not await hass.config_entries.async_unload_platforms(entry, STUDIO_PLATFORMS):
+        return False
     if (connections := entry.runtime_data.connections) is not None:
         await connections.async_stop()
     async_unregister_panel(hass)
@@ -290,10 +297,11 @@ async def async_remove_config_entry_device(
     hass: HomeAssistant, entry: HueStudioConfigEntry, device: dr.DeviceEntry
 ) -> bool:
     """A bridge's device can be deleted once the native integration lost the bridge;
-    it comes back when the bridge does."""
+    it comes back when the bridge does. Hue Studio's own device stays."""
     if not is_studio(entry):
         return False
     bridges = {e.unique_id for e in async_supported_hue_entries(hass)}
+    bridges.add(POOL_DEVICE_ID)
     return not any(
         len(ident) > 1 and ident[0] == DOMAIN and ident[1] in bridges
         for ident in device.identifiers
