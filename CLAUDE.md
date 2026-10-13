@@ -159,7 +159,8 @@ touching anything outside this repository.
   workflow refuses anything else). HACS installs `hue_studio.zip` from the release
   (`zip_release`), built by `.github/workflows/release.yml` — the tag must match the
   manifest version. Pushing the tag is enough: the workflow creates the pre-release
-  (generated notes) with the zip attached; a release published in the UI works too. CI runs HACS validation and hassfest.
+  (generated notes) with the zip attached; a release published in the UI works too, and so
+  does running the workflow by hand on a branch (it tags that commit as v<manifest version>). CI runs HACS validation and hassfest.
 
 ## Data model
 
