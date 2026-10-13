@@ -9,6 +9,7 @@ from homeassistant.helpers import area_registry as ar, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
+from custom_components.hue_studio.bridges import async_bridges_payload
 from custom_components.hue_studio.entertainment import default_points
 
 from .conftest import ENTERTAINMENT, HUE_DOMAIN, make_entertainment
@@ -169,11 +170,89 @@ async def test_bridges_and_motion_areas(
             "lights": [{"entity_id": "light.bulb", "health": "healthy"}],
         }
     ]
+    assert (bridge["connected"], bridge["pro"], bridge["name"]) == (
+        True,
+        True,
+        "Hue Bridge",
+    )
     reply = await _ws(
         client, type="hue_studio/bridges/motion_area", area_id="ma-1", enabled=False
     )
     assert reply["success"]
     assert hue_lights.request.call_args.kwargs["json"] == {"enabled": False}
+
+
+async def test_bridges_without_pro(
+    hass: HomeAssistant,
+    hue_lights: MagicMock,
+    hue_entry: MockConfigEntry,
+) -> None:
+    """A bridge without MotionAware is no Bridge Pro; a bridge of the native
+    integration Hue Studio is not connected to is listed with what its entry says."""
+    hue_lights.config.bridge_device = SimpleNamespace(
+        id="dev-bridge",
+        metadata=SimpleNamespace(name="Upstairs"),
+        product_data=SimpleNamespace(
+            product_name="Hue Bridge", software_version="1.70", model_id="BSB002"
+        ),
+    )
+    other = MockConfigEntry(
+        domain=HUE_DOMAIN,
+        title="Garden Bridge",
+        unique_id="bridge-2",
+        data={"host": "192.0.2.20", "api_key": "key", "api_version": 2},
+    )
+    other.add_to_hass(hass)
+    payload = async_bridges_payload(hass)
+    bridge = payload[hue_entry.entry_id]
+    assert (bridge["name"], bridge["pro"], bridge["motion_areas"]) == (
+        "Upstairs",
+        False,
+        None,
+    )
+    assert payload[other.entry_id] | {"connected": False} == {
+        "name": "Garden Bridge",
+        "connected": False,
+        "host": "192.0.2.20",
+        "id": "bridge-2",
+        "model": None,
+        "software": None,
+        "pro": False,
+        "ha_device": None,
+        "devices": None,
+        "lights": None,
+        "motion_areas": None,
+    }
+    # A Bridge Pro without MotionAware areas yet: an empty list.
+    hue_lights.config.bridge_device.product_data.model_id = "BSB003"
+    assert async_bridges_payload(hass)[hue_entry.entry_id]["motion_areas"] == []
+
+
+async def test_rename_bridge(
+    hass: HomeAssistant,
+    hue_lights: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """A bridge is renamed on the bridge (its device), like in the Hue app."""
+    hue_lights.devices.update = AsyncMock()
+    hue_lights.config.bridge_device = SimpleNamespace(
+        id="dev-bridge", metadata=SimpleNamespace(name="Hue Bridge")
+    )
+    client = await hass_ws_client(hass)
+    reply = await _ws(
+        client,
+        type="hue_studio/bridges/rename",
+        hue_entry_id=hue_entry.entry_id,
+        name=" Upstairs ",
+    )
+    assert reply["success"]
+    rid, put = hue_lights.devices.update.call_args.args
+    assert (rid, put.metadata.name) == ("dev-bridge", "Upstairs")
+    reply = await _ws(
+        client, type="hue_studio/bridges/rename", hue_entry_id="nope", name="X"
+    )
+    assert not reply["success"]
 
 
 async def test_integration_settings(

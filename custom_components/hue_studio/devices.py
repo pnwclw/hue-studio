@@ -1,8 +1,10 @@
 """Adding Hue devices from Home Assistant (HA-first device setup).
 
 - Search: the bridge's `zigbee_device_discovery` (bridge firmware 1.60+), optionally
-  limited to serial numbers printed on the devices (up to 10). Devices the bridge adds
-  while Home Assistant runs are remembered as "new" until they are set up.
+  limited to serial numbers printed on the devices (up to 10), or open to Zigbee lights
+  of other brands (that join with the default link key) where the bridge offers it.
+  Devices the bridge adds while Home Assistant runs are remembered as "new" until they
+  are set up.
 - Set up: a name (on the bridge; the native integration follows), an HA area (the HA
   device, like HA's "Assign area") and, for lights, the Hue room of that area (rooms
   hold devices, see `rooms.async_align`).
@@ -10,6 +12,8 @@
   app can be set up the same way.
 - Motion sensors also carry their sensitivity (the Hue app's "Motion sensitivity"),
   which the native integration does not expose; it is set on the bridge like the name.
+- Delete: a device is removed from the bridge (the Hue app's "Delete"); the native
+  integration then removes its HA device.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ from aiohue.v2.models.device import Device, DeviceMetaDataPut, DevicePut
 from aiohue.v2.models.feature import MotionSensingFeatureSensitivityPut
 from aiohue.v2.models.motion import MotionPut
 from aiohue.v2.models.resource import ResourceTypes
+from aiohue.v2.models.zigbee_device_discovery import SearchActionType
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import (
@@ -64,6 +69,8 @@ class DeviceSetup:
 
     # hue device id -> time.time() it appeared on the bridge
     found: dict[str, float] = field(default_factory=dict)
+    # hue entry id -> time.time() a search through Hue Studio started
+    search_started: dict[str, float] = field(default_factory=dict)
     # hue entry id -> (the bridge object watched, unsubscribe from its device events)
     watching: dict[str, tuple[HueBridgeV2, Callable[[], None]]] = field(
         default_factory=dict
@@ -148,13 +155,37 @@ def async_stop_watching(hass: HomeAssistant) -> None:
     setup.watching.clear()
 
 
+def _discovery(bridge: HueBridgeV2) -> list[Any]:
+    """The bridge's `zigbee_device_discovery` resources (none: it cannot search)."""
+    discovery = getattr(bridge.config, "zigbee_device_discovery", None)
+    return list(discovery) if discovery is not None else []
+
+
 def _searching(bridge: HueBridgeV2) -> bool | None:
     """Whether the bridge searches now (None: it cannot search through the API)."""
-    discovery = getattr(bridge.config, "zigbee_device_discovery", None)
-    items = list(discovery) if discovery is not None else []
+    items = _discovery(bridge)
     if not items:
         return None
     return any(item.status.value == "active" for item in items)
+
+
+def _other_brands(bridge: HueBridgeV2) -> bool:
+    """Whether the bridge can also let other brands' Zigbee lights join."""
+    items = _discovery(bridge)
+    action = getattr(items[0], "action", None) if items else None
+    return SearchActionType.SEARCH_ALLOW_DEFAULT_LINK_KEY in (
+        getattr(action, "action_type_values", None) or []
+    )
+
+
+def _reachable(bridge: HueBridgeV2, device: Device) -> bool | None:
+    """Whether the bridge reaches the device over Zigbee (None: it does not say)."""
+    try:
+        connectivity = bridge.devices.get_zigbee_connectivity(device.id)
+    except AttributeError, KeyError:
+        return None
+    status = getattr(getattr(connectivity, "status", None), "value", None)
+    return status != "disconnected" if isinstance(status, str) else None
 
 
 def _sensitivity_of(motion: Any) -> dict[str, Any] | None:
@@ -193,8 +224,11 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
     """What the panel's "Add devices" screen shows, per bridge (native hue entry id).
 
     {hue entry id: {"name", "searching": bool | None (None: no search through the API),
+                    "search_started": time a search through Hue Studio started | None,
+                    "other_brands": bool (the search can let other brands' lights join),
                     "devices": [{"id", "name", "product", "model", "archetype", "kind",
-                                 "new", "area", "lights"}]}}
+                                 "new", "found", "area", "lights", "ha_device",
+                                 "sensitivity", "software", "reachable"}]}}
     Every device but the bridge; `new`: added while HA runs and not set up yet.
     """
     setup = _setup(hass)
@@ -238,49 +272,66 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
                     ),
                     "ha_device": ha_device.id if ha_device else None,
                     "sensitivity": _device_sensitivity(bridge, device),
+                    "software": device.product_data.software_version,
+                    "reachable": _reachable(bridge, device),
                 }
             )
         # Newest first, then by name.
         listed.sort(key=lambda d: (-(d["found"] or 0), d["name"].casefold()))
         entry = hass.config_entries.async_get_entry(hue_entry_id)
+        searching = _searching(bridge)
         payload[hue_entry_id] = {
             "name": entry.title if entry else "Hue Bridge",
-            "searching": _searching(bridge),
+            "searching": searching,
+            "search_started": setup.search_started.get(hue_entry_id)
+            if searching
+            else None,
+            "other_brands": _other_brands(bridge),
             "devices": listed,
         }
     return payload
 
 
-def _bridge(hass: HomeAssistant, hue_entry_id: str | None) -> list[HueBridgeV2]:
+def _bridge(hass: HomeAssistant, hue_entry_id: str | None) -> dict[str, HueBridgeV2]:
     bridges = async_bridges(hass)
     if hue_entry_id is None:
-        return list(bridges.values())
+        return bridges
     if hue_entry_id not in bridges:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="hue_entry_missing"
         )
-    return [bridges[hue_entry_id]]
+    return {hue_entry_id: bridges[hue_entry_id]}
 
 
 async def async_search(
-    hass: HomeAssistant, hue_entry_id: str | None, serials: list[str]
+    hass: HomeAssistant,
+    hue_entry_id: str | None,
+    serials: list[str],
+    other_brands: bool = False,
 ) -> None:
-    """Let new devices join (about a minute); serial numbers find reset or far ones."""
+    """Let new devices join (about a minute); serial numbers find reset or far ones,
+    `other_brands` also lets Zigbee lights of other brands join."""
     async_watch_bridges(hass)
+    setup = _setup(hass)
     codes = [s.strip().upper() for s in serials if s.strip()][:MAX_SERIALS]
-    for bridge in _bridge(hass, hue_entry_id):
-        discovery = getattr(bridge.config, "zigbee_device_discovery", None)
-        items = list(discovery) if discovery is not None else []
+    for entry_id, bridge in _bridge(hass, hue_entry_id).items():
+        items = _discovery(bridge)
         if not items:
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="search_unsupported"
             )
+        extra: dict[str, Any] = {}
+        if other_brands and _other_brands(bridge):
+            extra["action_type"] = SearchActionType.SEARCH_ALLOW_DEFAULT_LINK_KEY
         try:
-            await discovery.search(items[0].id, search_codes=codes or None)
+            await bridge.config.zigbee_device_discovery.search(
+                items[0].id, search_codes=codes or None, **extra
+            )
         except (AiohueException, ClientError, TimeoutError) as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="search_failed"
             ) from err
+        setup.search_started[entry_id] = time.time()
     async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
 
 
@@ -410,5 +461,27 @@ async def async_setup_device(
     }
     if lights and area_id is not None:
         await async_align(hass, only=lights, hue_entry_id=hue_entry_id)
+    _setup(hass).found.pop(device.id, None)
+    async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
+
+
+async def async_delete_device(hass: HomeAssistant, device_id: str) -> None:
+    """Remove a device from its bridge (never the bridge itself); the native
+    integration removes its HA device when the bridge reports it gone."""
+    _, bridge, device = _find(hass, device_id)
+    if device.product_data.product_archetype.value.startswith("bridge"):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_hue_device",
+            translation_placeholders={"device": device_id},
+        )
+    try:
+        await bridge.request("delete", f"clip/v2/resource/device/{device.id}")
+    except (AiohueException, ClientError, TimeoutError) as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"entity_id": device.metadata.name},
+        ) from err
     _setup(hass).found.pop(device.id, None)
     async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)

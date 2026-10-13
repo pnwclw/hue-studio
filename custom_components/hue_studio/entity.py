@@ -43,5 +43,5 @@ class SyncBoxEntity(CoordinatorEntity[SyncBoxCoordinator]):
             model_id=device.device_type,
             sw_version=device.firmware_version,
             serial_number=box_id,
-            configuration_url=SETTINGS_URL,
+            configuration_url=f"{SETTINGS_URL}/{coordinator.config_entry.entry_id}",
         )

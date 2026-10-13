@@ -17,13 +17,14 @@ from aiohue.v2.models.feature import (
 )
 from aiohue.v2.models.motion import Motion
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
+from aiohue.v2.models.zigbee_device_discovery import SearchActionType
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.devices import device_kind
+from custom_components.hue_studio.devices import async_devices_payload, device_kind
 
 from .conftest import HUE_DOMAIN
 
@@ -84,6 +85,12 @@ def bridge(hue_lights: MagicMock) -> MagicMock:
     hue_lights.devices.get.side_effect = DEVICES.get
     hue_lights.devices.update = AsyncMock()
     hue_lights.devices.set_identify = AsyncMock()
+    hue_lights.devices.get_zigbee_connectivity.side_effect = lambda rid: (
+        SimpleNamespace(status=SimpleNamespace(value="disconnected"))
+        if rid == "dev-dial"
+        else None
+    )
+    hue_lights.request = AsyncMock(return_value=[])
     hue_lights.devices.subscribe.return_value = MagicMock()
     motion = Motion(
         id="m1",
@@ -148,7 +155,12 @@ async def test_add_devices(
         "lights": ["light.bulb"],
         "ha_device": lamp.id,
         "sensitivity": None,
+        "software": "1.0",
+        "reachable": None,
     }
+    assert listed["dev-dial"]["reachable"] is False
+    assert state["search_started"] is None
+    assert state["other_brands"] is False
     assert listed["dev-motion"]["ha_device"] == sensor.id
     assert listed["dev-motion"]["sensitivity"] == {
         "value": 2,
@@ -282,3 +294,60 @@ async def test_sensitivity_alone(
         client, type="hue_studio/devices/sensitivity", device="dev-bulb", sensitivity=1
     )
     assert not reply["success"]
+
+
+async def test_search_other_brands(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """Where the bridge offers it, a search also lets other brands' lights join; the
+    panel learns when the search started."""
+    discovery = bridge.config.zigbee_device_discovery
+    status = SimpleNamespace(value="ready")
+    item = SimpleNamespace(
+        id="disc-1",
+        status=status,
+        action=SimpleNamespace(
+            action_type_values=[
+                SearchActionType.SEARCH,
+                SearchActionType.SEARCH_ALLOW_DEFAULT_LINK_KEY,
+            ]
+        ),
+    )
+    discovery.__iter__.side_effect = lambda: iter([item])
+    client = await hass_ws_client(hass)
+    reply = await _ws(
+        client, type="hue_studio/devices/search", serials=[], other_brands=True
+    )
+    assert reply["success"]
+    discovery.search.assert_awaited_once_with(
+        "disc-1",
+        search_codes=None,
+        action_type=SearchActionType.SEARCH_ALLOW_DEFAULT_LINK_KEY,
+    )
+    status.value = "active"
+    state = async_devices_payload(hass)[hue_entry.entry_id]
+    assert state["searching"] is True
+    assert state["other_brands"] is True
+    assert isinstance(state["search_started"], float)
+
+
+async def test_delete_device(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """A device is removed from its bridge; the bridge itself never is."""
+    client = await hass_ws_client(hass)
+    reply = await _ws(client, type="hue_studio/devices/delete", device="dev-dial")
+    assert reply["success"]
+    bridge.request.assert_awaited_once_with(
+        "delete", "clip/v2/resource/device/dev-dial"
+    )
+    bridge.request.reset_mock()
+    reply = await _ws(client, type="hue_studio/devices/delete", device="dev-bridge")
+    assert not reply["success"]
+    bridge.request.assert_not_awaited()

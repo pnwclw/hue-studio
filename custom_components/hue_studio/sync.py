@@ -23,12 +23,14 @@ from aiohue.v2.models.entertainment_configuration import (
 from aiohuesyncbox import (
     AiohuesyncboxException,
     CycleDirection,
+    DeviceUpdate,
     ExecutionMode,
     GameMode,
     HdmiSource,
     HueSyncBox,
     Input,
     Intensity,
+    LedMode,
     MusicMode,
     MusicPalette,
     Presets,
@@ -36,10 +38,12 @@ from aiohuesyncbox import (
     Unauthorized,
     VideoMode,
 )
-from aiohuesyncbox.models import ExecutionUpdate
+from aiohuesyncbox.controllers.behavior import Behavior
+from aiohuesyncbox.controllers.device import Device
+from aiohuesyncbox.models import BehaviorUpdate, ExecutionUpdate
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -78,6 +82,8 @@ PALETTES = {
     "neutral": MusicPalette.NEUTRAL,
 }
 BRIGHTNESS_STEP = 20  # of the box's 0-200
+LED_MODES = {"off": LedMode.OFF, "normal": LedMode.REGULAR, "dimmed": LedMode.DIMMED}
+NAME_MAX = 32
 
 # What a remote button (IR code) can do: action -> the execution change it sends.
 # Also "input:<input1-4>" and "preset:<id>".
@@ -141,6 +147,38 @@ class SyncPresets(Presets):
     async def delete(self, preset_id: str) -> None:
         """Forget a preset."""
         await self._request("delete", f"{self._path}/{preset_id}")
+
+
+class SyncDevice(Device):
+    """The box's device resource with what aiohuesyncbox (0.1.6) does not have yet:
+    its name. Built on its controller and models."""
+
+    def __init__(self, device: Device) -> None:
+        """Wrap the device resource of a box (same data, same request function)."""
+        super().__init__(device._data, device._request)
+
+    async def set_name(self, name: str) -> None:
+        """Rename the box."""
+        await self._put(DeviceUpdate(name=name).to_dict())
+
+
+class SyncBehavior(Behavior):
+    """The box's behavior with what aiohuesyncbox (0.1.6) does not have yet: turning
+    on and off with the TV (HDMI CEC)."""
+
+    def __init__(self, behavior: Behavior) -> None:
+        """Wrap the behavior resource of a box (same data, same request function)."""
+        super().__init__(behavior._data, behavior._request)
+
+    async def set_cec_powersave(self, enabled: bool) -> None:
+        """Follow the TV: on when it turns on, standby when it turns off."""
+        await self._put(BehaviorUpdate(cec_powersave=enabled).to_dict())
+
+
+def led_mode(api: HueSyncBox) -> str | None:
+    """The box's LED as an option of LED_MODES."""
+    mode = api.device.led_mode
+    return next((name for name, value in LED_MODES.items() if value == mode), None)
 
 
 MODELS = {
@@ -340,6 +378,30 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
             return {"game": GameMode(**settings)}
         return {"video": VideoMode(**settings)}
 
+    async def async_configure(
+        self,
+        *,
+        name: str | None = None,
+        led: str | None = None,
+        tv_power: bool | None = None,
+    ) -> None:
+        """The box's own settings: its name, its LED and following the TV."""
+        if name is not None:
+            name = name.strip()[:NAME_MAX]
+            if name and name != self.api.device.name:
+                await self.async_command(SyncDevice(self.api.device).set_name(name))
+                devices = dr.async_get(self.hass)
+                if device := devices.async_get_device_by_identifier(
+                    (DOMAIN, self.box_id), self.config_entry.entry_id
+                ):
+                    devices.async_update_device(device.id, name=name)
+        if led is not None and LED_MODES[led] != self.api.device.led_mode:
+            await self.async_command(self.api.device.set_led_mode(LED_MODES[led]))
+        if tv_power is not None and self.api.behavior is not None:
+            await self.async_command(
+                SyncBehavior(self.api.behavior).set_cec_powersave(tv_power)
+            )
+
     @property
     def presets(self) -> SyncPresets:
         """The box's presets (start, delete as well)."""
@@ -472,6 +534,11 @@ def sync_box_info(
     api = coordinator.api
     state = coordinator.state
     hdmi = api.hdmi
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, coordinator.box_id), coordinator.config_entry.entry_id
+    )
+    wifi = api.device.wifi
+    update = api.device.updatable_firmware_version
     return {
         "available": True,
         "entity_id": entity_id,
@@ -529,8 +596,20 @@ def sync_box_info(
         if api.ir
         else None,
         # What only a directly paired box can do (not one linked through huesyncbox).
-        "features": ["palette", "background_lighting", "presets"]
+        "features": ["palette", "background_lighting", "presets", "settings"]
         + (["ir"] if api.ir else []),
+        "device": {
+            "id": coordinator.box_id,
+            "host": api.device.ip_address,
+            "firmware": api.device.firmware_version,
+            "update": update
+            if update and update != api.device.firmware_version
+            else None,
+            "wifi": int(wifi.strength) if wifi else None,
+            "led": led_mode(api),
+            "tv_power": api.behavior.cec_powersave if api.behavior else None,
+            "ha_device": device.id if device else None,
+        },
         "content": (hdmi.content_specs or None) if hdmi else None,
         "video_supported": hdmi.video_sync_supported if hdmi else True,
         "audio_supported": hdmi.audio_sync_supported if hdmi else True,

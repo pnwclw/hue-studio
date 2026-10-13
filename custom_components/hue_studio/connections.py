@@ -52,7 +52,8 @@ CONNECT_TIMEOUT = 10
 # Seconds between attempts while a bridge does not answer: doubling up to the maximum.
 RETRY_MIN = 15
 RETRY_MAX = 300
-# The panel's page of bridges and Sync Boxes ("Visit" on the device page).
+# The panel's page of bridges and Sync Boxes; "Visit" on a device page opens the
+# page of that bridge or box (`SETTINGS_URL/<its config entry id>`).
 SETTINGS_URL = "homeassistant://hue/settings/bridges"
 
 
@@ -222,9 +223,21 @@ class BridgeConnections:
             # Streaming started/stopped: Sync Boxes and open panels update at once.
             async_dispatcher_send(self.hass, SIGNAL_ENTERTAINMENT_UPDATED)
 
-        self._unsubs[hue_entry.entry_id] = (
-            bridge.config.entertainment_configuration.subscribe(on_entertainment)
-        )
+        @callback
+        def on_motion_area(event_type: EventType, resource: object) -> None:
+            # A MotionAware area changed (in the Hue app too): the settings update.
+            async_dispatcher_send(self.hass, SIGNAL_BRIDGES_UPDATED)
+
+        unsubs = [bridge.config.entertainment_configuration.subscribe(on_entertainment)]
+        areas = getattr(bridge.config, "motion_area_configuration", None)
+        if areas is not None:
+            unsubs.append(areas.subscribe(on_motion_area))
+
+        def unsubscribe() -> None:
+            for unsub in unsubs:
+                unsub()
+
+        self._unsubs[hue_entry.entry_id] = unsubscribe
         self._async_device(hue_entry, bridge)
         self._async_notify()
 
@@ -303,7 +316,7 @@ class BridgeConnections:
             identifiers={(DOMAIN, hue_entry.unique_id)},
             entry_type=dr.DeviceEntryType.SERVICE,
             name=hue_entry.title,
-            configuration_url=SETTINGS_URL,
+            configuration_url=f"{SETTINGS_URL}/{hue_entry.entry_id}",
             **facts,  # type: ignore[arg-type]
         )
 

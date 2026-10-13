@@ -618,7 +618,8 @@ export const CSS = `
   .sensor-kind { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
   .sensor-kind ha-icon { --mdc-icon-size: 16px; }
   .rows .item .check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text-2); display: flex; align-items: center; justify-content: center; flex: none; }
-  .rows .item .check.on { background: var(--accent); border-color: var(--accent); }
+  .rows .item .check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rows .item .check.on svg { fill: currentColor; opacity: 1; }
   .rows .item .check svg { width: 14px; height: 14px; }
   .dot-badge.live { background: #3ddc84; }
   /* Phones: the area picker of a Hue room/zone gets a line of its own. */
@@ -627,6 +628,51 @@ export const CSS = `
     .group-row .select { flex: 1 1 100%; max-width: none; width: auto; margin-left: 38px; }
   }
   .device-form .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .device-form .danger-row { display: flex; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+  .device-form .hint { margin: 8px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+  .hint.warn, .dim.warn, .small.warn { color: #ffb340; }
+  .small.error { color: #ff6b5e; }
+  .pill.danger { color: #ff6b5e; }
+  .pill.danger.confirm { background: #c0392b; color: #fff; }
+  .rows .item.add-row { font-weight: 500; }
+  .rows .item.add-row .round.plus-blue { flex: none; width: 32px; height: 32px; border-radius: 50%; }
+  .rows .item.add-row .round.plus-blue ha-icon { color: #fff; --mdc-icon-size: 20px; }
+  .rows .item .value-text { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .settings-page .sensor-hero { padding-bottom: 14px; }
+  /* "Add devices": what is added, the steps to get it ready, the search. */
+  .kind-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px; }
+  .kind-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 120px; padding: 16px; border: none;
+               border-radius: var(--radius); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
+               transition: transform 0.15s var(--ease); }
+  .kind-tile:active { transform: scale(0.97); }
+  .kind-tile ha-icon { --mdc-icon-size: 34px; margin-bottom: 8px; color: var(--text); }
+  .kind-tile .name { font-size: 17px; font-weight: 600; }
+  @container (max-width: 560px) {
+    .kind-tiles { grid-template-columns: 1fr; }
+    .kind-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; min-height: 0; align-items: center; }
+    .kind-tile ha-icon { grid-row: span 2; margin: 0; }
+  }
+  .add-art { display: flex; justify-content: center; padding: 18px 0 8px; }
+  .add-art ha-icon { --mdc-icon-size: 76px; }
+  .add-art.dim ha-icon { color: var(--text-2); }
+  .add-steps { margin: 6px 0 16px; padding: 0; list-style: none; counter-reset: step; }
+  .add-steps li { position: relative; padding: 10px 4px 10px 44px; font-size: 15px; line-height: 1.45; counter-increment: step; }
+  .add-steps li::before { content: counter(step); position: absolute; left: 4px; top: 8px; width: 28px; height: 28px; border-radius: 50%;
+                          display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: 14px; font-weight: 600; }
+  .add-steps.tips li::before { content: "•"; background: none; font-size: 20px; }
+  .add-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 6px; }
+  .add-actions .pill:not(.go) { height: 44px; min-width: 180px; border-radius: 22px; font-size: 15px; text-transform: none; letter-spacing: 0; }
+  .search-ring { position: relative; width: 180px; height: 180px; margin: 22px auto 10px; }
+  .search-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .search-ring circle { fill: none; stroke-width: 6; }
+  .search-ring .track { stroke: var(--surface-2); }
+  .search-ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; }
+  .search-ring .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+                            font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .search-ring .ring-text ha-icon { --mdc-icon-size: 40px; animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.45; } }
+  .rows .item.fresh { animation: pop 0.35s var(--ease); }
+  .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
   .item.col .field { margin-top: 10px; }
   .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--radius);
                 cursor: pointer; text-align: left; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);

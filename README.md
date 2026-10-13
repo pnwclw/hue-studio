@@ -99,8 +99,10 @@ written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-an
 ## Settings
 
 The panel's Settings tab is laid out like the Hue app's. **In this home**: Devices (every
-Hue device by area, and adding new ones), Bridges (and Sync Boxes), MotionAware areas
-(health, on/off) and Entertainment areas (create, rename, change type and lights, arrange
+Hue device by area, and adding new ones), Bridges (every bridge and Sync Box as a row of its
+own, each opening its page: a bridge's name, facts, devices and MotionAware areas; a Sync
+Box's name, status light, turning on and off with the TV, how it is connected), MotionAware
+areas (health, on/off; shown only with a Hue Bridge Pro) and Entertainment areas (create, rename, change type and lights, arrange
 where the lights stand, delete — they are not rooms or zones). **Hue Studio**: Rooms and
 zones, Scene gallery, Integration settings (rooms follow areas, which area each Hue room or
 zone belongs to, the sensors of each room) and Experimental. Every setting of Hue Studio is
@@ -108,11 +110,15 @@ here: the integration has no options dialog in Home Assistant's settings.
 
 ## Adding devices
 
-Settings → **Devices** in the panel: the bridge searches for new Hue lights, switches
-and sensors (optionally by the serial numbers printed on them, for devices from another
-bridge or far away). Each new device — and any Hue device not in a Home Assistant area
-yet — gets a name (on the bridge, so the Hue app shows it too), an area and, for lights,
-the Hue room of that area. "Identify" makes a light breathe or a sensor blink.
+Settings → Devices → **Add devices** in the panel (or a room's "+" → Device), like the Hue
+app: pick what you add (Hue lights, accessories, or Zigbee lights of other brands where the
+bridge allows it), follow the steps to get it ready, and the bridge searches for about a
+minute (optionally by the serial numbers printed on the devices, for devices from another
+bridge or far away); devices show up as they join. Each new device then gets a name (on the
+bridge, so the Hue app shows it too) and a room — a Home Assistant area, or a new one
+created on the spot — and a light also moves into the Hue room of that area. "Identify"
+makes a light breathe or a sensor blink. Any Hue device can later be renamed, moved to
+another area or deleted from its bridge (Home Assistant removes its device then).
 
 ## Dashboard cards
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
-from aiohuesyncbox import ExecutionMode, HdmiSource, LedMode
+from aiohuesyncbox import ExecutionMode, HdmiSource
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
@@ -17,11 +17,17 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HueStudioConfigEntry
 from .entity import SyncBoxEntity
-from .sync import INTENSITIES, SYNC_MODES, SyncBoxCoordinator, hue_target, inputs
+from .sync import (
+    INTENSITIES,
+    LED_MODES,
+    SYNC_MODES,
+    SyncBoxCoordinator,
+    hue_target,
+    inputs,
+    led_mode,
+)
 
 PARALLEL_UPDATES = 1
-
-LED_MODES = {"off": LedMode.OFF, "normal": LedMode.REGULAR, "dimmed": LedMode.DIMMED}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -60,8 +66,7 @@ async def _select_led(c: SyncBoxCoordinator, option: str) -> None:
 
 
 def _led(c: SyncBoxCoordinator) -> str | None:
-    mode = c.api.device.led_mode
-    return next((name for name, value in LED_MODES.items() if value == mode), None)
+    return led_mode(c.api)
 
 
 DESCRIPTIONS = (

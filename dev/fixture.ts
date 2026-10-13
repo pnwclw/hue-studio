@@ -5,6 +5,7 @@ import { mirekToRgb, xyToRgb } from "../src/color.ts";
 import { predictSync } from "../src/sync.ts";
 import type {
   Gallery,
+  BridgesMessage,
   Hass,
   HassState,
   HueDeviceInfo,
@@ -23,6 +24,7 @@ import type {
   StudioConfig,
   SceneInfo,
   ServiceData,
+  SyncBoxDevice,
   SyncBoxInfo,
   SyncChange,
   XY,
@@ -139,7 +141,8 @@ const SYNC_BOX: SyncBoxInfo = {
   video_supported: true,
   audio_supported: true,
   connection: "connected",
-  features: ["palette", "background_lighting", "presets", "ir"],
+  features: ["palette", "background_lighting", "presets", "settings", "ir"],
+  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
   palette: "neutral",
   background_lighting: { video: false, game: true },
   presets: [
@@ -457,12 +460,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
   // Add devices: a switch and a sensor without an area; the search finds a lamp.
   const hueDevices: HueDeviceInfo[] = [
-    { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: null },
+    { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: null, software: "2.47.8", reachable: false },
     { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: { value: 2, max: 4 } },
     // The office's motion sensor (HA device dev_motion).
     { id: "dev-motion1", name: "Office sensor", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: "office", lights: [], ha_device: "dev_motion", sensitivity: { value: 2, max: 4 } },
   ];
   let searching = false;
+  let searchStarted: number | null = null;
   // Entertainment areas: the TV area (the living room's TV lights) and a desk area.
   const entAreas: EntertainmentArea[] = [
     { id: "ent-tv", name: "TV area", type: "screen", streaming: false, lights: {
@@ -473,11 +477,22 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const entMessage = () => ({ "hue-entry": { name: "Hue Bridge", areas: structuredClone(entAreas),
     lights: ["light.candle", "light.desk_lamp", "light.globe_lights", "light.play_left", "light.play_right", "light.tv_strip"] } });
   const pushEnt = () => setTimeout(() => entListeners.forEach((cb) => cb(entMessage())), 60);
-  const bridgesMessage = { "hue-entry": { name: "Hue Bridge", host: "192.0.2.10", id: "001788fffe000000", model: "Hue Bridge", software: "1.70.1970",
-    motion_areas: [{ id: "ma-1", name: "Living room", group: "Living room", enabled: true, health: "healthy",
-      lights: [{ entity_id: "light.play_left", health: "healthy" }, { entity_id: "light.play_right", health: "healthy" }] }] } };
+  // ?bridges=basic: no Hue Bridge Pro (no MotionAware).
+  const pro = new URLSearchParams(location.search).get("bridges") !== "basic";
+  const bridgesMessage: BridgesMessage = {
+    "hue-entry": { name: "Hue Bridge", connected: true, host: "192.0.2.10", id: "001788fffe000000", model: pro ? "Hue Bridge Pro" : "Hue Bridge",
+      software: "1.70.1970", pro, ha_device: "dev_bridge", devices: 14, lights: 11,
+      motion_areas: pro ? [{ id: "ma-1", name: "Living room", group: "Living room", enabled: true, health: "healthy",
+        lights: [{ entity_id: "light.play_left", health: "healthy" }, { entity_id: "light.play_right", health: "healthy" }] }] : null },
+    "hue-entry-2": { name: "Garden Bridge", connected: false, host: "192.0.2.11", id: "001788fffe000001", model: null, software: null,
+      pro: false, ha_device: null, devices: null, lights: null, motion_areas: null },
+  };
+  const bridgeListeners = new Set<(m: unknown) => void>();
+  const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
   const deviceListeners = new Set<(m: unknown) => void>();
-  const devicesMessage = () => ({ "hue-entry": { name: "Hue Bridge", searching, devices: structuredClone(hueDevices) } });
+  const devicesMessage = () => ({
+    "hue-entry": { name: "Hue Bridge", searching, search_started: searching ? searchStarted : null, other_brands: true, devices: structuredClone(hueDevices) },
+  });
   const pushDevices = () => setTimeout(() => deviceListeners.forEach((cb) => cb(devicesMessage())), 60);
   /** A small copy of the backend's alignment plan (alignment.py), one light per device. */
   const planRooms = (): RoomsPlan => {
@@ -826,16 +841,59 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         pushEnt();
         return null as T;
       }
-      if (msg.type === "hue_studio/bridges/motion_area") return null as T;
+      if (msg.type === "hue_studio/bridges/motion_area") {
+        const area = bridgesMessage["hue-entry"].motion_areas?.find((a) => a.id === msg.area_id);
+        if (area) area.enabled = !!msg.enabled;
+        pushBridges();
+        return null as T;
+      }
       if (msg.type === "hue_studio/config/set_group" || msg.type === "hue_studio/config/set_room_sensors") return null as T;
       if (msg.type === "hue_studio/devices/search") {
+        // ?found=0: the search finds nothing. Otherwise a lamp joins, then a dimmer switch.
+        const finds = new URLSearchParams(location.search).get("found") !== "0";
         searching = true;
+        searchStarted = Date.now() / 1000;
+        const n = hueDevices.filter((d) => d.id.startsWith("dev-new")).length;
+        if (finds) {
+          setTimeout(() => {
+            hueDevices.unshift({ id: `dev-new${n}`, name: `Hue color lamp ${3 + n}`, product: "Hue color lamp", model: "LCA006", archetype: "sultan_bulb", kind: "light", new: true, found: Date.now() / 1000, area: null, lights: [], ha_device: null, sensitivity: null, software: "1.122.2", reachable: true });
+            pushDevices();
+          }, 2500);
+          setTimeout(() => {
+            hueDevices.unshift({ id: `dev-new${n}-dimmer`, name: "Hue dimmer switch 1", product: "Hue dimmer switch", model: "RWL022", archetype: "unknown_archetype", kind: "switch", new: true, found: Date.now() / 1000, area: null, lights: [], ha_device: null, sensitivity: null, software: "2.45.2", reachable: true });
+            pushDevices();
+          }, 4500);
+        }
         setTimeout(() => {
           searching = false;
-          hueDevices.unshift({ id: "dev-new", name: "Hue color lamp 3", product: "Hue color lamp", model: "LCA006", archetype: "sultan_bulb", kind: "light", new: true, found: Date.now() / 1000, area: null, lights: [], ha_device: null, sensitivity: null });
           pushDevices();
-        }, 3000);
+        }, 8000);
         pushDevices();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/devices/delete") {
+        const i = hueDevices.findIndex((d) => d.id === msg.device);
+        if (i < 0) throw new Error("unknown device");
+        hueDevices.splice(i, 1);
+        pushDevices();
+        return null as T;
+      }
+      if (msg.type === "config/area_registry/create") {
+        const id = String(msg.name).toLowerCase().replace(/[^a-z0-9]+/g, "_");
+        AREAS[id] = { name: String(msg.name), icon: null };
+        onChange({ ...hass, areas: { ...AREAS } });
+        return { area_id: id, name: String(msg.name) } as T;
+      }
+      if (msg.type === "hue_studio/bridges/rename") {
+        bridgesMessage[String(msg.hue_entry_id)].name = String(msg.name);
+        pushBridges();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/sync/configure") {
+        const { entry_id: _, type: __, ...change } = msg;
+        if (typeof change.name === "string") box = { ...box, name: change.name };
+        box = { ...box, device: { ...box.device!, ...(change as Partial<SyncBoxDevice>) } };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
         return null as T;
       }
       if (msg.type === "hue_studio/devices/identify") return null as T;
@@ -926,8 +984,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           };
         }
         if (msg.type === "hue_studio/bridges/subscribe") {
-          setTimeout(() => send(bridgesMessage), 40);
-          return () => {};
+          bridgeListeners.add(send);
+          setTimeout(() => send(structuredClone(bridgesMessage)), 40);
+          return () => {
+            bridgeListeners.delete(send);
+          };
         }
         if (msg.type === "hue_studio/devices/subscribe") {
           deviceListeners.add(send);

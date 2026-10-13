@@ -219,6 +219,17 @@ directly. Per HA area with auto light settings:
   `zigbee_device_discovery` search (optionally by serial numbers), new devices and those
   without an HA area, each named on the bridge, put into an area and (lights) into the
   area's Hue room; identify. Checked on a live HA (read-only: no search started).
+- ~~"Add devices" as a flow~~ — done (0.9.1-alpha.3): like the Hue app's: what is added
+  (lights, accessories, other brands' Zigbee lights with the default link key), the steps
+  to get it ready, serial numbers, the search with its progress and the devices as they
+  join, then each one named and put into a room (an existing area or a new one); from a
+  room's "+" too. Devices can be deleted from their bridge; unreachable ones are marked.
+- ~~Bridges and Sync Boxes as entities of their own~~ — done (0.9.1-alpha.3): Settings →
+  Bridges lists every bridge (connected or not) and Sync Box; a bridge's page renames it on
+  the bridge and links its devices, entertainment and MotionAware areas; a Sync Box's page
+  has its name, status light, following the TV (paired directly), its connection mode and
+  facts. "Visit" on their HA device pages opens that page. MotionAware areas show only with
+  a Hue Bridge Pro.
 
 - ~~Sync Box, direct pairing only~~ — done: music palette, background lighting, presets
   (start, save the current state, delete; starting and deleting built on aiohuesyncbox's

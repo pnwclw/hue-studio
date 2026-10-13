@@ -17,7 +17,9 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
 from .bridges import (
+    NAME_MAX as BRIDGE_NAME_MAX,
     async_bridges_payload,
+    async_rename_bridge,
     async_set_motion_area,
 )
 from .const import (
@@ -35,6 +37,7 @@ from .const import (
 from .devices import (
     MAX_SERIALS,
     SIGNAL_DEVICES_UPDATED,
+    async_delete_device,
     async_devices_payload,
     async_identify,
     async_search,
@@ -76,7 +79,12 @@ from .rooms import (
     async_track_rooms,
 )
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
-from .sync import async_sync_boxes
+from .sync import (
+    LED_MODES,
+    NAME_MAX as SYNC_NAME_MAX,
+    SyncBoxCoordinator,
+    async_sync_boxes,
+)
 
 
 @callback
@@ -96,6 +104,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_identify_device)
     websocket_api.async_register_command(hass, ws_setup_device)
     websocket_api.async_register_command(hass, ws_set_sensitivity)
+    websocket_api.async_register_command(hass, ws_delete_device)
     for command in (
         ws_subscribe_entertainment,
         ws_create_entertainment,
@@ -104,6 +113,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_entertainment_positions,
         ws_subscribe_bridges,
         ws_set_motion_area,
+        ws_rename_bridge,
+        ws_configure_sync_box,
         ws_set_group_area,
         ws_set_room_sensors,
     ):
@@ -536,6 +547,7 @@ async def _ws_call(
         vol.Optional("serials", default=list): vol.All(
             [cv.string], vol.Length(max=MAX_SERIALS)
         ),
+        vol.Optional("other_brands", default=False): bool,
     }
 )
 @websocket_api.async_response
@@ -546,7 +558,11 @@ async def ws_search_devices(
 ) -> None:
     """Let new Hue devices join the bridge (all bridges without an entry id)."""
     await _ws_call(
-        connection, msg, async_search(hass, msg.get("hue_entry_id"), msg["serials"])
+        connection,
+        msg,
+        async_search(
+            hass, msg.get("hue_entry_id"), msg["serials"], msg["other_brands"]
+        ),
     )
 
 
@@ -593,6 +609,20 @@ async def ws_setup_device(
             msg.get("sensitivity"),
         ),
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/devices/delete", vol.Required("device"): str}
+)
+@websocket_api.async_response
+async def ws_delete_device(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Remove a Hue device from its bridge."""
+    await _ws_call(connection, msg, async_delete_device(hass, msg["device"]))
 
 
 @websocket_api.require_admin
@@ -801,6 +831,60 @@ async def ws_set_motion_area(
     """Switch a MotionAware area on or off."""
     await _ws_call(
         connection, msg, async_set_motion_area(hass, msg["area_id"], msg["enabled"])
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/rename",
+        vol.Required("hue_entry_id"): str,
+        vol.Required("name"): vol.All(str, vol.Length(min=1, max=BRIDGE_NAME_MAX)),
+    }
+)
+@websocket_api.async_response
+async def ws_rename_bridge(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Name a bridge."""
+    await _ws_call(
+        connection, msg, async_rename_bridge(hass, msg["hue_entry_id"], msg["name"])
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/sync/configure",
+        vol.Required("entry_id"): str,
+        vol.Optional("name"): vol.All(str, vol.Length(min=1, max=SYNC_NAME_MAX)),
+        vol.Optional("led"): vol.In(list(LED_MODES)),
+        vol.Optional("tv_power"): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_configure_sync_box(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """A Sync Box's own settings (paired directly only)."""
+    box = async_sync_boxes(hass).get(msg["entry_id"])
+    if not isinstance(box, SyncBoxCoordinator):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_FOUND,
+            "Not a Sync Box paired with Hue Studio",
+        )
+        return
+    await _ws_call(
+        connection,
+        msg,
+        box.async_configure(
+            name=msg.get("name"), led=msg.get("led"), tv_power=msg.get("tv_power")
+        ),
     )
 
 

@@ -1,20 +1,38 @@
-// Settings (a tab of the panel), laid out like the Hue app's: the home (devices, bridges,
-// MotionAware and entertainment areas), then Hue Studio's own (rooms and zones, scene
-// gallery, integration settings, experimental). Every row opens a screen of its own.
+// Settings (a tab of the panel), laid out like the Hue app's: the home (devices, bridges and
+// Sync Boxes, MotionAware areas with a Hue Bridge Pro, entertainment areas), then Hue
+// Studio's own (rooms and zones, scene gallery, integration settings, experimental). Every
+// row opens a screen of its own.
 
 import { html, nothing, type TemplateResult } from "lit";
-import { customElement } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 
+import { hasPro } from "../devices.ts";
 import { hueZones, planHasNews } from "../rooms.ts";
+import type { BridgesMessage } from "../types.ts";
 import { StudioView } from "./base.ts";
 
 @customElement("hue-studio-settings-view")
 export class SettingsView extends StudioView {
+  @state() private accessor bridges: BridgesMessage | null = null;
+  private stop?: () => void;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.stop = this.ctx.watch<BridgesMessage>("hue_studio/bridges/subscribe", (m) => (this.bridges = m));
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stop?.();
+  }
+
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
     const plan = ctx.rooms;
     const boxes = Object.keys(ctx.boxes).length;
+    const bridges = Object.keys(this.bridges || {}).length;
+    const bridgesSub = !this.bridges ? "" : t(boxes ? "settings.bridges_boxes" : "settings.bridges_count", { bridges, boxes });
     const row = (glyph: string, title: string, to: string, sub = "", badge = false): TemplateResult =>
       html`<button class="item" @click=${() => ctx.go(to)}>
         <ha-icon icon=${glyph}></ha-icon>
@@ -32,8 +50,8 @@ export class SettingsView extends StudioView {
       html`<h2 class="label">${t("settings.home")}</h2>
         <div class="rows">
           ${row("mdi:lightbulb-group-outline", t("settings.devices"), "/settings/devices", t("settings.devices_sub"))}
-          ${row("mdi:router-wireless", t("settings.bridges"), "/settings/bridges", boxes ? t("settings.bridges_sub", { boxes }) : "")}
-          ${row("mdi:motion-sensor", t("settings.motionaware"), "/settings/motionaware")}
+          ${row("mdi:router-wireless", t("settings.bridges"), "/settings/bridges", bridgesSub)}
+          ${hasPro(this.bridges) ? row("mdi:motion-sensor", t("settings.motionaware"), "/settings/motionaware") : nothing}
           ${row("mdi:television-ambient-light", t("settings.entertainment"), "/settings/entertainment")}
         </div>
         <h2 class="label">Hue Studio</h2>

@@ -17,7 +17,7 @@ from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 import pytest
@@ -93,6 +93,7 @@ BOX_STATE: dict[str, Any] = {
         "videoSyncSupported": True,
         "audioSyncSupported": True,
     },
+    "behavior": {"inactivePowersave": 20, "cecPowersave": True},
     "registrations": {},
     "presets": {
         "p1": {"name": "Movie night", "lastUsed": None, "execution": {"mode": "video"}},
@@ -675,7 +676,24 @@ async def test_subscribe_sync(
         "scanned": [],
         "codes": [{"code": "aa10", "name": "Red", "action": "toggle_sync"}],
     }
-    assert box["features"] == ["palette", "background_lighting", "presets", "ir"]
+    assert box["features"] == [
+        "palette",
+        "background_lighting",
+        "presets",
+        "settings",
+        "ir",
+    ]
+    assert box["device"]["ha_device"] is not None
+    assert box["device"] | {"ha_device": None} == {
+        "id": BOX_ID,
+        "host": BOX_HOST,
+        "firmware": "2.5.4",
+        "update": None,
+        "wifi": 3,
+        "led": "normal",
+        "tv_power": True,
+        "ha_device": None,
+    }
 
     sync_box.state["execution"].update(mode="video", syncActive=True)
     await box_entry.runtime_data.sync.async_refresh()
@@ -725,3 +743,38 @@ async def test_registry_unique_ids(hass: HomeAssistant, sync_box: FakeBox) -> No
     entry = er.async_get(hass).async_get("switch.sync_box_light_sync")
     assert entry is not None
     assert entry.unique_id == f"{BOX_ID}_light_sync"
+
+
+async def test_configure(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    sync_box: FakeBox,
+    box_entry: MockConfigEntry,
+) -> None:
+    """The box's own settings from the panel: name, LED, following the TV."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/sync/configure",
+            "entry_id": box_entry.entry_id,
+            "name": " Living room box ",
+            "led": "off",
+            "tv_power": False,
+        }
+    )
+    assert (await client.receive_json())["success"]
+    assert sync_box.sent(path="/device") == [
+        {"name": "Living room box"},
+        {"ledMode": 0},
+    ]
+    assert sync_box.sent(path="/behavior") == [{"cecPowersave": False}]
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, BOX_ID), box_entry.entry_id
+    )
+    assert device is not None
+    assert device.name == "Living room box"
+
+    await client.send_json_auto_id(
+        {"type": "hue_studio/sync/configure", "entry_id": "nope", "led": "off"}
+    )
+    assert not (await client.receive_json())["success"]

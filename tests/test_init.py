@@ -80,7 +80,10 @@ async def test_setup_and_unload(
     assert device.model == "Hue Bridge Pro"
     assert device.sw_version == "1.70.0"
     assert device.via_device_id == native.id
-    assert device.configuration_url == "homeassistant://hue/settings/bridges"
+    assert (
+        device.configuration_url
+        == f"homeassistant://hue/settings/bridges/{hue_entry.entry_id}"
+    )
 
     assert await hass.config_entries.async_unload(studio_entry.entry_id)
     assert studio_entry.state is ConfigEntryState.NOT_LOADED

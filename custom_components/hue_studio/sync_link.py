@@ -16,6 +16,7 @@ from aiohue.v2.models.entertainment_configuration import EntertainmentStatus
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_DEVICE_ID,
+    CONF_HOST,
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
@@ -169,6 +170,16 @@ class SyncBoxLink:
             "video_supported": True,
             "audio_supported": True,
             "connection": self._state(KEY_CONNECTION),
+            "device": {
+                "id": self.sync_entry.unique_id,
+                "host": self.sync_entry.data.get(CONF_HOST),
+                "firmware": device.sw_version if device else None,
+                "update": None,
+                "wifi": None,
+                "led": None,
+                "tv_power": None,
+                "ha_device": device.id if device else None,
+            },
         }
 
     async def async_set_sync(self, data: dict[str, Any]) -> None:

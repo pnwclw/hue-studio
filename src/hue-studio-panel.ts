@@ -18,9 +18,10 @@
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
-//   /settings/devices          Hue devices by area; add new ones (search, name, area, Hue room)
-//   /settings/bridges          bridges and Sync Boxes
-//   /settings/motionaware      MotionAware areas
+//   /settings/devices          Hue devices by area (name, area, identify, delete)
+//   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
+//   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
+//   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
 //   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
 //   /settings/integration      the integration's options
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
@@ -43,6 +44,7 @@ import "./views/bridges.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
 import "./views/integration.ts";
+import "./views/device-add.ts";
 import "./views/devices.ts";
 import "./views/experimental.ts";
 import "./views/gallery.ts";
@@ -77,7 +79,8 @@ type Route =
   | { name: "experimental" }
   | { name: "gallerySettings" }
   | { name: "devices" }
-  | { name: "bridges"; mode: "bridges" | "motion" }
+  | { name: "deviceAdd"; room: string | null }
+  | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
   | { name: "entertainment"; area: string | null; arrange: boolean }
   | { name: "integration" }
   | { name: "automations" }
@@ -122,9 +125,10 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
+  if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "add") return { name: "deviceAdd", room: params.get("room") };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
-  if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges" };
-  if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion" };
+  if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
+  if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
   if (parts[0] === "settings" && parts[1] === "integration") return { name: "integration" };
   if (parts[0] === "settings") return { name: "settings" };
@@ -184,6 +188,7 @@ export class HueStudioPanel extends LitElement {
           ? "automations"
           : route.name === "settings" || route.name === "rooms" || route.name === "experimental" || route.name === "gallerySettings" ||
               route.name === "devices" ||
+              route.name === "deviceAdd" ||
               route.name === "bridges" ||
               route.name === "entertainment" ||
               route.name === "integration"
@@ -252,7 +257,7 @@ export class HueStudioPanel extends LitElement {
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "bridges":
-        return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode}></hue-studio-bridges-view>`;
+        return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode} .item=${route.item}></hue-studio-bridges-view>`;
       case "entertainment":
         return route.arrange && route.area
           ? html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .entertainment=${route.area}></hue-studio-space-view>`
@@ -261,6 +266,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-integration-view .ctx=${ctx} .rev=${rev}></hue-studio-integration-view>`;
       case "devices":
         return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev}></hue-studio-devices-view>`;
+      case "deviceAdd":
+        return html`<hue-studio-device-add-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-device-add-view>`;
       case "experimental":
         return html`<hue-studio-experimental-view .ctx=${ctx} .rev=${rev}></hue-studio-experimental-view>`;
       case "gallerySettings":

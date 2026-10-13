@@ -70,10 +70,25 @@ export interface HueDeviceInfo {
   ha_device: string | null;
   /** A motion sensor's sensitivity (0..max; `changing`: calibrating to it), else null. */
   sensitivity: { value: number; max: number; changing?: boolean } | null;
+  software?: string | null;
+  /** Whether the bridge reaches it over Zigbee (null: the bridge does not say). */
+  reachable?: boolean | null;
 }
 
-/** Per bridge (native hue entry id); `searching` null: the bridge cannot search via its API. */
-export type DevicesMessage = Record<string, { name: string; searching: boolean | null; devices: HueDeviceInfo[] }>;
+/** One bridge's devices (hue_studio/devices/subscribe). */
+export interface BridgeDevices {
+  name: string;
+  /** null: the bridge cannot search through its API. */
+  searching: boolean | null;
+  /** When a search through Hue Studio started (seconds), while the bridge searches. */
+  search_started?: number | null;
+  /** The search can also let other brands' Zigbee lights join. */
+  other_brands?: boolean;
+  devices: HueDeviceInfo[];
+}
+
+/** Per bridge (native hue entry id). */
+export type DevicesMessage = Record<string, BridgeDevices>;
 
 /** Entertainment areas per bridge (hue_studio/entertainment/subscribe). */
 export type EntertainmentMessage = Record<string, { name: string; lights: string[]; areas: EntertainmentArea[] }>;
@@ -88,18 +103,26 @@ export interface EntertainmentArea {
 }
 
 /** Bridges and their MotionAware areas (hue_studio/bridges/subscribe). */
-export type BridgesMessage = Record<
-  string,
-  {
-    name: string;
-    host: string | null;
-    id: string;
-    model: string | null;
-    software: string | null;
-    /** null: no MotionAware on this bridge. */
-    motion_areas: MotionArea[] | null;
-  }
->;
+export type BridgesMessage = Record<string, BridgeInfo>;
+
+/** A bridge of the native integration; one Hue Studio is not connected to has its entry's facts only. */
+export interface BridgeInfo {
+  name: string;
+  connected?: boolean;
+  host: string | null;
+  id: string;
+  model: string | null;
+  software: string | null;
+  /** A Hue Bridge Pro (MotionAware). */
+  pro?: boolean;
+  /** The native bridge device in HA. */
+  ha_device?: string | null;
+  /** How many devices (lights, switches, sensors) and lights it has. */
+  devices?: number | null;
+  lights?: number | null;
+  /** null: no MotionAware on this bridge. */
+  motion_areas: MotionArea[] | null;
+}
 
 export interface MotionArea {
   id: string;
@@ -338,7 +361,9 @@ export interface SyncBoxInfo {
   audio_supported?: boolean;
   connection?: string | null;
   /** Direct pairing only (not a box linked through huesyncbox). */
-  features?: ("palette" | "background_lighting" | "presets" | "ir")[];
+  features?: ("palette" | "background_lighting" | "presets" | "ir" | "settings")[];
+  /** The box itself (settings only for a box paired directly). */
+  device?: SyncBoxDevice;
   /** Music mode's palette. */
   palette?: string | null;
   background_lighting?: { video: boolean; game: boolean };
@@ -363,6 +388,20 @@ export interface SyncIrCode {
 
 export interface SyncMessage {
   boxes: Record<string, SyncBoxInfo>;
+}
+
+export interface SyncBoxDevice {
+  id: string | null;
+  host: string | null;
+  firmware: string | null;
+  /** A newer firmware the box can install, or null. */
+  update: string | null;
+  /** Wi-Fi strength 0 (none) to 4, or null (wired or unknown). */
+  wifi: number | null;
+  led: "off" | "dimmed" | "normal" | null;
+  /** Turns on and off with the TV (HDMI CEC). */
+  tv_power: boolean | null;
+  ha_device: string | null;
 }
 
 /** Data of `hue_studio.set_sync`. */

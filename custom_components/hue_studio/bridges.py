@@ -1,5 +1,8 @@
 """The bridges as the panel's settings show them, and their MotionAware areas.
 
+Every bridge of the native integration is listed, connected or not; a connected one
+with its facts, and it can be renamed (on the bridge, like in the Hue app).
+
 MotionAware areas (`motion_area_configuration`, Bridge Pro) use lights as motion
 sensors; they are set up in the Hue app. Here they are listed with their health and
 can be switched on and off.
@@ -11,23 +14,48 @@ from typing import Any
 
 from aiohttp import ClientError
 from aiohue.errors import AiohueException
+from aiohue.v2.models.device import DeviceMetaDataPut, DevicePut
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN, SIGNAL_BRIDGES_UPDATED
+from .connections import async_supported_hue_entries
+from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
 from .lights import LIGHT_DOMAIN, async_bridges
+
+# Model ids of the Hue Bridge Pro (the bridge with MotionAware).
+PRO_MODELS = {"BSB003"}
+NAME_MAX = 32
 
 
 @callback
 def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
-    """{hue entry id: {"name", "host", "id", "model", "software",
+    """{hue entry id: {"name", "connected", "host", "id", "model", "software", "pro",
+                        "ha_device", "devices", "lights",
                         "motion_areas": [{"id", "name", "group", "enabled", "health",
                                           "lights": [{"entity_id", "health"}]}] | None}}
-    `motion_areas` is None when the bridge has no MotionAware (no Bridge Pro)."""
+    Every bridge of the native integration; one Hue Studio is not connected to (yet)
+    has only its name, address and id. `motion_areas` is None when the bridge has no
+    MotionAware (no Bridge Pro), a list (maybe empty) on a Bridge Pro."""
     payload: dict[str, Any] = {}
-    for hue_entry_id, bridge in async_bridges(hass).items():
+    bridges = async_bridges(hass)
+    for entry in async_supported_hue_entries(hass):
+        if entry.entry_id not in bridges:
+            payload[entry.entry_id] = {
+                "name": entry.title,
+                "connected": False,
+                "host": entry.data.get("host"),
+                "id": entry.unique_id,
+                "model": None,
+                "software": None,
+                "pro": False,
+                "ha_device": None,
+                "devices": None,
+                "lights": None,
+                "motion_areas": None,
+            }
+    for hue_entry_id, bridge in bridges.items():
         entry = hass.config_entries.async_get_entry(hue_entry_id)
         device = bridge.config.bridge_device
         lights = {
@@ -38,7 +66,9 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
         areas: list[dict[str, Any]] | None = None
         configs = getattr(bridge.config, "motion_area_configuration", None)
         items = list(configs) if configs is not None else []
-        if items:
+        model_id = getattr(getattr(device, "product_data", None), "model_id", None)
+        pro = bool(items) or model_id in PRO_MODELS
+        if pro:
             areas = []
             for config in items:
                 group = bridge.groups.room.get(
@@ -60,15 +90,61 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
                         ],
                     }
                 )
+        name = getattr(getattr(device, "metadata", None), "name", None)
+        native = (
+            dr.async_get(hass).async_get_device_by_identifier(
+                (HUE_DOMAIN, str(device.id)), hue_entry_id
+            )
+            if isinstance(getattr(device, "id", None), str)
+            else None
+        )
         payload[hue_entry_id] = {
-            "name": entry.title if entry else "Hue Bridge",
+            "name": name
+            if isinstance(name, str) and name
+            else (entry.title if entry else "Hue Bridge"),
+            "connected": True,
             "host": entry.data.get("host") if entry else None,
             "id": bridge.config.bridge_id,
             "model": device.product_data.product_name if device else None,
             "software": device.product_data.software_version if device else None,
+            "pro": pro,
+            "ha_device": native.id if native else None,
+            "devices": sum(
+                1
+                for d in bridge.devices
+                if not d.product_data.product_archetype.value.startswith("bridge")
+            ),
+            "lights": sum(1 for _ in bridge.lights),
             "motion_areas": areas,
         }
     return payload
+
+
+async def async_rename_bridge(
+    hass: HomeAssistant, hue_entry_id: str, name: str
+) -> None:
+    """Name a bridge (its device on the bridge, as the Hue app does)."""
+    bridge = async_bridges(hass).get(hue_entry_id)
+    if bridge is None or bridge.config.bridge_device is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="hue_entry_missing"
+        )
+    device = bridge.config.bridge_device
+    name = name.strip()[:NAME_MAX]
+    if not name or name == device.metadata.name:
+        return
+    try:
+        await bridge.devices.update(
+            device.id,
+            DevicePut(metadata=DeviceMetaDataPut(archetype=None, name=name)),
+        )
+    except (AiohueException, ClientError, TimeoutError) as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"entity_id": device.metadata.name},
+        ) from err
+    async_dispatcher_send(hass, SIGNAL_BRIDGES_UPDATED)
 
 
 async def async_set_motion_area(
