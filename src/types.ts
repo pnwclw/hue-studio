@@ -40,11 +40,12 @@ export type ServiceData = Record<string, unknown> & { entity_id?: string | strin
 export interface HassData {
   states: Record<string, HassState>;
   entities?: Record<string, HassEntityEntry>;
-  devices?: Record<string, { area_id?: string | null; name?: string | null; name_by_user?: string | null }>;
+  devices?: Record<string, { area_id?: string | null; name?: string | null; name_by_user?: string | null; model?: string | null }>;
   areas?: Record<string, HassArea>;
   config?: { location_name?: string };
   language?: string;
-  locale?: { language: string };
+  /** `time_format`: "12", "24", "language" or "system" (HA's profile setting). */
+  locale?: { language: string; time_format?: string };
 }
 
 /** A Hue device in the "Add devices" screen (hue_studio/devices/subscribe). */
@@ -61,6 +62,10 @@ export interface HueDeviceInfo {
   found: number | null;
   area: string | null;
   lights: string[];
+  /** Its HA device id, or null. */
+  ha_device: string | null;
+  /** A motion sensor's sensitivity (0..max), else null. */
+  sensitivity: { value: number; max: number } | null;
 }
 
 /** Per bridge (native hue entry id); `searching` null: the bridge cannot search via its API. */

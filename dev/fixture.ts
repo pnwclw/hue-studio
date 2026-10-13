@@ -201,7 +201,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     setLight(id, s);
   }
   // Sensors: a Hue motion sensor (with its thermometer) and a thermostat in the office.
-  devices.dev_motion = { area_id: "office", name: "Office sensor" };
+  devices.dev_motion = { area_id: "office", name: "Office sensor", model: "Hue motion sensor" };
   devices.dev_thermostat = { area_id: "office" };
   const sensor = (id: string, platform: string, device: string, state: string, attributes: Record<string, unknown>) => {
     entities[id] = { platform, device_id: device };
@@ -214,6 +214,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   // The Hue motion sensor's on/off switch (HA's `hue` creates it as "Motion sensor enabled").
   sensor("switch.office_sensor_motion_sensor_enabled", "hue", "dev_motion", "on", { friendly_name: "Office sensor Motion sensor enabled" });
   entities["switch.office_sensor_motion_sensor_enabled"].translation_key = "motion_sensor_enabled";
+  sensor("sensor.office_sensor_battery", "hue", "dev_motion", "85", { device_class: "battery", unit_of_measurement: "%", friendly_name: "Office sensor Battery" });
   sensor("weather.home", "met", "", "cloudy", { friendly_name: "Home", cloud_coverage: 85 });
   sensor("sensor.season", "season", "", "autumn", { device_class: "enum", friendly_name: "Season" });
   // Adaptive Lighting for the office lamp.
@@ -453,8 +454,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
   // Add devices: a switch and a sensor without an area; the search finds a lamp.
   const hueDevices: HueDeviceInfo[] = [
-    { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [] },
-    { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [] },
+    { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: null },
+    { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: { value: 2, max: 4 } },
+    // The office's motion sensor (HA device dev_motion).
+    { id: "dev-motion1", name: "Office sensor", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: "office", lights: [], ha_device: "dev_motion", sensitivity: { value: 2, max: 4 } },
   ];
   let searching = false;
   // Entertainment areas: the TV area (the living room's TV lights) and a desk area.
@@ -826,7 +829,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         searching = true;
         setTimeout(() => {
           searching = false;
-          hueDevices.unshift({ id: "dev-new", name: "Hue color lamp 3", product: "Hue color lamp", model: "LCA006", archetype: "sultan_bulb", kind: "light", new: true, found: Date.now() / 1000, area: null, lights: [] });
+          hueDevices.unshift({ id: "dev-new", name: "Hue color lamp 3", product: "Hue color lamp", model: "LCA006", archetype: "sultan_bulb", kind: "light", new: true, found: Date.now() / 1000, area: null, lights: [], ha_device: null, sensitivity: null });
           pushDevices();
         }, 3000);
         pushDevices();
@@ -835,6 +838,17 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "hue_studio/devices/identify") return null as T;
       if (msg.type === "hue_studio/devices/setup") {
         const i = hueDevices.findIndex((d) => d.id === msg.device);
+        const d = hueDevices[i];
+        if (d?.ha_device) {
+          // A device that HA has: the bridge renames it (HA follows), HA moves it.
+          if (msg.name) d.name = String(msg.name);
+          d.area = (msg.area_id as string | null) ?? null;
+          if (typeof msg.sensitivity === "number" && d.sensitivity) d.sensitivity = { ...d.sensitivity, value: msg.sensitivity };
+          devices[d.ha_device] = { ...devices[d.ha_device], name: d.name, area_id: d.area };
+          pushDevices();
+          onChange({ ...hass, states: { ...states }, devices: { ...devices } });
+          return null as T;
+        }
         if (i >= 0) hueDevices.splice(i, 1);
         pushDevices();
         return null as T;

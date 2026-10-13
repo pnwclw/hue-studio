@@ -11,6 +11,8 @@ from aiohue.v2.models.device import (
     DeviceMetaData,
     DeviceProductData,
 )
+from aiohue.v2.models.feature import MotionSensingFeatureSensitivity
+from aiohue.v2.models.motion import Motion
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
@@ -80,6 +82,15 @@ def bridge(hue_lights: MagicMock) -> MagicMock:
     hue_lights.devices.update = AsyncMock()
     hue_lights.devices.set_identify = AsyncMock()
     hue_lights.devices.subscribe.return_value = MagicMock()
+    motion = Motion(
+        id="m1",
+        owner=ResourceIdentifier(rid="dev-motion", rtype=ResourceTypes.DEVICE),
+        enabled=True,
+        sensitivity=MotionSensingFeatureSensitivity(sensitivity=2, sensitivity_max=4),
+    )
+    hue_lights.sensors.motion.get.side_effect = {"m1": motion}.get
+    hue_lights.sensors.motion.update = AsyncMock()
+    hue_lights.sensors.motion.subscribe.return_value = MagicMock()
     discovery = hue_lights.config.zigbee_device_discovery
     discovery.__iter__.side_effect = lambda: iter(
         [SimpleNamespace(id="disc-1", status=SimpleNamespace(value="ready"))]
@@ -107,7 +118,7 @@ async def test_add_devices(
     lamp = devices.async_get_or_create(
         config_entry_id=hue_entry.entry_id, identifiers={(HUE_DOMAIN, "dev-bulb")}
     )
-    devices.async_get_or_create(
+    sensor = devices.async_get_or_create(
         config_entry_id=hue_entry.entry_id,
         identifiers={(HUE_DOMAIN, "dev-motion")},
     )
@@ -132,7 +143,11 @@ async def test_add_devices(
         "found": None,
         "area": None,
         "lights": ["light.bulb"],
+        "ha_device": lamp.id,
+        "sensitivity": None,
     }
+    assert listed["dev-motion"]["ha_device"] == sensor.id
+    assert listed["dev-motion"]["sensitivity"] == {"value": 2, "max": 4}
 
     assert (
         await _ws(client, type="hue_studio/devices/search", serials=[" ab12cd ", ""])
@@ -176,3 +191,57 @@ async def test_add_devices(
         client, type="hue_studio/devices/setup", device="dev-gone", area_id=office.id
     )
     assert not reply["success"]
+
+
+async def test_motion_sensitivity(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """A motion sensor's sensitivity is set on the bridge (clamped); others refuse."""
+    office = ar.async_get(hass).async_create("Office")
+    client = await hass_ws_client(hass)
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/setup",
+        device="dev-motion",
+        area_id=office.id,
+        sensitivity=9,
+    )
+    assert reply["success"]
+    rid, put = bridge.sensors.motion.update.call_args.args
+    assert rid == "m1"
+    assert put.sensitivity.sensitivity == 4
+
+    bridge.sensors.motion.update.reset_mock()
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/setup",
+        device="dev-motion",
+        area_id=office.id,
+        sensitivity=2,
+    )
+    assert reply["success"]
+    bridge.sensors.motion.update.assert_not_awaited()
+
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/setup",
+        device="dev-bulb",
+        area_id=office.id,
+        sensitivity=1,
+    )
+    assert not reply["success"]
+    assert "motion sensitivity" in reply["error"]["message"]
+
+    # A changed sensitivity on the bridge reaches the panel; plain motion does not.
+    from custom_components.hue_studio.devices import async_watch_bridges
+
+    async_watch_bridges(hass)
+    changed = bridge.sensors.motion.subscribe.call_args.args[0]
+    motion = bridge.sensors.motion.get("m1")
+    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+        changed(EventType.RESOURCE_UPDATED, motion)
+        changed(EventType.RESOURCE_UPDATED, motion)
+    assert send.call_count == 1

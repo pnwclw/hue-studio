@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allDayDraft, areaFor, controlsGroup, daysLine, fromConfig, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
+import { allDayDraft, areaFor, cardLines, controlsGroup, daysLine, fromConfig, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
 import { localize } from "../../src/i18n.ts";
 
 const t = localize(null);
@@ -59,6 +59,14 @@ test("when, in words", () => {
   const schedule = newDraft("schedule", "Balcony", ["area.balcony"]);
   schedule.input = { ...schedule.input, start_kind: "sunset", end_kind: "time", end_time: "23:00:00", days: ["sat", "sun"] };
   assert.equal(whenLine(schedule, t), "Sunset – 23:00 · Weekend");
+});
+
+test("an automation's card: the time before the name, the days under it (the Hue app's)", () => {
+  const wake = newDraft("wake_up", "Wake up", ["area.office"]);
+  wake.input = { ...wake.input, time: "07:00:00", days: ["mon", "tue", "wed", "thu", "fri"] };
+  assert.deepEqual(cardLines(wake, "Wake up", t), { title: "07:00 • Wake up", sub: "Weekdays" });
+  const motion = newDraft("motion", "Office light", ["area.office"]);
+  assert.deepEqual(cardLines(motion, "Office light", t), { title: "Office light", sub: "On motion" });
 });
 
 test("an all-day scene is a schedule from sunrise showing the scene of the day", () => {

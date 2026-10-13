@@ -7,10 +7,12 @@
 //   /room/<key>/color?light=&back=   color wheel (effects too)
 //   /room/<key>/scene/<scene>  scene editor
 //   /room/<key>/space          arrange the room's lights (positions)
+//   /room/<key>/sensor/<device>   a Hue sensor's settings (its HA device id)
 //   /gallery?room=<key>        scene gallery of a room or zone (its "+"), full screen
 //   /automations               automations (tab): ours, and the other HA ones touching Hue lights
 //   /automations/new[?room=]   the types of the Hue app (+ a custom one in HA's editor)
-//   /automations/new/<type>[?room=<area>][&preset=all_day]   a new automation (all_day: a room's all-day scene)
+//   /automations/new/<type>[?room=<area>][&preset=all_day][&sensor=&lux=]   a new automation (all_day: a room's
+//                              all-day scene; sensor/lux: a motion one started from a sensor's "Add lights")
 //   /automations/<id>          an automation (its config id)
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
@@ -50,6 +52,7 @@ import "./views/rooms.ts";
 import "./views/settings.ts";
 import "./views/space.ts";
 import "./views/scene.ts";
+import "./views/sensor.ts";
 import "./views/sync.ts";
 import { registerHueIcons } from "./hue-icons.ts";
 
@@ -62,6 +65,7 @@ type Route =
   | { name: "color"; key: string; light: string | null; back: string | null; exit: string | null }
   | { name: "scene"; key: string; scene: string }
   | { name: "space"; key: string }
+  | { name: "sensor"; key: string; device: string }
   | { name: "gallery"; room: string | null }
   | { name: "sync"; box: string | null }
   | { name: "rooms" }
@@ -74,7 +78,15 @@ type Route =
   | { name: "integration" }
   | { name: "automations" }
   | { name: "automationNew"; room: string | null }
-  | { name: "automation"; id: string | null; type: string | null; room: string | null; preset: string | null };
+  | {
+      name: "automation";
+      id: string | null;
+      type: string | null;
+      room: string | null;
+      preset: string | null;
+      sensor: string | null;
+      lux: string | null;
+    };
 
 function parseRoute(path: string, search: string): Route {
   const params = new URLSearchParams(search);
@@ -87,13 +99,22 @@ function parseRoute(path: string, search: string): Route {
   }
   if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3]) return { name: "scene", key: parts[1], scene: parts[3] };
   if (parts[0] === "room" && parts[1] && parts[2] === "space") return { name: "space", key: parts[1] };
+  if (parts[0] === "room" && parts[1] && parts[2] === "sensor" && parts[3]) return { name: "sensor", key: parts[1], device: parts[3] };
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
-  if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return { name: "automation", id: null, type: parts[2], room: params.get("room"), preset: params.get("preset") };
+  if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return {
+      name: "automation",
+      id: null,
+      type: parts[2],
+      room: params.get("room"),
+      preset: params.get("preset"),
+      sensor: params.get("sensor"),
+      lux: params.get("lux"),
+    };
   if (parts[0] === "automations" && parts[1] === "new") return { name: "automationNew", room: params.get("room") };
-  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: params.get("room"), preset: null };
+  if (parts[0] === "automations" && parts[1]) return { name: "automation", id: parts[1], type: null, room: params.get("room"), preset: null, sensor: null, lux: null };
   if (parts[0] === "automations") return { name: "automations" };
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
@@ -169,7 +190,7 @@ export class HueStudioPanel extends LitElement {
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
-    const full = route.name === "color" || route.name === "scene" || route.name === "gallery";
+    const full = route.name === "color" || route.name === "scene" || route.name === "sensor" || route.name === "gallery";
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;
     return html`
@@ -200,6 +221,8 @@ export class HueStudioPanel extends LitElement {
         ></hue-studio-color-view>`;
       case "space":
         return html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .key=${route.key}></hue-studio-space-view>`;
+      case "sensor":
+        return html`<hue-studio-sensor-view .ctx=${ctx} .rev=${rev} .key=${route.key} .device=${route.device}></hue-studio-sensor-view>`;
       case "scene":
         return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
       case "sync":
@@ -216,6 +239,8 @@ export class HueStudioPanel extends LitElement {
           .newType=${route.type}
           .room=${route.room}
           .preset=${route.preset}
+          .sensor=${route.sensor}
+          .lux=${route.lux}
         ></hue-studio-automation-edit-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;

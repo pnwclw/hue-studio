@@ -11,10 +11,10 @@ import { property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { fromConfig, isType, TYPE_ICONS, whenLine } from "./automations.ts";
+import { cardLines, fromConfig, isType, TYPE_ICONS } from "./automations.ts";
 import { paletteArt } from "./color.ts";
 import { PANEL_PATH, StudioContext } from "./context.ts";
-import { groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
+import { automationCard, groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
 import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { currentHass, navigate } from "./ha-internals.ts";
 import { localize, type StringKey } from "./i18n.ts";
@@ -113,9 +113,7 @@ const CARD_CSS = css`
                        font-size: 28px; color: #fff; background: rgba(0, 0, 0, 0.35); }
   .cat { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
   .warn { color: var(--text-2); font-size: 13px; }
-  .auto-row { min-height: 48px; }
-  .auto-row + .auto-row { border-top: 1px solid var(--surface); }
-  .auto-row ha-icon { color: var(--text-2); }
+  .auto-card { box-shadow: none; }
 `;
 
 /** Base of the cards: shared context, HA's `hass`, a re-render on every change. */
@@ -309,17 +307,16 @@ class HueStudioAutomationsCard extends StudioCard {
       <div class="body">
         <div class="cat">${title}</div>
         ${list.length ? nothing : html`<div class="warn">${t("automations.empty")}</div>`}
-        ${list.map(({ entityId, id, type, draft, name }) => {
-          const on = ctx.hass.states[entityId]?.state === "on";
-          return html`<div class="row auto-row">
-            <ha-icon icon=${type && isType(type) ? TYPE_ICONS[type] : "mdi:robot-outline"}></ha-icon>
-            <button class="grow link" ?disabled=${!id} @click=${() => id && this.panel(`/automations/${encodeURIComponent(id)}${room}`)}>
-              <div class="name">${name}</div>
-              ${draft ? html`<div class="sub">${whenLine(draft, t)}</div>` : nothing}
-            </button>
-            ${toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }))}
-          </div>`;
-        })}
+        <div class="auto-list">
+          ${list.map(({ entityId, id, type, draft, name }) => {
+            const on = ctx.hass.states[entityId]?.state === "on";
+            const lines = draft ? cardLines(draft, name, t) : { title: name, sub: "" };
+            const glyph = type && isType(type) ? TYPE_ICONS[type] : "mdi:robot-outline";
+            const open = () => id && this.panel(`/automations/${encodeURIComponent(id)}${room}`);
+            const sw = toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }));
+            return automationCard(glyph, lines.title, lines.sub, open, sw);
+          })}
+        </div>
         <div class="actions"><button class="pill" @click=${() => this.panel(`/automations/new${room}`)}>${t("automations.add")}</button></div>
       </div>
     </ha-card>`;

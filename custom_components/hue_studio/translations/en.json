@@ -192,6 +192,9 @@
     "search_failed": {
       "message": "The Hue Bridge did not start searching for devices."
     },
+    "no_motion_sensitivity": {
+      "message": "{device} has no adjustable motion sensitivity."
+    },
     "unknown_hue_device": {
       "message": "No Hue device {device} on the bridges of Hue Studio."
     },

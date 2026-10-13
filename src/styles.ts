@@ -224,8 +224,21 @@ export const CSS = `
   .round.mini svg { width: 16px; height: 16px; }
   .light.unavailable { opacity: 0.45; }
   .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
-  .sensor.motion > .art ha-icon { color: #3ddc84; }
-  .sensor.off > .art ha-icon { opacity: 0.5; }
+  /* The Hue app's "Controls" tiles (sensors): picture and switch on top, name and status below. */
+  .control-row { display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: 12px; overflow-x: auto;
+                 margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+                 overscroll-behavior-x: contain; }
+  .control-row::-webkit-scrollbar { display: none; }
+  .control-card { box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; height: 106px; padding: 14px 14px 12px;
+                  border-radius: 16px; background: var(--surface); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); cursor: pointer;
+                  scroll-snap-align: start; transition: transform 0.15s var(--ease); }
+  .control-card:active { transform: scale(0.96); }
+  .control-card .top { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: auto; }
+  .control-card .top ha-icon { --mdc-icon-size: 28px; }
+  .control-card .top .inert { pointer-events: none; opacity: 0.35; }
+  .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; line-height: 1.25; }
+  .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 1.3; color: var(--text-2); }
+  .control-card.off .top ha-icon { opacity: 0.5; }
   /* A row of cards that scrolls sideways (lights, sensors), like the Hue app's. */
   .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto;
                margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
@@ -711,6 +724,40 @@ export const CSS = `
                           cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .rows .item .row-open .grow { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
   .rows .item .row-open .dim.small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A sensor's settings, like the Hue app's: picture and big name, then full-width rows on phones. */
+  .sensor-edit { padding-bottom: calc(28px + var(--safe-bottom)); }
+  .sensor-hero { padding: 18px 2px 6px; }
+  .sensor-hero .pic { display: block; --mdc-icon-size: 60px; }
+  .sensor-hero .name-row { margin: 14px 0 12px; }
+  .sensor-hero h1.big { white-space: normal; overflow-wrap: anywhere; font-size: 34px; }
+  .sensor-hero .name-input { font-size: 24px; }
+  .sensor-edit .rows { margin-top: 16px; }
+  .sensor-edit h2.label + .rows { margin-top: 0; }
+  .sensor-edit .rows .item { min-height: 64px; gap: 16px; font-size: 17px; }
+  .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 28px; color: var(--text); }
+  .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 15px; }
+  .sensor-edit .rows .item .value { color: var(--text-2); }
+  .sensor-edit h2.label { margin-top: 28px; }
+  .round.plus-blue { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--accent); color: #fff; }
+  .sensor-sheet .rows { border-radius: 12px; background: #333336; }
+  .sensor-sheet .form-body { padding-bottom: 16px; }
+  .sensor-sheet .hint { margin: 0 2px 12px; font-size: 15px; }
+  .sensor-sheet .tick { display: flex; color: var(--accent); }
+  .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: 34px; font-weight: 700; }
+  @container (max-width: 599px) {
+    .sensor-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+  }
+  /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
+  .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .auto-list + .rows { margin-top: 10px; }
+  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 0 18px 0 0; box-sizing: border-box;
+               border-radius: 16px; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
+  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 18px; padding: 14px 0 14px 18px;
+                         border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 32px; color: var(--text); }
+  .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 500; line-height: 1.25; }
+  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.3; color: var(--text-2); }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
   .automation-type { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; font-size: 13px; color: var(--text-2); }
   .automation-type ha-icon { --mdc-icon-size: 18px; }
@@ -807,7 +854,7 @@ export const CSS = `
     .searching { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
     .grid.inputs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sync-hero { padding: 24px; }
-    .tile:hover, .card:hover, .tile-card:hover { transform: translateY(-1px); }
+    .tile:hover, .card:hover, .tile-card:hover, .control-card:hover { transform: translateY(-1px); }
     h1.big { font-size: 34px; }
     /* Room header: a card in the column instead of a sheet glued to the top edge. */
     .page > .hero:first-child { position: relative; margin: 20px 0 0; padding: 4px 20px 18px; border-radius: 22px; }

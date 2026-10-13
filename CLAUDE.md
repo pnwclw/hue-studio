@@ -250,7 +250,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
                                 automations (the tab, "+" and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
-                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area),
+                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
                                 experimental, devices, bridges (and MotionAware), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule)
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers

@@ -61,8 +61,12 @@ export interface GroupState extends SensorReadings {
 export interface HueSensor {
   device: string;
   name: string;
+  /** The Hue app's picture of the sensor. */
+  icon: string;
   sensors: RoomSensors;
   enabled: string | null;
+  /** Its battery level sensor, or null. */
+  battery: string | null;
 }
 
 export interface AdaptiveSwitch {
@@ -248,6 +252,51 @@ export function groupState(hass: HassData, group: Group, lightInfo: Record<strin
 /** Switches of a Hue sensor that turn it on and off, by HA's `hue` translation keys, preferred first. */
 const SENSOR_SWITCHES = ["motion_sensor_enabled", "light_sensor_enabled"];
 
+/** The Hue app's picture of a sensor, from the HA device's model (product name). */
+export const sensorIcon = (model: string | null | undefined, motion: boolean): string =>
+  !motion ? "mdi:thermometer" : /outdoor/i.test(model || "") ? "hue-studio:outdoor-motion" : "hue-studio:motion-sensor";
+
+/** The Hue app's battery picture (a sensor's "Battery replacement"). */
+export const BATTERY_ICON = "hue-studio:battery-full";
+
+/** Hue sensor devices (HA device ids) with all their own sensors and switches. */
+function hueSensors(hass: HassData, wanted: Set<string>): Map<string, HueSensor> {
+  const found = new Map<string, HueSensor>();
+  const switches = new Map<string, string[]>();
+  for (const [id, entry] of Object.entries(hass.entities || {})) {
+    const device = entry.device_id;
+    if (entry.platform !== "hue" || !device || !wanted.has(device) || !hass.states[id]) continue;
+    let card = found.get(device);
+    if (!card) {
+      const info = hass.devices?.[device];
+      const sensors = { motion: [], temperature: [], illuminance: [] };
+      card = { device, name: info?.name_by_user || info?.name || "", icon: "", sensors, enabled: null, battery: null };
+      found.set(device, card);
+    }
+    if (id.startsWith("binary_sensor.") && hasDeviceClass(hass, id, MOTION_CLASSES)) card.sensors.motion.push(id);
+    else if (id.startsWith("sensor.") && hasDeviceClass(hass, id, ["temperature"])) card.sensors.temperature.push(id);
+    else if (id.startsWith("sensor.") && hasDeviceClass(hass, id, ["illuminance"])) card.sensors.illuminance.push(id);
+    else if (id.startsWith("sensor.") && hasDeviceClass(hass, id, ["battery"])) card.battery = id;
+    else if (id.startsWith("switch.") && SENSOR_SWITCHES.includes(entry.translation_key || "")) {
+      switches.set(device, [...(switches.get(device) || []), id]);
+    }
+  }
+  const rank = (id: string) => SENSOR_SWITCHES.indexOf(hass.entities?.[id]?.translation_key || "");
+  for (const card of found.values()) {
+    card.enabled = (switches.get(card.device) || []).sort((a, b) => rank(a) - rank(b))[0] ?? null;
+    card.icon = sensorIcon(hass.devices?.[card.device]?.model, card.sensors.motion.length > 0);
+    if (!card.name) card.name = friendlyName(hass, card.sensors.motion[0] || card.sensors.illuminance[0] || card.sensors.temperature[0] || card.device);
+  }
+  return found;
+}
+
+/** One Hue sensor device (an HA device id), or null if it has no sensors of its own. */
+export function hueSensor(hass: HassData, device: string): HueSensor | null {
+  const card = hueSensors(hass, new Set([device])).get(device);
+  const { motion, temperature, illuminance } = card?.sensors || { motion: [], temperature: [], illuminance: [] };
+  return card && motion.length + temperature.length + illuminance.length ? card : null;
+}
+
 /**
  * A room's sensors split by device: Hue devices that hold any of them (one card each, with
  * all of the device's own readings) and the sensors of anything else.
@@ -258,35 +307,19 @@ export function splitSensors(hass: HassData, sensors: RoomSensors): { devices: H
     return entry?.platform === "hue" && entry.device_id ? entry.device_id : null;
   };
   const ids = [...sensors.motion, ...sensors.temperature, ...sensors.illuminance];
-  const wanted = new Set(ids.map(deviceOf).filter((d) => d !== null));
-  const found = new Map<string, HueSensor>();
-  const switches = new Map<string, string[]>();
-  for (const [id, entry] of Object.entries(hass.entities || {})) {
-    const device = entry.device_id;
-    if (entry.platform !== "hue" || !device || !wanted.has(device) || !hass.states[id]) continue;
-    let card = found.get(device);
-    if (!card) {
-      const info = hass.devices?.[device];
-      card = { device, name: info?.name_by_user || info?.name || "", sensors: { motion: [], temperature: [], illuminance: [] }, enabled: null };
-      found.set(device, card);
-    }
-    if (id.startsWith("binary_sensor.") && hasDeviceClass(hass, id, MOTION_CLASSES)) card.sensors.motion.push(id);
-    else if (id.startsWith("sensor.") && hasDeviceClass(hass, id, ["temperature"])) card.sensors.temperature.push(id);
-    else if (id.startsWith("sensor.") && hasDeviceClass(hass, id, ["illuminance"])) card.sensors.illuminance.push(id);
-    else if (id.startsWith("switch.") && SENSOR_SWITCHES.includes(entry.translation_key || "")) {
-      switches.set(device, [...(switches.get(device) || []), id]);
-    }
-  }
-  const rank = (id: string) => SENSOR_SWITCHES.indexOf(hass.entities?.[id]?.translation_key || "");
-  for (const card of found.values()) {
-    card.enabled = (switches.get(card.device) || []).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-    if (!card.name) card.name = friendlyName(hass, card.sensors.motion[0] || card.sensors.illuminance[0] || card.sensors.temperature[0] || card.device);
-  }
+  const found = hueSensors(hass, new Set(ids.map(deviceOf).filter((d) => d !== null)));
   const other = (list: string[]) => list.filter((id) => !found.has(deviceOf(id) ?? ""));
   return {
     devices: [...found.values()].sort((a, b) => a.name.localeCompare(b.name)),
     rest: { motion: other(sensors.motion), temperature: other(sensors.temperature), illuminance: other(sensors.illuminance) },
   };
+}
+
+/** Names of a motion sensor's sensitivity levels (0..max), like the Hue app's; null: numbered. */
+export function sensitivityLevels(max: number): string[] | null {
+  if (max === 2) return ["low", "medium", "high"];
+  if (max === 4) return ["very_low", "low", "medium", "high", "very_high"];
+  return null;
 }
 
 /**

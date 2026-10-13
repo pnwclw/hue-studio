@@ -107,6 +107,20 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
   </div>`;
 }
 
+/**
+ * An automation's card, like the Hue app's: its picture, "07:00 • Wake up" over "Weekdays"
+ * (or what starts it), and its switch.
+ */
+export function automationCard(glyph: string, title: string, sub: string, open: () => void, toggle: TemplateResult | typeof nothing = nothing): TemplateResult {
+  return html`<div class="auto-card">
+    <button class="row-open" @click=${open}>
+      <ha-icon icon=${glyph}></ha-icon>
+      <span class="text"><span class="title">${title}</span>${sub ? html`<span class="sub">${sub}</span>` : nothing}</span>
+    </button>
+    ${toggle}
+  </div>`;
+}
+
 /** What a card shows; everything but the picture and the name is optional. */
 export interface TileCard {
   /** The picture on top: an icon or a round picture (`.dot`). */

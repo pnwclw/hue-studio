@@ -8,6 +8,8 @@
   hold devices, see `rooms.async_align`).
 - Hue devices whose HA device has no area are listed too, so devices added in the Hue
   app can be set up the same way.
+- Motion sensors also carry their sensitivity (the Hue app's "Motion sensitivity"),
+  which the native integration does not expose; it is set on the bridge like the name.
 """
 
 from __future__ import annotations
@@ -23,6 +25,8 @@ from aiohue import HueBridgeV2
 from aiohue.errors import AiohueException
 from aiohue.v2.controllers.events import EventType
 from aiohue.v2.models.device import Device, DeviceMetaDataPut, DevicePut
+from aiohue.v2.models.feature import MotionSensingFeatureSensitivityPut
+from aiohue.v2.models.motion import MotionPut
 from aiohue.v2.models.resource import ResourceTypes
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -64,6 +68,8 @@ class DeviceSetup:
     watching: dict[str, tuple[HueBridgeV2, Callable[[], None]]] = field(
         default_factory=dict
     )
+    # motion resource id -> its last sensitivity seen (motion events come often)
+    sensitivity: dict[str, int | None] = field(default_factory=dict)
 
 
 _DATA: HassKey[DeviceSetup] = HassKey(f"{DOMAIN}_device_setup")
@@ -103,7 +109,20 @@ def async_watch_bridges(hass: HomeAssistant) -> None:
                 setup.found[item.id] = time.time()
             async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
 
-        unsubs = [bridge.devices.subscribe(added)]
+        @callback
+        def motion_changed(event_type: EventType, item: Any) -> None:
+            value = _sensitivity_of(item)
+            value = value["value"] if value else None
+            if setup.sensitivity.get(item.id) != value:
+                setup.sensitivity[item.id] = value
+                async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
+
+        unsubs = [
+            bridge.devices.subscribe(added),
+            bridge.sensors.motion.subscribe(
+                motion_changed, event_filter=EventType.RESOURCE_UPDATED
+            ),
+        ]
         if (
             discovery := getattr(bridge.config, "zigbee_device_discovery", None)
         ) is not None:
@@ -137,6 +156,31 @@ def _searching(bridge: HueBridgeV2) -> bool | None:
     if not items:
         return None
     return any(item.status.value == "active" for item in items)
+
+
+def _sensitivity_of(motion: Any) -> dict[str, int] | None:
+    """{"value", "max"} of a motion resource, or None if it has none."""
+    feature = getattr(motion, "sensitivity", None)
+    value = getattr(feature, "sensitivity", None)
+    if not isinstance(value, int):
+        return None
+    top = getattr(feature, "sensitivity_max", None)
+    return {"value": value, "max": top if isinstance(top, int) else max(value, 2)}
+
+
+def _motion_of(bridge: HueBridgeV2, device: Device) -> tuple[str, Any] | None:
+    """The (first) motion resource of a device: (id, resource)."""
+    for service in device.services:
+        if service.rtype == ResourceTypes.MOTION:
+            motion = bridge.sensors.motion.get(service.rid)
+            if motion is not None:
+                return service.rid, motion
+    return None
+
+
+def _device_sensitivity(bridge: HueBridgeV2, device: Device) -> dict[str, int] | None:
+    found = _motion_of(bridge, device)
+    return _sensitivity_of(found[1]) if found else None
 
 
 @callback
@@ -187,6 +231,8 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
                         for rid in device.lights
                         if rid in light_entities
                     ),
+                    "ha_device": ha_device.id if ha_device else None,
+                    "sensitivity": _device_sensitivity(bridge, device),
                 }
             )
         # Newest first, then by name.
@@ -258,10 +304,24 @@ async def async_identify(hass: HomeAssistant, device_id: str) -> None:
 
 
 async def async_setup_device(
-    hass: HomeAssistant, device_id: str, name: str | None, area_id: str | None
+    hass: HomeAssistant,
+    device_id: str,
+    name: str | None,
+    area_id: str | None,
+    sensitivity: int | None = None,
 ) -> None:
-    """Name a Hue device, put it into an HA area and its lights into that Hue room."""
+    """Name a Hue device, put it into an HA area and its lights into that Hue room;
+    a motion sensor's sensitivity too."""
     hue_entry_id, bridge, device = _find(hass, device_id)
+    motion = _motion_of(bridge, device) if sensitivity is not None else None
+    if sensitivity is not None and (
+        motion is None or _sensitivity_of(motion[1]) is None
+    ):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="no_motion_sensitivity",
+            translation_placeholders={"device": device.metadata.name},
+        )
     if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -281,6 +341,26 @@ async def async_setup_device(
                 translation_key="command_failed",
                 translation_placeholders={"entity_id": device.metadata.name},
             ) from err
+    if motion is not None and sensitivity is not None:
+        rid, resource = motion
+        current = _sensitivity_of(resource) or {"value": 0, "max": 0}
+        value = min(max(sensitivity, 0), current["max"])
+        if value != current["value"]:
+            try:
+                await bridge.sensors.motion.update(
+                    rid,
+                    MotionPut(
+                        sensitivity=MotionSensingFeatureSensitivityPut(
+                            sensitivity=value
+                        )
+                    ),
+                )
+            except (AiohueException, ClientError, TimeoutError) as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="command_failed",
+                    translation_placeholders={"entity_id": device.metadata.name},
+                ) from err
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     ha_device = next(

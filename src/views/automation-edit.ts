@@ -102,6 +102,9 @@ export class AutomationEditView extends StudioView {
   @property() accessor room: string | null = null;
   /** `all_day`: a new all-day scene (a schedule showing the scene of the day). */
   @property() accessor preset: string | null = null;
+  /** A new motion automation started from a sensor's settings: its motion and light level sensors. */
+  @property() accessor sensor: string | null = null;
+  @property() accessor lux: string | null = null;
 
   @state() private accessor draft: AutomationDraft | null = null;
   @state() private accessor page: "main" | "day" = "main";
@@ -140,6 +143,10 @@ export class AutomationEditView extends StudioView {
         this.preset === "all_day" && this.newType === "schedule"
           ? allDayDraft(ctx.t("add.all_day"), places)
           : newDraft(this.newType, ctx.t(`automations.type_${this.newType}` as StringKey), places);
+      if (this.newType === "motion" && this.sensor && ctx.hass.states[this.sensor]) {
+        const lux = this.lux && ctx.hass.states[this.lux] ? { lux_sensor: this.lux } : {};
+        this.draft = { ...this.draft, input: { ...this.draft.input, motion: [this.sensor], ...lux } };
+      }
     } else if (this.automationId) {
       const entity = ctx.automationEntity(this.automationId);
       const config = entity ? ctx.automationConfigs[entity] : undefined;

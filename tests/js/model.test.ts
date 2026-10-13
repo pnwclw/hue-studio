@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildHome, groupState, splitSensors } from "../../src/model.ts";
+import { buildHome, groupState, hueSensor, sensitivityLevels, splitSensors } from "../../src/model.ts";
 import type { HassData, XY } from "../../src/types.ts";
 
 const light = (state: string, attrs = {}) => ({ state, attributes: { friendly_name: "x", ...attrs } });
@@ -123,7 +123,7 @@ test("room sensors: defaults from the area, overridable by options", () => {
 
 test("room sensors split into Hue sensor devices (with all their readings and switch) and the rest", () => {
   const h = structuredClone(hass) as Required<HassData>;
-  h.devices.d_sensor = { area_id: "office", name: "Hue motion sensor", name_by_user: "Office sensor" };
+  h.devices.d_sensor = { area_id: "office", name: "Hue motion sensor", name_by_user: "Office sensor", model: "Hue outdoor motion sensor" };
   const add = (id: string, entry: object, state: string, attributes = {}) => {
     h.entities[id] = { platform: "hue", device_id: "d_sensor", ...entry };
     h.states[id] = { state, attributes };
@@ -131,6 +131,7 @@ test("room sensors split into Hue sensor devices (with all their readings and sw
   add("binary_sensor.sensor_motion", {}, "off", { device_class: "motion" });
   add("sensor.sensor_temperature", {}, "20.5", { device_class: "temperature" });
   add("sensor.sensor_lux", {}, "12", { device_class: "illuminance" });
+  add("sensor.sensor_battery", {}, "80", { device_class: "battery" });
   add("switch.sensor_light_enabled", { translation_key: "light_sensor_enabled" }, "on");
   add("switch.sensor_motion_enabled", { translation_key: "motion_sensor_enabled" }, "on");
   h.entities["sensor.thermostat"] = { platform: "demo", device_id: "d_desk" };
@@ -142,14 +143,25 @@ test("room sensors split into Hue sensor devices (with all their readings and sw
     {
       device: "d_sensor",
       name: "Office sensor",
+      icon: "hue-studio:outdoor-motion",
       sensors: { motion: ["binary_sensor.sensor_motion"], temperature: ["sensor.sensor_temperature"], illuminance: ["sensor.sensor_lux"] },
       enabled: "switch.sensor_motion_enabled",
+      battery: "sensor.sensor_battery",
     },
   ]);
+  // The settings screen finds the same sensor by its device; a light is no sensor.
+  assert.deepEqual(hueSensor(h, "d_sensor"), devices[0]);
+  assert.equal(hueSensor(h, "d_desk"), null);
   assert.deepEqual(rest, { motion: [], temperature: ["sensor.thermostat"], illuminance: [] });
 
   // No Hue sensor among the room's sensors: no cards.
   assert.deepEqual(splitSensors(h, { motion: [], temperature: ["sensor.thermostat"], illuminance: [] }).devices, []);
+});
+
+test("motion sensitivity levels are named like the Hue app's", () => {
+  assert.deepEqual(sensitivityLevels(2), ["low", "medium", "high"]);
+  assert.equal(sensitivityLevels(4)?.length, 5);
+  assert.equal(sensitivityLevels(7), null);
 });
 
 test("adaptive lighting switches covering a room", () => {

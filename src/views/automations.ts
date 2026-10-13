@@ -7,9 +7,10 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import { type AutomationDraft, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES, whenLine } from "../automations.ts";
+import { type AutomationDraft, cardLines, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES } from "../automations.ts";
 import type { StudioContext } from "../context.ts";
 import type { StringKey } from "../i18n.ts";
+import { automationCard } from "../controls.ts";
 import { allGroups, friendlyName, type Group } from "../model.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -50,23 +51,15 @@ function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null 
   const on = state?.state === "on";
   const draft = l.draft;
   const name = draft?.alias || friendlyName(ctx.hass, l.entityId);
-  const sub = l.custom
-    ? t("automations.custom_sub")
-    : draft
-      ? [whenLine(draft, t), !inGroup || placesOf(draft.input).length > 1 ? roomsLine(ctx.hass, draft.input) : ""].filter(Boolean).join(" · ")
-      : "";
+  const lines = draft && !l.custom ? cardLines(draft, name, t) : { title: name, sub: l.custom ? t("automations.custom_sub") : "" };
+  const rooms = draft && !l.custom && (!inGroup || placesOf(draft.input).length > 1) ? roomsLine(ctx.hass, draft.input) : "";
   const id = ctx.automations?.automations[l.entityId]?.id;
   const room = from ? `?room=${encodeURIComponent(from.key)}` : "";
   // Ours open here (one whose config can't be read says so there); taken over in HA: HA's editor.
   const open = () => (l.custom || !id ? haEditor(ctx, l.entityId) : ctx.go(`/automations/${encodeURIComponent(id)}${room}`));
   const glyph = l.type && l.type in TYPE_ICONS ? TYPE_ICONS[l.type as keyof typeof TYPE_ICONS] : "mdi:robot-outline";
-  return html`<div class="item automation">
-    <button class="plain grow row-open" @click=${open}>
-      <ha-icon icon=${glyph}></ha-icon>
-      <span class="grow">${name}<span class="dim small">${sub}</span></span>
-    </button>
-    ${toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId }))}
-  </div>`;
+  const sub = [lines.sub, rooms].filter(Boolean).join(" · ");
+  return automationCard(glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })));
 }
 
 /** The automations of a room or zone, for its screen (nothing without any: its "+" adds them). */
@@ -74,7 +67,7 @@ export function roomAutomations(ctx: StudioContext, g: Group): TemplateResult | 
   const list = ofGroup(ours(ctx), g);
   if (!list.length) return nothing;
   return html`<h2 class="label">${ctx.t("automations.title")}</h2>
-    <div class="rows automations">${list.map((l) => row(ctx, l, true, g))}</div>`;
+    <div class="auto-list">${list.map((l) => row(ctx, l, true, g))}</div>`;
 }
 
 /** Ours by room and zone (the home's order), then those of no room or zone known here. */
@@ -85,12 +78,12 @@ function byGroup(ctx: StudioContext, list: Listed[]): TemplateResult[] {
     .filter((s) => s.items.length)
     .map(
       ({ g, items }) => html`<h2 class="label">${g.name}</h2>
-        <div class="rows automations">${items.map((l) => row(ctx, l, true))}</div>`,
+        <div class="auto-list">${items.map((l) => row(ctx, l, true))}</div>`,
     );
   const rest = list.filter((l) => !groups.some((g) => controlsGroup(l.controls, g.key, g.group)));
   if (rest.length)
     sections.push(html`<h2 class="label">${ctx.t("automations.no_room")}</h2>
-      <div class="rows automations">${rest.map((l) => row(ctx, l))}</div>`);
+      <div class="auto-list">${rest.map((l) => row(ctx, l))}</div>`);
   return sections;
 }
 
@@ -114,17 +107,17 @@ export class AutomationsView extends StudioView {
             </div>`}
         <h2 class="label">${t("automations.ha")}</h2>
         <p class="lead">${t("automations.ha_hint")}</p>
-        <div class="rows automations">
-          ${related.map((id) => {
-            const on = ctx.hass.states[id].state === "on";
-            const name = friendlyName(ctx.hass, id);
-            return html`<div class="item automation">
-              <button class="plain grow row-open" @click=${() => haEditor(ctx, id)}>
-                <ha-icon icon="mdi:robot-outline"></ha-icon><span class="grow">${name}</span>
-              </button>
-              ${toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: id }))}
-            </div>`;
-          })}
+        ${related.length
+          ? html`<div class="auto-list">
+              ${related.map((id) => {
+                const on = ctx.hass.states[id].state === "on";
+                const name = friendlyName(ctx.hass, id);
+                const sw = toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: id }));
+                return automationCard("mdi:robot-outline", name, "", () => haEditor(ctx, id), sw);
+              })}
+            </div>`
+          : nothing}
+        <div class="rows">
           <button class="item" @click=${() => haEditor(ctx, null)}>
             <ha-icon icon="mdi:home-assistant"></ha-icon><div class="grow">${t("automations.custom")}<div class="dim small">${t("automations.custom_hint")}</div></div>
             <ha-icon class="chevron" icon="mdi:open-in-new"></ha-icon>

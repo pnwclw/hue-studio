@@ -1,6 +1,7 @@
 // Room: header with toggle, brightness, Adaptive Lighting and "+" (add a scene, an automation
-// or a device: add-sheet.ts); readings of the room's other sensors; the room's Hue scenes;
-// its lights; its Hue sensors (a card each); its automations, like the Hue app.
+// or a device: add-sheet.ts); the room's readings (temperature, light level, motion of
+// sensors that are not Hue's); its Hue scenes; its lights; its Hue sensors ("Controls", a
+// card each, opening the sensor's settings); its automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -75,7 +76,7 @@ export class RoomView extends StudioView {
       </div>
     </div>
     <div class="screen-body"><div class="page">
-      ${this.readings(sensors.rest)}
+      ${this.readings(g.sensors, sensors.rest)}
       ${this.syncCards(g)}
       ${g.scenes.length
         ? html`<h2 class="label">${t("room.scenes")}</h2>
@@ -90,8 +91,8 @@ export class RoomView extends StudioView {
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
       ${sensors.devices.length
-        ? html`<h2 class="label">${t("room.sensors")}</h2>
-            <div class="light-row">${sensors.devices.map((d) => this.sensor(d))}</div>`
+        ? html`<h2 class="label">${t("room.controls")}</h2>
+            <div class="control-row">${sensors.devices.map((d) => this.sensor(g, d))}</div>`
         : nothing}
       ${roomAutomations(ctx, g)}
     </div></div>
@@ -100,71 +101,68 @@ export class RoomView extends StudioView {
       : nothing}`;
   }
 
-  /** Motion, temperature and light level from the room's sensors that are not Hue sensors; a tap opens the sensor in HA. */
-  private readings(sensors: RoomSensors) {
+  /**
+   * The room's temperature and light level, and motion of sensors that are not Hue's (a Hue
+   * sensor has its card); a tap opens the sensor in HA.
+   */
+  private readings(all: RoomSensors, rest: RoomSensors) {
     const { ctx } = this;
     const { t } = ctx;
     const lang = this.userLang();
-    const state = sensorReadings(ctx.hass, sensors);
+    const state = sensorReadings(ctx.hass, { ...all, motion: rest.motion });
     const chip = (ids: string[], glyph: string, text: string, on = false) =>
       html`<button class=${classMap({ "sensor-chip": true, on })} @click=${() => openStockMoreInfo(ids[0])}>
         <ha-icon icon=${glyph}></ha-icon><span>${text}</span>
       </button>`;
-    const { motion, temperature, illuminance } = sensors;
     const chips = [
-      motion.length
+      rest.motion.length
         ? chip(
-            motion,
+            rest.motion,
             state.motion ? "mdi:motion-sensor" : "mdi:motion-sensor-off",
             state.motion ? t("sensors.motion") : state.lastMotion ? t("sensors.motion_ago", { time: since(state.lastMotion, lang) }) : t("sensors.no_motion"),
             state.motion,
           )
         : nothing,
-      state.temperature !== null ? chip(temperature, "mdi:thermometer", `${this.number(state.temperature, 1)} °C`) : nothing,
-      state.illuminance !== null ? chip(illuminance, "mdi:brightness-5", `${this.number(state.illuminance, 0)} lx`) : nothing,
+      state.temperature !== null ? chip(all.temperature, "mdi:thermometer", `${this.number(state.temperature, 1)} °C`) : nothing,
+      state.illuminance !== null ? chip(all.illuminance, "mdi:brightness-5", `${this.number(state.illuminance, 0)} lx`) : nothing,
     ].filter((c) => c !== nothing);
     return chips.length ? html`<div class="sensor-row">${chips}</div>` : nothing;
   }
 
   /**
-   * A Hue sensor's card: motion (now, or how long ago), temperature and light level, and
-   * its switch (the Hue app's sensor on/off). A tap opens the sensor in HA.
+   * A Hue sensor's card, the Hue app's "Controls" tile: its picture and switch (the sensor
+   * on/off) on top, the name and when it last saw motion below; a tap opens its settings.
    */
-  private sensor(d: HueSensor) {
+  private sensor(g: Group, d: HueSensor) {
     const { ctx } = this;
     const { t } = ctx;
     const state = sensorReadings(ctx.hass, d.sensors);
     const enabled = d.enabled ? ctx.hass.states[d.enabled] : undefined;
     const off = enabled?.state === "off";
-    const hasMotion = d.sensors.motion.length > 0;
     const status = off
       ? t("sensors.off")
-      : !hasMotion
-        ? ""
-        : state.motion
-          ? t("sensors.motion")
-          : state.lastMotion
-            ? since(state.lastMotion, this.userLang())
-            : t("sensors.no_motion");
-    const values = [
-      state.temperature !== null ? `${this.number(state.temperature, 1)}°` : "",
-      state.illuminance !== null ? `${this.number(state.illuminance, 0)} lx` : "",
-    ].filter(Boolean);
-    const glyph = !hasMotion ? "mdi:thermometer" : off ? "mdi:motion-sensor-off" : "mdi:motion-sensor";
-    const main = d.sensors.motion[0] || d.sensors.illuminance[0] || d.sensors.temperature[0];
-    return tileCard({
-      art: html`<ha-icon icon=${glyph}></ha-icon>`,
-      name: d.name,
-      sub: [status, values.join(" · ")],
-      toggle: enabled
-        ? toggle(enabled.state === "on", t("common.toggle"), () =>
-            ctx.call("switch", enabled.state === "on" ? "turn_off" : "turn_on", { entity_id: d.enabled! }),
-          )
-        : undefined,
-      inert: enabled?.state === "unavailable",
-      classes: { surface: true, sensor: true, motion: state.motion && !off, off },
-      click: () => main && openStockMoreInfo(main),
-    });
+      : state.motion
+        ? t("sensors.motion")
+        : state.lastMotion
+          ? lastSeen(state.lastMotion, ctx.hass.locale, this.userLang())
+          : d.sensors.motion.length
+            ? t("sensors.no_motion")
+            : "";
+    const open = () => ctx.go(`/room/${encodeURIComponent(g.key)}/sensor/${encodeURIComponent(d.device)}`);
+    return html`<div class=${classMap({ "control-card": true, motion: state.motion && !off, off })} role="button" tabindex="0" @click=${open}>
+      <div class="top">
+        <ha-icon icon=${d.icon}></ha-icon>
+        ${enabled
+          ? html`<div class=${classMap({ inert: enabled.state === "unavailable" })}>
+              ${toggle(enabled.state === "on", t("common.toggle"), () =>
+                ctx.call("switch", enabled.state === "on" ? "turn_off" : "turn_on", { entity_id: d.enabled! }),
+              )}
+            </div>`
+          : nothing}
+      </div>
+      <div class="name">${d.name}</div>
+      ${status ? html`<div class="sub">${status}</div>` : nothing}
+    </div>`;
   }
 
   private userLang(): string {
@@ -314,6 +312,12 @@ export class RoomView extends StudioView {
     const open = () => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
     return lightTile(this.ctx, id, open, { busy });
   }
+}
+
+/** When something happened, like the Hue app: "Oct 12, 23:42" (HA's 12/24-hour setting). */
+export function lastSeen(iso: string, locale: { time_format?: string } | undefined, lang: string): string {
+  const cycle = locale?.time_format === "24" ? { hourCycle: "h23" as const } : locale?.time_format === "12" ? { hourCycle: "h12" as const } : {};
+  return new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", ...cycle }).format(new Date(iso));
 }
 
 /** "5 min ago", "2 hr ago", "yesterday" in the user's language. */

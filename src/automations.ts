@@ -261,6 +261,28 @@ export function whenLine(draft: AutomationDraft, t: Translate): string {
   }
 }
 
+/**
+ * An automation's card, like the Hue app's: the time before the name ("07:00 • Wake up")
+ * and the days under it; automations without a time of day have their trigger there.
+ */
+export function cardLines(draft: AutomationDraft, name: string, t: Translate): { title: string; sub: string } {
+  const i = draft.input;
+  const timed = (time: string) => ({ title: `${time} • ${name}`, sub: daysLine(i.days, t) });
+  switch (draft.type) {
+    case "wake_up":
+    case "go_to_sleep":
+      return timed(hhmm(i.time));
+    case "mimic_presence":
+      return timed(`${momentLine(i.start_kind, i.start_time, i.start_offset, t)} – ${hhmm(i.end_time)}`);
+    case "schedule": {
+      const end = momentLine(i.end_kind, i.end_time, i.end_offset, t);
+      return timed(`${momentLine(i.start_kind, i.start_time, i.start_offset, t)}${end ? ` – ${end}` : ""}`);
+    }
+    default:
+      return { title: name, sub: whenLine(draft, t) };
+  }
+}
+
 /** Names of the rooms (areas) and zones an automation uses. */
 export function roomsLine(hass: HassData, input: Pick<AutomationInput, "rooms" | "zones">): string {
   return [
