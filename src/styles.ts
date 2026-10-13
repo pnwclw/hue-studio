@@ -189,60 +189,59 @@ export const CSS = `
   .badge svg { width: 16px; height: 16px; }
   .badge.on { background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
   .grid { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .scene, .light { position: relative; border: none; border-radius: var(--radius); cursor: pointer; text-align: center;
-                   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); transition: transform 0.15s var(--ease), color 0.3s var(--ease); }
-  .scene:active, .light:active { transform: scale(0.96); }
-  .scene { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; aspect-ratio: 1; padding: 8px; }
-  .scene .dot { width: 52px; height: 52px; border-radius: 50%; background: #555 center / cover no-repeat; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-                transition: transform 0.25s var(--spring); }
-  .scene:active .dot { transform: scale(0.9); }
-  .scene .name { font-size: 13px; font-weight: 600; line-height: 1.2; }
-  .scene .sub { margin-top: -6px; font-size: 11px; color: var(--text-2); }
+  /* Cards (scenes, lights, sensors; tileCard): the picture at a fixed distance from the top, a text
+     block of fixed height with the name (and lines under it) centered in it, and an optional
+     switch zone of its own at the bottom (the Hue app's). Every card is as tall as any other. */
+  .tile-card { --top: 14px; --art: 44px; --gap: 6px; --text-h: 52px; --zone: 48px; --icon-y: calc(var(--top) + var(--art) / 2);
+               position: relative; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
+               min-width: 0; padding: var(--top) 6px 8px; border: none; border-radius: 16px; cursor: pointer; text-align: center;
+               background: var(--surface); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+               transition: transform 0.15s var(--ease), color 0.3s var(--ease); }
+  .tile-card.switchable { padding-bottom: calc(var(--zone) + 8px); }
+  .tile-card:active { transform: scale(0.96); }
+  .tile-card > .art { flex: none; width: 100%; height: var(--art); display: flex; align-items: center; justify-content: center; }
+  .tile-card > .art ha-icon { --mdc-icon-size: 30px; }
+  .tile-card > .art .dot { width: var(--art); height: var(--art); border-radius: 50%; background: #555 center / cover no-repeat;
+                           box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3); transition: transform 0.25s var(--spring); }
+  .tile-card:active > .art .dot { transform: scale(0.9); }
+  .tile-card > .text { flex: none; box-sizing: border-box; width: 100%; height: var(--text-h); margin-top: var(--gap); display: flex;
+                       flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+  .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;
+                     overflow-wrap: anywhere; font-size: 15px; font-weight: 600; line-height: 1.2; }
+  /* Two lines under the name: the name keeps one. */
+  .tile-card .subs-2 .name { -webkit-line-clamp: 1; }
+  .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap;
+                    overflow: hidden; text-overflow: ellipsis; }
+  .tile-card > .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: var(--zone); display: flex; align-items: center;
+                              justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
+                              border-top: 1px solid rgba(255, 255, 255, 0.1); }
+  .switch-zone.inert { pointer-events: none; }
+  .switch-zone.inert .toggle { opacity: 0.35; }
   .scene.active { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 3px 10px rgba(0, 0, 0, 0.18); }
-  .scene-actions { position: absolute; top: 6px; left: 6px; right: 6px; display: flex; }
+  .scene-actions { position: absolute; top: 6px; left: 6px; right: 6px; z-index: 1; display: flex; }
   .scene-actions .edit { margin-left: auto; }
   .round.mini { width: 28px; height: 28px; background: rgba(0, 0, 0, 0.28); color: #fff; }
   .round.mini svg { width: 16px; height: 16px; }
-  .light { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px 12px; }
-  .light ha-icon { --mdc-icon-size: 28px; }
-  .light .name { font-size: 13px; font-weight: 500; line-height: 1.2; min-height: 2.4em; display: flex; align-items: center; }
   .light.unavailable { opacity: 0.45; }
-  .light.selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #fff; }
-  /* The room's lights under the color wheel, like the Hue app: a row of cards, tap to pick one. */
+  .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
+  .sensor.motion > .art ha-icon { color: #3ddc84; }
+  .sensor.off > .art ha-icon { opacity: 0.5; }
+  /* A row of cards that scrolls sideways (lights, sensors), like the Hue app's. */
   .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto;
                margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
-  /* Tall cards: icon, name, room and status on top, the switch in a zone of its own below (the Hue app's). The row
-     stretches every card to the tallest, so a status line never squeezes the switch. */
-  .light-row .light { scroll-snap-align: start; height: 156px; box-sizing: border-box; justify-content: flex-start; gap: 0;
-                      padding: 0 0 52px; border-radius: 16px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); }
-  /* The icon on top, the text centered between it and the switch's zone (the Hue app's). */
-  .light-row .light { --icon-y: 32px; }
-  .light-row .light ha-icon { margin-top: 19px; --mdc-icon-size: 26px; }
-  .light-row .light .name { flex: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 0;
-                            margin: auto 8px 0; font-size: 15px; font-weight: 600; line-height: 1.2; overflow: hidden; overflow-wrap: anywhere; }
-  .light-row .light > :nth-last-child(2) { margin-bottom: auto; }
-  .light-row .light .sub { margin: 2px 4px auto; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap; overflow: hidden;
-                           text-overflow: ellipsis; max-width: calc(100% - 8px); }
-  .light-row .light .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: 52px; display: flex; align-items: center;
-                                   justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
-                                   border-top: 1px solid rgba(255, 255, 255, 0.1); }
-  .switch-zone.inert { pointer-events: none; }
-  .switch-zone.inert .toggle { opacity: 0.35; }
+  .light-row .tile-card { scroll-snap-align: start; }
   /* Syncing: the switch reads plainly as off (the Hue app's), it is just out of reach. */
   .light.busy .switch-zone.inert .toggle { opacity: 1; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
-    .light-row .light { height: 140px; padding-bottom: 44px; }
-    .light-row .light { --icon-y: 25px; }
-    .light-row .light ha-icon { margin-top: 12px; --mdc-icon-size: 24px; }
-    .light-row .light .name { margin-top: 4px; font-size: 14px; }
-    .light-row .light .switch-zone { height: 44px; }
+    .tile-card { --top: 10px; --art: 38px; --gap: 4px; --text-h: 48px; --zone: 44px; }
+    .tile-card > .art ha-icon { --mdc-icon-size: 26px; }
+    .tile-card .name { font-size: 14px; }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
     .controls { margin-bottom: 12px; }
   }
-  .light-row .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
   /* A Sync Box drives it (the Hue app's "Sync active"): white light pulsing out from the icon
      (--icon-y: the icon's center); every tile on the same beat (views align the animations). */
   .light.busy { cursor: default; }
@@ -645,9 +644,7 @@ export const CSS = `
                       gap: 12px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none;
                       scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
     .grid.scene-row::-webkit-scrollbar { display: none; }
-    .grid.scene-row .scene { box-sizing: border-box; aspect-ratio: auto; height: 116px; scroll-snap-align: start; }
-    .grid.scene-row .scene .dot { width: 48px; height: 48px; }
-    .grid.scene-row .scene .name { font-size: 14.5px; font-weight: 500; }
+    .grid.scene-row .tile-card { scroll-snap-align: start; }
   }
   .grid.locked .scene { opacity: 0.45; cursor: default; }
   .grid.locked .scene:active { transform: none; }
@@ -810,7 +807,7 @@ export const CSS = `
     .searching { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
     .grid.inputs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sync-hero { padding: 24px; }
-    .tile:hover, .card:hover, .scene:hover, .light:hover { transform: translateY(-1px); }
+    .tile:hover, .card:hover, .tile-card:hover { transform: translateY(-1px); }
     h1.big { font-size: 34px; }
     /* Room header: a card in the column instead of a sheet glued to the top edge. */
     .page > .hero:first-child { position: relative; margin: 20px 0 0; padding: 4px 20px 18px; border-radius: 22px; }

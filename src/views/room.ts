@@ -1,6 +1,6 @@
 // Room: header with toggle, brightness, Adaptive Lighting and "+" (add a scene, an automation
-// or a device: add-sheet.ts); the room's sensors (motion, temperature, light level); the
-// room's Hue scenes; its lights; its automations, like the Hue app.
+// or a device: add-sheet.ts); readings of the room's other sensors; the room's Hue scenes;
+// its lights; its Hue sensors (a card each); its automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -8,13 +8,23 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../color.ts";
-import { groupSlider, groupToggle, lightTile, shownState, surfaceOf, syncBanner } from "../controls.ts";
+import { groupSlider, groupToggle, lightTile, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
 import { openStockMoreInfo } from "../ha-internals.ts";
-import { type AdaptiveSwitch, adaptiveFor, findGroup, friendlyName, type Group, type GroupState, type Scene } from "../model.ts";
+import {
+  type AdaptiveSwitch,
+  adaptiveFor,
+  findGroup,
+  friendlyName,
+  type Group,
+  type HueSensor,
+  type Scene,
+  sensorReadings,
+  splitSensors,
+} from "../model.ts";
 import { type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
-import type { SceneInfo, SyncBoxInfo } from "../types.ts";
+import type { RoomSensors, SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
 import "./add-sheet.ts";
 import { roomAutomations } from "./automations.ts";
@@ -42,6 +52,7 @@ export class RoomView extends StudioView {
     const surface = surfaceOf(state);
     const room = encodeURIComponent(g.key);
     const syncing = syncingIn(ctx.boxes, g);
+    const sensors = splitSensors(ctx.hass, g.sensors);
 
     // The room's colored header stays; scenes and lights scroll below it.
     return html`<div class="screen-head hero-head">
@@ -64,7 +75,7 @@ export class RoomView extends StudioView {
       </div>
     </div>
     <div class="screen-body"><div class="page">
-      ${this.sensors(g, state)}
+      ${this.readings(sensors.rest)}
       ${this.syncCards(g)}
       ${g.scenes.length
         ? html`<h2 class="label">${t("room.scenes")}</h2>
@@ -78,6 +89,10 @@ export class RoomView extends StudioView {
       </div>
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
+      ${sensors.devices.length
+        ? html`<h2 class="label">${t("room.sensors")}</h2>
+            <div class="light-row">${sensors.devices.map((d) => this.sensor(d))}</div>`
+        : nothing}
       ${roomAutomations(ctx, g)}
     </div></div>
     ${this.adding
@@ -85,17 +100,17 @@ export class RoomView extends StudioView {
       : nothing}`;
   }
 
-  /** Motion, temperature and light level of the room; a tap opens the sensor in HA. */
-  private sensors(g: Group, state: GroupState) {
+  /** Motion, temperature and light level from the room's sensors that are not Hue sensors; a tap opens the sensor in HA. */
+  private readings(sensors: RoomSensors) {
     const { ctx } = this;
     const { t } = ctx;
-    const lang = ctx.hass.locale?.language || ctx.hass.language || "en";
-    const number = (v: number, digits: number) => new Intl.NumberFormat(lang, { maximumFractionDigits: digits }).format(v);
+    const lang = this.userLang();
+    const state = sensorReadings(ctx.hass, sensors);
     const chip = (ids: string[], glyph: string, text: string, on = false) =>
       html`<button class=${classMap({ "sensor-chip": true, on })} @click=${() => openStockMoreInfo(ids[0])}>
         <ha-icon icon=${glyph}></ha-icon><span>${text}</span>
       </button>`;
-    const { motion, temperature, illuminance } = g.sensors;
+    const { motion, temperature, illuminance } = sensors;
     const chips = [
       motion.length
         ? chip(
@@ -105,10 +120,59 @@ export class RoomView extends StudioView {
             state.motion,
           )
         : nothing,
-      state.temperature !== null ? chip(temperature, "mdi:thermometer", `${number(state.temperature, 1)} °C`) : nothing,
-      state.illuminance !== null ? chip(illuminance, "mdi:brightness-5", `${number(state.illuminance, 0)} lx`) : nothing,
+      state.temperature !== null ? chip(temperature, "mdi:thermometer", `${this.number(state.temperature, 1)} °C`) : nothing,
+      state.illuminance !== null ? chip(illuminance, "mdi:brightness-5", `${this.number(state.illuminance, 0)} lx`) : nothing,
     ].filter((c) => c !== nothing);
     return chips.length ? html`<div class="sensor-row">${chips}</div>` : nothing;
+  }
+
+  /**
+   * A Hue sensor's card: motion (now, or how long ago), temperature and light level, and
+   * its switch (the Hue app's sensor on/off). A tap opens the sensor in HA.
+   */
+  private sensor(d: HueSensor) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const state = sensorReadings(ctx.hass, d.sensors);
+    const enabled = d.enabled ? ctx.hass.states[d.enabled] : undefined;
+    const off = enabled?.state === "off";
+    const hasMotion = d.sensors.motion.length > 0;
+    const status = off
+      ? t("sensors.off")
+      : !hasMotion
+        ? ""
+        : state.motion
+          ? t("sensors.motion")
+          : state.lastMotion
+            ? since(state.lastMotion, this.userLang())
+            : t("sensors.no_motion");
+    const values = [
+      state.temperature !== null ? `${this.number(state.temperature, 1)}°` : "",
+      state.illuminance !== null ? `${this.number(state.illuminance, 0)} lx` : "",
+    ].filter(Boolean);
+    const glyph = !hasMotion ? "mdi:thermometer" : off ? "mdi:motion-sensor-off" : "mdi:motion-sensor";
+    const main = d.sensors.motion[0] || d.sensors.illuminance[0] || d.sensors.temperature[0];
+    return tileCard({
+      art: html`<ha-icon icon=${glyph}></ha-icon>`,
+      name: d.name,
+      sub: [status, values.join(" · ")],
+      toggle: enabled
+        ? toggle(enabled.state === "on", t("common.toggle"), () =>
+            ctx.call("switch", enabled.state === "on" ? "turn_off" : "turn_on", { entity_id: d.enabled! }),
+          )
+        : undefined,
+      inert: enabled?.state === "unavailable",
+      classes: { surface: true, sensor: true, motion: state.motion && !off, off },
+      click: () => main && openStockMoreInfo(main),
+    });
+  }
+
+  private userLang(): string {
+    return this.ctx.hass.locale?.language || this.ctx.hass.language || "en";
+  }
+
+  private number(v: number, digits: number): string {
+    return new Intl.NumberFormat(this.userLang(), { maximumFractionDigits: digits }).format(v);
   }
 
   /**
@@ -200,11 +264,11 @@ export class RoomView extends StudioView {
       const data = { entity_id: s.entity_id, shuffle: true, recall: true };
       if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
     };
-    return html`<div class=${classMap({ scene: true, ...surface.classes, active })} style=${styleMap(surface.style)} role="button" tabindex="0" @click=${apply}>
-      <div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>
-      <div class="name">${s.name}</div>
-      ${s.group !== g.group ? html`<div class="sub">${friendlyName(ctx.hass, s.group)}</div>` : nothing}
-      ${active
+    return tileCard({
+      art: html`<div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>`,
+      name: s.name,
+      sub: [s.group !== g.group ? friendlyName(ctx.hass, s.group) : ""],
+      overlay: active
         ? html`<div class="scene-actions">
             ${info.dynamic
               ? html`<button class="round mini play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>
@@ -216,8 +280,11 @@ export class RoomView extends StudioView {
               : nothing}
             <button class="round mini edit" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
           </div>`
-        : nothing}
-    </div>`;
+        : nothing,
+      classes: { scene: true, ...surface.classes, active },
+      style: surface.style,
+      click: apply,
+    });
   }
 
   /**

@@ -107,31 +107,70 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
   </div>`;
 }
 
-/** A light tile (room, scene editor, color view): icon, name, toggle; colored like the light. */
+/** What a card shows; everything but the picture and the name is optional. */
+export interface TileCard {
+  /** The picture on top: an icon or a round picture (`.dot`). */
+  art: TemplateResult;
+  name: string;
+  /** Lines under the name (room, status, readings); empty ones are left out. */
+  sub?: string[];
+  /** The card's switch, in a zone of its own at the bottom. */
+  toggle?: TemplateResult;
+  /** The switch is shown but out of reach. */
+  inert?: boolean;
+  /** Absolutely placed extras (action buttons, the sync glow). */
+  overlay?: TemplateResult | typeof nothing;
+  classes?: Record<string, boolean>;
+  style?: Record<string, string | undefined>;
+  click?: (e: Event) => void;
+}
+
+/**
+ * Every card of the panel (scenes, lights, sensors) has the same layout, like the Hue app's:
+ * the picture at a fixed distance from the top, a text block of fixed height with the name
+ * (and lines under it) centered in it, and an optional switch zone at the bottom.
+ */
+export function tileCard(card: TileCard): TemplateResult {
+  const sub = (card.sub || []).filter(Boolean);
+  return html`<div
+    class=${classMap({ "tile-card": true, switchable: !!card.toggle, ...card.classes })}
+    style=${styleMap(card.style || {})}
+    role="button"
+    tabindex="0"
+    @click=${card.click}
+  >
+    ${card.overlay ?? nothing}
+    <div class="art">${card.art}</div>
+    <div class=${classMap({ text: true, [`subs-${Math.min(sub.length, 2)}`]: true })}>
+      <div class="name">${card.name}</div>
+      ${sub.slice(0, 2).map((line) => html`<div class="sub">${line}</div>`)}
+    </div>
+    ${card.toggle ? html`<div class=${classMap({ "switch-zone": true, inert: !!card.inert })}>${card.toggle}</div>` : nothing}
+  </div>`;
+}
+
+/** A light card (room, scene editor, color view): icon, name, toggle; colored like the light. */
 export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false, sub = "" } = {}): TemplateResult {
   const state = ctx.hass.states[id];
   const colors = busy ? [] : lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const unreachable = !state || state.state === "unavailable";
   const brightness = state?.state === "on" ? Math.round(((state.attributes.brightness as number | undefined) ?? 255) / 2.55) : undefined;
   const surface = surfaceOf({ on: colors.length > 0, colors, available: !unreachable, brightness });
-  const style = { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" };
   // Busy: a Sync Box drives it (the Hue app's "Sync active": white pulsing around the icon,
   // the switch off, a tap refused); unreachable: the bridge lost it. Either is said
   // in place of the room line, and the switch rests.
   const status = busy ? ctx.t("light.sync_active") : unreachable ? ctx.t("light.unreachable") : "";
-  return html`<div
-    class=${classMap({ light: true, ...surface.classes, off: false, selected, busy })}
-    style=${styleMap(style)}
-    @click=${busy ? (e: Event) => refuse(e.currentTarget) : open}
-  >
-    ${busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing}
-    <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
-    <div class="name">${friendlyName(ctx.hass, id)}</div>
-    ${status || sub ? html`<div class="sub">${status || sub}</div>` : nothing}
-    <div class=${classMap({ "switch-zone": true, inert: busy || unreachable })}>
-      ${toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id }))}
-    </div>
-  </div>`;
+  return tileCard({
+    art: html`<ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>`,
+    name: friendlyName(ctx.hass, id),
+    sub: [status || sub],
+    toggle: toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id })),
+    inert: busy || unreachable,
+    overlay: busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing,
+    classes: { light: true, ...surface.classes, off: false, selected, busy },
+    style: { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" },
+    click: busy ? (e: Event) => refuse(e.currentTarget) : open,
+  });
 }
 
 /**

@@ -18,6 +18,11 @@ test("turning on a Hue group predicts its members", () => {
   assert.equal(p.get("light.a")?.attributes?.brightness, 127);
 });
 
+test("a switch shows its new state at once", () => {
+  const h = { states: { "switch.sensor_enabled": { state: "on", attributes: {} } } };
+  assert.equal(predict(h, "switch", "turn_off", { entity_id: "switch.sensor_enabled" }).get("switch.sensor_enabled")?.state, "off");
+});
+
 test("patches show until HA confirms or they expire", () => {
   let now = 0;
   const o = new Optimistic(() => now);

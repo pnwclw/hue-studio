@@ -19,6 +19,7 @@ export interface HassEntityEntry {
   device_id?: string | null;
   area_id?: string | null;
   icon?: string | null;
+  translation_key?: string | null;
 }
 
 export interface HassArea {
@@ -39,7 +40,7 @@ export type ServiceData = Record<string, unknown> & { entity_id?: string | strin
 export interface HassData {
   states: Record<string, HassState>;
   entities?: Record<string, HassEntityEntry>;
-  devices?: Record<string, { area_id?: string | null }>;
+  devices?: Record<string, { area_id?: string | null; name?: string | null; name_by_user?: string | null }>;
   areas?: Record<string, HassArea>;
   config?: { location_name?: string };
   language?: string;

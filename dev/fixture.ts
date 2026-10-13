@@ -201,7 +201,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     setLight(id, s);
   }
   // Sensors: a Hue motion sensor (with its thermometer) and a thermostat in the office.
-  devices.dev_motion = { area_id: "office" };
+  devices.dev_motion = { area_id: "office", name: "Office sensor" };
   devices.dev_thermostat = { area_id: "office" };
   const sensor = (id: string, platform: string, device: string, state: string, attributes: Record<string, unknown>) => {
     entities[id] = { platform, device_id: device };
@@ -211,6 +211,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   sensor("sensor.office_motion_temperature", "hue", "dev_motion", "21.9", { device_class: "temperature", friendly_name: "Office motion temperature" });
   sensor("sensor.office_thermostat", "demo", "dev_thermostat", "22.5", { device_class: "temperature", friendly_name: "Office thermostat" });
   sensor("sensor.office_motion_illuminance", "hue", "dev_motion", "35", { device_class: "illuminance", friendly_name: "Office motion illuminance" });
+  // The Hue motion sensor's on/off switch (HA's `hue` creates it as "Motion sensor enabled").
+  sensor("switch.office_sensor_motion_sensor_enabled", "hue", "dev_motion", "on", { friendly_name: "Office sensor Motion sensor enabled" });
+  entities["switch.office_sensor_motion_sensor_enabled"].translation_key = "motion_sensor_enabled";
   sensor("weather.home", "met", "", "cloudy", { friendly_name: "Home", cloud_coverage: 85 });
   sensor("sensor.season", "season", "", "autumn", { device_class: "enum", friendly_name: "Season" });
   // Adaptive Lighting for the office lamp.
