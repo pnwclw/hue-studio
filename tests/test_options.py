@@ -1,9 +1,8 @@
-"""Tests for the options flow (room mapping, room sensors) and the config WS API."""
+"""Tests for the settings (room mapping, room sensors) and the config WS API."""
 
 from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -14,7 +13,12 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 from custom_components.hue_studio.const import DOMAIN, HUE_DOMAIN
 
 
-async def test_options_flow_and_config_ws(
+async def _ws(client, **msg) -> dict:
+    await client.send_json_auto_id(msg)
+    return await client.receive_json()
+
+
+async def test_config_pushed_to_panel(
     hass: HomeAssistant,
     hass_ws_client: WebSocketGenerator,
     hue_entry: MockConfigEntry,
@@ -34,10 +38,10 @@ async def test_options_flow_and_config_ws(
     office = ar.async_get(hass).async_create("Office")
     registry.async_update_entity("light.bulb", area_id=office.id)
 
-    client = await hass_ws_client(hass)
-    await client.send_json_auto_id({"type": "hue_studio/config/subscribe"})
-    assert (await client.receive_json())["success"]
-    assert (await client.receive_json())["event"] == {
+    panel = await hass_ws_client(hass)
+    await panel.send_json_auto_id({"type": "hue_studio/config/subscribe"})
+    assert (await panel.receive_json())["success"]
+    assert (await panel.receive_json())["event"] == {
         "groups": {},
         "rooms": {},
         "auto_align": False,
@@ -47,45 +51,24 @@ async def test_options_flow_and_config_ws(
         "gallery_rules": {},
     }
 
-    flow = hass.config_entries.options
-    result = await flow.async_init(studio_entry.entry_id)
-    assert result["type"] is FlowResultType.MENU
-
-    # Hue room -> HA area
-    result = await flow.async_configure(result["flow_id"], {"next_step_id": "groups"})
-    assert result["step_id"] == "groups"
-    result = await flow.async_configure(result["flow_id"], {"Downstairs": office.id})
-    assert result["type"] is FlowResultType.MENU
-
-    # Sensors of the Office room
-    result = await flow.async_configure(
-        result["flow_id"], {"next_step_id": "room_select"}
-    )
-    assert result["step_id"] == "room_select"
-    result = await flow.async_configure(
-        result["flow_id"], {"room": f"area.{office.id}"}
-    )
-    assert result["step_id"] == "room_sensors"
-    result = await flow.async_configure(
-        result["flow_id"],
+    client = await hass_ws_client(hass)
+    for msg in (
         {
+            "type": "hue_studio/config/set_group",
+            "entity_id": group.entity_id,
+            "area_id": office.id,
+        },
+        {
+            "type": "hue_studio/config/set_room_sensors",
+            "room": f"area.{office.id}",
             "motion": ["binary_sensor.office_motion"],
             "temperature": ["sensor.office_t"],
             "illuminance": ["sensor.office_lux"],
         },
-    )
-    assert result["type"] is FlowResultType.MENU
-
-    # Rooms follow areas automatically
-    result = await flow.async_configure(
-        result["flow_id"], {"next_step_id": "alignment"}
-    )
-    assert result["step_id"] == "alignment"
-    result = await flow.async_configure(result["flow_id"], {"auto_align": True})
-    assert result["type"] is FlowResultType.MENU
-
-    result = await flow.async_configure(result["flow_id"], {"next_step_id": "save"})
-    assert result["type"] is FlowResultType.CREATE_ENTRY
+        {"type": "hue_studio/config/set", "auto_align": True},
+    ):
+        assert (await _ws(client, **msg))["success"]
+    await hass.async_block_till_done()
     assert studio_entry.options == {
         "auto_align": True,
         "groups": {"grp-room": office.id},
@@ -97,10 +80,10 @@ async def test_options_flow_and_config_ws(
             }
         },
     }
-    await hass.async_block_till_done()
 
     # Pushed to the panel with entity ids instead of unique ids.
-    event = (await client.receive_json())["event"]
+    for _ in range(3):
+        event = (await panel.receive_json())["event"]
     assert event["groups"] == {group.entity_id: office.id}
     assert event["auto_align"] is True
     assert event["rooms"][f"area.{office.id}"]["motion"] == [
@@ -109,40 +92,23 @@ async def test_options_flow_and_config_ws(
     assert event["rooms"][f"area.{office.id}"]["illuminance"] == ["sensor.office_lux"]
 
 
-def _suggested(result: dict, field: str) -> str | None:
-    """The value a form field is prefilled with."""
-    for key in result["data_schema"].schema:
-        if key == field:
-            return (key.description or {}).get("suggested_value")
-    raise KeyError(field)
-
-
-async def _groups_step(hass: HomeAssistant, entry: MockConfigEntry) -> dict:
-    flow = hass.config_entries.options
-    result = await flow.async_init(entry.entry_id)
-    return await flow.async_configure(result["flow_id"], {"next_step_id": "groups"})
-
-
-async def _save(hass: HomeAssistant, result: dict) -> None:
-    await hass.config_entries.options.async_configure(
-        result["flow_id"], {"next_step_id": "save"}
-    )
-
-
-async def test_groups_prefilled_with_automatic_match(
+async def test_groups_follow_automatic_match(
     hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
     hue_entry: MockConfigEntry,
     studio_entry: MockConfigEntry,
     hue_lights: MagicMock,
 ) -> None:
-    """Rows start at the area with the same lights; only deviations are stored."""
+    """The area with the same lights is automatic; only deviations are stored."""
     registry = er.async_get(hass)
     office = ar.async_get(hass).async_create("Office")
     registry.async_update_entity("light.bulb", area_id=office.id)
+    groups = {}
     for unique_id, name in (("grp-office", "Office"), ("grp-tv", "TV")):
         group = registry.async_get_or_create(
             "light", HUE_DOMAIN, unique_id, config_entry=hue_entry
         )
+        groups[unique_id] = group.entity_id
         hass.states.async_set(
             group.entity_id,
             "on",
@@ -150,31 +116,29 @@ async def test_groups_prefilled_with_automatic_match(
             if unique_id == "grp-office"
             else {"is_hue_group": True, "friendly_name": name},
         )
-    flow = hass.config_entries.options
+    client = await hass_ws_client(hass)
 
-    # Accepting the prefilled rows stores nothing: the mapping stays automatic.
-    result = await _groups_step(hass, studio_entry)
-    assert _suggested(result, "Office") == office.id
-    assert _suggested(result, "TV") is None
-    result = await flow.async_configure(result["flow_id"], {"Office": office.id})
-    await _save(hass, result)
+    async def set_group(unique_id: str, area_id: str | None) -> dict:
+        return await _ws(
+            client,
+            type="hue_studio/config/set_group",
+            entity_id=groups[unique_id],
+            area_id=area_id,
+        )
+
+    # The automatic match stores nothing: the mapping stays automatic.
+    assert (await set_group("grp-office", office.id))["success"]
     assert studio_entry.options["groups"] == {}
 
     # Two groups for one area is an error.
-    result = await _groups_step(hass, studio_entry)
-    result = await flow.async_configure(
-        result["flow_id"], {"Office": office.id, "TV": office.id}
-    )
-    assert result["errors"] == {"TV": "area_taken"}
+    reply = await set_group("grp-tv", office.id)
+    assert not reply["success"]
+    assert studio_entry.options["groups"] == {}
 
-    # Clearing an automatic match makes the group a zone; back again removes it.
-    result = await flow.async_configure(result["flow_id"], {})
-    await _save(hass, result)
+    # Leaving an automatic match makes the group a zone; back again removes it.
+    assert (await set_group("grp-office", None))["success"]
     assert studio_entry.options["groups"] == {"grp-office": "zone"}
-    result = await _groups_step(hass, studio_entry)
-    assert _suggested(result, "Office") is None
-    result = await flow.async_configure(result["flow_id"], {"Office": office.id})
-    await _save(hass, result)
+    assert (await set_group("grp-office", office.id))["success"]
     assert studio_entry.options["groups"] == {}
 
 

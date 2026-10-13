@@ -11,7 +11,10 @@ time-of-day phases, weather, seasons, presence and automations.
 
 Hue Studio **extends** the built-in [Philips Hue](https://www.home-assistant.io/integrations/hue/)
 integration instead of replacing it. Lights, scenes and sensors stay with the native
-integration; Hue Studio reuses its bridge connection, so no second pairing is needed.
+integration; Hue Studio reuses its bridge connections, so no second pairing is needed. It
+is added once and uses every bridge of the Philips Hue integration — a bridge added there
+later is picked up by itself. Each bridge shows up as a service of Hue Studio (linked to
+its device in the Philips Hue integration), with a link into the panel.
 
 > **Status:** early development. So far: config flow, bridge connection, services and a
 > `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes,
@@ -90,7 +93,7 @@ lights to move, scenes that lose or gain lights — and aligns them on confirmat
 light moved in the Hue app shows up in its room with "move in Home Assistant" or "move
 back in Hue"; Hue lights without an area are listed under "No room" with an area
 picker. Zones (any lights from any rooms) are created and edited on the same screen.
-With "Rooms follow areas" turned on (Settings tab, or the integration options), every area change is
+With "Rooms follow areas" turned on (Settings tab → Integration settings), every area change is
 written to the bridge at once. Details: [docs/rooms-and-scenes.md](docs/rooms-and-scenes.md).
 
 ## Settings
@@ -100,8 +103,8 @@ Hue device by area, and adding new ones), Bridges (and Sync Boxes), MotionAware 
 (health, on/off) and Entertainment areas (create, rename, change type and lights, arrange
 where the lights stand, delete — they are not rooms or zones). **Hue Studio**: Rooms and
 zones, Scene gallery, Integration settings (rooms follow areas, which area each Hue room or
-zone belongs to, the sensors of each room — the integration's options, without leaving
-the panel) and Experimental.
+zone belongs to, the sensors of each room) and Experimental. Every setting of Hue Studio is
+here: the integration has no options dialog in Home Assistant's settings.
 
 ## Adding devices
 
@@ -200,8 +203,9 @@ Box integration is installed, **Use the Sync Box integration (compatibility mode
 1. HACS → ⋮ → **Custom repositories** → add `https://github.com/pnwclw/hue-studio`,
    category **Integration**.
 2. Install **Hue Studio** and restart Home Assistant.
-3. **Settings → Devices & services → Add integration → Hue Studio → Hue bridge**, then
-   pick your Hue bridge.
+3. **Settings → Devices & services → Add integration → Hue Studio → Hue Studio for your
+   Hue bridges**. All bridges of the Philips Hue integration are used; Sync Boxes are
+   added the same way later (**Add integration → Hue Studio**).
 
 ### Manual
 

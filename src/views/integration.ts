@@ -1,6 +1,7 @@
 // Settings → Integration settings: everything of the integration's options in the panel.
 // Rooms follow areas; which area each Hue room or zone belongs to; the sensors of each
-// room. Pairing a bridge or a Sync Box stays on HA's integration page (a link).
+// room. Adding or pairing a Sync Box stays on HA's integration page (a link); bridges come
+// from the Philips Hue integration by themselves.
 
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";

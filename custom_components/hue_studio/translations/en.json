@@ -4,16 +4,13 @@
       "user": {
         "title": "Add to Hue Studio",
         "menu_options": {
-          "bridge": "Hue bridge (from the Philips Hue integration)",
+          "bridges": "Hue Studio for your Hue bridges (from the Philips Hue integration)",
           "sync_box": "Hue Play HDMI Sync Box"
         }
       },
-      "bridge": {
-        "title": "Choose a Hue bridge",
-        "description": "Hue Studio reuses the connection of the Philips Hue integration, so no extra pairing is needed.",
-        "data": {
-          "hue_entry_id": "Hue bridge"
-        }
+      "bridges": {
+        "title": "Hue Studio",
+        "description": "Hue Studio uses every bridge of the Philips Hue integration (found: {bridges}). It reuses their connection, so no extra pairing is needed, and a bridge added there later is used at once. Each bridge shows up here as a service; the settings are in the Hue Studio panel."
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
@@ -59,7 +56,6 @@
     },
     "abort": {
       "already_configured": "This is already set up in Hue Studio.",
-      "bridge_not_found": "The selected Hue bridge is no longer available.",
       "no_bridges": "No Philips Hue bridge with API v2 is configured. Set up the Philips Hue integration first.",
       "not_sync_box": "This device is not a Sync Box.",
       "reauth_successful": "The Sync Box is paired again.",
@@ -76,13 +72,13 @@
   },
   "exceptions": {
     "hue_entry_missing": {
-      "message": "The Philips Hue config entry used by Hue Studio no longer exists. Remove and re-add Hue Studio."
+      "message": "This Hue bridge is not connected to Hue Studio."
     },
-    "bridge_auth_failed": {
-      "message": "The Hue bridge rejected the app key of the Philips Hue integration. Re-authenticate the Philips Hue integration first."
+    "not_set_up": {
+      "message": "Hue Studio is not set up."
     },
-    "bridge_unreachable": {
-      "message": "Cannot connect to the Hue bridge at {host}."
+    "unknown_entry": {
+      "message": "This Hue Studio entry comes from a newer version of Hue Studio. Update Hue Studio or remove the entry."
     },
     "not_hue_light": {
       "message": "{entity_id} is not a Hue light on a bridge connected to Hue Studio."
@@ -637,52 +633,6 @@
         "auto": "Scene of the day",
         "off": "Off"
       }
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Hue Studio settings",
-        "menu_options": {
-          "groups": "Hue rooms and zones → HA areas",
-          "room_select": "Sensors in rooms",
-          "alignment": "Rooms follow areas",
-          "save": "Save"
-        }
-      },
-      "groups": {
-        "title": "Hue rooms and zones → HA areas",
-        "description": "Each Hue room or zone on the left, the Home Assistant area it belongs to on the right. Filled in automatically when an area has exactly the same lights; leave a row empty to show the group as a zone. The bridge itself is not changed."
-      },
-      "room_select": {
-        "title": "Sensors in rooms",
-        "description": "Pick a room to attach motion and temperature sensors to it.",
-        "data": {
-          "room": "Room"
-        }
-      },
-      "room_sensors": {
-        "title": "{room}",
-        "description": "Motion sensors show presence on the room card. Temperature sensors are averaged into the room temperature; a Hue motion sensor's own thermometer can be combined with the room's thermostat. Light sensors show how bright the room is. Without a choice, the room's Hue sensors are used.",
-        "data": {
-          "motion": "Motion sensors",
-          "temperature": "Temperature sensors",
-          "illuminance": "Light sensors"
-        }
-      },
-      "alignment": {
-        "title": "Rooms follow areas",
-        "description": "Hue Studio can keep the Hue rooms on the bridge in line with the Home Assistant areas (the panel's \"Rooms and zones\" screen shows what would change). With this on, every change of an area, or of the area of a Hue light, is written to the bridge at once. Empty Hue rooms are never deleted automatically.",
-        "data": {
-          "auto_align": "Align automatically when areas change"
-        }
-      }
-    },
-    "error": {
-      "area_taken": "Another Hue room or zone already belongs to this area."
-    },
-    "abort": {
-      "no_groups": "No Hue rooms, zones or areas with Hue lights were found."
     }
   },
   "entity": {

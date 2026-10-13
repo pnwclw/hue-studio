@@ -237,7 +237,13 @@ directly. Per HA area with auto light settings:
 
 - ~~Settings tab~~ — In this home: Devices (all, by area, plus adding), Bridges, MotionAware
   areas, Entertainment areas; Hue Studio: Rooms and zones, Auto light, Integration
-  settings (the options flow's settings in the panel), Experimental. Security comes later.
+  settings (the integration's options, only in the panel: there is no options flow since
+  0.9.1-alpha.2), Experimental. Security comes later.
+- ~~One Hue Studio for all bridges~~ — done (0.9.1-alpha.2): one config entry that uses every bridge
+  of the native `hue` integration and follows its entries (connects when one is loaded,
+  closes when it is unloaded, retries while a bridge does not answer); each bridge is a
+  service device of it, linked to the native bridge device, with "Visit" opening the
+  panel. The old one-entry-per-bridge entries are merged on setup.
 - ~~Entertainment areas~~ — `entertainment.py`: list, create, change name/type/lights
   (kept lights keep their places), arrange (the room arrange screen), delete; not while
   streaming.

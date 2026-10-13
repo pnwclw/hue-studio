@@ -31,10 +31,14 @@ touching anything outside this repository.
    with it. We add what it can't do — palettes, multi-color gradients, a scene gallery,
    automations like the Hue app's — and a good UI for it.
 2. **Backend** — `custom_components/hue_studio/`:
-   - its own CLIP v2 connection to the bridge (aiohue). **Host and app key are read from
-     the `hue` config entry** — no second pairing with the bridge button. We never reach
-     into the native integration's bridge object via `hass.data`: that is internal API and
-     breaks on upgrades;
+   - **one Hue Studio config entry for every bridge of `hue`**, with its own CLIP v2
+     connection to each (aiohue). **Host and app key are read from the bridge's `hue`
+     config entry** — no second pairing with the bridge button — and the connection
+     follows that entry (opens when it is loaded, closes when it is unloaded or removed,
+     retries while the bridge does not answer). Each bridge is a service device of our
+     entry (`via_device_id` to the native bridge device, "Visit" opens the panel). We never
+     reach into the native integration's bridge object via `hass.data`: that is internal
+     API and breaks on upgrades;
    - the bridge event stream (SSE) pushes state, no polling;
    - **services with schemas** (`hue_studio.apply_palette`, `set_gradient`, `set_effect`,
      `create_scene`, `delete_scene`, `save_scene`, …) — visible in the automation editor;
@@ -58,9 +62,9 @@ touching anything outside this repository.
      panel lists them by room/zone from what HA reports they control (public
      `automations_with_area`/`_entity`) and reads their inputs through HA's automation
      config API (`automation/config` gives a blueprint automation expanded);
-   - **GUI first, no YAML.** Every setting has a GUI path (panel or options flow) and is
-     read/written through the WS API and services, never by editing files. No YAML
-     configuration layer.
+   - **GUI first, no YAML.** Every setting has a GUI path in the panel (the options of the
+     Hue Studio entry; there is no options flow) and is read/written through the WS API and
+     services, never by editing files. No YAML configuration layer.
 3. **Frontend** — TypeScript + Lit in `src/`, bundled by esbuild into
    `custom_components/hue_studio/frontend/`; registered by the integration itself via
    `frontend.add_extra_js_url` (no manual Lovelace resources):
@@ -128,8 +132,8 @@ touching anything outside this repository.
 ## Conventions
 
 - **Code style follows Home Assistant core:** `async`, full type hints,
-  `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: pick an
-  existing `hue` entry, or add a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
+  `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: add Hue Studio
+  once — it uses every `hue` bridge — or a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
 - **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
   1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
 - **The on-screen keyboard.** Text fields are at least 16px (smaller ones make iOS zoom in).
@@ -233,9 +237,10 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
-  config_flow.py                setup (menu: pick a `hue` entry; Sync Box: pair or use `huesyncbox`) + options: Hue room/zone -> HA area,
-                                motion/temperature sensors per room, rooms follow areas (Roborock-style menu)
-  options.py                    option helpers; unique ids -> entity ids for the frontend
+  config_flow.py                setup (menu: Hue Studio once, for every `hue` bridge; Sync Box: pair or use `huesyncbox`); no options flow
+  connections.py                the Hue Studio entry: one connection per `hue` bridge, following its entry; bridges as service devices
+  options.py                    the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
+                                unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
   panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
   gallery.py                    backend access to the bundled gallery

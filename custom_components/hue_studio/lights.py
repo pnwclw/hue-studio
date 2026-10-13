@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from aiohue import HueBridgeV2
 from aiohue.v2.models.feature import EffectStatus
@@ -14,10 +14,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONF_HUE_ENTRY_ID, DOMAIN, HUE_DOMAIN
-
-if TYPE_CHECKING:
-    from . import HueStudioConfigEntry
+from .connections import async_studio_entry
+from .const import DOMAIN, HUE_DOMAIN
 
 LIGHT_DOMAIN = "light"
 # Not real effects: "no effect" stops one, "unknown" is aiohue's fallback.
@@ -38,14 +36,11 @@ class HueLight:
 @callback
 def async_bridges(hass: HomeAssistant) -> dict[str, HueBridgeV2]:
     """Return connected bridges keyed by the id of their native `hue` entry."""
-    entries: list[HueStudioConfigEntry] = hass.config_entries.async_loaded_entries(
-        DOMAIN
-    )
-    return {
-        e.data[CONF_HUE_ENTRY_ID]: e.runtime_data.bridge
-        for e in entries
-        if CONF_HUE_ENTRY_ID in e.data and e.runtime_data.bridge is not None
-    }
+    entry = async_studio_entry(hass)
+    data = getattr(entry, "runtime_data", None)
+    if data is None or data.connections is None:
+        return {}
+    return dict(data.connections.bridges)
 
 
 @callback

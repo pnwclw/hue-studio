@@ -1,4 +1,5 @@
-"""Room/zone mapping and per-room sensors (config entry options).
+"""Room/zone mapping, per-room sensors and panel settings (the Hue Studio entry's
+options, changed from the panel's settings).
 
 Options use stable ids (registry unique ids of Hue grouped lights, area ids); the
 frontend gets them translated to entity ids by `async_frontend_config`.
@@ -18,6 +19,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 
+from .connections import async_studio_entry
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
@@ -25,7 +27,6 @@ from .const import (
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
     CONF_GROUPS,
-    CONF_HUE_ENTRY_ID,
     CONF_ILLUMINANCE,
     CONF_MOTION,
     CONF_ROOMS,
@@ -98,13 +99,6 @@ def _async_hue_light_areas(hass: HomeAssistant) -> dict[str, str | None]:
 
 
 @callback
-def async_light_areas(hass: HomeAssistant) -> list[ar.AreaEntry]:
-    """HA areas that contain at least one Hue light, in area registry order."""
-    used = set(_async_hue_light_areas(hass).values())
-    return [area for area in ar.async_get(hass).async_list_areas() if area.id in used]
-
-
-@callback
 def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, str]:
     """Hue group unique id -> the area it becomes the room of automatically.
 
@@ -138,20 +132,16 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
 
 
 @callback
-def async_merged_options(hass: HomeAssistant) -> dict[str, Any]:
-    """Options of all Hue Studio entries merged (one entry per bridge)."""
-    groups: dict[str, str] = {}
-    rooms: dict[str, dict[str, list[str]]] = {}
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        groups.update(entry.options.get(CONF_GROUPS, {}))
-        rooms.update(entry.options.get(CONF_ROOMS, {}))
-    return {CONF_GROUPS: groups, CONF_ROOMS: rooms}
+def async_options(hass: HomeAssistant) -> dict[str, Any]:
+    """The Hue Studio entry's options (empty before it is added)."""
+    entry = async_studio_entry(hass)
+    return dict(entry.options) if entry else {}
 
 
 @callback
 def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
     """Options with unique ids replaced by entity ids, as the panel uses them."""
-    options = async_merged_options(hass)
+    options = async_options(hass)
     by_unique_id = {g.unique_id: g.entity_id for g in async_hue_groups(hass)}
 
     def room_key(key: str) -> str | None:
@@ -163,7 +153,7 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
 
     groups = {
         by_unique_id[uid]: target
-        for uid, target in options[CONF_GROUPS].items()
+        for uid, target in options.get(CONF_GROUPS, {}).items()
         if uid in by_unique_id and target != GROUP_AUTO
     }
     rooms = {
@@ -172,44 +162,32 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
             CONF_TEMPERATURE: value.get(CONF_TEMPERATURE, []),
             CONF_ILLUMINANCE: value.get(CONF_ILLUMINANCE, []),
         }
-        for key, value in options[CONF_ROOMS].items()
+        for key, value in options.get(CONF_ROOMS, {}).items()
         if (frontend_key := room_key(key)) is not None
     }
     return {
         CONF_GROUPS: groups,
         CONF_ROOMS: rooms,
-        CONF_AUTO_ALIGN: any(
-            entry.options.get(CONF_AUTO_ALIGN, False)
-            for entry in hass.config_entries.async_entries(DOMAIN)
-        ),
-        # Panel settings (same on every bridge entry): the first entry that has them.
-        CONF_FOOTER: _panel_option(hass, CONF_FOOTER, False),
-        CONF_FOOTER_TABS: _panel_option(hass, CONF_FOOTER_TABS, []),
-        CONF_GALLERY_SEASONAL: _panel_option(hass, CONF_GALLERY_SEASONAL, False),
-        CONF_GALLERY_RULES: _panel_option(hass, CONF_GALLERY_RULES, {}),
+        CONF_AUTO_ALIGN: options.get(CONF_AUTO_ALIGN, False),
+        CONF_FOOTER: options.get(CONF_FOOTER, False),
+        CONF_FOOTER_TABS: options.get(CONF_FOOTER_TABS, []),
+        CONF_GALLERY_SEASONAL: options.get(CONF_GALLERY_SEASONAL, False),
+        CONF_GALLERY_RULES: options.get(CONF_GALLERY_RULES, {}),
     }
-
-
-def _panel_option(hass: HomeAssistant, key: str, default: Any) -> Any:
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        if key in entry.options:
-            return entry.options[key]
-    return default
 
 
 # ---- changed from the panel (Settings → Integration settings) ----
 
 
-def _studio_entry(hass: HomeAssistant, hue_entry_id: str | None) -> Any:
-    """The Hue Studio entry of a bridge (the first one without an id)."""
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        if CONF_HUE_ENTRY_ID in entry.data and (
-            hue_entry_id is None or entry.data[CONF_HUE_ENTRY_ID] == hue_entry_id
-        ):
-            return entry
-    raise ServiceValidationError(
-        translation_domain=DOMAIN, translation_key="hue_entry_missing"
-    )
+@callback
+def async_update_options(hass: HomeAssistant, changes: dict[str, Any]) -> None:
+    """Change some options of the Hue Studio entry (open panels get them pushed)."""
+    entry = async_studio_entry(hass)
+    if entry is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="not_set_up"
+        )
+    hass.config_entries.async_update_entry(entry, options={**entry.options, **changes})
 
 
 @callback
@@ -217,8 +195,8 @@ def async_set_group_area(
     hass: HomeAssistant, entity_id: str, target: str | None
 ) -> None:
     """Which area a Hue room/zone belongs to: an area id, None (a zone of its own) or
-    "auto" (the area with exactly its lights). Like the options' room mapping, only
-    deviations from the automatic match are stored."""
+    "auto" (the area with exactly its lights). Only deviations from the automatic
+    match are stored, so the rest keeps following changes of lights and areas."""
     registry = er.async_get(hass)
     reg = registry.async_get(entity_id)
     groups = async_hue_groups(hass, reg.config_entry_id if reg else None)
@@ -229,8 +207,7 @@ def async_set_group_area(
             translation_key="not_hue_group",
             translation_placeholders={"entity_id": entity_id},
         )
-    entry = _studio_entry(hass, reg.config_entry_id)
-    stored = dict(entry.options.get(CONF_GROUPS, {}))
+    stored = dict(async_options(hass).get(CONF_GROUPS, {}))
     auto = async_auto_areas(hass, groups)
     if target not in (None, GROUP_AUTO):
         if ar.async_get(hass).async_get_area(target) is None:
@@ -254,9 +231,7 @@ def async_set_group_area(
         stored[group.unique_id] = GROUP_ZONE
     else:
         stored[group.unique_id] = target
-    hass.config_entries.async_update_entry(
-        entry, options={**entry.options, CONF_GROUPS: stored}
-    )
+    async_update_options(hass, {CONF_GROUPS: stored})
 
 
 @callback
@@ -274,9 +249,9 @@ def async_set_room_sensors(
                 translation_key="not_hue_group",
                 translation_placeholders={"entity_id": ident},
             )
-        key, owner = f"hue.{reg.unique_id}", _studio_entry(hass, reg.config_entry_id)
+        key = f"hue.{reg.unique_id}"
     elif kind == "area":
-        key, owner = room, _studio_entry(hass, None)
+        key = room
     else:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -286,14 +261,9 @@ def async_set_room_sensors(
     value = {
         k: sensors.get(k, []) for k in (CONF_MOTION, CONF_TEMPERATURE, CONF_ILLUMINANCE)
     }
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        if CONF_HUE_ENTRY_ID not in entry.data:
-            continue
-        rooms = dict(entry.options.get(CONF_ROOMS, {}))
-        if entry is owner and any(value.values()):
-            rooms[key] = value
-        else:
-            rooms.pop(key, None)
-        hass.config_entries.async_update_entry(
-            entry, options={**entry.options, CONF_ROOMS: rooms}
-        )
+    rooms = dict(async_options(hass).get(CONF_ROOMS, {}))
+    if any(value.values()):
+        rooms[key] = value
+    else:
+        rooms.pop(key, None)
+    async_update_options(hass, {CONF_ROOMS: rooms})

@@ -227,7 +227,7 @@ export class StudioContext {
     navigate(`${PANEL_PATH}${path}`);
   }
 
-  /** HA's page of the integration (its options hold the room mapping). */
+  /** HA's page of the integration (adding a Sync Box, the bridges as services, logs). */
   openSettings(): void {
     navigate("/config/integrations/integration/hue_studio");
   }

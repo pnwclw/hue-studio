@@ -17,7 +17,6 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
 from .bridges import (
-    SIGNAL_BRIDGES_UPDATED,
     async_bridges_payload,
     async_set_motion_area,
 )
@@ -27,10 +26,9 @@ from .const import (
     CONF_FOOTER_TABS,
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
-    CONF_HUE_ENTRY_ID,
-    DOMAIN,
     FOOTER_MAX_TABS,
     GALLERY_SEASONS,
+    SIGNAL_BRIDGES_UPDATED,
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
@@ -64,6 +62,7 @@ from .options import (
     async_frontend_config,
     async_set_group_area,
     async_set_room_sensors,
+    async_update_options,
 )
 from .positions import (
     SIGNAL_POSITIONS_UPDATED,
@@ -280,9 +279,10 @@ def ws_subscribe_sync(
     unsubscribers: list[Callable[[], None]] = [
         box.async_add_listener(send) for box in boxes.values()
     ]
-    # Area lights and streaming flags come from the bridge.
-    unsubscribers.append(
-        async_dispatcher_connect(hass, SIGNAL_ENTERTAINMENT_UPDATED, send)
+    # Area lights and streaming flags come from the bridges.
+    unsubscribers.extend(
+        async_dispatcher_connect(hass, signal, send)
+        for signal in (SIGNAL_ENTERTAINMENT_UPDATED, SIGNAL_BRIDGES_UPDATED)
     )
 
     @callback
@@ -385,10 +385,9 @@ def ws_set_config(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Change options from the panel's settings (every bridge entry alike).
+    """Change options of the Hue Studio entry from the panel's settings.
 
-    The same options as the options flow; open panels get them through
-    hue_studio/config/subscribe.
+    Open panels get them through hue_studio/config/subscribe.
     """
     changes = {
         k: v
@@ -402,11 +401,11 @@ def ws_set_config(
             CONF_GALLERY_RULES,
         )
     }
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        if CONF_HUE_ENTRY_ID in entry.data:
-            hass.config_entries.async_update_entry(
-                entry, options={**entry.options, **changes}
-            )
+    try:
+        async_update_options(hass, changes)
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "not_set_up", str(err))
+        return
     connection.send_result(msg["id"])
 
 
@@ -440,6 +439,7 @@ def ws_subscribe_positions(
         async_dispatcher_connect(hass, SIGNAL_POSITIONS_UPDATED, send),
         # Entertainment areas changed (positions written, streaming started/stopped).
         async_dispatcher_connect(hass, SIGNAL_ENTERTAINMENT_UPDATED, send),
+        async_dispatcher_connect(hass, SIGNAL_BRIDGES_UPDATED, send),
         async_track_areas(hass, send),
     ]
 
@@ -663,7 +663,7 @@ def ws_subscribe_entertainment(
         connection,
         msg,
         lambda: async_entertainment_payload(hass),
-        [SIGNAL_ENTERTAINMENT_UPDATED],
+        [SIGNAL_ENTERTAINMENT_UPDATED, SIGNAL_BRIDGES_UPDATED],
     )
 
 

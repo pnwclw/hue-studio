@@ -6,6 +6,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
+from .connections import SETTINGS_URL
 from .const import DOMAIN
 from .sync import MODELS, SyncBoxCoordinator
 
@@ -42,4 +43,5 @@ class SyncBoxEntity(CoordinatorEntity[SyncBoxCoordinator]):
             model_id=device.device_type,
             sw_version=device.firmware_version,
             serial_number=box_id,
+            configuration_url=SETTINGS_URL,
         )

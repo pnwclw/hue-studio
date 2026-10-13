@@ -1,21 +1,18 @@
 """Hue Studio: Hue-app-style light control on top of the native Hue integration.
 
-Kinds of config entries: a Hue bridge (borrowed from the native `hue` entry) and a Hue
-Play HDMI Sync Box — paired directly (with entities of its own), or used through the
-HACS `huesyncbox` integration (its entities and service, nothing of our own).
+Kinds of config entries: the Hue Studio entry (one, for every bridge of the native
+`hue` integration: each is a service device of it) and a Hue Play HDMI Sync Box —
+paired directly (with entities of its own), or used through the HACS `huesyncbox`
+integration (its entities and service, nothing of our own).
 """
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 import logging
+from typing import Any
 
-from aiohttp import ClientError
-from aiohue import HueBridgeV2, LinkButtonNotPressed, Unauthorized
-from aiohue.errors import BridgeBusy
-from aiohue.v2.controllers.events import EventType
 from aiohuesyncbox import HueSyncBox, RequestError, Unauthorized as SyncBoxUnauthorized
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST, Platform
@@ -26,24 +23,35 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
     HomeAssistantError,
 )
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
 from .automations import async_setup_automations
+from .connections import (
+    BridgeConnections,
+    async_studio_entry,
+    async_supported_hue_entries,
+    is_studio,
+)
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_BOX_ID,
+    CONF_FOOTER,
+    CONF_FOOTER_TABS,
+    CONF_GALLERY_RULES,
+    CONF_GALLERY_SEASONAL,
+    CONF_GROUPS,
     CONF_HUE_ENTRY_ID,
     CONF_KIND,
     CONF_REGISTRATION_ID,
+    CONF_ROOMS,
     CONF_SYNC_ENTRY_ID,
     DOMAIN,
-    HUE_CONF_API_KEY,
+    KIND_STUDIO,
     KIND_SYNC_BOX,
     KIND_SYNC_BOX_LINK,
     SIGNAL_CONFIG_UPDATED,
-    SIGNAL_ENTERTAINMENT_UPDATED,
     SYNC_BOX_INTEGRATION,
 )
 from .panel import async_register_panel, async_unregister_panel
@@ -58,7 +66,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-CONNECT_TIMEOUT = 10
+STUDIO_TITLE = "Hue Studio"
 
 SYNC_BOX_PLATFORMS = [
     Platform.NUMBER,
@@ -70,9 +78,9 @@ SYNC_BOX_PLATFORMS = [
 
 @dataclass
 class HueStudioData:
-    """Runtime data of a Hue Studio config entry (a bridge or a Sync Box)."""
+    """Runtime data of a Hue Studio config entry (the bridges, or a Sync Box)."""
 
-    bridge: HueBridgeV2 | None = None
+    connections: BridgeConnections | None = None
     sync: SyncBoxCoordinator | None = None
     link: SyncBoxLink | None = None
 
@@ -85,13 +93,9 @@ def is_sync_box(entry: ConfigEntry) -> bool:
     return entry.data.get(CONF_KIND) == KIND_SYNC_BOX
 
 
-def is_bridge(entry: ConfigEntry) -> bool:
-    """Whether the entry is a Hue bridge (the original kind, without `kind`)."""
-    return CONF_KIND not in entry.data
-
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register services and the WebSocket API (once, independent of entries)."""
+    await _async_merge_bridge_entries(hass)
     async_setup_services(hass)
     async_setup_websocket(hass)
     await async_setup_positions(hass)
@@ -100,50 +104,78 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
-    """Set up a bridge or a Sync Box."""
+    """Set up the bridges or a Sync Box."""
     if is_sync_box(entry):
         return await _async_setup_sync_box(hass, entry)
     if entry.data.get(CONF_KIND) == KIND_SYNC_BOX_LINK:
         return await _async_setup_sync_box_link(hass, entry)
-    return await _async_setup_bridge(hass, entry)
+    return await _async_setup_studio(hass, entry)
 
 
-async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
-    """Connect to the bridge of the linked native Hue config entry."""
-    hue_entry = hass.config_entries.async_get_entry(entry.data[CONF_HUE_ENTRY_ID])
-    if hue_entry is None:
-        raise ConfigEntryError(
-            translation_domain=DOMAIN, translation_key="hue_entry_missing"
-        )
+async def _async_merge_bridge_entries(hass: HomeAssistant) -> None:
+    """Entries of one bridge each (up to 0.9.1-alpha.1) become the one Hue Studio entry.
 
-    host: str = hue_entry.data[CONF_HOST]
-    bridge = HueBridgeV2(host, hue_entry.data[HUE_CONF_API_KEY])
-    try:
-        async with asyncio.timeout(CONNECT_TIMEOUT):
-            await bridge.initialize()
-    except (LinkButtonNotPressed, Unauthorized) as err:
-        await bridge.close()
-        raise ConfigEntryError(
-            translation_domain=DOMAIN, translation_key="bridge_auth_failed"
-        ) from err
-    except (TimeoutError, ClientError, BridgeBusy) as err:
-        await bridge.close()
-        raise ConfigEntryNotReady(
-            translation_domain=DOMAIN,
-            translation_key="bridge_unreachable",
-            translation_placeholders={"host": host},
-        ) from err
-
-    entry.runtime_data = HueStudioData(bridge=bridge)
-
-    @callback
-    def on_entertainment(event_type: EventType, resource: object) -> None:
-        # Streaming started/stopped: Sync Boxes and open panels update at once.
-        async_dispatcher_send(hass, SIGNAL_ENTERTAINMENT_UPDATED)
-
-    entry.async_on_unload(
-        bridge.config.entertainment_configuration.subscribe(on_entertainment)
+    The first of them is kept as the Hue Studio entry, with the options of all of them
+    (room mapping and sensors are keyed by unique ids, so they never clash); the others
+    are removed. Runs before any entry is set up.
+    """
+    old = sorted(
+        (
+            e
+            for e in hass.config_entries.async_entries(DOMAIN)
+            if CONF_HUE_ENTRY_ID in e.data
+        ),
+        key=lambda e: e.disabled_by is not None,
     )
+    if not old:
+        return
+    studio = async_studio_entry(hass)
+    sources = [*([studio] if studio else []), *old]
+    groups: dict[str, Any] = {}
+    rooms: dict[str, Any] = {}
+    for source in reversed(sources):
+        groups.update(source.options.get(CONF_GROUPS, {}))
+        rooms.update(source.options.get(CONF_ROOMS, {}))
+    options: dict[str, Any] = {
+        CONF_GROUPS: groups,
+        CONF_ROOMS: rooms,
+        CONF_AUTO_ALIGN: any(s.options.get(CONF_AUTO_ALIGN) for s in sources),
+    }
+    # Panel settings were written to every bridge entry alike: the first one's.
+    for key in (
+        CONF_FOOTER,
+        CONF_FOOTER_TABS,
+        CONF_GALLERY_SEASONAL,
+        CONF_GALLERY_RULES,
+    ):
+        if (owner := next((s for s in sources if key in s.options), None)) is not None:
+            options[key] = owner.options[key]
+    if studio is None:
+        studio, old = old[0], old[1:]
+        hass.config_entries.async_update_entry(
+            studio,
+            data={CONF_KIND: KIND_STUDIO},
+            title=STUDIO_TITLE,
+            unique_id=DOMAIN,
+            options=options,
+        )
+    else:
+        hass.config_entries.async_update_entry(studio, options=options)
+    for entry in old:
+        await hass.config_entries.async_remove(entry.entry_id)
+    _LOGGER.info("Hue Studio now has one entry for all bridges (%s)", studio.entry_id)
+
+
+async def _async_setup_studio(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
+    """Connect to every bridge of the native integration and register the panel."""
+    if not is_studio(entry):
+        # An unknown kind of entry (from a newer version, after a downgrade).
+        raise ConfigEntryError(
+            translation_domain=DOMAIN, translation_key="unknown_entry"
+        )
+    connections = BridgeConnections(hass, entry)
+    entry.runtime_data = HueStudioData(connections=connections)
+    await connections.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     entry.async_on_unload(_async_track_auto_align(hass, entry))
     await async_register_panel(hass)
@@ -154,7 +186,7 @@ async def _async_setup_bridge(hass: HomeAssistant, entry: HueStudioConfigEntry) 
 def _async_track_auto_align(
     hass: HomeAssistant, entry: HueStudioConfigEntry
 ) -> Callable[[], None]:
-    """With the option on, align the bridge's rooms when HA areas change.
+    """With the option on, align the bridges' rooms when HA areas change.
 
     Only HA changes trigger it: a light moved in the Hue app is a mismatch the panel
     shows, not something to undo behind the user's back. Empty rooms are never
@@ -165,7 +197,7 @@ def _async_track_auto_align(
         if not entry.options.get(CONF_AUTO_ALIGN):
             return
         try:
-            await async_align(hass, hue_entry_id=entry.data[CONF_HUE_ENTRY_ID])
+            await async_align(hass)
         except HomeAssistantError as err:
             _LOGGER.warning("Automatic room alignment failed: %s", err)
 
@@ -241,24 +273,31 @@ async def _async_options_updated(
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> bool:
-    """Close the bridge connection or drop the box's entities.
-
-    The panel goes with the last bridge.
-    """
+    """Close the bridge connections (and the panel), or drop the box's entities."""
     if is_sync_box(entry):
         return await hass.config_entries.async_unload_platforms(
             entry, SYNC_BOX_PLATFORMS
         )
-    if not is_bridge(entry):
+    if not is_studio(entry):
         return True
-    if (bridge := entry.runtime_data.bridge) is not None:
-        await bridge.close()
-    if not any(
-        other.entry_id != entry.entry_id and is_bridge(other)
-        for other in hass.config_entries.async_loaded_entries(DOMAIN)
-    ):
-        async_unregister_panel(hass)
+    if (connections := entry.runtime_data.connections) is not None:
+        await connections.async_stop()
+    async_unregister_panel(hass)
     return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: HueStudioConfigEntry, device: dr.DeviceEntry
+) -> bool:
+    """A bridge's device can be deleted once the native integration lost the bridge;
+    it comes back when the bridge does."""
+    if not is_studio(entry):
+        return False
+    bridges = {e.unique_id for e in async_supported_hue_entries(hass)}
+    return not any(
+        len(ident) > 1 and ident[0] == DOMAIN and ident[1] in bridges
+        for ident in device.identifiers
+    )
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -> None:

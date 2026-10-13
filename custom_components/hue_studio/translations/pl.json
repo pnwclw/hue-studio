@@ -4,16 +4,13 @@
       "user": {
         "title": "Dodaj do Hue Studio",
         "menu_options": {
-          "bridge": "Mostek Hue (z integracji Philips Hue)",
+          "bridges": "Hue Studio dla Twoich mostków Hue (z integracji Philips Hue)",
           "sync_box": "Hue Play HDMI Sync Box"
         }
       },
-      "bridge": {
-        "title": "Wybierz mostek Hue",
-        "description": "Hue Studio korzysta z połączenia integracji Philips Hue, więc nie trzeba ponownie parować mostka.",
-        "data": {
-          "hue_entry_id": "Mostek Hue"
-        }
+      "bridges": {
+        "title": "Hue Studio",
+        "description": "Hue Studio korzysta ze wszystkich mostków integracji Philips Hue (znalezione: {bridges}). Używa ich połączenia, więc nie trzeba ponownie parować mostków, a mostek dodany tam później jest od razu używany. Każdy mostek pojawia się tu jako usługa; ustawienia są w panelu Hue Studio."
       },
       "sync_box": {
         "title": "Hue Play HDMI Sync Box",
@@ -59,7 +56,6 @@
     },
     "abort": {
       "already_configured": "To jest już skonfigurowane w Hue Studio.",
-      "bridge_not_found": "Wybrany mostek Hue nie jest już dostępny.",
       "no_bridges": "Nie skonfigurowano mostka Philips Hue z API v2. Najpierw skonfiguruj integrację Philips Hue.",
       "not_sync_box": "To urządzenie nie jest Sync Box.",
       "reauth_successful": "Sync Box został ponownie sparowany.",
@@ -76,13 +72,13 @@
   },
   "exceptions": {
     "hue_entry_missing": {
-      "message": "Wpis konfiguracji Philips Hue używany przez Hue Studio już nie istnieje. Usuń i dodaj ponownie Hue Studio."
+      "message": "Ten mostek Hue nie jest połączony z Hue Studio."
     },
-    "bridge_auth_failed": {
-      "message": "Mostek Hue odrzucił klucz aplikacji integracji Philips Hue. Najpierw ponownie uwierzytelnij integrację Philips Hue."
+    "not_set_up": {
+      "message": "Hue Studio nie jest skonfigurowane."
     },
-    "bridge_unreachable": {
-      "message": "Nie można połączyć się z mostkiem Hue pod adresem {host}."
+    "unknown_entry": {
+      "message": "Ten wpis Hue Studio pochodzi z nowszej wersji Hue Studio. Zaktualizuj Hue Studio lub usuń wpis."
     },
     "not_hue_light": {
       "message": "{entity_id} nie jest światłem Hue na mostku połączonym z Hue Studio."
@@ -637,52 +633,6 @@
         "auto": "Scena dnia",
         "off": "Wyłączone"
       }
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Ustawienia Hue Studio",
-        "menu_options": {
-          "groups": "Pokoje i strefy Hue → obszary HA",
-          "room_select": "Czujniki w pokojach",
-          "alignment": "Pokoje podążają za obszarami",
-          "save": "Zapisz"
-        }
-      },
-      "groups": {
-        "title": "Pokoje i strefy Hue → obszary HA",
-        "description": "Po lewej każdy pokój lub strefa Hue, po prawej obszar Home Assistant, do którego należy. Wypełniane automatycznie, gdy obszar ma dokładnie te same światła; zostaw wiersz pusty, aby pokazać grupę jako strefę. Mostek nie jest zmieniany."
-      },
-      "room_select": {
-        "title": "Czujniki w pokojach",
-        "description": "Wybierz pokój, aby przypisać do niego czujniki ruchu i temperatury.",
-        "data": {
-          "room": "Pokój"
-        }
-      },
-      "room_sensors": {
-        "title": "{room}",
-        "description": "Czujniki ruchu pokazują obecność na karcie pokoju. Czujniki temperatury są uśredniane do temperatury pokoju; termometr czujnika ruchu Hue można połączyć z termostatem pokoju. Czujniki światła pokazują, jak jasno jest w pokoju. Bez wyboru używane są czujniki Hue z pokoju.",
-        "data": {
-          "motion": "Czujniki ruchu",
-          "temperature": "Czujniki temperatury",
-          "illuminance": "Czujniki światła"
-        }
-      },
-      "alignment": {
-        "title": "Pokoje podążają za obszarami",
-        "description": "Hue Studio może utrzymywać pokoje Hue na mostku zgodne z obszarami Home Assistant (ekran „Pokoje i strefy” w panelu pokazuje, co by się zmieniło). Gdy ta opcja jest włączona, każda zmiana obszaru lub obszaru światła Hue trafia od razu na mostek. Puste pokoje Hue nigdy nie są usuwane automatycznie.",
-        "data": {
-          "auto_align": "Wyrównuj automatycznie, gdy zmieniają się obszary"
-        }
-      }
-    },
-    "error": {
-      "area_taken": "Inny pokój lub strefa Hue już należy do tego obszaru."
-    },
-    "abort": {
-      "no_groups": "Nie znaleziono pokoi ani stref Hue ani obszarów ze światłami Hue."
     }
   },
   "entity": {

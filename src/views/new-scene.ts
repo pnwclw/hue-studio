@@ -68,7 +68,7 @@ export class NewSceneSheet extends StudioView {
           : html`<div class="form-body"><p class="hint">${t("room.no_group", { room: g.name })}</p></div>
               <div class="actions">
                 <button class="pill apply" ?disabled=${this.busy} @click=${createZone}>${t("room.create_zone")}</button>
-                <button class="pill" @click=${() => ctx.openSettings()}>${t("room.mapping")}</button>
+                <button class="pill" @click=${() => ctx.go("/settings/integration")}>${t("room.mapping")}</button>
               </div>`}
       </div>
     </div>`;

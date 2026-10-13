@@ -6,7 +6,8 @@ DOMAIN: Final = "hue_studio"
 
 HUE_DOMAIN: Final = "hue"
 
-# Config entry data: id of the native `hue` entry we borrow host and app key from.
+# Data of the old entries of one bridge each: the native `hue` entry they used.
+# Such entries are merged into the Hue Studio entry on setup.
 CONF_HUE_ENTRY_ID: Final = "hue_entry_id"
 
 # Keys of the native `hue` entry data (homeassistant/components/hue/const.py).
@@ -38,10 +39,13 @@ CONF_GALLERY_RULES: Final = "gallery_rules"
 GALLERY_SEASONS: Final = ("winter", "spring", "summer", "autumn")
 
 SIGNAL_CONFIG_UPDATED: Final = "hue_studio_config_updated"
+# A bridge connected or went away, or its MotionAware areas changed.
+SIGNAL_BRIDGES_UPDATED: Final = "hue_studio_bridges_updated"
 
-# A config entry is either a Hue bridge (no `kind`, the original entry type) or a Hue
-# Play HDMI Sync Box paired directly with Hue Studio.
+# A config entry is the Hue Studio entry (one, for every bridge of the native `hue`
+# integration; its options hold the settings) or a Hue Play HDMI Sync Box.
 CONF_KIND: Final = "kind"
+KIND_STUDIO: Final = "studio"
 KIND_SYNC_BOX: Final = "sync_box"
 # Sync Box entry data (besides host): box id (certificate common name) and our
 # registration on the box.

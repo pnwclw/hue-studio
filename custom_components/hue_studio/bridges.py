@@ -16,10 +16,8 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_BRIDGES_UPDATED
 from .lights import LIGHT_DOMAIN, async_bridges
-
-SIGNAL_BRIDGES_UPDATED = f"{DOMAIN}_bridges_updated"
 
 
 @callback

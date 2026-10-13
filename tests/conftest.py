@@ -46,11 +46,12 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.hue_studio.const import (
-    CONF_HUE_ENTRY_ID,
+    CONF_KIND,
     DOMAIN,
     HUE_CONF_API_KEY,
     HUE_CONF_API_VERSION,
     HUE_DOMAIN,
+    KIND_STUDIO,
 )
 
 BRIDGE_ID = "001788fffe000000"
@@ -101,12 +102,12 @@ def hue_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 @pytest.fixture
 def studio_entry(hass: HomeAssistant, hue_entry: MockConfigEntry) -> MockConfigEntry:
-    """A Hue Studio config entry linked to `hue_entry`."""
+    """The Hue Studio entry (it uses `hue_entry`'s bridge)."""
     entry = MockConfigEntry(
         domain=DOMAIN,
-        title=hue_entry.title,
-        unique_id=BRIDGE_ID,
-        data={CONF_HUE_ENTRY_ID: hue_entry.entry_id},
+        title="Hue Studio",
+        unique_id=DOMAIN,
+        data={CONF_KIND: KIND_STUDIO},
     )
     entry.add_to_hass(hass)
     return entry
@@ -255,7 +256,9 @@ def reset_entertainment() -> Generator[None]:
 @pytest.fixture
 def mock_bridge() -> Generator[MagicMock]:
     """Patch aiohue's HueBridgeV2 used by Hue Studio."""
-    with patch("custom_components.hue_studio.HueBridgeV2", autospec=True) as bridge_cls:
+    with patch(
+        "custom_components.hue_studio.connections.HueBridgeV2", autospec=True
+    ) as bridge_cls:
         bridge = bridge_cls.return_value
         bridge.initialize = AsyncMock()
         bridge.close = AsyncMock()
