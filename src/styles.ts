@@ -180,12 +180,15 @@ export const CSS = `
   .hero .topbar.adjusting .title { font-variant-numeric: tabular-nums; }
   .hero .inner { max-width: 960px; margin: 0 auto; }
   .hero .meta { margin: 2px 2px 0; }
+  /* The Hue app's spacing around the room's slider: close under the bar, a short edge below. */
+  .hero-head .hero .slider { margin-top: 10px; }
   .sensor-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
   .sensor-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 999px; border: 0; background: var(--surface); color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
   .sensor-chip ha-icon { --mdc-icon-size: 18px; opacity: 0.75; }
   .sensor-chip.on ha-icon { color: #3ddc84; opacity: 1; }
   .hero.dark-text .round { background: rgba(0, 0, 0, 0.1); }
   .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .badges:empty { display: none; }
   .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: 14px; cursor: pointer;
            font-size: 12px; font-weight: 600; background: rgba(0, 0, 0, 0.22); transition: background 0.2s, transform 0.15s var(--ease); }
   .badge:active { transform: scale(0.96); }
