@@ -1,19 +1,27 @@
 name: Release
 
-# Publishing a GitHub release (tag vX.Y.Z-alpha.N) builds the frontend and attaches
-# hue_studio.zip, which HACS installs (`zip_release` in hacs.json). The built
-# JavaScript is not in git, so installing from the source tree would miss it.
+# Pushing a tag vX.Y.Z-alpha.N (or publishing a GitHub release for it) builds the
+# frontend and attaches hue_studio.zip, which HACS installs (`zip_release` in
+# hacs.json). The built JavaScript is not in git, so installing from the source tree
+# would miss it. A pushed tag without a release gets one: a pre-release named after the
+# tag, with generated notes.
 #
 # For now every release is an alpha: the version must be X.Y.Z-alpha.N and the
 # GitHub release must be marked as a pre-release (HACS shows it only with
 # "Show beta versions" enabled).
 
 on:
+  push:
+    tags: ["v*"]
   release:
     types: [published]
 
 permissions:
   contents: write
+
+# A release made in the UI with a new tag fires both events: one run at a time.
+concurrency:
+  group: release-${{ github.ref_name }}
 
 jobs:
   zip:
@@ -21,14 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check the tag matches manifest.json and is an alpha pre-release
-        env:
-          PRERELEASE: ${{ github.event.release.prerelease }}
+      - name: Check the tag matches manifest.json and is an alpha
         run: |
           version=$(jq -r .version custom_components/hue_studio/manifest.json)
           test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != manifest v$version"; exit 1; }
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]] || { echo "$version is not X.Y.Z-alpha.N"; exit 1; }
-          test "$PRERELEASE" = "true" || { echo "mark the GitHub release as a pre-release"; exit 1; }
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -42,7 +47,14 @@ jobs:
           cd custom_components/hue_studio
           find . -name '__pycache__' -prune -exec rm -rf {} +
           zip -r "$GITHUB_WORKSPACE/hue_studio.zip" . -x '*.map'
-      - name: Attach to the release
+      - name: Attach to the release (a pushed tag without one gets a pre-release)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" hue_studio.zip --clobber
+        run: |
+          if ! gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
+            gh release create "${GITHUB_REF_NAME}" hue_studio.zip --verify-tag --prerelease --generate-notes --title "${GITHUB_REF_NAME}"
+            exit 0
+          fi
+          test "$(gh release view "${GITHUB_REF_NAME}" --json isPrerelease --jq .isPrerelease)" = "true" ||
+            { echo "mark the GitHub release as a pre-release"; exit 1; }
+          gh release upload "${GITHUB_REF_NAME}" hue_studio.zip --clobber
