@@ -215,7 +215,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 align_rooms, save_scene, reset_scene, recall_scene, set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
-                                hue_studio/devices/search|identify|setup, hue_studio/entertainment/subscribe|create|update|delete|positions,
+                                hue_studio/devices/search|identify|setup|sensitivity, hue_studio/entertainment/subscribe|create|update|delete|positions,
                                 hue_studio/bridges/subscribe|motion_area
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align

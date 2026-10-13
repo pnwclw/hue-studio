@@ -215,6 +215,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   sensor("switch.office_sensor_motion_sensor_enabled", "hue", "dev_motion", "on", { friendly_name: "Office sensor Motion sensor enabled" });
   entities["switch.office_sensor_motion_sensor_enabled"].translation_key = "motion_sensor_enabled";
   sensor("sensor.office_sensor_battery", "hue", "dev_motion", "85", { device_class: "battery", unit_of_measurement: "%", friendly_name: "Office sensor Battery" });
+  // The office Hue room's grouped motion (on the room's service device): never a sensor card.
+  devices.dev_office_room = { area_id: "office", name: "Office", model: "Room", entry_type: "service" };
+  sensor("binary_sensor.office_grouped_motion", "hue", "dev_office_room", "off", { device_class: "motion", friendly_name: "Office" });
   sensor("weather.home", "met", "", "cloudy", { friendly_name: "Home", cloud_coverage: 85 });
   sensor("sensor.season", "season", "", "autumn", { device_class: "enum", friendly_name: "Season" });
   // Adaptive Lighting for the office lamp.
@@ -851,6 +854,18 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         }
         if (i >= 0) hueDevices.splice(i, 1);
         pushDevices();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/devices/sensitivity") {
+        // The sensor calibrates to it for a while (the bridge's `changing`), then it is set.
+        const d = hueDevices.find((x) => x.id === msg.device);
+        if (!d?.sensitivity) throw new Error("no motion sensitivity");
+        d.sensitivity = { ...d.sensitivity, value: Number(msg.sensitivity), changing: true };
+        pushDevices();
+        setTimeout(() => {
+          d.sensitivity = { ...d.sensitivity!, changing: false };
+          pushDevices();
+        }, 4000);
         return null as T;
       }
       if (msg.type === "hue_studio/config/set") {

@@ -170,6 +170,9 @@ export const CSS = `
 
   /* room */
   .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 22px 22px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22); }
+  /* Its bar row sits where every other screen's is (the 44px row of .bar), the gap below kept. */
+  .hero .topbar { min-height: 44px; padding-bottom: 8px; }
+  main.wide .hero .topbar { padding-bottom: 0; }
   .hero .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Dragging the brightness: the bar shows just the percentage (the Hue app's). */
   .hero .topbar > :not(.title) { transition: opacity 0.2s var(--ease); }
@@ -744,6 +747,40 @@ export const CSS = `
   .sensor-sheet .hint { margin: 0 2px 12px; font-size: 15px; }
   .sensor-sheet .tick { display: flex; color: var(--accent); }
   .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: 34px; font-weight: 700; }
+  .sensor-sheet .sheet-bar { padding: 14px 16px; font-size: 18px; }
+  .sensor-sheet .sheet-bar .pill.save { height: 40px; padding: 0 18px; border-radius: 20px; font-size: 15px; text-transform: uppercase; }
+  /* Phones: the sheet comes up from the bottom, like the Hue app's. */
+  .sheet.bottom { align-items: flex-end; padding: 0; }
+  .sheet.bottom .box { width: 100%; max-width: none; border-radius: 18px 18px 0 0; animation: rise 0.3s var(--ease); }
+  .sheet.bottom .sensor-sheet .form-body { padding-bottom: calc(20px + var(--safe-bottom)); }
+  @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
+  /* Motion sensitivity: the level, a stepped slider with the names under its stops, trying it out. */
+  .sens-level { margin: 34px 0 18px; text-align: center; }
+  .sens-level .label { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); }
+  .sens-level .value { margin-top: 4px; font-size: 20px; font-weight: 600; }
+  .sens-slider { --r: 13px; position: relative; padding: 0 8px; }
+  .sens-slider input { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 30px; margin: 0; background: none; cursor: pointer; }
+  .sens-slider input::-webkit-slider-runnable-track { height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, var(--accent) calc(var(--r) + (100% - 2 * var(--r)) * var(--f)), rgba(255, 255, 255, 0.14) 0); }
+  .sens-slider input::-moz-range-track { height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, var(--accent) calc(var(--r) + (100% - 2 * var(--r)) * var(--f)), rgba(255, 255, 255, 0.14) 0); }
+  .sens-slider input::-webkit-slider-thumb { -webkit-appearance: none; width: calc(2 * var(--r)); height: calc(2 * var(--r)); margin-top: calc(4px - var(--r));
+    border: none; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+  .sens-slider input::-moz-range-thumb { width: calc(2 * var(--r)); height: calc(2 * var(--r)); border: none; border-radius: 50%; background: #fff; }
+  /* Names under the stops (long ones wrap); the outer ones line up with the ends of the track. */
+  .sens-slider .ticks { position: relative; height: 38px; margin: 6px calc(8px + var(--r)) 0; font-size: 14px; line-height: 1.2; color: var(--text-2); }
+  .sens-slider .ticks span { position: absolute; top: 0; left: calc(var(--i) * 100%); width: max-content; max-width: 72px; height: auto;
+                             transform: translateX(-50%); text-align: center; }
+  .sens-slider .ticks span:first-child { transform: translateX(calc(-1 * var(--r) - 8px)); text-align: left; }
+  .sens-slider .ticks span:last-child:not(:first-child) { transform: translateX(calc(-100% + var(--r) + 8px)); text-align: right; }
+  .sheet .box.sensor-sheet { width: min(100%, 480px); }
+  .sheet.bottom .box.sensor-sheet { width: 100%; }
+  .sens-try { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 30px 0 4px; font-size: 15px; color: var(--text-2); }
+  .sens-try .dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); transition: background 0.2s, box-shadow 0.2s; }
+  .sens-try.moving { color: var(--text); }
+  .sens-try.moving .dot { background: var(--accent); box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .sens-try.calibrating .dot { animation: calibrate 1.2s ease-in-out infinite; }
+  @keyframes calibrate { 50% { opacity: 0.3; transform: scale(0.8); } }
   @container (max-width: 599px) {
     .sensor-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
   }

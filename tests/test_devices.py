@@ -11,7 +11,10 @@ from aiohue.v2.models.device import (
     DeviceMetaData,
     DeviceProductData,
 )
-from aiohue.v2.models.feature import MotionSensingFeatureSensitivity
+from aiohue.v2.models.feature import (
+    MotionSensingFeatureSensitivity,
+    MotionSensingFeatureSensitivityStatus,
+)
 from aiohue.v2.models.motion import Motion
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from homeassistant.core import HomeAssistant
@@ -147,7 +150,11 @@ async def test_add_devices(
         "sensitivity": None,
     }
     assert listed["dev-motion"]["ha_device"] == sensor.id
-    assert listed["dev-motion"]["sensitivity"] == {"value": 2, "max": 4}
+    assert listed["dev-motion"]["sensitivity"] == {
+        "value": 2,
+        "max": 4,
+        "changing": False,
+    }
 
     assert (
         await _ws(client, type="hue_studio/devices/search", serials=[" ab12cd ", ""])
@@ -245,3 +252,33 @@ async def test_motion_sensitivity(
         changed(EventType.RESOURCE_UPDATED, motion)
         changed(EventType.RESOURCE_UPDATED, motion)
     assert send.call_count == 1
+    # So does calibration starting after a change.
+    motion.sensitivity.status = MotionSensingFeatureSensitivityStatus.CHANGING
+    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+        changed(EventType.RESOURCE_UPDATED, motion)
+    assert send.call_count == 1
+
+
+async def test_sensitivity_alone(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """The sensitivity sheet tries values out live: only the sensitivity changes."""
+    client = await hass_ws_client(hass)
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/sensitivity",
+        device="dev-motion",
+        sensitivity=0,
+    )
+    assert reply["success"]
+    rid, put = bridge.sensors.motion.update.call_args.args
+    assert (rid, put.sensitivity.sensitivity) == ("m1", 0)
+    bridge.devices.update.assert_not_awaited()
+
+    reply = await _ws(
+        client, type="hue_studio/devices/sensitivity", device="dev-bulb", sensitivity=1
+    )
+    assert not reply["success"]

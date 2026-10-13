@@ -32,6 +32,7 @@ import { keyed } from "lit/directives/keyed.js";
 
 import { PANEL_PATH, StudioContext } from "./context.ts";
 import { fitToViewport, outsidePath, toggleSidebar } from "./ha-internals.ts";
+import { tabTarget } from "./footer-model.ts";
 import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
@@ -58,6 +59,9 @@ import { registerHueIcons } from "./hue-icons.ts";
 
 // Also registered by the extra JS on every page; the panel may load first.
 registerHueIcons();
+
+/** The page each tab showed last (path below the panel, with its query): a tab goes back there. */
+const lastPaths: Record<string, string> = {};
 
 type Route =
   | { name: "home" }
@@ -171,7 +175,8 @@ export class HueStudioPanel extends LitElement {
   protected override render() {
     const ctx = this.ctx;
     if (!ctx?.ready) return nothing;
-    const route = parseRoute(this.route?.path ?? location.pathname.replace(PANEL_PATH, ""), location.search);
+    const path = this.route?.path ?? location.pathname.replace(PANEL_PATH, "");
+    const route = parseRoute(path, location.search);
     const tab =
       route.name === "sync"
         ? "sync"
@@ -184,6 +189,7 @@ export class HueStudioPanel extends LitElement {
               route.name === "integration"
             ? "settings"
             : "home";
+    lastPaths[tab] = path + location.search;
     const tabs: [string, string, IconName, string][] = [
       ["home", "", "home", ctx.t("nav.home")],
       ["automations", "/automations", "clock", ctx.t("nav.automations")],
@@ -197,7 +203,8 @@ export class HueStudioPanel extends LitElement {
       <main class=${classMap({ colorview: route.name === "color", "under-footer": top, wide: !ctx.narrow })}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
       <nav class=${classMap({ tabs: true, top })} ?hidden=${full}>
         ${tabs.map(
-          ([id, to, name, label]) => html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(to)}>${icon(name)}${label}</button>`,
+          ([id, to, name, label]) =>
+            html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(tabTarget(lastPaths, id, tab, to))}>${icon(name)}${label}</button>`,
         )}
       </nav>
       <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>

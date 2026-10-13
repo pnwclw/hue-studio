@@ -40,6 +40,7 @@ from .devices import (
     async_devices_payload,
     async_identify,
     async_search,
+    async_set_sensitivity,
     async_setup_device,
     async_watch_bridges,
 )
@@ -95,6 +96,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_search_devices)
     websocket_api.async_register_command(hass, ws_identify_device)
     websocket_api.async_register_command(hass, ws_setup_device)
+    websocket_api.async_register_command(hass, ws_set_sensitivity)
     for command in (
         ws_subscribe_entertainment,
         ws_create_entertainment,
@@ -590,6 +592,28 @@ async def ws_setup_device(
             msg.get("area_id"),
             msg.get("sensitivity"),
         ),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/devices/sensitivity",
+        vol.Required("device"): str,
+        vol.Required("sensitivity"): vol.All(int, vol.Range(min=0)),
+    }
+)
+@websocket_api.async_response
+async def ws_set_sensitivity(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Set a motion sensor's sensitivity alone."""
+    await _ws_call(
+        connection,
+        msg,
+        async_set_sensitivity(hass, msg["device"], msg["sensitivity"]),
     )
 
 

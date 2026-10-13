@@ -154,6 +154,13 @@ test("room sensors split into Hue sensor devices (with all their readings and sw
   assert.equal(hueSensor(h, "d_desk"), null);
   assert.deepEqual(rest, { motion: [], temperature: ["sensor.thermostat"], illuminance: [] });
 
+  // The Hue room's own grouped motion (a service device of HA's `hue`): not picked, no card.
+  h.devices.d_room = { area_id: "office", name: "Office", model: "Room", entry_type: "service" };
+  h.entities["binary_sensor.office_grouped"] = { platform: "hue", device_id: "d_room" };
+  h.states["binary_sensor.office_grouped"] = { state: "off", attributes: { device_class: "motion" } };
+  assert.ok(!buildHome(h).rooms[0].sensors.motion.includes("binary_sensor.office_grouped"));
+  assert.deepEqual(splitSensors(h, { motion: ["binary_sensor.office_grouped"], temperature: [], illuminance: [] }).devices, []);
+
   // No Hue sensor among the room's sensors: no cards.
   assert.deepEqual(splitSensors(h, { motion: [], temperature: ["sensor.thermostat"], illuminance: [] }).devices, []);
 });

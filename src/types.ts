@@ -40,7 +40,11 @@ export type ServiceData = Record<string, unknown> & { entity_id?: string | strin
 export interface HassData {
   states: Record<string, HassState>;
   entities?: Record<string, HassEntityEntry>;
-  devices?: Record<string, { area_id?: string | null; name?: string | null; name_by_user?: string | null; model?: string | null }>;
+  /** `entry_type` "service": not a physical device (the `hue` integration's Hue rooms and zones). */
+  devices?: Record<
+    string,
+    { area_id?: string | null; name?: string | null; name_by_user?: string | null; model?: string | null; entry_type?: string | null }
+  >;
   areas?: Record<string, HassArea>;
   config?: { location_name?: string };
   language?: string;
@@ -64,8 +68,8 @@ export interface HueDeviceInfo {
   lights: string[];
   /** Its HA device id, or null. */
   ha_device: string | null;
-  /** A motion sensor's sensitivity (0..max), else null. */
-  sensitivity: { value: number; max: number } | null;
+  /** A motion sensor's sensitivity (0..max; `changing`: calibrating to it), else null. */
+  sensitivity: { value: number; max: number; changing?: boolean } | null;
 }
 
 /** Per bridge (native hue entry id); `searching` null: the bridge cannot search via its API. */

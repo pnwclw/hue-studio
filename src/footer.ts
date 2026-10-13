@@ -7,7 +7,7 @@ import { css, html, LitElement, nothing } from "lit";
 import { state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import { activeTab, FOOTER_SPACE, type FooterTab, footerTabs, footerVisible } from "./footer-model.ts";
+import { activeTab, FOOTER_SPACE, type FooterTab, footerTabs, footerVisible, tabTarget } from "./footer-model.ts";
 import { navigate, openSidebar, reserveBottom, watchHass } from "./ha-internals.ts";
 import { localize } from "./i18n.ts";
 import type { Hass, StudioConfig } from "./types.ts";
@@ -46,6 +46,8 @@ class HueStudioFooter extends LitElement {
   }
   @state() private accessor path = location.pathname;
   @state() private accessor strings: ReturnType<typeof localize> = localize(null);
+  /** The page each tab showed last (tab path -> path and query), kept by `start`. */
+  lastPaths: Record<string, string> = {};
 
   setTabs(tabs: FooterTab[], hass: Hass): void {
     this.tabs = tabs;
@@ -63,7 +65,7 @@ class HueStudioFooter extends LitElement {
     return html`<nav aria-label=${t("footer.label")}>
       ${this.tabs.map(
         (tab) => html`<button class=${classMap({ on: tab.path === active })} aria-current=${tab.path === active ? "page" : "false"}
-          @click=${() => navigate(`/${tab.path}`)}><ha-icon icon=${tab.icon}></ha-icon><span>${tab.label}</span></button>`,
+          @click=${() => navigate(tabTarget(this.lastPaths, tab.path, active, `/${tab.path}`))}><ha-icon icon=${tab.icon}></ha-icon><span>${tab.label}</span></button>`,
       )}
       <button @click=${() => openSidebar()}><ha-icon icon="mdi:dots-horizontal"></ha-icon><span>${t("footer.more")}</span></button>
     </nav>`;
@@ -78,6 +80,8 @@ function start(): void {
   let hass: Hass | undefined;
   let footer: HueStudioFooter | null = null;
   let subscribed = false;
+  // Kept while the footer comes and goes (settings pages, rotating the phone).
+  const lastPaths: Record<string, string> = {};
 
   const update = () => {
     const show = !!config?.footer && !!hass && footerVisible(location.pathname, window.innerWidth);
@@ -92,7 +96,11 @@ function start(): void {
       document.body.append(footer);
       reserveBottom(FOOTER_SPACE);
     }
-    footer.setTabs(footerTabs(hass!.panels, config!.footer_tabs, hass!.localize), hass!);
+    const tabs = footerTabs(hass!.panels, config!.footer_tabs, hass!.localize);
+    const active = activeTab(location.pathname, tabs);
+    if (active) lastPaths[active] = location.pathname + location.search;
+    footer.lastPaths = lastPaths;
+    footer.setTabs(tabs, hass!);
     footer.setPath(location.pathname);
   };
 

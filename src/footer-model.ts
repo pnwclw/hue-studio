@@ -52,6 +52,13 @@ export function activeTab(pathname: string, tabs: FooterTab[]): string | null {
   return tabs.find((t) => t.path === first)?.path ?? null;
 }
 
+/**
+ * Where a tab leads, like a phone app's tab bar: back to the page it showed last (`last`:
+ * tab -> path), or to its start when it is the tab shown already (or showed nothing yet).
+ */
+export const tabTarget = (last: Record<string, string>, tab: string, active: string | null, start: string): string =>
+  tab === active ? start : (last[tab] ?? start);
+
 /** Shown on phones only, and never on HA's own settings pages. */
 export const footerVisible = (pathname: string, width: number): boolean => width < NARROW_WIDTH && !/^\/config(\/|$)/.test(pathname);
 

@@ -15,7 +15,7 @@ integration; Hue Studio reuses its bridge connection, so no second pairing is ne
 
 > **Status:** early development. So far: config flow, bridge connection, services and a
 > `/hue` sidebar panel — rooms (your HA areas) and zones, room view with Hue scenes,
-> lights and the room's sensors (temperature, light level; a card per Hue sensor with its on/off and its settings: name, room, lights, motion sensitivity), a gamut-aware color
+> lights and the room's sensors (temperature, light level; a card per Hue sensor with its on/off and its settings: name, room, lights, motion sensitivity tried out live while it calibrates), a gamut-aware color
 > wheel with one pin per gradient point, white mode and gradient styles, light effects
 > (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
 > dynamic speed, auto-play, reset, dynamic playback), the scene gallery with

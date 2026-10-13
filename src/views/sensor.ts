@@ -2,8 +2,10 @@
 // (renamed on the bridge, HA follows), its room (the HA device's area), the lights it
 // switches ("Add lights": the motion automations that use it, and a new one), motion
 // sensitivity (on the bridge; HA's `hue` does not expose it), daylight (the light level
-// below which its automations switch the lights on) and support. "Save" stores the name,
-// the room and the sensitivity at once.
+// below which its automations switch the lights on) and support. "Save" stores the name
+// and the room at once. The sensitivity sheet is the Hue app's: a slider whose value goes
+// to the bridge as soon as it is let go, so the sensor can be tried out (it calibrates for
+// about 15 s, then a dot lights up on motion); its "Save" keeps it, closing goes back.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -12,13 +14,15 @@ import { classMap } from "lit/directives/class-map.js";
 import { type AutomationDraft, fromConfig, roomsLine } from "../automations.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { BATTERY_ICON, findGroup, type HueSensor, hueSensor, sensitivityLevels } from "../model.ts";
+import { BATTERY_ICON, defaultSensitivity, findGroup, type HueSensor, hueSensor, sensitivityLevels } from "../model.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
 const NAME_MAX = 32;
 const HELP_URL = "https://www.philips-hue.com/support";
+/** How long a motion sensor calibrates after its sensitivity changed (the Hue app's "about 15 seconds"). */
+const CALIBRATION_MS = 15_000;
 
 type Sheet = "room" | "sensitivity" | "placement" | "battery";
 
@@ -40,7 +44,14 @@ export class SensorView extends StudioView {
   @state() private accessor editingName = false;
   /** The room picked (an area id, null: none); undefined: unchanged. */
   @state() private accessor area: string | null | undefined = undefined;
-  @state() private accessor sensitivity: number | null = null;
+  /** The sensitivity sheet: the value tried out (sent to the bridge) and the one it opened with. */
+  @state() private accessor trying: number | null = null;
+  private opened: number | null = null;
+  /** The value last sent to the bridge (its own may not have come back yet). */
+  private sent: number | null = null;
+  /** Until when the sensor calibrates after a value was sent (the bridge may not say). */
+  @state() private accessor calibrating = 0;
+  private calibrationTimer?: ReturnType<typeof setTimeout>;
   @state() private accessor sheet: Sheet | null = null;
   @state() private accessor saving = false;
   private stop?: () => void;
@@ -53,6 +64,10 @@ export class SensorView extends StudioView {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stop?.();
+    clearTimeout(this.calibrationTimer);
+    // Left with a value only tried out: the sensor gets back the one it had.
+    const info = this.info;
+    if (this.sheet === "sensitivity" && info && this.opened !== null) this.sendSensitivity(info, this.opened);
   }
 
   /** The bridge's side of the sensor (its id there, sensitivity). */
@@ -76,8 +91,7 @@ export class SensorView extends StudioView {
     const info = this.info;
     return (
       (this.name !== null && this.name.trim() !== "" && this.name.trim() !== (info?.name ?? "")) ||
-      (this.area !== undefined && this.area !== this.currentArea) ||
-      (this.sensitivity !== null && this.sensitivity !== info?.sensitivity?.value)
+      (this.area !== undefined && this.area !== this.currentArea)
     );
   }
 
@@ -168,7 +182,7 @@ export class SensorView extends StudioView {
       <h2 class="label">${t("sensor.general")}</h2>
       <div class="rows">
         ${info?.sensitivity
-          ? this.row("mdi:motion-sensor", t("sensor.sensitivity"), this.level(this.sensitivity ?? info.sensitivity.value, info.sensitivity.max), () => this.open("sensitivity"))
+          ? this.row("mdi:motion-sensor", t("sensor.sensitivity"), this.level(info.sensitivity.value, info.sensitivity.max), () => this.open("sensitivity"))
           : nothing}
         ${motion
           ? this.row(
@@ -195,7 +209,7 @@ export class SensorView extends StudioView {
     // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
     return html`<div class="screen-head">${head}</div>
       <div class="screen-body">${body}</div>
-      ${this.sheet ? this.renderSheet(this.sheet, info, area, level) : nothing}`;
+      ${this.sheet ? this.renderSheet(this.sheet, sensor, info, area, level) : nothing}`;
   }
 
   /** A row like the Hue app's: picture, title and value, no chevron. */
@@ -216,12 +230,78 @@ export class SensorView extends StudioView {
     haptic("selection");
     this.editingName = false;
     this.sheet = sheet;
+    if (sheet === "sensitivity") {
+      this.opened = this.trying = this.info?.sensitivity?.value ?? null;
+      this.sent = null;
+    }
   }
 
-  private renderSheet(sheet: Sheet, info: HueDeviceInfo | null, area: string | null, level: string): TemplateResult {
+  /** Close a sheet; the sensitivity one puts back the value it opened with unless `keep`. */
+  private close(keep = false): void {
+    const info = this.info;
+    if (this.sheet === "sensitivity" && !keep && info && this.opened !== null) this.sendSensitivity(info, this.opened);
+    if (this.sheet === "sensitivity" && keep) haptic("success");
+    this.sheet = null;
+    this.trying = this.opened = null;
+  }
+
+  /** Send a sensitivity to the bridge; the sensor calibrates for a while. */
+  private sendSensitivity(info: HueDeviceInfo, value: number): void {
+    if (value === (this.sent ?? info.sensitivity?.value)) return;
+    this.sent = value;
+    void this.ctx.ws({ type: "hue_studio/devices/sensitivity", device: info.id, sensitivity: value });
+    this.calibrating = Date.now() + CALIBRATION_MS;
+    clearTimeout(this.calibrationTimer);
+    this.calibrationTimer = setTimeout(() => (this.calibrating = 0), CALIBRATION_MS);
+  }
+
+  /** The Hue app's sensitivity sheet: what it does, the level, a stepped slider, trying it out. */
+  private sensitivitySheet(sensor: HueSensor, info: HueDeviceInfo, sensitivity: NonNullable<HueDeviceInfo["sensitivity"]>): TemplateResult {
+    const { t } = this.ctx;
+    const { max } = sensitivity;
+    const value = this.trying ?? sensitivity.value;
+    const fallback = defaultSensitivity(max);
+    const name = this.level(value, max);
+    const motion = sensor.sensors.motion[0];
+    const calibrating = sensitivity.changing || this.calibrating > Date.now();
+    const moving = !calibrating && motion !== undefined && this.ctx.hass.states[motion]?.state === "on";
+    const step = (e: Event) => {
+      const v = Number((e.target as HTMLInputElement).value);
+      if (v !== this.trying) haptic("selection");
+      this.trying = v;
+    };
+    return html`<p class="hint">${t("sensor.sensitivity_hint")}</p>
+      <p class="hint">${t("sensor.sensitivity_calibrate")}</p>
+      <div class="sens-level">
+        <div class="label">${t("sensor.sensitivity_label")}</div>
+        <div class="value">${value === fallback ? t("sensor.level_default", { level: name }) : name}</div>
+      </div>
+      <div class="sens-slider" style="--f:${max ? value / max : 0}">
+        <input
+          type="range"
+          min="0"
+          max=${max}
+          step="1"
+          .value=${String(value)}
+          aria-label=${t("sensor.sensitivity")}
+          aria-valuetext=${name}
+          @input=${step}
+          @change=${(e: Event) => this.sendSensitivity(info, Number((e.target as HTMLInputElement).value))}
+        />
+        <div class="ticks">
+          ${Array.from({ length: max + 1 }, (_, i) => html`<span style="--i:${i / max}">${this.level(i, max)}</span>`)}
+        </div>
+      </div>
+      <div class=${classMap({ "sens-try": true, calibrating, moving })} role="status">
+        <span class="dot"></span>
+        <span>${calibrating ? t("sensor.calibrating") : moving ? t("sensor.motion_now") : t("sensor.try_out")}</span>
+      </div>`;
+  }
+
+  private renderSheet(sheet: Sheet, sensor: HueSensor, info: HueDeviceInfo | null, area: string | null, level: string): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
-    const done = () => (this.sheet = null);
+    const done = () => this.close();
     const pick = (selected: boolean, label: string, act: () => void) =>
       html`<button class=${classMap({ item: true, on: selected })} role="radio" aria-checked=${selected} @click=${() => {
         haptic("selection");
@@ -239,10 +319,7 @@ export class SensorView extends StudioView {
       content = html`<div class="rows">${areas.map(([id, a]) => pick(id === area, a.name, () => (this.area = id)))}</div>`;
     } else if (sheet === "sensitivity" && info?.sensitivity) {
       title = t("sensor.sensitivity");
-      const { max } = info.sensitivity;
-      const value = this.sensitivity ?? info.sensitivity.value;
-      content = html`<p class="hint">${t("sensor.sensitivity_hint")}</p>
-        <div class="rows">${Array.from({ length: max + 1 }, (_, i) => pick(i === value, this.level(i, max), () => (this.sensitivity = i)))}</div>`;
+      content = this.sensitivitySheet(sensor, info, info.sensitivity);
     } else if (sheet === "battery") {
       title = t("sensor.battery");
       content = html`${level ? html`<p class="big-value">${level}</p>` : nothing}<p class="hint">${t("sensor.battery_text")}</p>`;
@@ -250,11 +327,15 @@ export class SensorView extends StudioView {
       title = t("sensor.placement");
       content = html`<p class="hint">${t("sensor.placement_text")}</p>`;
     }
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && done()}>
+    // Like the Hue app's: a sheet from the bottom (phones), close on the left, "Save" where it keeps something.
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && done()}>
       <div class="box form sensor-sheet" role="dialog" aria-label=${title}>
         <div class="sheet-bar">
-          <div class="grow">${title}</div>
           <button class="round close" aria-label=${t("common.close")} @click=${done}>${icon("close")}</button>
+          <div class="grow">${title}</div>
+          ${sheet === "sensitivity"
+            ? html`<button class="pill save" ?disabled=${this.trying === null} @click=${() => this.close(true)}>${t("scene.save")}</button>`
+            : nothing}
         </div>
         <div class="form-body">${content}</div>
       </div>
@@ -270,7 +351,6 @@ export class SensorView extends StudioView {
       device: info.id,
       name,
       area_id: this.area !== undefined ? this.area : this.currentArea,
-      ...(this.sensitivity !== null && this.sensitivity !== info.sensitivity?.value ? { sensitivity: this.sensitivity } : {}),
     });
     this.saving = false;
     if (!ok) return;
@@ -278,7 +358,6 @@ export class SensorView extends StudioView {
     ctx.toast(ctx.t("devices.saved", { name }));
     this.name = null;
     this.area = undefined;
-    this.sensitivity = null;
     this.editingName = false;
     ctx.go(this.roomPath);
   }

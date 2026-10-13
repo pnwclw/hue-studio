@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { activeTab, choosablePanels, footerTabs, footerVisible, moveTab, panelLabel } from "../../src/footer-model.ts";
+import { activeTab, choosablePanels, footerTabs, footerVisible, moveTab, panelLabel, tabTarget } from "../../src/footer-model.ts";
 import type { HassPanel } from "../../src/types.ts";
 
 const panels: Record<string, HassPanel> = {
@@ -31,6 +31,13 @@ test("active tab and where the footer shows", () => {
   assert.equal(footerVisible("/hue", 1440), false);
   assert.equal(footerVisible("/config/integrations", 430), false);
   assert.equal(footerVisible("/configurator", 430), true);
+});
+
+test("a tab goes back to the page it showed last; the shown tab goes to its start", () => {
+  const last = { hue: "/hue/room/area.office", lovelace: "/lovelace/2" };
+  assert.equal(tabTarget(last, "hue", "lovelace", "/hue"), "/hue/room/area.office");
+  assert.equal(tabTarget(last, "hue", "hue", "/hue"), "/hue");
+  assert.equal(tabTarget(last, "map", "hue", "/map"), "/map");
 });
 
 test("moving tabs", () => {

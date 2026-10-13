@@ -107,6 +107,16 @@ export function scenesOf(hass: HassData, groupId: string): Scene[] {
 }
 
 const hasDeviceClass = (hass: HassData, id: string, classes: string[]): boolean => classes.includes(hass.states[id]?.attributes.device_class);
+
+/**
+ * An entity of a Hue room or zone itself (HA's `hue` registers them as service devices):
+ * the bridge's grouped motion and light level, MotionAware. They repeat the room's own
+ * sensors, so a room never picks them by itself and they get no sensor card.
+ */
+function onHueGroup(hass: HassData, id: string): boolean {
+  const device = hass.entities?.[id]?.device_id;
+  return !!device && hass.devices?.[device]?.entry_type === "service";
+}
 const MOTION_CLASSES = ["motion", "occupancy", "presence"];
 
 /**
@@ -115,7 +125,9 @@ const MOTION_CLASSES = ["motion", "occupancy", "presence"];
  */
 function defaultSensors(hass: HassData, areaId: string | null): RoomSensors {
   if (!areaId) return { motion: [], temperature: [], illuminance: [] };
-  const inArea = Object.keys(hass.states).filter((id) => areaOf(hass, id) === areaId && hass.entities?.[id]?.platform === "hue");
+  const inArea = Object.keys(hass.states).filter(
+    (id) => areaOf(hass, id) === areaId && hass.entities?.[id]?.platform === "hue" && !onHueGroup(hass, id),
+  );
   const areaTemp = hass.areas?.[areaId]?.temperature_entity_id;
   return {
     motion: inArea.filter((id) => id.startsWith("binary_sensor.") && hasDeviceClass(hass, id, MOTION_CLASSES)),
@@ -304,7 +316,7 @@ export function hueSensor(hass: HassData, device: string): HueSensor | null {
 export function splitSensors(hass: HassData, sensors: RoomSensors): { devices: HueSensor[]; rest: RoomSensors } {
   const deviceOf = (id: string): string | null => {
     const entry = hass.entities?.[id];
-    return entry?.platform === "hue" && entry.device_id ? entry.device_id : null;
+    return entry?.platform === "hue" && entry.device_id && !onHueGroup(hass, id) ? entry.device_id : null;
   };
   const ids = [...sensors.motion, ...sensors.temperature, ...sensors.illuminance];
   const found = hueSensors(hass, new Set(ids.map(deviceOf).filter((d) => d !== null)));
@@ -314,6 +326,9 @@ export function splitSensors(hass: HassData, sensors: RoomSensors): { devices: H
     rest: { motion: other(sensors.motion), temperature: other(sensors.temperature), illuminance: other(sensors.illuminance) },
   };
 }
+
+/** The Hue app's default sensitivity of a range (0..max): the middle of five levels; null: unknown. */
+export const defaultSensitivity = (max: number): number | null => (max === 4 ? 2 : null);
 
 /** Names of a motion sensor's sensitivity levels (0..max), like the Hue app's; null: numbered. */
 export function sensitivityLevels(max: number): string[] | null {
