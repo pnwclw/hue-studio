@@ -220,7 +220,7 @@
       "fields": {
         "palette": {
           "name": "Palette",
-          "description": "gallery:<id>, b64:<base64 JSON palette> or a gallery scene id."
+          "description": "gallery:ID, b64:BASE64_JSON_PALETTE or a gallery scene id."
         },
         "gallery_scene": {
           "name": "Gallery scene",
@@ -510,7 +510,7 @@
         },
         "action": {
           "name": "Action",
-          "description": "toggle_sync, sync_on, sync_off, power_off, passthrough, mode_video, mode_music, mode_game, next_mode, next_input, next_intensity, brighter, darker, toggle_background, input:input1-4 or preset:<name or id>."
+          "description": "toggle_sync, sync_on, sync_off, power_off, passthrough, mode_video, mode_music, mode_game, next_mode, next_input, next_intensity, brighter, darker, toggle_background, input:input1-4 or preset:NAME_OR_ID."
         }
       }
     },

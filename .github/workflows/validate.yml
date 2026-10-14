@@ -19,8 +19,9 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # TODO: drop once brand images are added.
-          ignore: brands
+          # TODO: drop brands once brand images are added, topics once the
+          # GitHub repository has topics (e.g. home-assistant, hacs, hue).
+          ignore: brands topics
 
   hassfest:
     name: Hassfest
