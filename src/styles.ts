@@ -875,7 +875,10 @@ export const CSS = `
   .empty-today { color: var(--text-2); font-size: 14px; }
   .scene-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
   .scene-tiles.small { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
-  .scene-tiles .tile { border: none; padding: 0; text-align: left; font: inherit; color: inherit; }
+  /* Height from an in-flow 16:9 spacer, not aspect-ratio: iOS WebKit sizes these grid rows without the ratio (rows one line
+     tall, tiles stacked over each other), above all in the scrolling picker. */
+  .scene-tiles .tile { aspect-ratio: auto; border: none; padding: 0; text-align: left; font: inherit; color: inherit; }
+  .scene-tiles .tile::before { content: ""; display: block; padding-top: 56.25%; }
   .scene-tiles .tile .remove { position: absolute; top: 6px; right: 6px; z-index: 2; }
   .scene-tiles .tile.dimmed { opacity: 0.55; }
   .scene-tiles .tile .tile-open { position: absolute; inset: 0; z-index: 1; padding: 0; border: none; background: none; cursor: pointer; }
@@ -894,8 +897,11 @@ export const CSS = `
   .tag-editor .chips { padding: 0; }
   .tag-editor .chip:not(.on) { background: rgba(120, 120, 128, 0.24); }
   .tag-editor .hint { margin: 6px 2px 0; }
-  .add-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: transparent !important;
+  .add-tile { display: grid; grid-template-rows: 1fr auto auto 1fr; justify-items: center; row-gap: 4px; background: transparent !important;
               box-shadow: inset 0 0 0 1.5px rgba(120, 120, 128, 0.45) !important; color: var(--text-2); }
+  .add-tile::before { grid-area: 1 / 1 / 5 / 2; justify-self: stretch; }
+  .add-tile > :not(span) { grid-area: 2 / 1; }
+  .add-tile > span { grid-area: 3 / 1; }
   .add-tile::after { display: none; }
   .add-tile span { position: static !important; text-shadow: none !important; color: var(--text-2) !important; }
   .picker-grid { max-height: 52vh; overflow-y: auto; padding: 0 16px; margin: 12px 0 0; }
