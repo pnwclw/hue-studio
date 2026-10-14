@@ -103,6 +103,17 @@ const ARCHETYPES: Record<string, string> = {
   reading_lamp: "table_shade",
   hall_spot: "single_spot",
 };
+/** What the bridge says the lights are (product, model): Settings → Devices shows it. */
+const LIGHT_PRODUCTS: Record<string, [string, string]> = {
+  desk_lamp: ["Signe gradient table", "915005987001"],
+  tv_strip: ["Hue Play gradient lightstrip", "LCX006"],
+  play_left: ["Hue Play", "LCT024"],
+  play_right: ["Hue Play", "LCT024"],
+  candle: ["Hue color candle", "LCT015"],
+  kitchen_bulb: ["Hue color lamp", "LCA006"],
+  string_lights: ["Festavia string lights", "LCX027"],
+  globe_lights: ["Festavia globe string lights", "LCX029"],
+};
 /** Product names where one archetype covers several products (the icon tells them apart). */
 const PRODUCTS: Record<string, string> = { desk_lamp: "Signe gradient table" };
 
@@ -525,6 +536,16 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     { id: "dev-motion2", name: "Hue motion sensor 2", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: { value: 2, max: 4 } },
     // The office's motion sensor (HA device dev_motion).
     { id: "dev-motion1", name: "Office sensor", product: "Hue motion sensor", model: "SML003", archetype: "unknown_archetype", kind: "sensor", new: false, found: null, area: "office", lights: [], ha_device: "dev_motion", sensitivity: { value: 2, max: 4 } },
+    // The lights (one device each); the string lights are switched off at the wall.
+    ...Object.entries(LIGHTS).map(([id, [name, area]]): HueDeviceInfo => {
+      const [product, model] = LIGHT_PRODUCTS[id] ?? ["Hue color lamp", "LCA006"];
+      return {
+        id: `dev-${id}`, name, product, model, archetype: ARCHETYPES[id] ?? "classic_bulb", kind: "light", new: false, found: null,
+        area: area || null, lights: [`light.${id}`], ha_device: `dev_${id}`, sensitivity: null, software: "1.122.8",
+        reachable: id !== "string_lights", function: id === "string_lights" || id === "globe_lights" || id === "candle" ? "decorative" : "functional",
+        power_on: id === "kitchen_bulb" ? "powerfail" : "safety",
+      };
+    }),
   ];
   let searching = false;
   let searchStarted: number | null = null;
@@ -997,6 +1018,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           if (msg.name) d.name = String(msg.name);
           d.area = (msg.area_id as string | null) ?? null;
           if (typeof msg.sensitivity === "number" && d.sensitivity) d.sensitivity = { ...d.sensitivity, value: msg.sensitivity };
+          if (typeof msg.function === "string") d.function = msg.function as HueDeviceInfo["function"];
+          if (typeof msg.power_on === "string") d.power_on = msg.power_on as HueDeviceInfo["power_on"];
           devices[d.ha_device] = { ...devices[d.ha_device], name: d.name, area_id: d.area };
           pushDevices();
           onChange({ ...hass, states: { ...states }, devices: { ...devices } });

@@ -188,6 +188,9 @@
     "search_failed": {
       "message": "Mostek Hue nie zaczął szukać urządzeń."
     },
+    "not_a_light": {
+      "message": "{device} nie jest światłem."
+    },
     "no_motion_sensitivity": {
       "message": "{device} nie ma regulowanej czułości ruchu."
     },

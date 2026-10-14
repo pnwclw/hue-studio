@@ -229,7 +229,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/bridges/subscribe|motion_area|rename, hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
-  devices.py                    adding devices: Zigbee search (serials, other brands), all devices, name + area + Hue room, delete
+  devices.py                    adding devices: Zigbee search (serials, other brands), all devices, name + area + Hue room,
+                                a light's function and power-on preset, delete
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
   automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
@@ -268,7 +269,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
                                 automations (the tab, "+" and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
-                                experimental, devices, device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
+                                experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
+                                settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
@@ -279,7 +281,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 splitting settings from before 0.10
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
-  devices.ts                    pure: adding devices (serial numbers, search progress, found devices), Bridge Pro, Wi-Fi
+  devices.ts                    pure: adding devices (serial numbers, search progress, found devices), Bridge Pro, Wi-Fi;
+                                Settings → Devices (kinds, search and filters, by room, a device's picture)
   seasons.ts                    pure: seasonal gallery (a rule per category: seasons and/or dates; season source)
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`

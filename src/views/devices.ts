@@ -1,32 +1,50 @@
-// Settings → Devices: every Hue device by area. "Add devices" opens the flow that searches
-// for new ones (views/device-add.ts); a search running shows here too. Any device can get a
-// name and an HA area (for lights also the Hue room of that area), be identified, or be
-// deleted from its bridge (HA removes its device then).
+// Settings → Devices, like the Hue app's: "+" adds devices (views/device-add.ts), then a row
+// per kind with its count ("Lights & smart plugs", switches, sensors, other devices); new
+// devices a search found are listed above them. A kind's list (`list`) has a search field,
+// filters by location and type, and the devices by room; a device opens its settings
+// (views/device.ts; a Hue sensor HA has opens the sensor's own, views/sensor.ts).
 
-import { html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { html, nothing, type TemplateResult } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
+import {
+  allDevices,
+  byLocation,
+  type DeviceFilter,
+  type DeviceGroup,
+  DEVICE_GROUPS,
+  deviceIcon,
+  deviceTypes,
+  filterDevices,
+  type FoundDevice,
+  GROUP_ICONS,
+  groupOf,
+  NO_AREA,
+} from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
+import { hueSensor } from "../model.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
+import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { KIND_ICONS } from "./device-add.ts";
 
-/** What the user typed for a device, until saved. */
-interface Draft {
-  name: string;
-  area: string;
+type Picker = "location" | "type";
+
+/** Where a device's settings are: a Hue sensor HA has gets the sensor's own page. */
+export function devicePath(ctx: StudioView["ctx"], d: HueDeviceInfo): string {
+  if (d.kind === "sensor" && d.ha_device && hueSensor(ctx.hass, d.ha_device)) return `/settings/devices/sensor/${encodeURIComponent(d.ha_device)}`;
+  return `/settings/devices/device/${encodeURIComponent(d.id)}`;
 }
 
 @customElement("hue-studio-devices-view")
 export class DevicesView extends StudioView {
+  /** A kind's list, or null: the overview. */
+  @property() accessor list: DeviceGroup | null = null;
+
   @state() private accessor devices: DevicesMessage | null = null;
-  @state() private accessor open: string | null = null;
-  @state() private accessor drafts: Record<string, Draft> = {};
-  /** The device whose "Delete" was tapped once (a second tap deletes it). */
-  @state() private accessor confirmDelete: string | null = null;
-  @state() private accessor busy = false;
+  @state() private accessor filter: DeviceFilter = { query: "", area: null, type: null };
+  @state() private accessor picker: Picker | null = null;
   private stop?: () => void;
 
   override connectedCallback(): void {
@@ -40,107 +58,159 @@ export class DevicesView extends StudioView {
   }
 
   protected override render() {
+    return this.list ? this.renderList(this.list) : this.renderOverview();
+  }
+
+  private addButton(): TemplateResult {
+    const { ctx } = this;
+    const searching = Object.values(this.devices || {}).some((b) => b.searching);
+    return html`<button class="round plus-blue add-devices" aria-label=${ctx.t("devices.add")} @click=${() => ctx.go("/settings/devices/add")}>
+      ${icon("plus")}${searching ? html`<span class="dot-badge live" aria-hidden="true"></span>` : nothing}
+    </button>`;
+  }
+
+  /** A device: its picture, name, and "Unreachable" when the bridge cannot reach it. */
+  private deviceRow(d: HueDeviceInfo, sub = ""): TemplateResult {
+    const { ctx } = this;
+    const unreachable = d.reachable === false;
+    return html`<button class="item" @click=${() => ctx.go(devicePath(ctx, d))}>
+      <ha-icon icon=${deviceIcon(ctx.hass, d)}></ha-icon>
+      <div class="grow">
+        <div class="name">${d.name}</div>
+        ${unreachable ? html`<div class="small warn">${ctx.t("devices.unreachable")}</div>` : sub ? html`<div class="dim small">${sub}</div>` : nothing}
+      </div>
+    </button>`;
+  }
+
+  private renderOverview(): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
-    const bridges = Object.entries(this.devices || {});
-    const searching = bridges.some(([, b]) => b.searching);
-    const all = bridges.flatMap(([, b]) => b.devices);
+    const all = allDevices(this.devices);
+    const searching = Object.values(this.devices || {}).some((b) => b.searching);
     const fresh = all.filter((d) => d.new);
-    const loose = all.filter((d) => !d.new && !d.area);
-    const areas = ctx.hass.areas || {};
-    const byArea = Object.entries(areas)
-      .map(([id, a]) => [a.name, all.filter((d) => !d.new && d.area === id)] as const)
-      .filter(([, list]) => list.length)
-      .sort(([a], [b]) => a.localeCompare(b));
+    const count = (g: DeviceGroup) => all.filter((d) => groupOf(d.kind) === g).length;
+    const unreachable = (g: DeviceGroup) => all.some((d) => groupOf(d.kind) === g && d.reachable === false);
+    const groups = DEVICE_GROUPS.filter((g) => g === "lights" || g === "sensors" || count(g));
     return this.screen(
-      this.subHead(t("settings.devices"), () => ctx.go("/settings")),
-      html`<div class="rows">
-        <button class="item add-row" @click=${() => ctx.go("/settings/devices/add")}>
-          <span class="round plus-blue"><ha-icon icon="mdi:plus"></ha-icon></span>
-          <div class="grow">${t("devices.title")}<div class="dim small">${t(searching ? "devices.searching" : "devices.sub")}</div></div>
-          ${searching ? html`<span class="dot-badge live" aria-hidden="true"></span>` : nothing}
-          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-        </button>
-      </div>
-      ${!this.devices ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}
-      ${fresh.length ? html`<h2 class="label">${t("devices.new")}</h2><div class="rows">${fresh.map((d) => this.device(d))}</div>` : nothing}
-      ${loose.length
-        ? html`<h2 class="label">${t("devices.no_area")}</h2>
-            <p class="lead small">${t("devices.no_area_hint")}</p>
-            <div class="rows">${loose.map((d) => this.device(d))}</div>`
-        : nothing}
-      ${byArea.map(([name, list]) => html`<h2 class="label">${name}</h2><div class="rows">${list.map((d) => this.device(d))}</div>`)}`,
-      "settings-page",
+      this.subHead(t("settings.devices"), () => ctx.go("/settings"), this.addButton()),
+      html`${!this.devices ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}
+        ${searching
+          ? html`<button class="notice" @click=${() => ctx.go("/settings/devices/add")}>
+              <span class="dot-badge live" aria-hidden="true"></span><span class="grow">${t("devices.searching")}</span><ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
+            </button>`
+          : nothing}
+        ${fresh.length
+          ? html`<h2 class="label">${t("devices.new")}</h2>
+              <div class="rows device-list">${fresh.map((d) => this.deviceRow(d, d.product))}</div>`
+          : nothing}
+        ${this.devices
+          ? html`<div class="rows device-list kinds">
+              ${groups.map(
+                (g) => html`<button class="item" @click=${() => ctx.go(`/settings/devices/${g}`)}>
+                  <ha-icon icon=${GROUP_ICONS[g]}></ha-icon>
+                  <div class="grow">${t(`devices.${g}` as StringKey)}</div>
+                  ${unreachable(g) ? html`<span class="dot-badge warn" aria-hidden="true"></span>` : nothing}
+                  <span class="value">${count(g)}</span>
+                  <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+                </button>`,
+              )}
+            </div>`
+          : nothing}`,
+      "settings-page devices-page",
     );
   }
 
-  private device(d: HueDeviceInfo) {
+  private renderList(group: DeviceGroup): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
-    const isOpen = this.open === d.id;
-    const draft = this.drafts[d.id] ?? { name: d.name, area: d.area ?? "" };
-    const set = (patch: Partial<Draft>) => (this.drafts = { ...this.drafts, [d.id]: { ...(this.drafts[d.id] ?? draft), ...patch } });
-    const areas = Object.entries(ctx.hass.areas || {}).sort(([, a], [, b]) => a.name.localeCompare(b.name));
-    const save = async () => {
-      this.busy = true;
-      const current = this.drafts[d.id] ?? draft;
-      const ok = await ctx.ws({ type: "hue_studio/devices/setup", device: d.id, name: current.name, area_id: current.area || null });
-      this.busy = false;
-      if (ok) {
-        haptic("success");
-        this.open = null;
-        ctx.toast(t("devices.saved", { name: current.name || d.name }));
-      }
+    const areas = ctx.hass.areas || {};
+    const areaName = (id: string) => areas[id]?.name;
+    const mine: FoundDevice[] = allDevices(this.devices).filter((d) => groupOf(d.kind) === group);
+    const shown = filterDevices(mine, this.filter);
+    const sections = byLocation(shown, areaName, t("devices.no_area"));
+    const { area, type, query } = this.filter;
+    const chip = (which: Picker, label: string, on: boolean) =>
+      html`<button class=${classMap({ chip: true, "filter-chip": true, on })} aria-haspopup="dialog" @click=${() => this.openPicker(which)}>
+        <span>${label}</span><ha-icon icon="mdi:chevron-down"></ha-icon>
+      </button>`;
+    const body = html`<label class="search-field device-search">
+        ${icon("search")}
+        <input
+          class="q"
+          type="search"
+          enterkeyhint="search"
+          placeholder=${t("devices.search")}
+          aria-label=${t("devices.search")}
+          .value=${query}
+          @input=${(e: InputEvent) => (this.filter = { ...this.filter, query: (e.target as HTMLInputElement).value })}
+        />
+      </label>
+      <div class="section-head filter-head">
+        <h2 class="label">${t("devices.filter_by")}</h2>
+        <span class="count">${shown.length}</span>
+      </div>
+      <div class="chips filters">
+        ${chip("location", area === null ? t("devices.location") : area === NO_AREA ? t("devices.no_area") : (areaName(area) ?? area), area !== null)}
+        ${chip("type", type ?? t("devices.type"), type !== null)}
+      </div>
+      ${!this.devices ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}
+      ${this.devices && !shown.length ? html`<p class="empty">${t(mine.length ? "devices.no_matches" : "devices.none")}</p>` : nothing}
+      ${sections.map(
+        (s) => html`<div class="section-head">
+            <h2 class="label">${s.name}</h2>
+            <span class="count">${s.devices.length}</span>
+          </div>
+          <div class="rows device-list">${s.devices.map((d) => this.deviceRow(d))}</div>`,
+      )}`;
+    return html`<div class="screen-head">${this.subHead(t(`devices.${group}` as StringKey), () => ctx.go("/settings/devices"), this.addButton())}</div>
+      <div class="screen-body"><div class="page settings-page devices-page">${body}</div></div>
+      ${this.picker ? this.renderPicker(this.picker, mine) : nothing}`;
+  }
+
+  private openPicker(which: Picker): void {
+    haptic("selection");
+    this.picker = which;
+  }
+
+  /** The filter's choices, as a sheet (outside the scrolling body: iOS would clip it). */
+  private renderPicker(which: Picker, mine: HueDeviceInfo[]): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const done = () => (this.picker = null);
+    const areas = ctx.hass.areas || {};
+    const current = which === "location" ? this.filter.area : this.filter.type;
+    const set = (value: string | null) => {
+      haptic("selection");
+      this.filter = which === "location" ? { ...this.filter, area: value } : { ...this.filter, type: value };
+      done();
     };
-    const remove = async () => {
-      if (this.confirmDelete !== d.id) {
-        haptic("warning");
-        this.confirmDelete = d.id;
-        return;
-      }
-      this.busy = true;
-      const ok = await ctx.ws({ type: "hue_studio/devices/delete", device: d.id });
-      this.busy = false;
-      this.confirmDelete = null;
-      if (ok) {
-        haptic("success");
-        this.open = null;
-        ctx.toast(t("devices.deleted", { name: d.name }));
-      }
-    };
-    const toggleOpen = () => {
-      this.open = isOpen ? null : d.id;
-      this.confirmDelete = null;
-    };
-    const sub = [d.product, t(`devices.kind_${d.kind}` as StringKey), d.reachable === false ? t("devices.unreachable") : ""].filter(Boolean).join(" · ");
-    return html`<div class=${classMap({ "device-card": true, open: isOpen })}>
-      <button class="item" aria-expanded=${isOpen} @click=${toggleOpen}>
-        <ha-icon icon=${KIND_ICONS[d.kind]}></ha-icon>
-        <div class="grow">${d.name}<div class=${classMap({ "dim small": true, warn: d.reachable === false })}>${sub}</div></div>
-        <ha-icon class="chevron" icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
-      </button>
-      ${isOpen
-        ? html`<div class="device-form">
-            <input class="field" maxlength="32" aria-label=${t("devices.name")} placeholder=${t("devices.name")} .value=${draft.name}
-              @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })} />
-            <select class="select wide" aria-label=${t("devices.area")} @change=${(e: Event) => set({ area: (e.target as HTMLSelectElement).value })}>
-              <option value="" ?selected=${!draft.area}>${t("devices.pick_area")}</option>
-              ${areas.map(([id, a]) => html`<option value=${id} ?selected=${draft.area === id}>${a.name}</option>`)}
-            </select>
-            <p class="hint">${t(d.kind === "light" ? "devices.room_hint" : "devices.area_hint")}</p>
-            ${d.model || d.software ? html`<p class="hint">${[d.model, d.software ? t("devices.software", { version: d.software }) : ""].filter(Boolean).join(" · ")}</p>` : nothing}
-            <div class="actions">
-              <button class="pill" @click=${() => ctx.ws({ type: "hue_studio/devices/identify", device: d.id })}>${t("devices.identify")}</button>
-              <button class="pill apply" ?disabled=${this.busy || !draft.area} @click=${save}>${t("zone.save")}</button>
-            </div>
-            <div class="danger-row">
-              <button class=${classMap({ pill: true, danger: true, confirm: this.confirmDelete === d.id })} ?disabled=${this.busy} @click=${remove}>
-                ${t(this.confirmDelete === d.id ? "devices.delete_confirm" : "devices.delete")}
-              </button>
-            </div>
-            ${this.confirmDelete === d.id ? html`<p class="hint warn">${t("devices.delete_hint")}</p>` : nothing}
-          </div>`
-        : nothing}
+    const options: [string | null, string][] =
+      which === "location"
+        ? [
+            [null, t("devices.all_locations")],
+            ...[...new Set(mine.map((d) => (d.area && areas[d.area] ? d.area : NO_AREA)))]
+              .map((id): [string, string] => [id, id === NO_AREA ? t("devices.no_area") : areas[id]!.name])
+              .sort(([a, x], [b, y]) => (a === NO_AREA ? 1 : 0) - (b === NO_AREA ? 1 : 0) || x.localeCompare(y)),
+          ]
+        : [[null, t("devices.all_types")], ...deviceTypes(mine).map((p): [string, string] => [p, p])];
+    const title = t(which === "location" ? "devices.location" : "devices.type");
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && done()}>
+      <div class="box form sensor-sheet" role="dialog" aria-label=${title}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${done}>${icon("close")}</button>
+          <div class="grow">${title}</div>
+        </div>
+        <div class="form-body">
+          <div class="rows" role="radiogroup">
+            ${options.map(
+              ([value, label]) => html`<button class=${classMap({ item: true, on: value === current })} role="radio" aria-checked=${value === current} @click=${() => set(value)}>
+                <div class="grow">${label}</div>
+                ${value === current ? html`<span class="tick">${icon("check")}</span>` : nothing}
+              </button>`,
+            )}
+          </div>
+        </div>
+      </div>
     </div>`;
   }
 }

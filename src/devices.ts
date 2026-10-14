@@ -1,7 +1,8 @@
 // Pure: adding Hue devices (the "Add devices" flow) and what the settings show of bridges.
 // Serial numbers typed by the user, when a search is over, which devices it found.
 
-import type { BridgeDevices, BridgesMessage, DevicesMessage, HueDeviceInfo } from "./types.ts";
+import { ARCHETYPE_ICONS, PRODUCT_ICONS, sensorIcon } from "./model.ts";
+import type { BridgeDevices, BridgesMessage, DevicesMessage, HassData, HueDeviceInfo, LightFunction, PowerOn } from "./types.ts";
 
 /** The bridge takes up to 10 serial numbers per search. */
 export const MAX_SERIALS = 10;
@@ -62,3 +63,109 @@ export const hasPro = (bridges: BridgesMessage | null): boolean => Object.values
 /** Wi-Fi strength (0-4) as a word of the Sync Box app. */
 export const wifiKey = (strength: number | null | undefined): "none" | "weak" | "fair" | "good" | "excellent" | null =>
   strength == null ? null : (["none", "weak", "fair", "good", "excellent"] as const)[Math.max(0, Math.min(4, Math.round(strength)))];
+
+// Settings → Devices, like the Hue app's: devices by kind ("Lights & smart plugs", …), a
+// list per kind by room with a search and filters, a device's settings.
+
+/** The lists of Settings → Devices (a route segment each). */
+export type DeviceGroup = "lights" | "switches" | "sensors" | "other";
+export const DEVICE_GROUPS: DeviceGroup[] = ["lights", "switches", "sensors", "other"];
+
+export const groupOf = (kind: HueDeviceInfo["kind"]): DeviceGroup =>
+  kind === "light" ? "lights" : kind === "switch" ? "switches" : kind === "sensor" ? "sensors" : "other";
+
+export const isDeviceGroup = (s: string | null | undefined): s is DeviceGroup => DEVICE_GROUPS.includes(s as DeviceGroup);
+
+export const KIND_ICONS: Record<HueDeviceInfo["kind"], string> = {
+  light: "mdi:lightbulb-on-outline",
+  switch: "mdi:light-switch",
+  sensor: "mdi:motion-sensor",
+  other: "mdi:devices",
+};
+
+/** Icons of the lists (the Hue app's bulb for lights). */
+export const GROUP_ICONS: Record<DeviceGroup, string> = {
+  lights: "hue-studio:bulb-sultan-v2",
+  switches: "mdi:light-switch",
+  sensors: "hue-studio:motion-sensor",
+  other: "mdi:devices",
+};
+
+/**
+ * A device's picture: an icon set on one of its lights in HA wins, then the Hue app's for
+ * its product and shape (lights) or model (sensors), else one per kind.
+ */
+export function deviceIcon(hass: HassData, d: HueDeviceInfo): string {
+  const own = d.lights.map((id) => hass.entities?.[id]?.icon).find(Boolean);
+  if (own) return own;
+  if (d.kind === "light") return PRODUCT_ICONS.find(([re]) => re.test(d.product))?.[1] || ARCHETYPE_ICONS[d.archetype] || KIND_ICONS.light;
+  if (d.kind === "sensor") return sensorIcon(d.product || d.model, d.sensitivity !== null || /motion/i.test(d.product));
+  return KIND_ICONS[d.kind];
+}
+
+/** Lower case without diacritics: "Taśma" is found by "tasma". */
+const fold = (s: string): string =>
+  s
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/ł/g, "l")
+    .replace(/Ł/g, "L")
+    .toLocaleLowerCase();
+
+/** The location filter's value for devices in no area. */
+export const NO_AREA = "";
+
+export interface DeviceFilter {
+  /** What was typed in the search field. */
+  query: string;
+  /** An area id, NO_AREA, or null: every location. */
+  area: string | null;
+  /** A product name, or null: every type. */
+  type: string | null;
+}
+
+/** Devices that match the search (name or product) and the filters. */
+export function filterDevices(list: HueDeviceInfo[], f: DeviceFilter): HueDeviceInfo[] {
+  const q = fold(f.query.trim());
+  return list.filter(
+    (d) =>
+      (!q || fold(d.name).includes(q) || fold(d.product).includes(q)) &&
+      (f.area === null || (d.area ?? NO_AREA) === f.area) &&
+      (f.type === null || d.product === f.type),
+  );
+}
+
+/** Types to filter by: the products of the devices, by name. */
+export const deviceTypes = (list: HueDeviceInfo[]): string[] =>
+  [...new Set(list.map((d) => d.product).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+export interface DeviceSection {
+  /** The area id, or null: no area. */
+  area: string | null;
+  name: string;
+  devices: HueDeviceInfo[];
+}
+
+/** Devices by area (areas by name, devices in no area last), devices by name. */
+export function byLocation(list: HueDeviceInfo[], areaName: (id: string) => string | undefined, noArea: string): DeviceSection[] {
+  const sections = new Map<string | null, HueDeviceInfo[]>();
+  for (const d of list) {
+    const area = d.area && areaName(d.area) !== undefined ? d.area : null;
+    sections.set(area, [...(sections.get(area) ?? []), d]);
+  }
+  return [...sections]
+    .map(([area, devices]) => ({
+      area,
+      name: area === null ? noArea : areaName(area)!,
+      devices: devices.sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => (a.area === null ? 1 : 0) - (b.area === null ? 1 : 0) || a.name.localeCompare(b.name));
+}
+
+/** Every device of every bridge, with its bridge. */
+export const allDevices = (msg: DevicesMessage | null): FoundDevice[] =>
+  Object.entries(msg || {}).flatMap(([bridge, b]) => b.devices.map((d) => ({ ...d, bridge })));
+
+/** The function and power-on choices of a light's settings, in the Hue app's order. */
+export const LIGHT_FUNCTIONS: LightFunction[] = ["functional", "decorative", "mixed"];
+export const POWER_ON: Exclude<PowerOn, "custom">[] = ["safety", "powerfail", "last_on_state"];

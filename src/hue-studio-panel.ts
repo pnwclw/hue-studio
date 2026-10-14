@@ -19,7 +19,10 @@
 //   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
 //   /settings/daylight         light of the day: mood, phase times, sources, scene pool
-//   /settings/devices          Hue devices by area (name, area, identify, delete)
+//   /settings/devices          Hue devices by kind (lights, switches, sensors, other); new ones
+//   /settings/devices/<kind>   one kind (lights|switches|sensors|other) by room: search, filters
+//   /settings/devices/device/<id>     a device's settings (its bridge id): name, room, function, power on, delete
+//   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
 //   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
@@ -35,6 +38,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { PANEL_PATH, StudioContext } from "./context.ts";
 import { fitToViewport, outsidePath, toggleSidebar } from "./ha-internals.ts";
 import { tabTarget } from "./footer-model.ts";
+import { type DeviceGroup, isDeviceGroup } from "./devices.ts";
 import { findGroup } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
@@ -47,6 +51,7 @@ import "./views/color.ts";
 import "./views/entertainment.ts";
 import "./views/integration.ts";
 import "./views/device-add.ts";
+import "./views/device.ts";
 import "./views/devices.ts";
 import "./views/experimental.ts";
 import "./views/gallery.ts";
@@ -81,7 +86,9 @@ type Route =
   | { name: "experimental" }
   | { name: "gallerySettings" }
   | { name: "daylight" }
-  | { name: "devices" }
+  | { name: "devices"; list: DeviceGroup | null }
+  | { name: "device"; device: string }
+  | { name: "deviceSensor"; device: string }
   | { name: "deviceAdd"; room: string | null }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
   | { name: "entertainment"; area: string | null; arrange: boolean }
@@ -130,7 +137,9 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "add") return { name: "deviceAdd", room: params.get("room") };
   if (parts[0] === "settings" && parts[1] === "daylight") return { name: "daylight" };
-  if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices" };
+  if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "device" && parts[3]) return { name: "device", device: parts[3] };
+  if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
+  if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null };
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
@@ -193,6 +202,8 @@ export class HueStudioPanel extends LitElement {
           : route.name === "settings" || route.name === "rooms" || route.name === "experimental" || route.name === "gallerySettings" ||
               route.name === "daylight" ||
               route.name === "devices" ||
+              route.name === "device" ||
+              route.name === "deviceSensor" ||
               route.name === "deviceAdd" ||
               route.name === "bridges" ||
               route.name === "entertainment" ||
@@ -206,7 +217,13 @@ export class HueStudioPanel extends LitElement {
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
-    const full = route.name === "color" || route.name === "scene" || route.name === "sensor" || route.name === "gallery";
+    const full =
+      route.name === "color" ||
+      route.name === "scene" ||
+      route.name === "sensor" ||
+      route.name === "deviceSensor" ||
+      route.name === "device" ||
+      route.name === "gallery";
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;
     return html`
@@ -270,7 +287,11 @@ export class HueStudioPanel extends LitElement {
       case "integration":
         return html`<hue-studio-integration-view .ctx=${ctx} .rev=${rev}></hue-studio-integration-view>`;
       case "devices":
-        return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev}></hue-studio-devices-view>`;
+        return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev} .list=${route.list}></hue-studio-devices-view>`;
+      case "device":
+        return html`<hue-studio-device-view .ctx=${ctx} .rev=${rev} .device=${route.device}></hue-studio-device-view>`;
+      case "deviceSensor":
+        return html`<hue-studio-sensor-view .ctx=${ctx} .rev=${rev} .device=${route.device} .back=${"/settings/devices/sensors"}></hue-studio-sensor-view>`;
       case "deviceAdd":
         return html`<hue-studio-device-add-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-device-add-view>`;
       case "experimental":

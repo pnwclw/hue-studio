@@ -1,8 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { areaOfRoom, hasPro, newDevices, parseSerials, searchOver, searchProgress, wifiKey } from "../../src/devices.ts";
-import type { BridgeDevices, BridgeInfo, HueDeviceInfo } from "../../src/types.ts";
+import {
+  areaOfRoom,
+  byLocation,
+  deviceIcon,
+  deviceTypes,
+  filterDevices,
+  groupOf,
+  hasPro,
+  newDevices,
+  NO_AREA,
+  parseSerials,
+  searchOver,
+  searchProgress,
+  wifiKey,
+} from "../../src/devices.ts";
+import type { BridgeDevices, BridgeInfo, HassData, HueDeviceInfo } from "../../src/types.ts";
 
 const device = (id: string, extra: Partial<HueDeviceInfo> = {}): HueDeviceInfo => ({
   id,
@@ -78,4 +92,39 @@ test("a room's area, a Bridge Pro, Wi-Fi words", () => {
   assert.equal(hasPro(null), false);
   assert.deepEqual([0, 2, 4, 9].map(wifiKey), ["none", "fair", "excellent", "excellent"]);
   assert.equal(wifiKey(null), null);
+});
+
+test("Settings → Devices: kinds, search, filters, rooms", () => {
+  const list = [
+    device("strip", { name: "Taśma Play", product: "Hue Play gradient lightstrip", area: "living" }),
+    device("bulb", { name: "Kitchen bulb", area: "kitchen" }),
+    device("lamp", { name: "Hall lamp", area: null }),
+    device("old", { name: "Old lamp", area: "gone" }),
+  ];
+  assert.deepEqual([groupOf("light"), groupOf("switch"), groupOf("sensor"), groupOf("other")], ["lights", "switches", "sensors", "other"]);
+  const all = { query: "", area: null, type: null };
+  // Without diacritics, by product too.
+  assert.deepEqual(filterDevices(list, { ...all, query: " tasma " }).map((d) => d.id), ["strip"]);
+  assert.deepEqual(filterDevices(list, { ...all, query: "gradient" }).map((d) => d.id), ["strip"]);
+  assert.deepEqual(filterDevices(list, { ...all, area: "kitchen" }).map((d) => d.id), ["bulb"]);
+  assert.deepEqual(filterDevices(list, { ...all, area: NO_AREA }).map((d) => d.id), ["lamp"]);
+  assert.deepEqual(filterDevices(list, { ...all, type: "Hue color lamp" }).map((d) => d.id), ["bulb", "lamp", "old"]);
+  assert.deepEqual(deviceTypes(list), ["Hue color lamp", "Hue Play gradient lightstrip"]);
+  // Areas by name, a device whose area is gone counts as in none, those last.
+  const names: Record<string, string> = { living: "Living room", kitchen: "Kitchen" };
+  const sections = byLocation(list, (id) => names[id], "No room");
+  assert.deepEqual(
+    sections.map((s) => [s.name, s.devices.map((d) => d.id)]),
+    [["Kitchen", ["bulb"]], ["Living room", ["strip"]], ["No room", ["lamp", "old"]]],
+  );
+});
+
+test("a device's picture: own icon, product, shape, kind", () => {
+  const hass = { states: {}, entities: { "light.own": { icon: "mdi:star" } } } as unknown as HassData;
+  assert.equal(deviceIcon(hass, device("a", { lights: ["light.own"] })), "mdi:star");
+  assert.equal(deviceIcon(hass, device("b", { product: "Signe gradient table", archetype: "hue_signe" })), "hue-studio:signe-gradient-table");
+  assert.equal(deviceIcon(hass, device("c", { archetype: "hue_play" })), "hue-studio:play");
+  assert.equal(deviceIcon(hass, device("d", { archetype: "nothing_known" })), "mdi:lightbulb-on-outline");
+  assert.equal(deviceIcon(hass, device("e", { kind: "sensor", product: "Hue outdoor motion sensor", sensitivity: { value: 2, max: 4 } })), "hue-studio:outdoor-motion");
+  assert.equal(deviceIcon(hass, device("f", { kind: "switch" })), "mdi:light-switch");
 });

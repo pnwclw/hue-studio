@@ -833,6 +833,56 @@ export const CSS = `
   @container (max-width: 599px) {
     .sensor-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
   }
+  /* Settings → Devices, like the Hue app's: kinds with their counts, then a kind's devices by
+     room under a search field and filters; big pictures, "Unreachable" in orange, separators
+     from the text on, full-width rows on phones. */
+  .bar.sub .round.plus-blue.add-devices { width: 36px; height: 36px; }
+  .round.plus-blue.add-devices svg { width: 24px; height: 24px; }
+  .add-devices .dot-badge { position: absolute; top: -1px; right: -1px; border: 2px solid var(--bg); }
+  .devices-page .notice .dot-badge { margin: 0 4px; }
+  .devices-page .notice .go { --mdc-icon-size: 20px; }
+  .devices-page .rows.kinds { margin-top: 16px; }
+  .devices-page h2.label + .rows { margin-top: 0; }
+  .rows.device-list .item { min-height: 72px; gap: 18px; font-size: 18px; }
+  .rows.device-list .item + .item { position: relative; border-top: none; }
+  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 70px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 36px; --mdc-icon-size: 34px; color: var(--text); }
+  .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rows.device-list .item .small { margin-top: 2px; font-size: 15px; }
+  .rows.device-list .item .small.warn { font-weight: 500; }
+  .rows.device-list .item .value { font-size: 17px; color: var(--text-2); }
+  .rows.device-list .item .dot-badge.warn { background: #ffb340; }
+  .devices-page .device-search { display: flex; height: 44px; margin-top: 14px; padding: 0 16px; border-radius: 22px; }
+  .devices-page .section-head { margin: 26px 2px 8px; }
+  .devices-page .section-head .count { font-size: 15px; color: var(--text-2); }
+  .chips.filters { gap: 10px; padding-top: 4px; }
+  .chip.filter-chip { height: 40px; padding: 0 12px 0 18px; border-radius: 20px; border: none; background: rgba(120, 120, 128, 0.28);
+                      font-size: 15px; letter-spacing: 0.6px; text-transform: uppercase; }
+  .chip.filter-chip span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip.filter-chip ha-icon { --mdc-icon-size: 24px; }
+  .chip.filter-chip.on { background: var(--accent); }
+  @container (max-width: 599px) {
+    .rows.device-list { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+  }
+  /* A device's settings ("Light settings"): the sensor page's layout, a note, "Delete". */
+  .sensor-hero > .small.warn { margin-top: -4px; font-size: 15px; font-weight: 500; }
+  .device-edit .rows .item .value { max-width: 50%; text-align: right; }
+  .info-box { margin: 22px 0 0; padding: 14px 16px; border: 1.5px solid rgba(10, 98, 255, 0.6); border-radius: 12px; background: rgba(10, 98, 255, 0.1); }
+  .info-box .info-head { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; letter-spacing: 1.6px;
+                         text-transform: uppercase; color: #6c9dff; }
+  .info-box .info-head ha-icon { --mdc-icon-size: 22px; color: inherit; }
+  .info-box p { margin: 8px 0 0; font-size: 15px; line-height: 1.45; }
+  .info-box.warn { border-color: rgba(255, 179, 64, 0.6); background: rgba(255, 179, 64, 0.1); }
+  .info-box.warn .info-head { color: #ffb340; }
+  .delete-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 36px; }
+  .delete-btn { min-width: 180px; height: 48px; padding: 0 28px; border: 2px solid #e5484d; border-radius: 24px; cursor: pointer;
+                background: rgba(229, 72, 77, 0.14); color: var(--text); font: inherit; font-size: 17px; font-weight: 500;
+                transition: transform 0.15s var(--ease), background 0.2s; }
+  .delete-btn:active { transform: scale(0.96); }
+  .delete-btn.confirm { border-color: #c0392b; background: #c0392b; }
+  .delete-btn:disabled { opacity: 0.5; }
+  .delete-area .hint { max-width: 380px; margin: 0; font-size: 13px; line-height: 1.45; text-align: center; }
+  .sensor-sheet .rows .item.on[aria-disabled] { cursor: default; }
   /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
   .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .auto-list + .rows { margin-top: 10px; }

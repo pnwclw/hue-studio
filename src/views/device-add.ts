@@ -8,7 +8,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import { type AddKind, areaOfRoom, type FoundDevice, MAX_SERIALS, newDevices, parseSerials, searchOver, searchProgress } from "../devices.ts";
+import { type AddKind, areaOfRoom, deviceIcon, type FoundDevice, MAX_SERIALS, newDevices, parseSerials, searchOver, searchProgress } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup } from "../model.ts";
@@ -19,13 +19,6 @@ import { StudioView } from "./base.ts";
 type Step = "kind" | "prepare" | "search" | "results" | "setup";
 
 const NAME_MAX = 32;
-
-export const KIND_ICONS: Record<HueDeviceInfo["kind"], string> = {
-  light: "mdi:lightbulb-on-outline",
-  switch: "mdi:light-switch",
-  sensor: "mdi:motion-sensor",
-  other: "mdi:devices",
-};
 
 const ADD_KINDS: { kind: AddKind; icon: string }[] = [
   { kind: "light", icon: "mdi:lightbulb-on-outline" },
@@ -45,6 +38,7 @@ interface Done {
   name: string;
   area: string | null;
   kind: HueDeviceInfo["kind"];
+  icon: string;
 }
 
 @customElement("hue-studio-device-add-view")
@@ -294,7 +288,7 @@ export class DeviceAddView extends StudioView {
             <div class="rows">
               ${done.map(
                 ([, d]) => html`<div class="item">
-                  <ha-icon icon=${KIND_ICONS[d.kind]}></ha-icon>
+                  <ha-icon icon=${d.icon}></ha-icon>
                   <div class="grow">${d.name}<div class="dim small">${this.areaName(d.area) ?? ""}</div></div>
                   <span class="check on">${icon("check")}</span>
                 </div>`,
@@ -319,7 +313,7 @@ export class DeviceAddView extends StudioView {
       this.area = id;
     };
     return html`<div class="sensor-hero">
-        <ha-icon class="pic" icon=${KIND_ICONS[d.kind]}></ha-icon>
+        <ha-icon class="pic" icon=${deviceIcon(this.ctx.hass, d)}></ha-icon>
         <div class="dim">${d.product}</div>
       </div>
       <div class="rows">
@@ -362,7 +356,7 @@ export class DeviceAddView extends StudioView {
   /** A device found (and not set up yet): opens its setup. */
   private deviceRow(d: FoundDevice, open = true): TemplateResult {
     const { t } = this.ctx;
-    const content = html`<ha-icon icon=${KIND_ICONS[d.kind]}></ha-icon>
+    const content = html`<ha-icon icon=${deviceIcon(this.ctx.hass, d)}></ha-icon>
       <div class="grow">${d.name}<div class="dim small">${d.product} · ${t(`devices.kind_${d.kind}` as StringKey)}</div></div>`;
     if (!open) return html`<div class="item fresh">${content}</div>`;
     return html`<button class="item" @click=${() => this.open(d)}>
@@ -433,7 +427,7 @@ export class DeviceAddView extends StudioView {
     if (!ok) return;
     haptic("success");
     ctx.toast(ctx.t("devices.saved", { name }));
-    this.done = { ...this.done, [d.id]: { name, area: this.area, kind: d.kind } };
+    this.done = { ...this.done, [d.id]: { name, area: this.area, kind: d.kind, icon: deviceIcon(this.ctx.hass, d) } };
     this.current = null;
     this.go("results");
   }

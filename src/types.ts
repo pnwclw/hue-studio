@@ -73,7 +73,15 @@ export interface HueDeviceInfo {
   software?: string | null;
   /** Whether the bridge reaches it over Zigbee (null: the bridge does not say). */
   reachable?: boolean | null;
+  /** A light's function (the Hue app's "How you use this light"), else null. */
+  function?: LightFunction | null;
+  /** A light's power-up preset (the Hue app's "Power on"), else null. */
+  power_on?: PowerOn | null;
 }
+
+export type LightFunction = "functional" | "decorative" | "mixed";
+/** "custom" is set in the Hue app only: shown, not picked. */
+export type PowerOn = "safety" | "powerfail" | "last_on_state" | "custom";
 
 /** One bridge's devices (hue_studio/devices/subscribe). */
 export interface BridgeDevices {

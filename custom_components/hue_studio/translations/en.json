@@ -188,6 +188,9 @@
     "search_failed": {
       "message": "The Hue Bridge did not start searching for devices."
     },
+    "not_a_light": {
+      "message": "{device} is not a light."
+    },
     "no_motion_sensitivity": {
       "message": "{device} has no adjustable motion sensitivity."
     },

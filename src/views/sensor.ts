@@ -6,6 +6,7 @@
 // and the room at once. The sensitivity sheet is the Hue app's: a slider whose value goes
 // to the bridge as soon as it is let go, so the sensor can be tried out (it calibrates for
 // about 15 s, then a dot lights up on motion); its "Save" keeps it, closing goes back.
+// "Delete" at the bottom removes the sensor from its bridge (a second tap confirms).
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -38,6 +39,8 @@ export class SensorView extends StudioView {
   @property() accessor key = "";
   /** The sensor's HA device id. */
   @property() accessor device = "";
+  /** Where closing goes when opened outside a room (Settings → Devices → Sensors). */
+  @property() accessor back = "";
 
   @state() private accessor devices: DevicesMessage | null = null;
   @state() private accessor name: string | null = null;
@@ -54,6 +57,8 @@ export class SensorView extends StudioView {
   private calibrationTimer?: ReturnType<typeof setTimeout>;
   @state() private accessor sheet: Sheet | null = null;
   @state() private accessor saving = false;
+  /** "Delete" was tapped once: the next tap deletes. */
+  @state() private accessor confirmDelete = false;
   private stop?: () => void;
 
   override connectedCallback(): void {
@@ -80,6 +85,7 @@ export class SensorView extends StudioView {
   }
 
   private get roomPath(): string {
+    if (this.back) return this.back;
     return findGroup(this.ctx.home, this.key) ? `/room/${encodeURIComponent(this.key)}` : "/";
   }
 
@@ -205,6 +211,15 @@ export class SensorView extends StudioView {
         ${this.row("mdi:help-circle", t("sensor.help"), "", () => window.open(HELP_URL, "_blank", "noopener"))}
         ${this.row("mdi:home-assistant", t("sensor.in_ha"), "", () => ctx.openHa(`/config/devices/device/${encodeURIComponent(this.device)}`))}
       </div>
+
+      ${info
+        ? html`<div class="delete-area">
+            <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${this.saving} @click=${() => this.deleteDevice(info)}>
+              ${t(this.confirmDelete ? "devices.delete_confirm" : "devices.delete")}
+            </button>
+            ${this.confirmDelete ? html`<p class="hint warn">${t("devices.delete_hint")}</p>` : nothing}
+          </div>`
+        : nothing}
     </div>`;
     // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
     return html`<div class="screen-head">${head}</div>
@@ -229,6 +244,7 @@ export class SensorView extends StudioView {
   private open(sheet: Sheet): void {
     haptic("selection");
     this.editingName = false;
+    this.confirmDelete = false;
     this.sheet = sheet;
     if (sheet === "sensitivity") {
       this.opened = this.trying = this.info?.sensitivity?.value ?? null;
@@ -340,6 +356,23 @@ export class SensorView extends StudioView {
         <div class="form-body">${content}</div>
       </div>
     </div>`;
+  }
+
+  private async deleteDevice(info: HueDeviceInfo): Promise<void> {
+    const { ctx } = this;
+    if (!this.confirmDelete) {
+      haptic("warning");
+      this.confirmDelete = true;
+      return;
+    }
+    this.saving = true;
+    const ok = await ctx.ws({ type: "hue_studio/devices/delete", device: info.id });
+    this.saving = false;
+    this.confirmDelete = false;
+    if (!ok) return;
+    haptic("success");
+    ctx.toast(ctx.t("devices.deleted", { name: info.name }));
+    ctx.go(this.roomPath);
   }
 
   private async save(info: HueDeviceInfo): Promise<void> {

@@ -14,7 +14,9 @@ from aiohue.v2.models.device import (
 from aiohue.v2.models.feature import (
     MotionSensingFeatureSensitivity,
     MotionSensingFeatureSensitivityStatus,
+    PowerUpPreset,
 )
+from aiohue.v2.models.light import LightFunction
 from aiohue.v2.models.motion import Motion
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from aiohue.v2.models.zigbee_device_discovery import SearchActionType
@@ -157,6 +159,8 @@ async def test_add_devices(
         "sensitivity": None,
         "software": "1.0",
         "reachable": None,
+        "function": None,
+        "power_on": None,
     }
     assert listed["dev-dial"]["reachable"] is False
     assert state["search_started"] is None
@@ -269,6 +273,72 @@ async def test_motion_sensitivity(
     with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
         changed(EventType.RESOURCE_UPDATED, motion)
     assert send.call_count == 1
+
+
+async def test_light_settings(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """A light's function and power-on behavior: listed, set on the bridge (only
+    what changed), refused for other devices; changes on the bridge reach the panel."""
+    light = SimpleNamespace(
+        id="res-bulb",
+        metadata=SimpleNamespace(function=LightFunction.DECORATIVE),
+        powerup=SimpleNamespace(preset=PowerUpPreset.SAFETY),
+    )
+    bridge.lights.get.side_effect = {"res-bulb": light}.get
+    state = async_devices_payload(hass)[hue_entry.entry_id]
+    listed = {d["id"]: d for d in state["devices"]}
+    assert (listed["dev-bulb"]["function"], listed["dev-bulb"]["power_on"]) == (
+        "decorative",
+        "safety",
+    )
+    assert listed["dev-motion"]["function"] is None
+
+    client = await hass_ws_client(hass)
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/setup",
+        device="dev-bulb",
+        function="decorative",
+        power_on="last_on_state",
+    )
+    assert reply["success"]
+    bridge.request.assert_awaited_once_with(
+        "put",
+        "clip/v2/resource/light/res-bulb",
+        json={"powerup": {"preset": "last_on_state"}},
+    )
+
+    bridge.request.reset_mock()
+    reply = await _ws(
+        client, type="hue_studio/devices/setup", device="dev-bulb", power_on="safety"
+    )
+    assert reply["success"]
+    bridge.request.assert_not_awaited()
+
+    reply = await _ws(
+        client, type="hue_studio/devices/setup", device="dev-dial", function="mixed"
+    )
+    assert not reply["success"]
+    assert "not a light" in reply["error"]["message"]
+    reply = await _ws(
+        client, type="hue_studio/devices/setup", device="dev-bulb", power_on="custom"
+    )
+    assert not reply["success"]
+
+    from custom_components.hue_studio.devices import async_watch_bridges
+
+    async_watch_bridges(hass)
+    changed = bridge.lights.subscribe.call_args.args[0]
+    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+        changed(EventType.RESOURCE_UPDATED, light)
+        changed(EventType.RESOURCE_UPDATED, light)
+        light.metadata.function = LightFunction.FUNCTIONAL
+        changed(EventType.RESOURCE_UPDATED, light)
+    assert send.call_count == 2
 
 
 async def test_sensitivity_alone(

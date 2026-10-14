@@ -12,6 +12,9 @@
   app can be set up the same way.
 - Motion sensors also carry their sensitivity (the Hue app's "Motion sensitivity"),
   which the native integration does not expose; it is set on the bridge like the name.
+- Lights carry the Hue app's "Function" (functional, decorative, mixed) and "Power on"
+  (what the light does when it gets power: the bridge's power-up presets), set on every
+  light service of the device.
 - Delete: a device is removed from the bridge (the Hue app's "Delete"); the native
   integration then removes its HA device.
 """
@@ -52,6 +55,9 @@ _LOGGER = logging.getLogger(__name__)
 SIGNAL_DEVICES_UPDATED = f"{DOMAIN}_devices_updated"
 MAX_SERIALS = 10
 NAME_MAX = 32
+LIGHT_FUNCTIONS = ("functional", "decorative", "mixed")
+# Power-up presets the panel can pick; "custom" (set in the Hue app) is shown, not set.
+POWER_ON_PRESETS = ("safety", "powerfail", "last_on_state")
 
 SWITCH_TYPES = {ResourceTypes.BUTTON, ResourceTypes.RELATIVE_ROTARY}
 SENSOR_TYPES = {
@@ -77,6 +83,10 @@ class DeviceSetup:
     )
     # motion resource id -> its last sensitivity seen (motion events come often)
     sensitivity: dict[str, dict[str, Any] | None] = field(default_factory=dict)
+    # light resource id -> its last (function, power-up preset) seen (light events too)
+    light_settings: dict[str, tuple[str | None, str | None]] = field(
+        default_factory=dict
+    )
 
 
 _DATA: HassKey[DeviceSetup] = HassKey(f"{DOMAIN}_device_setup")
@@ -123,10 +133,20 @@ def async_watch_bridges(hass: HomeAssistant) -> None:
                 setup.sensitivity[item.id] = value
                 async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
 
+        @callback
+        def light_changed(event_type: EventType, item: Any) -> None:
+            value = _light_settings_of(item)
+            if setup.light_settings.get(item.id) != value:
+                setup.light_settings[item.id] = value
+                async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
+
         unsubs = [
             bridge.devices.subscribe(added),
             bridge.sensors.motion.subscribe(
                 motion_changed, event_filter=EventType.RESOURCE_UPDATED
+            ),
+            bridge.lights.subscribe(
+                light_changed, event_filter=EventType.RESOURCE_UPDATED
             ),
         ]
         if (
@@ -204,6 +224,28 @@ def _sensitivity_of(motion: Any) -> dict[str, Any] | None:
     }
 
 
+def _enum_value(value: Any) -> str | None:
+    value = getattr(value, "value", None)
+    return value if isinstance(value, str) and value != "unknown" else None
+
+
+def _light_settings_of(light: Any) -> tuple[str | None, str | None]:
+    """(function, power-up preset) of a light resource; None where it has none."""
+    function = _enum_value(getattr(getattr(light, "metadata", None), "function", None))
+    preset = _enum_value(getattr(getattr(light, "powerup", None), "preset", None))
+    return function, preset
+
+
+def _device_light_settings(
+    bridge: HueBridgeV2, device: Device
+) -> tuple[str | None, str | None]:
+    """(function, power-up preset) of a device's (first) light."""
+    for rid in device.lights:
+        if (light := bridge.lights.get(rid)) is not None:
+            return _light_settings_of(light)
+    return None, None
+
+
 def _motion_of(bridge: HueBridgeV2, device: Device) -> tuple[str, Any] | None:
     """The (first) motion resource of a device: (id, resource)."""
     for service in device.services:
@@ -228,8 +270,10 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
                     "other_brands": bool (the search can let other brands' lights join),
                     "devices": [{"id", "name", "product", "model", "archetype", "kind",
                                  "new", "found", "area", "lights", "ha_device",
-                                 "sensitivity", "software", "reachable"}]}}
+                                 "sensitivity", "software", "reachable",
+                                 "function", "power_on"}]}}
     Every device but the bridge; `new`: added while HA runs and not set up yet.
+    `function` and `power_on` (a power-up preset): a light's, else None.
     """
     setup = _setup(hass)
     devices = dr.async_get(hass)
@@ -254,6 +298,7 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
             ha_device = by_hue_id.get(device.id)
             area = ha_device.area_id if ha_device else None
             new = device.id in setup.found
+            function, power_on = _device_light_settings(bridge, device)
             listed.append(
                 {
                     "id": device.id,
@@ -274,6 +319,8 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
                     "sensitivity": _device_sensitivity(bridge, device),
                     "software": device.product_data.software_version,
                     "reachable": _reachable(bridge, device),
+                    "function": function,
+                    "power_on": power_on,
                 }
             )
         # Newest first, then by name.
@@ -412,11 +459,19 @@ async def async_setup_device(
     name: str | None,
     area_id: str | None,
     sensitivity: int | None = None,
+    function: str | None = None,
+    power_on: str | None = None,
 ) -> None:
     """Name a Hue device, put it into an HA area and its lights into that Hue room;
-    a motion sensor's sensitivity too."""
+    a motion sensor's sensitivity, a light's function and power-on behavior too."""
     hue_entry_id, bridge, device = _find(hass, device_id)
     motion = _sensitive_motion(bridge, device) if sensitivity is not None else None
+    if (function is not None or power_on is not None) and not device.lights:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="not_a_light",
+            translation_placeholders={"device": device.metadata.name},
+        )
     if area_id is not None and ar.async_get(hass).async_get_area(area_id) is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN,
@@ -438,6 +493,8 @@ async def async_setup_device(
             ) from err
     if motion is not None and sensitivity is not None:
         await _put_sensitivity(bridge, device, motion, sensitivity)
+    if function is not None or power_on is not None:
+        await _put_light_settings(bridge, device, function, power_on)
     devices = dr.async_get(hass)
     entities = er.async_get(hass)
     ha_device = next(
@@ -463,6 +520,30 @@ async def async_setup_device(
         await async_align(hass, only=lights, hue_entry_id=hue_entry_id)
     _setup(hass).found.pop(device.id, None)
     async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
+
+
+async def _put_light_settings(
+    bridge: HueBridgeV2, device: Device, function: str | None, power_on: str | None
+) -> None:
+    """Set the function and the power-up preset of every light of a device (only
+    what differs; aiohue's LightPut has no metadata, hence the plain request)."""
+    for rid in device.lights:
+        current_function, current_preset = _light_settings_of(bridge.lights.get(rid))
+        body: dict[str, Any] = {}
+        if function is not None and function != current_function:
+            body["metadata"] = {"function": function}
+        if power_on is not None and power_on != current_preset:
+            body["powerup"] = {"preset": power_on}
+        if not body:
+            continue
+        try:
+            await bridge.request("put", f"clip/v2/resource/light/{rid}", json=body)
+        except (AiohueException, ClientError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"entity_id": device.metadata.name},
+            ) from err
 
 
 async def async_delete_device(hass: HomeAssistant, device_id: str) -> None:

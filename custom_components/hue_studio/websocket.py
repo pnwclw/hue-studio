@@ -35,7 +35,9 @@ from .const import (
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
 from .devices import (
+    LIGHT_FUNCTIONS,
     MAX_SERIALS,
+    POWER_ON_PRESETS,
     SIGNAL_DEVICES_UPDATED,
     async_delete_device,
     async_devices_payload,
@@ -588,6 +590,8 @@ async def ws_identify_device(
         vol.Optional("name"): vol.Any(None, str),
         vol.Optional("area_id"): vol.Any(None, str),
         vol.Optional("sensitivity"): vol.Any(None, vol.All(int, vol.Range(min=0))),
+        vol.Optional("function"): vol.Any(None, vol.In(LIGHT_FUNCTIONS)),
+        vol.Optional("power_on"): vol.Any(None, vol.In(POWER_ON_PRESETS)),
     }
 )
 @websocket_api.async_response
@@ -597,7 +601,7 @@ async def ws_setup_device(
     msg: dict[str, Any],
 ) -> None:
     """Name a Hue device, put it into an area and its lights into that Hue room
-    (a motion sensor's sensitivity too)."""
+    (a motion sensor's sensitivity, a light's function and power-on behavior too)."""
     await _ws_call(
         connection,
         msg,
@@ -607,6 +611,8 @@ async def ws_setup_device(
             msg.get("name"),
             msg.get("area_id"),
             msg.get("sensitivity"),
+            msg.get("function"),
+            msg.get("power_on"),
         ),
     )
 
