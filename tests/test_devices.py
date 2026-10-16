@@ -421,3 +421,18 @@ async def test_delete_device(
     reply = await _ws(client, type="hue_studio/devices/delete", device="dev-bridge")
     assert not reply["success"]
     bridge.request.assert_not_awaited()
+
+
+async def test_bridge_pro_not_listed(
+    hass: HomeAssistant, bridge: MagicMock, hue_entry: MockConfigEntry
+) -> None:
+    """A bridge is not one of its own devices, whatever its archetype (a Bridge Pro's
+    `bridge_v3` is unknown to older aiohue)."""
+    pro = _device("dev-pro", "Hue Bridge Pro", [], "unknown_archetype")
+    bridge.devices.__iter__.side_effect = lambda: iter([*DEVICES.values(), pro])
+    bridge.config.bridge_device = SimpleNamespace(id="dev-pro")
+    listed = {
+        d["id"] for d in async_devices_payload(hass)[hue_entry.entry_id]["devices"]
+    }
+    assert "dev-pro" not in listed and "dev-bridge" not in listed
+    assert "dev-bulb" in listed

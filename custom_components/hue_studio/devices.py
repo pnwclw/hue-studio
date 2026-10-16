@@ -96,6 +96,14 @@ def _setup(hass: HomeAssistant) -> DeviceSetup:
     return hass.data.setdefault(_DATA, DeviceSetup())
 
 
+def is_bridge_device(bridge: HueBridgeV2, device: Device) -> bool:
+    """The bridge itself (a Bridge Pro has its own archetype, not `bridge_v2`)."""
+    own = bridge.config.bridge_device
+    return (own is not None and device.id == own.id) or str(
+        getattr(device.product_data.product_archetype, "value", "")
+    ).startswith("bridge")
+
+
 def device_kind(device: Device) -> str:
     """light, switch, sensor or other: what the device mainly is."""
     types = {service.rtype for service in device.services}
@@ -293,7 +301,7 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
         }
         listed = []
         for device in bridge.devices:
-            if device.product_data.product_archetype.value == "bridge_v2":
+            if is_bridge_device(bridge, device):
                 continue
             ha_device = by_hue_id.get(device.id)
             area = ha_device.area_id if ha_device else None
