@@ -143,7 +143,7 @@ def async_watch_bridges(hass: HomeAssistant) -> None:
 
         @callback
         def light_changed(event_type: EventType, item: Any) -> None:
-            value = _light_settings_of(item)
+            value = light_settings(item)
             if setup.light_settings.get(item.id) != value:
                 setup.light_settings[item.id] = value
                 async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
@@ -237,7 +237,7 @@ def _enum_value(value: Any) -> str | None:
     return value if isinstance(value, str) and value != "unknown" else None
 
 
-def _light_settings_of(light: Any) -> tuple[str | None, str | None]:
+def light_settings(light: Any) -> tuple[str | None, str | None]:
     """(function, power-up preset) of a light resource; None where it has none."""
     function = _enum_value(getattr(getattr(light, "metadata", None), "function", None))
     preset = _enum_value(getattr(getattr(light, "powerup", None), "preset", None))
@@ -250,7 +250,7 @@ def _device_light_settings(
     """(function, power-up preset) of a device's (first) light."""
     for rid in device.lights:
         if (light := bridge.lights.get(rid)) is not None:
-            return _light_settings_of(light)
+            return light_settings(light)
     return None, None
 
 
@@ -533,19 +533,10 @@ async def async_setup_device(
 async def _put_light_settings(
     bridge: HueBridgeV2, device: Device, function: str | None, power_on: str | None
 ) -> None:
-    """Set the function and the power-up preset of every light of a device (only
-    what differs; aiohue's LightPut has no metadata, hence the plain request)."""
+    """Set the function and the power-up preset of every light of a device."""
     for rid in device.lights:
-        current_function, current_preset = _light_settings_of(bridge.lights.get(rid))
-        body: dict[str, Any] = {}
-        if function is not None and function != current_function:
-            body["metadata"] = {"function": function}
-        if power_on is not None and power_on != current_preset:
-            body["powerup"] = {"preset": power_on}
-        if not body:
-            continue
         try:
-            await bridge.request("put", f"clip/v2/resource/light/{rid}", json=body)
+            await put_light_settings(bridge, rid, function, power_on)
         except (AiohueException, ClientError, TimeoutError) as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -554,11 +545,36 @@ async def _put_light_settings(
             ) from err
 
 
+async def put_light_settings(
+    bridge: HueBridgeV2, rid: str, function: str | None, power_on: str | None
+) -> None:
+    """Set a light's function and power-up preset (only what differs; aiohue's
+    LightPut has no metadata, hence the plain request). A "custom" preset is the Hue
+    app's own and is left alone."""
+    current_function, current_preset = light_settings(bridge.lights.get(rid))
+    body: dict[str, Any] = {}
+    if function is not None and function != current_function:
+        body["metadata"] = {"function": function}
+    if power_on not in (None, "custom") and power_on != current_preset:
+        body["powerup"] = {"preset": power_on}
+    if body:
+        await bridge.request("put", f"clip/v2/resource/light/{rid}", json=body)
+
+
+@callback
+def async_forget_new(hass: HomeAssistant, device_ids: list[str]) -> None:
+    """Devices that are not new any more (e.g. moved from another bridge)."""
+    setup = _setup(hass)
+    for device_id in device_ids:
+        setup.found.pop(device_id, None)
+    async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
+
+
 async def async_delete_device(hass: HomeAssistant, device_id: str) -> None:
     """Remove a device from its bridge (never the bridge itself); the native
     integration removes its HA device when the bridge reports it gone."""
     _, bridge, device = _find(hass, device_id)
-    if device.product_data.product_archetype.value.startswith("bridge"):
+    if is_bridge_device(bridge, device):
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="unknown_hue_device",

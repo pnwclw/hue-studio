@@ -69,6 +69,16 @@ from .lights import (
     light_info,
     light_product,
 )
+from .migration import (
+    SIGNAL_MOVE_UPDATED,
+    Selection,
+    async_finish_move,
+    async_move_payload,
+    async_move_plan,
+    async_retry_move,
+    async_select,
+    async_start_move,
+)
 from .options import (
     async_frontend_config,
     async_set_group_area,
@@ -124,6 +134,11 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_link_bridge,
         ws_set_motion_area,
         ws_rename_bridge,
+        ws_move_plan,
+        ws_move,
+        ws_move_retry,
+        ws_move_finish,
+        ws_subscribe_move,
         ws_configure_sync_box,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -949,6 +964,127 @@ async def ws_rename_bridge(
     """Name a bridge."""
     await _ws_call(
         connection, msg, async_rename_bridge(hass, msg["hue_entry_id"], msg["name"])
+    )
+
+
+# What a move to another bridge names: an area's Hue lights or some lights, the bridge
+# they go to, and (lights only) the area they go into.
+MOVE_SCHEMA = {
+    vol.Required("target"): str,
+    vol.Exclusive("area", "what"): str,
+    vol.Exclusive("lights", "what"): vol.All([cv.entity_id], vol.Length(min=1)),
+    vol.Optional("to_area"): str,
+}
+SERIALS = vol.All([cv.string], vol.Length(max=MAX_SERIALS))
+
+
+def _selection(hass: HomeAssistant, msg: dict[str, Any]) -> Selection:
+    return async_select(
+        hass,
+        msg["target"],
+        area=msg.get("area"),
+        lights=msg.get("lights"),
+        to_area=msg.get("to_area"),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/move_plan", **MOVE_SCHEMA}
+)
+@callback
+def ws_move_plan(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """What moving lights or an area's lights to another bridge would do
+    (migration.async_move_plan); nothing changes."""
+    try:
+        plan = async_move_plan(hass, _selection(hass, msg))
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"], plan)
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/move",
+        **MOVE_SCHEMA,
+        vol.Optional("serials", default=list): SERIALS,
+    }
+)
+@websocket_api.async_response
+async def ws_move(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Start moving lights or an area's lights to another bridge (watched with
+    hue_studio/bridges/move/subscribe)."""
+    try:
+        selection = _selection(hass, msg)
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    await _ws_call(connection, msg, async_start_move(hass, selection, msg["serials"]))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/move/retry",
+        vol.Optional("serials", default=list): SERIALS,
+        vol.Optional("target"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_move_retry(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Search again for the lights a move has not found (serial numbers; or another
+    bridge, e.g. the old one)."""
+    await _ws_call(
+        connection, msg, async_retry_move(hass, msg["serials"], msg.get("target"))
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/move/finish"}
+)
+@websocket_api.async_response
+async def ws_move_finish(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Forget a finished move, or stop waiting for lights it has not found."""
+    await _ws_call(connection, msg, async_finish_move(hass))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/move/subscribe"}
+)
+@callback
+def ws_subscribe_move(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The move to another bridge, as it goes (migration.async_move_payload; null:
+    none)."""
+    _subscribe(
+        hass,
+        connection,
+        msg,
+        lambda: async_move_payload(hass),
+        [SIGNAL_MOVE_UPDATED],
     )
 
 

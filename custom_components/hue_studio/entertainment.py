@@ -31,7 +31,7 @@ NAME_MAX = 32
 ENDPOINT = "clip/v2/resource/entertainment_configuration"
 
 
-def _services(bridge: HueBridgeV2) -> dict[str, str]:
+def entertainment_services(bridge: HueBridgeV2) -> dict[str, str]:
     """Light id -> its entertainment service id (lights that can stream)."""
     return {
         service.renderer_reference.rid: service.id
@@ -65,7 +65,7 @@ def async_entertainment_payload(hass: HomeAssistant) -> dict[str, Any]:
     """
     payload: dict[str, Any] = {}
     for hue_entry_id, bridge in async_bridges(hass).items():
-        services = _services(bridge)
+        services = entertainment_services(bridge)
         by_service = {sid: lid for lid, sid in services.items()}
         entities = _light_ids(hass, hue_entry_id)
         areas = []
@@ -131,7 +131,7 @@ def _locations(
     keep: dict[str, list[list[float]]],
 ) -> list[dict[str, Any]]:
     """service_locations for these light entities (kept points, else defaults)."""
-    services = _services(bridge)
+    services = entertainment_services(bridge)
     by_entity = {eid: lid for lid, eid in _light_ids(hass, hue_entry_id).items()}
     locations = []
     for index, entity_id in enumerate(lights):

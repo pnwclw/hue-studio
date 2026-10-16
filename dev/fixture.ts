@@ -6,6 +6,7 @@ import { predictSync } from "../src/sync.ts";
 import type {
   Gallery,
   BridgesMessage,
+  MoveState,
   Hass,
   HassState,
   HueDeviceInfo,
@@ -586,6 +587,44 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   bridgesMessage["hue-entry"].rooms = Object.entries(GROUPS).filter(([g, v]) => v[1] === "room" && groupBridge(g) === "hue-entry").length;
   bridgesMessage["hue-entry"].zones = Object.values(GROUPS).filter((v) => v[1] === "zone").length;
   const bridgeListeners = new Set<(m: unknown) => void>();
+  // Moving to another bridge (?bridges=two): a simulated run; ?move=searching|waiting|done
+  // starts the page with a move in that state (the living room's lights to the Garden Bridge).
+  const moveListeners = new Set<(m: unknown) => void>();
+  const moveTimers: ReturnType<typeof setTimeout>[] = [];
+  const movingLights = (msg: Record<string, unknown>): string[] =>
+    Array.isArray(msg.lights) ? (msg.lights as string[]) : Object.keys(LIGHTS).filter((l) => devices[`dev_${l}`].area_id === msg.area).map((l) => `light.${l}`);
+  let move: MoveState | null = null;
+  const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
+  const runMove = (from: number, missing: number) => {
+    const steps: MoveState["step"][] = ["removing", "searching", "restoring", "rooms", "scenes", "done"];
+    moveTimers.splice(0).forEach(clearTimeout);
+    steps.slice(from).forEach((step, i) =>
+      moveTimers.push(setTimeout(() => {
+        if (!move) return;
+        const searching = step === "searching";
+        move = { ...move, step, running: step !== "done", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
+        if (searching) move.lights = move.lights.map((l, j) => ({ ...l, found: j < move!.lights.length - missing && j === 0 }));
+        if (step === "restoring") {
+          move.lights = move.lights.map((l, j) => ({ ...l, found: j < move!.lights.length - missing }));
+          if (missing) {
+            move = { ...move, step: "waiting", running: false, error: "not_found" };
+            moveTimers.splice(0).forEach(clearTimeout);
+          }
+        }
+        pushMove();
+      }, 900 + i * 2200)),
+    );
+  };
+  const seedMove = params.get("move");
+  if (twoBridges && seedMove) {
+    const lights = ["tv_strip", "play_left", "play_right", "candle"];
+    move = {
+      step: seedMove as MoveState["step"], error: seedMove === "waiting" ? "not_found" : null, source: "hue-entry", target: "hue-entry-2",
+      source_name: "Hue Bridge", target_name: "Garden Bridge", room: "Living room", area: "living_room",
+      searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching",
+      lights: lights.map((l, i) => ({ entity_id: `light.${l}`, name: LIGHTS[l][0], found: seedMove === "done" || i < (seedMove === "waiting" ? 3 : 2) })),
+    };
+  }
   const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
   const deviceListeners = new Set<(m: unknown) => void>();
   const devicesMessage = () => ({
@@ -1034,6 +1073,40 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         onChange({ ...hass, areas: { ...AREAS } });
         return { area_id: id, name: String(msg.name) } as T;
       }
+      if (msg.type === "hue_studio/bridges/move_plan") {
+        const lights = movingLights(msg);
+        const room = msg.area ? AREAS[String(msg.area)]?.name ?? null : null;
+        return {
+          source: "hue-entry", target: String(msg.target), source_name: "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
+          lights, room, scenes: room ? 4 : 0,
+          zones: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: room !== null }] : [],
+          entertainment: lights.includes("light.tv_strip") ? ["TV area"] : [], staying: room === "Office" ? ["Office sensor"] : [], over_limit: false,
+        } as T;
+      }
+      if (msg.type === "hue_studio/bridges/move") {
+        const lights = movingLights(msg);
+        move = {
+          step: "saving", error: null, source: "hue-entry", target: String(msg.target), source_name: "Hue Bridge",
+          target_name: bridgesMessage[String(msg.target)]?.name ?? "", room: msg.area ? AREAS[String(msg.area)]?.name ?? null : null,
+          area: String(msg.area ?? msg.to_area ?? ""), searching_until: null, running: true,
+          lights: lights.map((l) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, found: false })),
+        };
+        pushMove();
+        runMove(0, params.get("movefail") === "1" ? 1 : 0);
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/move/retry") {
+        if (move) move = { ...move, running: true, error: null };
+        pushMove();
+        runMove(1, 0);
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/move/finish") {
+        moveTimers.splice(0).forEach(clearTimeout);
+        move = null;
+        pushMove();
+        return null as T;
+      }
       if (msg.type === "hue_studio/bridges/rename") {
         bridgesMessage[String(msg.hue_entry_id)].name = String(msg.name);
         pushBridges();
@@ -1162,6 +1235,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             timers.push(setTimeout(() => send({ step: "done", hue_entry_id: "hue-entry-2", name: "Hue Bridge Pro" }), 9000));
           }
           return () => timers.forEach(clearTimeout);
+        }
+        if (msg.type === "hue_studio/bridges/move/subscribe") {
+          moveListeners.add(send);
+          setTimeout(() => send(structuredClone(move)), 30);
+          return () => {
+            moveListeners.delete(send);
+          };
         }
         if (msg.type === "hue_studio/bridges/subscribe") {
           bridgeListeners.add(send);

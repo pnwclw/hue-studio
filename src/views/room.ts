@@ -287,11 +287,18 @@ export class RoomView extends StudioView {
     });
   }
 
-  /** With several bridges: the bridge the room is on. */
+  /** With several bridges: the bridge the room is on; an admin moves the room from there. */
   private bridgeTag(g: Group) {
-    const plan = this.ctx.rooms;
+    const { ctx } = this;
+    const plan = ctx.rooms;
     const name = severalBridges(plan) ? bridgeName(plan, groupBridge(plan, g)) : null;
-    return name ? html`<span class="bridge-tag"><ha-icon icon="mdi:router-wireless"></ha-icon>${name}</span>` : nothing;
+    if (!name) return nothing;
+    const content = html`<ha-icon icon="mdi:router-wireless"></ha-icon>${name}`;
+    if (g.kind !== "area" || !ctx.hass.user?.is_admin) return html`<span class="bridge-tag">${content}</span>`;
+    const area = g.key.slice("area.".length);
+    return html`<button class="bridge-tag" aria-label=${ctx.t("move.title")} @click=${() => ctx.go(`/settings/bridges/move?area=${encodeURIComponent(area)}`)}>
+      ${content}<ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+    </button>`;
   }
 
   /**
@@ -315,7 +322,15 @@ export class RoomView extends StudioView {
             main: bridgeName(plan, main[0]) ?? "",
           })}</p>`,
       )}
-      <div class="buttons"><button class="pill" @click=${() => ctx.go("/rooms")}>${t("rooms.title")}</button></div>
+      <div class="buttons">
+        ${ctx.hass.user?.is_admin
+          ? others.map(([, lights]) => {
+              const query = `lights=${lights.map(encodeURIComponent).join(",")}&to_area=${encodeURIComponent(g.key.slice("area.".length))}&to=${encodeURIComponent(main[0])}`;
+              return html`<button class="pill" @click=${() => ctx.go(`/settings/bridges/move?${query}`)}>${t("move.to_bridge", { bridge: bridgeName(plan, main[0]) ?? "" })}</button>`;
+            })
+          : nothing}
+        <button class="pill" @click=${() => ctx.go("/rooms")}>${t("rooms.title")}</button>
+      </div>
     </div>`;
   }
 

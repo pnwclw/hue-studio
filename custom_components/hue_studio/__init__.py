@@ -54,6 +54,7 @@ from .const import (
     SIGNAL_CONFIG_UPDATED,
     SYNC_BOX_INTEGRATION,
 )
+from .migration import async_setup_moves
 from .panel import async_register_panel, async_unregister_panel
 from .pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
 from .positions import async_setup_positions
@@ -103,6 +104,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_websocket(hass)
     async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
+    await async_setup_moves(hass)
     await async_setup_automations(hass)
     return True
 

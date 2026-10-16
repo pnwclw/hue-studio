@@ -11,6 +11,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { allDevices, deviceIcon, type FoundDevice, groupOf, LIGHT_FUNCTIONS, POWER_ON } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
+import { bridgeName, groupBridge, severalBridges } from "../rooms.ts";
 import type { DevicesMessage, LightFunction, PowerOn } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -52,10 +53,26 @@ export class DeviceView extends StudioView {
     return allDevices(this.devices).find((d) => d.id === this.device) ?? null;
   }
 
+  /** The bridge an area's room is on (null: none, e.g. no Hue lights there yet). */
+  private areaBridge(area: string | null): string | null {
+    const room = area ? this.ctx.home.rooms.find((r) => r.key === `area.${area}`) : undefined;
+    return room ? groupBridge(this.ctx.rooms, room) : null;
+  }
+
+  /**
+   * A light going to a room on another bridge: an area belongs to one bridge, so the light
+   * moves there (views/bridge-move.ts) instead of being saved into it.
+   */
+  private crossBridge(d: FoundDevice, area: string | null): string | null {
+    if (d.kind !== "light" || area === d.area) return null;
+    const bridge = this.areaBridge(area);
+    return bridge && bridge !== d.bridge ? bridge : null;
+  }
+
   private dirty(d: FoundDevice): boolean {
     return (
       (this.name !== null && this.name.trim() !== "" && this.name.trim() !== d.name) ||
-      (this.area !== undefined && this.area !== d.area) ||
+      (this.area !== undefined && this.area !== d.area && !this.crossBridge(d, this.area)) ||
       (this.fn !== undefined && this.fn !== d.function) ||
       (this.power !== undefined && this.power !== d.power_on)
     );
@@ -119,6 +136,7 @@ export class DeviceView extends StudioView {
           <span class="value">${area ? ctx.hass.areas?.[area]?.name || area : t("sensor.no_room")}</span>
         </button>
       </div>
+      ${this.moveNote(d, area)}
 
       ${light
         ? html`<h2 class="label">${t("sensor.general")}</h2>
@@ -181,6 +199,25 @@ export class DeviceView extends StudioView {
     this.sheet = sheet;
   }
 
+  /** With several bridges, under a room for a light: the bridge it is on. */
+  private areaSub(d: FoundDevice, area: string): string {
+    if (d.kind !== "light" || !severalBridges(this.ctx.rooms)) return "";
+    return bridgeName(this.ctx.rooms, this.areaBridge(area)) ?? "";
+  }
+
+  /** The room picked is on another bridge: the light moves there. */
+  private moveNote(d: FoundDevice, area: string | null): TemplateResult | typeof nothing {
+    const { ctx } = this;
+    const bridge = this.crossBridge(d, area);
+    if (!bridge || !area) return nothing;
+    const name = bridgeName(ctx.rooms, bridge) ?? "";
+    const query = `lights=${d.lights.map(encodeURIComponent).join(",")}&to_area=${encodeURIComponent(area)}&to=${encodeURIComponent(bridge)}`;
+    return html`<div class="mismatch">
+      <p>${ctx.t("move.light_note", { room: ctx.hass.areas?.[area]?.name || area, bridge: name })}</p>
+      <div class="buttons"><button class="pill" @click=${() => ctx.go(`/settings/bridges/move?${query}`)}>${ctx.t("move.to_bridge", { bridge: name })}</button></div>
+    </div>`;
+  }
+
   private renderSheet(sheet: Sheet, d: FoundDevice, area: string | null, fn: LightFunction | null, power: PowerOn | null): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
@@ -200,7 +237,7 @@ export class DeviceView extends StudioView {
       title = t("sensor.room");
       const areas = Object.entries(ctx.hass.areas || {}).sort(([, a], [, b]) => a.name.localeCompare(b.name));
       content = html`${d.kind === "light" ? html`<p class="hint">${t("devices.room_hint")}</p>` : nothing}
-        <div class="rows" role="radiogroup">${areas.map(([id, a]) => pick(id === area, a.name, "", () => (this.area = id)))}</div>`;
+        <div class="rows" role="radiogroup">${areas.map(([id, a]) => pick(id === area, a.name, this.areaSub(d, id), () => (this.area = id)))}</div>`;
     } else if (sheet === "function") {
       title = t("devices.function");
       content = html`<p class="hint">${t("devices.function_hint")}</p>

@@ -16,7 +16,7 @@ import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature, statusKey } from "../sync.ts";
-import type { BridgeInfo, BridgesMessage, MotionArea, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
+import type { BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -30,19 +30,24 @@ export class BridgesView extends StudioView {
   /** A bridge (its native hue entry id) or a Sync Box (its entry id) to show; null: the list. */
   @property() accessor item: string | null = null;
   @state() private accessor bridges: BridgesMessage | null = null;
+  /** A move to another bridge in progress or waiting (admins). */
+  @state() private accessor move: MoveState | null = null;
   /** The name being typed (null: not renaming). */
   @state() private accessor name: string | null = null;
   @state() private accessor busy = false;
   private stop?: () => void;
+  private stopMove?: () => void;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.stop = this.ctx.watch<BridgesMessage>("hue_studio/bridges/subscribe", (m) => (this.bridges = m));
+    if (this.ctx.hass.user?.is_admin) this.stopMove = this.ctx.watch<MoveState | null>("hue_studio/bridges/move/subscribe", (m) => (this.move = m));
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stop?.();
+    this.stopMove?.();
   }
 
   protected override render() {
@@ -85,7 +90,15 @@ export class BridgesView extends StudioView {
         <div class="grow">${title}<div class=${classMap({ "dim small": true, warn })}>${sub}</div></div>
         <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
       </button>`;
-    return html`<h2 class="label">${t("settings.bridges")}</h2>
+    const move = this.move;
+    return html`${move
+        ? html`<button class="notice" @click=${() => ctx.go("/settings/bridges/move")}>
+            ${move.running ? html`<span class="dot-badge live" aria-hidden="true"></span>` : html`<ha-icon icon="mdi:alert-outline"></ha-icon>`}
+            <span class="grow">${t(move.step === "done" ? "move.notice_done" : move.running ? "move.notice" : "move.notice_waiting", { bridge: move.target_name })}</span>
+            <ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
+          </button>`
+        : nothing}
+      <h2 class="label">${t("settings.bridges")}</h2>
       <div class="rows">
         ${Object.entries(bridges).map(([id, b]) =>
           row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : this.summary(b), b.connected === false),

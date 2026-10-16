@@ -498,6 +498,10 @@ export const CSS = `
   /* The room's bridge, with several bridges: next to "Lights". */
   .bridge-tag { display: inline-flex; align-items: center; gap: 4px; margin: 0 auto 0 8px; color: var(--text-2); font-size: 13px; }
   .bridge-tag ha-icon { --mdc-icon-size: 16px; }
+  button.bridge-tag { padding: 4px 6px 4px 8px; border: 0; border-radius: 12px; background: rgba(120, 120, 128, 0.2); font: inherit; font-size: 13px; cursor: pointer; }
+  .bridge-tag .chevron { --mdc-icon-size: 14px; opacity: 0.7; }
+  .move-steps .step-no svg { width: 14px; height: 14px; }
+  .move-steps .item.dim { color: var(--text-2); }
   .zone-bridges { margin: 14px 16px 0; }
   .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; }
   .pill.shuffle svg { width: 18px; height: 18px; }

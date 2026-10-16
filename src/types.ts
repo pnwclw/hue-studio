@@ -151,6 +151,47 @@ export interface BridgeDiscoverMessage {
   bridges: FoundBridge[];
 }
 
+/** What moving lights or a room to another bridge does (hue_studio/bridges/move_plan). */
+export interface MovePlan {
+  source: string;
+  target: string;
+  source_name: string;
+  target_name: string;
+  /** The light entities that move. */
+  lights: string[];
+  /** The Hue room that moves as a whole, or null. */
+  room: string | null;
+  /** Scenes copied (the room's and the zones'). */
+  scenes: number;
+  /** Zones of the moving lights: moved (whole) or split. */
+  zones: { name: string; whole: boolean }[];
+  /** Entertainment areas the lights leave. */
+  entertainment: string[];
+  /** Other devices of the room (sensors, switches) that stay on the old bridge. */
+  staying: string[];
+  /** The target bridge would hold more lights than it can. */
+  over_limit: boolean;
+}
+
+export type MoveStep = "saving" | "removing" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
+
+/** A move to another bridge as it goes (hue_studio/bridges/move/subscribe); null: none. */
+export interface MoveState {
+  step: MoveStep;
+  /** not_found, interrupted, bridge, target_offline, source_offline. */
+  error: string | null;
+  source: string;
+  target: string;
+  source_name: string;
+  target_name: string;
+  room: string | null;
+  area: string | null;
+  /** When the current search ends (seconds since epoch). */
+  searching_until: number | null;
+  running: boolean;
+  lights: { entity_id: string | null; name: string; found: boolean }[];
+}
+
 /** Steps of linking a bridge (hue_studio/bridges/link). */
 export type BridgeLinkEvent =
   | { step: "connecting" }

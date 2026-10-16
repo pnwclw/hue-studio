@@ -57,11 +57,26 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
   room searches on the room's bridge.
 - The rooms payload (`hue_studio/rooms/subscribe`) carries `bridges`, `bridge_of` (light,
   room, zone and scene entities) and `split_areas`.
-- **Moving between bridges** (planned): a whole bridge moves with the Hue app's own
-  transfer. Hue Studio moves a room or a zone with everything tied to it, and a light when
-  it goes to a room on another bridge; Home Assistant keeps the entity ids, areas and
-  names (the light is recognized by its Zigbee MAC). A zone whose rooms move only in part
-  is split: the moved lights get a zone of the same name on the new bridge.
+- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): a
+  whole bridge moves with the Hue app's own transfer. Hue Studio moves a room (from the
+  bridge next to "Lights" on its page) and a light that goes to a room on another bridge
+  (its room picker, or a room's note about lights on another bridge):
+  - everything is remembered first, in a Store (`hue_studio.move`), so a restart in
+    between loses nothing;
+  - without serial numbers the old bridge deletes the lights (a deleted light resets
+    and joins the next bridge that searches); with them the new bridge takes the lights
+    first and the old one forgets them afterwards;
+  - the new bridge searches (a few rounds of about a minute) and knows each light again
+    by its Zigbee MAC; name, archetype, function and power-on come back on the bridge,
+    and in HA the new entities take the old entity ids, names, icons, labels and area;
+  - the room on the new bridge comes from room alignment; a whole room's scenes are
+    copied there, and only then its old scenes (and the room, when nothing is left in it)
+    are deleted and the copies take over their entity ids. A zone whose lights all moved
+    goes the same way; a zone left behind in part is split (a zone of its name over the
+    moved lights);
+  - lights not found leave the move waiting: search again (serial numbers), put them back
+    on the old bridge, or stop waiting. Sensors and switches stay (they need a reset);
+    entertainment areas lose the lights that leave.
 
 ## HA -> bridge (Hue Studio)
 

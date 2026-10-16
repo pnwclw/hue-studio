@@ -214,6 +214,18 @@
     },
     "no_scene_of_the_day": {
       "message": "Scena dnia nie ma teraz żadnej sceny: dodaj sceny do puli w Hue Studio (Ustawienia → Światło dnia)."
+    },
+    "move_nothing": {
+      "message": "Nie ma świateł Hue do przeniesienia."
+    },
+    "move_one_source": {
+      "message": "Światła do przeniesienia są na różnych mostkach; przenoś je z jednego mostka naraz."
+    },
+    "move_same_bridge": {
+      "message": "Te światła są już na tym mostku."
+    },
+    "move_busy": {
+      "message": "Inne przenoszenie na mostek jeszcze się nie skończyło."
     }
   },
   "services": {
