@@ -95,9 +95,10 @@ class FakeBridge:
         return f"{self.prefix}-{kind}-{next(self.ids)}"
 
     def add_device(self, key: str, *, light: bool = True, device_id: str = "") -> str:
-        """A device (with one light, `<device id>-light`) joins."""
+        """A device (with one light, `<device id>-light`, and its Zigbee connectivity
+        `<device id>-zc`) joins."""
         device_id = device_id or self.new_id(key)
-        services = []
+        services = [_ref(f"{device_id}-zc", ResourceTypes.ZIGBEE_CONNECTIVITY)]
         if light:
             rid = f"{device_id}-light"
             self.lights.items[rid] = SimpleNamespace(
@@ -122,7 +123,8 @@ class FakeBridge:
             self.macs[device_id] = MAC[key]
         self.on_add(self, "device", device_id)
         for service in services:
-            self.on_add(self, "light", service.rid, device_id)
+            kind = "light" if service.rtype == ResourceTypes.LIGHT else "sensor"
+            self.on_add(self, kind, service.rid, device_id)
         return device_id
 
     def add_group(self, kind: str, rid: str, name: str, children: list[str]) -> Any:
@@ -176,6 +178,7 @@ class FakeBridge:
         for rid in lights:
             del self.lights.items[rid]
             self.on_remove(self, "light", rid)
+        self.on_remove(self, "sensor", f"{device_id}-zc")
         self.on_remove(self, "device", device_id)
 
     async def request(self, method: str, path: str, json: Any = None) -> Any:
@@ -223,7 +226,7 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     for name in ("a", "b"):
         entries[name] = MockConfigEntry(domain=HUE, title=f"Bridge {name}", data={})
         entries[name].add_to_hass(hass)
-    domains = {"light": "light", "group": "light", "scene": "scene"}
+    domains = {"light": "light", "group": "light", "scene": "scene", "sensor": "sensor"}
 
     def on_add(
         bridge: FakeBridge, kind: str, rid: str, device_id: str | None = None
@@ -282,6 +285,7 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     name_entity("light", "a-desk-light", "desk")
     name_entity("light", "a-lamp-light", "lamp")
     name_entity("light", "a-other-light", "other")
+    name_entity("sensor", "a-desk-zc", "desk_zigbee")
     entities.async_update_entity("light.desk", name="Desk lamp", icon="mdi:desk-lamp")
     a.add_group("room", "a-office", "Office", [desk, lamp])
     a.add_group("zone", "a-work", "Work", ["a-desk-light", "a-lamp-light"])
@@ -303,17 +307,16 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
                     found.append(HueLight(e.entity_id, bridge, res))
         return found
 
-    searches: list[tuple[str, list[str]]] = []
+    searches: list[tuple[str, list[str], bool]] = []
 
     async def search(_hass: HomeAssistant, entry_id: str, serials: list[str]) -> None:
-        """Lights that were let go (or, with serials, any) join the searching bridge."""
-        searches.append((entry_id, serials))
+        """Lights that were reset (by serial number or by hand: `joining`) join the
+        searching bridge; deleting a light on its bridge does not reset it."""
+        # Whether the old bridge still had the desk when the search started.
+        searches.append((entry_id, serials, a.devices.get("a-desk") is not None))
         target = bridges[entry_id]
         for key in world.joining:
-            on_a = MAC[key] in a.macs.values() and any(
-                a.macs.get(d.id) == MAC[key] for d in a.devices
-            )
-            if (serials or not on_a) and MAC[key] not in target.macs.values():
+            if MAC[key] not in target.macs.values():
                 target.add_device(key)
 
     async def align(_hass: HomeAssistant, *, only: set[str], hue_entry_id: str) -> None:
@@ -393,14 +396,16 @@ async def test_move_room(hass: HomeAssistant, world: SimpleNamespace) -> None:
     await migration.async_start_move(hass, selection, [])
     memo = await _run(hass)
     assert (memo["step"], memo["error"]) == ("done", None)
-    # Deleted on the old bridge first (no serial numbers), then found by MAC.
+    # Found by MAC first (reset by hand: no serials), then the old bridge forgets.
+    assert world.searches == [(b_id, [], True)]
     assert ("delete", "clip/v2/resource/device/a-desk", None) in world.a.requests
-    assert world.searches == [(b_id, [])]
     desk = next(d for d in memo["devices"] if d["id"] == "a-desk")
     new_desk = desk["new_lights"]["a-desk-light"]
     assert _unique_id(hass, "light.desk") == (b_id, new_desk)
     entry = er.async_get(hass).async_get("light.desk")
     assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
+    # The device's other entities keep their ids too.
+    assert _unique_id(hass, "sensor.desk_zigbee") == (b_id, f"{desk['new_id']}-zc")
     assert world.b.devices.get(desk["new_id"]).metadata.name == "Hue lamp a-desk"
     ha_device = dr.async_get(hass).async_get(entry.device_id)
     assert ha_device.area_id == world.office
@@ -441,7 +446,7 @@ async def test_move_light_with_serials(
     await migration.async_start_move(hass, selection, ["ABC123"])
     memo = await _run(hass)
     assert memo["step"] == "done"
-    assert world.searches == [(b_id, ["ABC123"])]
+    assert world.searches == [(b_id, ["ABC123"], True)]
     assert world.a.devices.get("a-desk") is None
     entry = er.async_get(hass).async_get("light.desk")
     assert entry.config_entry_id == b_id and entry.area_id is None
@@ -462,6 +467,12 @@ async def test_not_found_then_retry(
     memo = await _run(hass)
     assert (memo["step"], memo["error"]) == ("waiting", "not_found")
     assert len(world.searches) == migration.SEARCH_ROUNDS
+    # The lamp was not found: still on the old bridge, as it was.
+    assert world.a.devices.get("a-lamp") is not None
+    assert _unique_id(hass, "light.lamp") == (
+        world.entries["a"].entry_id,
+        "a-lamp-light",
+    )
     payload = migration.async_move_payload(hass)
     assert [(x["entity_id"], x["found"]) for x in payload["lights"]] == [
         ("light.desk", True),

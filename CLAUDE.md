@@ -235,8 +235,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
   migration.py                  moving a room (with its scenes and zones) or lights going to a room on another bridge:
-                                remembered in a Store, removed from the old bridge (or taken by serial number), found by
-                                Zigbee MAC, settings restored, HA keeps entity ids/names/areas; one move at a time, in the background
+                                remembered in a Store, found by the new bridge (serial numbers or reset by hand) by Zigbee
+                                MAC, only then forgotten by the old one, settings restored, HA keeps entity ids/names/areas;
+                                one move at a time, in the background
   bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
                                 (its button); Wi-Fi bridges are put on the network by the Hue app
   automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light

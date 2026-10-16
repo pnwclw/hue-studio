@@ -1,10 +1,10 @@
 // Moving a room, or lights that go to a room on another bridge, to another bridge
 // (custom_components/hue_studio/migration.py). First what it does: the lights, the scenes
-// copied, zones moved or split, what stays behind, the bridge it goes to, serial numbers
-// if they are at hand. Then the move as it goes: the old bridge lets the lights go, the
-// new one finds them, names, rooms and scenes come back, and Home Assistant keeps their
-// entity ids. Lights not found leave it waiting: search again (serial numbers), put them
-// back on the old bridge, or stop waiting. The move runs in Home Assistant: this screen
+// copied, zones moved or split, what stays behind, the bridge it goes to, and how the
+// lights get there: by serial number (the new bridge resets them, when they are close to
+// it) or reset by hand. Then the move as it goes: the new bridge finds them, the old one
+// forgets them, names, rooms and scenes come back, and Home Assistant keeps their entity
+// ids. Lights not found stay where they were and leave it waiting: search again, or stop. The move runs in Home Assistant: this screen
 // only watches it, so it can be left and opened again (Settings → Bridges shows it).
 
 import { html, nothing, type TemplateResult } from "lit";
@@ -21,7 +21,9 @@ import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
 /** The steps shown while a move goes, in order. */
-const STEPS: MoveStep[] = ["removing", "searching", "restoring", "rooms", "scenes"];
+const STEPS: MoveStep[] = ["searching", "removing", "restoring", "rooms", "scenes"];
+/** How the lights get to the new bridge: by serial number, or reset by hand first. */
+type Way = "serials" | "hand";
 const ERRORS = ["not_found", "interrupted", "bridge", "target_offline", "source_offline"];
 
 @customElement("hue-studio-bridge-move-view")
@@ -39,6 +41,7 @@ export class BridgeMoveView extends StudioView {
   @state() private accessor plan: MovePlan | null = null;
   @state() private accessor planError: string | null = null;
   @state() private accessor serials = "";
+  @state() private accessor way: Way = "serials";
   @state() private accessor showSerials = false;
   @state() private accessor busy = false;
   @state() private accessor now = Date.now();
@@ -162,24 +165,37 @@ export class BridgeMoveView extends StudioView {
                   ${plan.over_limit ? row("mdi:alert-outline", t("move.over_limit", { bridge: plan.target_name })) : nothing}
                 </div>`
               : nothing}
+            <h2 class="label">${t("move.reset")}</h2>
+            <div class="seg two" role="tablist">
+              ${(["serials", "hand"] as Way[]).map(
+                (way) => html`<button role="tab" class=${way === this.way ? "on" : ""} aria-selected=${way === this.way} @click=${() => {
+                  haptic("selection");
+                  this.way = way;
+                }}>${t(`move.way_${way}` as StringKey)}</button>`,
+              )}
+            </div>
+            <p class="lead small">${t(`move.way_${this.way}_sub` as StringKey, { from: plan.source_name, to: plan.target_name })}</p>
+            ${this.way === "serials" ? html`<div class="rows">${this.serialField(parsed, bad, t("move.serials_hint"), true)}</div>` : nothing}
             <h2 class="label">${t("move.how")}</h2>
             <ol class="rows steps-list">
               ${(["move.how_1", "move.how_2", "move.how_3"] as StringKey[]).map(
                 (key, i) => html`<li class="item"><span class="step-no">${i + 1}</span><div class="grow">${t(key, { from: plan.source_name, to: plan.target_name })}</div></li>`,
               )}
             </ol>
-            <div class="rows">${this.serialField(parsed, bad, t("move.serials_sub", { from: plan.source_name, to: plan.target_name }))}</div>
-            <div class="center"><button class="pill go" ?disabled=${this.busy || bad} @click=${() => this.start(parsed.codes)}>${t("move.start", { bridge: plan.target_name })}</button></div>`
+            <div class="center">
+              <button class="pill go" ?disabled=${this.busy || bad || (this.way === "serials" && !parsed.codes.length)}
+                @click=${() => this.start(this.way === "serials" ? parsed.codes : [])}>${t("move.start", { bridge: plan.target_name })}</button>
+            </div>`
         : nothing}`;
   }
 
-  private serialField(parsed: ReturnType<typeof parseSerials>, bad: boolean, sub: string): TemplateResult {
+  private serialField(parsed: ReturnType<typeof parseSerials>, bad: boolean, sub: string, open = false): TemplateResult {
     const { t } = this.ctx;
-    return this.showSerials
+    return this.showSerials || open
       ? html`<div class="item col">
-          <div class="line"><span>${t("devices.serials")}</span><span class="dim">${parsed.codes.length}/${MAX_SERIALS}</span></div>
+          <div class="line"><span>${t("move.serials")}</span><span class="dim">${parsed.codes.length}/${MAX_SERIALS}</span></div>
           <input class="field" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="A1B2C3, D4E5F6"
-            aria-label=${t("devices.serials")} .value=${this.serials} @input=${(e: InputEvent) => (this.serials = (e.target as HTMLInputElement).value)} />
+            aria-label=${t("move.serials")} .value=${this.serials} @input=${(e: InputEvent) => (this.serials = (e.target as HTMLInputElement).value)} />
           <div class=${classMap({ "dim small": true, error: bad })}>
             ${bad ? t(parsed.tooMany ? "add_device.serials_many" : "add_device.serials_bad", { codes: parsed.invalid.join(", ") }) : sub}
           </div>
@@ -253,21 +269,18 @@ export class BridgeMoveView extends StudioView {
                 (key, i) => html`<li class="item"><span class="step-no">${i + 1}</span><div class="grow">${t(key, { to: s.target_name })}</div></li>`,
               )}
             </ol>
-            <div class="rows">${this.serialField(parsed, bad, t("move.serials_retry"))}</div>
+            <div class="rows">${this.serialField(parsed, bad, t("move.serials_retry", { to: s.target_name }))}</div>
             <div class="link-actions">
               <button class="pill go" ?disabled=${this.busy || bad || s.running} @click=${() => this.retry(parsed.codes)}>${t("move.again", { bridge: s.target_name })}</button>
-              ${found === 0 && s.source !== s.target
-                ? html`<button class="pill" ?disabled=${this.busy || s.running} @click=${() => this.retry(parsed.codes, s.source)}>${t("move.back", { bridge: s.source_name })}</button>`
-                : nothing}
               <button class="pill" ?disabled=${this.busy || s.running} @click=${() => this.finish()}>${t("move.stop")}</button>
             </div>`
         : nothing}`;
   }
 
-  private async retry(serials: string[], target?: string): Promise<void> {
+  private async retry(serials: string[]): Promise<void> {
     if (this.busy) return;
     this.busy = true;
-    await this.ctx.ws({ type: "hue_studio/bridges/move/retry", serials, ...(target ? { target } : {}) });
+    await this.ctx.ws({ type: "hue_studio/bridges/move/retry", serials });
     this.busy = false;
   }
 

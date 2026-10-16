@@ -8,11 +8,13 @@ and Home Assistant keeps their entity ids, names and areas:
 1. What moves is remembered first, in a Store (a restart in between loses nothing):
    per device its Zigbee MAC, name, archetype, each light's function and power-on
    preset, the HA side of its entities and device; the room's and zones' scenes.
-2. The devices leave the old bridge: deleted there (a deleted light resets itself and
-   joins the next bridge that searches). With serial numbers the new bridge takes them
-   first (it resets them by their serial) and the old one forgets them afterwards.
-3. The new bridge searches (about a minute, a few times) and each device is known again
-   by its Zigbee MAC.
+2. The new bridge searches (about a minute, a few times) and each device is known again
+   by its Zigbee MAC. A light joins it only when it was reset: by its serial number (the
+   new bridge resets it over touchlink, which reaches only lights close to it) or by
+   hand (the Hue app over Bluetooth, a dimmer switch). Deleting a light on its bridge
+   does not reset it, so the old bridge forgets a light only once the new one has it:
+   a light not found stays where it was.
+3. The old bridge forgets the lights the new one has.
 4. Name, archetype, function and power-on are set again; in HA the new entities get the
    old entity ids, names, icons, labels and the area (the old ones are gone by then).
 5. Hue rooms follow the areas (`rooms.async_align` on the new bridge). A whole room's
@@ -23,7 +25,7 @@ and Home Assistant keeps their entity ids, names and areas:
 
 One move runs at a time, as a background task the panel watches
 (`hue_studio/bridges/move/subscribe`); lights the search does not find leave it waiting
-for another search (with serial numbers, or on another bridge).
+for another search (with serial numbers, or after resetting them).
 """
 
 from __future__ import annotations
@@ -307,7 +309,22 @@ def _remember_entity(hass: HomeAssistant, entity_id: str | None) -> dict[str, An
         "area_id": entry.area_id,
         "labels": sorted(entry.labels),
         "aliases": _strings(entry.aliases),
+        "enabled": entry.disabled_by is None,
+        "hidden_by_user": entry.hidden_by == er.RegistryEntryHider.USER,
     }
+
+
+def _service_keys(device: Any) -> list[tuple[str, str]]:
+    """(key, resource id) of a device's services other than lights; the key (type and
+    index among that type) is the same for the device on any bridge."""
+    seen: dict[str, int] = {}
+    keys = []
+    for service in device.services:
+        if service.rtype == ResourceTypes.LIGHT:
+            continue
+        index = seen[service.rtype.value] = seen.get(service.rtype.value, -1) + 1
+        keys.append((f"{service.rtype.value}:{index}", service.rid))
+    return keys
 
 
 def _scene_body(scene: Any) -> dict[str, Any]:
@@ -375,6 +392,9 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
     bridge = async_bridges(hass)[selection.source]
     entities = er.async_get(hass)
     devices_reg = dr.async_get(hass)
+    by_unique_id: dict[str, list[er.RegistryEntry]] = {}
+    for entry in er.async_entries_for_config_entry(entities, selection.source):
+        by_unique_id.setdefault(entry.unique_id, []).append(entry)
     devices = []
     light_ids: set[str] = set()
     for device_id in selection.devices:
@@ -406,6 +426,16 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
                 "name": device.metadata.name,
                 "archetype": device.metadata.archetype.value,
                 "lights": lights,
+                # The device's other entities (e.g. its Zigbee connectivity sensor).
+                "others": [
+                    {
+                        "key": key,
+                        "domain": entry.domain,
+                        "entity": _remember_entity(hass, entry.entity_id),
+                    }
+                    for key, rid in _service_keys(device)
+                    for entry in by_unique_id.get(rid, [])
+                ],
                 "ha_device": {
                     "area_id": ha_device.area_id,
                     "name_by_user": ha_device.name_by_user,
@@ -417,6 +447,7 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
                 "removed": False,
                 "new_id": None,
                 "new_lights": {},
+                "new_services": {},
                 "restored": False,
             }
         )
@@ -552,22 +583,13 @@ async def async_start_move(
     )
 
 
-async def async_retry_move(
-    hass: HomeAssistant, serials: list[str], target: str | None = None
-) -> None:
-    """Search again for the lights not found yet (with serial numbers, or on another
-    bridge, e.g. the old one to put them back)."""
+async def async_retry_move(hass: HomeAssistant, serials: list[str]) -> None:
+    """Search again for the lights not found yet (serial numbers, or reset by hand)."""
     mover = _mover(hass)
     if mover.busy or mover.memo is None:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="move_busy"
         )
-    if target is not None:
-        if target not in async_bridges(hass):
-            raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="hue_entry_missing"
-            )
-        mover.memo["target"] = target
     mover.memo.update(serials=serials, error=None)
     mover.task = hass.async_create_background_task(
         _async_run(mover), f"{DOMAIN} move to another bridge"
@@ -576,7 +598,7 @@ async def async_retry_move(
 
 async def async_finish_move(hass: HomeAssistant) -> None:
     """Forget a finished move, or stop waiting for lights that were not found (they
-    stay wherever they are; the rest has been restored)."""
+    stay on the old bridge; the ones found have moved)."""
     mover = _mover(hass)
     if mover.busy:
         raise ServiceValidationError(
@@ -629,25 +651,16 @@ async def _async_move(hass: HomeAssistant, mover: Mover, memo: dict[str, Any]) -
     if target is None:
         raise MoveError("target_offline")
     pending = [d for d in memo["devices"] if d["new_id"] is None]
-    # Lights the target bridge has already (an earlier round, or a move back).
+    # Lights the target bridge has already (an earlier round).
     _match(target, pending)
-    pending = [d for d in pending if d["new_id"] is None]
-
-    if pending and not memo["serials"]:
-        # Without serial numbers the old bridge lets go first (a deleted light resets).
-        if source is None and any(not d["removed"] for d in pending):
-            raise MoveError("source_offline")
-        await mover.async_step("removing")
-        for device in pending:
-            await _async_remove(source, device)
-            await mover.async_save()
-
-    if pending:
+    if any(d["new_id"] is None for d in pending):
         await _async_search(hass, mover, target, memo)
     found = [d for d in memo["devices"] if d["new_id"] is not None]
-    # With serial numbers the new bridge took them; the old one forgets them now.
-    for device in found:
-        if not device["removed"]:
+    # Only a light the new bridge has is forgotten by the old one (deleting it there
+    # does not reset it: it would be on neither).
+    if any(not d["removed"] for d in found):
+        await mover.async_step("removing")
+        for device in found:
             await _async_remove(source, device)
     await mover.async_save()
 
@@ -697,12 +710,15 @@ def _match(bridge: HueBridgeV2, devices: list[dict[str, Any]]) -> None:
             for index, light in enumerate(memo["lights"])
             if index < len(new)
         }
+        memo["new_services"] = dict(_service_keys(device))
 
 
 async def _async_remove(source: HueBridgeV2 | None, device: dict[str, Any]) -> None:
-    if device["removed"]:
+    """The old bridge forgets a device the new one has (when it is connected; else it
+    stays there, unreachable, until it is deleted in the Hue app)."""
+    if device["removed"] or source is None:
         return
-    if source is not None and source.devices.get(device["id"]) is not None:
+    if source.devices.get(device["id"]) is not None:
         await _async_request(source, "delete", f"{DEVICE_PATH}/{device['id']}")
     device["removed"] = True
 
@@ -792,6 +808,11 @@ async def _async_take_over(
         changes["area_id"] = None
     elif old.get("area_id") is not None:
         changes["area_id"] = old["area_id"]
+    entry = entities.async_get(entity_id)
+    if old.get("enabled") and entry is not None and entry.disabled_by is not None:
+        changes["disabled_by"] = None
+    if old.get("hidden_by_user"):
+        changes["hidden_by"] = er.RegistryEntryHider.USER
     if changes:
         entities.async_update_entity(entity_id, **changes)
     return changes.get("new_entity_id", entity_id)
@@ -813,6 +834,9 @@ async def _async_restore_ha(
             await _async_take_over(
                 hass, LIGHT_DOMAIN, rid, light["entity"], keep_area=not memo["area"]
             )
+        for other in device.get("others", []):
+            if (rid := device.get("new_services", {}).get(other["key"])) is not None:
+                await _async_take_over(hass, other["domain"], rid, other["entity"])
         ha_device = devices_reg.async_get_device_by_identifier(
             (HUE_DOMAIN, device["new_id"]), memo["target"]
         )

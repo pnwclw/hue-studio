@@ -596,7 +596,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   let move: MoveState | null = null;
   const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
   const runMove = (from: number, missing: number) => {
-    const steps: MoveState["step"][] = ["removing", "searching", "restoring", "rooms", "scenes", "done"];
+    const steps: MoveState["step"][] = ["searching", "removing", "restoring", "rooms", "scenes", "done"];
     moveTimers.splice(0).forEach(clearTimeout);
     steps.slice(from).forEach((step, i) =>
       moveTimers.push(setTimeout(() => {
@@ -1098,7 +1098,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "hue_studio/bridges/move/retry") {
         if (move) move = { ...move, running: true, error: null };
         pushMove();
-        runMove(1, 0);
+        runMove(0, 0);
         return null as T;
       }
       if (msg.type === "hue_studio/bridges/move/finish") {

@@ -1038,7 +1038,6 @@ async def ws_move(
     {
         vol.Required("type"): "hue_studio/bridges/move/retry",
         vol.Optional("serials", default=list): SERIALS,
-        vol.Optional("target"): str,
     }
 )
 @websocket_api.async_response
@@ -1047,11 +1046,9 @@ async def ws_move_retry(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Search again for the lights a move has not found (serial numbers; or another
-    bridge, e.g. the old one)."""
-    await _ws_call(
-        connection, msg, async_retry_move(hass, msg["serials"], msg.get("target"))
-    )
+    """Search again for the lights a move has not found (serial numbers, or reset by
+    hand)."""
+    await _ws_call(connection, msg, async_retry_move(hass, msg["serials"]))
 
 
 @websocket_api.require_admin
