@@ -694,7 +694,8 @@ def _subscribe(
     @callback
     def send() -> None:
         data = payload()
-        if data == last.get("payload"):
+        # The first payload always goes out, even None ("nothing").
+        if "payload" in last and data == last["payload"]:
             return
         last["payload"] = data
         connection.send_message(websocket_api.event_message(msg["id"], data))

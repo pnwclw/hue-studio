@@ -39,6 +39,7 @@ from custom_components.hue_studio.positions import (
     async_setup_positions,
     position_store,
 )
+from custom_components.hue_studio.websocket import async_setup_websocket
 
 HUE = "hue"
 MAC = {"desk": "00:17:88:01:00:00:00:01", "lamp": "00:17:88:01:00:00:00:02"}
@@ -509,3 +510,18 @@ async def test_room_on_two_bridges(hass: HomeAssistant, world: SimpleNamespace) 
     assert (selection.source, selection.devices) == (b_id, ["b-spot"])
     to_b = migration.async_select(hass, b_id, area=world.office)
     assert to_b.devices == ["a-desk", "a-lamp"]
+
+
+async def test_subscribe_without_move(
+    hass: HomeAssistant,
+    world: SimpleNamespace,
+    hass_ws_client: Any,
+    hass_admin_user: Any,
+) -> None:
+    """With no move the subscription still answers (null), so the panel can plan one."""
+    async_setup_websocket(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "hue_studio/bridges/move/subscribe"})
+    assert (await client.receive_json())["success"]
+    event = await client.receive_json()
+    assert event["type"] == "event" and event["event"] is None
