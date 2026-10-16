@@ -225,9 +225,11 @@ async def test_bridges_without_pro(
         "zones": None,
         "motion_areas": None,
     }
-    # A Bridge Pro without MotionAware areas yet: an empty list.
+    # A Bridge Pro without MotionAware areas yet: an empty list. It calls itself
+    # "Hue Bridge"; its model id names it.
     hue_lights.config.bridge_device.product_data.model_id = "BSB003"
-    assert async_bridges_payload(hass)[hue_entry.entry_id]["motion_areas"] == []
+    pro = async_bridges_payload(hass)[hue_entry.entry_id]
+    assert (pro["motion_areas"], pro["model"]) == ([], "Hue Bridge Pro")
 
 
 async def test_rename_bridge(

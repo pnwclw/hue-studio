@@ -21,6 +21,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
+from .bridge_setup import MODELS
 from .connections import async_supported_hue_entries
 from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
 from .lights import LIGHT_DOMAIN, async_bridges
@@ -116,7 +117,10 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
             "connected": True,
             "host": entry.data.get("host") if entry else None,
             "id": bridge.config.bridge_id,
-            "model": device.product_data.product_name if device else None,
+            # A Bridge Pro calls itself "Hue Bridge"; its model id tells them apart.
+            "model": (MODELS.get(model_id) or device.product_data.product_name)
+            if device
+            else None,
             "software": device.product_data.software_version if device else None,
             "pro": pro,
             "ha_device": native.id if native else None,
