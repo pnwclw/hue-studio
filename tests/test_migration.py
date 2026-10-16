@@ -23,7 +23,7 @@ from aiohue.v2.models.scene import (
     SceneMetadata,
     SceneStatus,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import (
     area_registry as ar,
@@ -33,7 +33,7 @@ from homeassistant.helpers import (
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.hue_studio import migration
+from custom_components.hue_studio import migration, transfer
 from custom_components.hue_studio.lights import HueLight
 from custom_components.hue_studio.positions import (
     async_setup_positions,
@@ -42,7 +42,11 @@ from custom_components.hue_studio.positions import (
 from custom_components.hue_studio.websocket import async_setup_websocket
 
 HUE = "hue"
-MAC = {"desk": "00:17:88:01:00:00:00:01", "lamp": "00:17:88:01:00:00:00:02"}
+MAC = {
+    "desk": "00:17:88:01:00:00:00:01",
+    "lamp": "00:17:88:01:00:00:00:02",
+    "other": "00:17:88:01:00:00:00:03",
+}
 
 
 def _ref(rid: str, rtype: ResourceTypes) -> ResourceIdentifier:
@@ -218,6 +222,7 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     integration would have it."""
     await async_setup_positions(hass)
     await migration.async_setup_moves(hass)
+    await transfer.async_setup_transfer(hass)
     entities = er.async_get(hass)
     devices = dr.async_get(hass)
     office = ar.async_get(hass).async_create("Office")
@@ -340,8 +345,17 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
         searches=searches,
         joining=["desk", "lamp"],
     )
+
+    @callback
+    def drop_state(event: Event) -> None:
+        """As an entity platform does: a removed entity loses its state."""
+        if event.data["action"] == "remove":
+            hass.states.async_remove(event.data["entity_id"])
+
+    hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, drop_state)
     with (
         patch.object(migration, "async_bridges", lambda _h: bridges),
+        patch.object(transfer, "async_bridges", lambda _h: bridges),
         patch.object(migration, "async_all_lights", all_lights),
         patch.object(migration, "async_search", search),
         patch.object(migration, "async_align", align),
@@ -536,3 +550,50 @@ async def test_subscribe_without_move(
     assert (await client.receive_json())["success"]
     event = await client.receive_json()
     assert event["type"] == "event" and event["event"] is None
+
+
+async def test_transfer_bridge(hass: HomeAssistant, world: SimpleNamespace) -> None:
+    """The Hue app moves bridge a to the Bridge Pro b; Hue Studio remembered a first,
+    and on finishing a leaves HA and b's devices, rooms, zones and scenes take over."""
+    a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
+    with pytest.raises(ServiceValidationError):
+        # The Hue app migrates to a Bridge Pro only.
+        await transfer.async_start_transfer(hass, a_id, b_id)
+    world.b.config.bridge_device.product_data.model_id = "BSB003"
+    await transfer.async_start_transfer(hass, a_id, b_id)
+    payload = transfer.async_transfer_payload(hass)
+    assert (payload["step"], payload["devices"], payload["source_connected"]) == (
+        "waiting",
+        {"total": 3, "arrived": 0},
+        True,
+    )
+    # The Hue app's migration: the same devices (by MAC), rooms, zones and scenes.
+    new = {key: world.b.add_device(key) for key in ("desk", "lamp")}
+    world.b.add_group("room", "b-office", "Office", list(new.values()))
+    world.b.add_group("zone", "b-work", "Work", [f"{d}-light" for d in new.values()])
+    world.b.add_scene(
+        "b-read", "Read", "b-office", [f"{d}-light" for d in new.values()]
+    )
+    payload = transfer.async_transfer_payload(hass)
+    assert payload["devices"] == {"total": 3, "arrived": 2}
+    assert payload["missing"] == ["Hue lamp a-other"]
+    assert (payload["groups"]["arrived"], payload["scenes"]["arrived"]) == (2, 1)
+
+    await transfer.async_finish_transfer(hass)
+    await hass.data[transfer.STORAGE_KEY].task
+    await hass.async_block_till_done()
+    assert transfer.async_transfer_payload(hass)["step"] == "done"
+    assert hass.config_entries.async_get_entry(a_id) is None
+    assert _unique_id(hass, "light.desk") == (b_id, f"{new['desk']}-light")
+    assert _unique_id(hass, "sensor.desk_zigbee") == (b_id, f"{new['desk']}-zc")
+    entry = er.async_get(hass).async_get("light.desk")
+    assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
+    assert dr.async_get(hass).async_get(entry.device_id).area_id == world.office
+    assert _unique_id(hass, "light.office") == (b_id, "b-office-group")
+    assert _unique_id(hass, "light.work") == (b_id, "b-work-group")
+    assert _unique_id(hass, "scene.office_read") == (b_id, "b-read")
+    # The other light did not arrive: it went with the old bridge.
+    assert er.async_get(hass).async_get("light.other") is None
+    assert position_store(hass).lights == {f"{new['desk']}-light": [[0.1, 0.2, 0.0]]}
+    await transfer.async_cancel_transfer(hass)
+    assert transfer.async_transfer_payload(hass) is None

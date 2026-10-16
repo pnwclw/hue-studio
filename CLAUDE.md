@@ -227,6 +227,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
                                 hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/finish|move/subscribe,
+                                hue_studio/bridges/transfer/start|finish|cancel|subscribe,
                                 hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
@@ -238,6 +239,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 remembered in a Store, found by the new bridge (serial numbers or reset by hand) by Zigbee
                                 MAC, only then forgotten by the old one, settings restored, HA keeps entity ids/names/areas;
                                 one move at a time, in the background
+  transfer.py                   a whole bridge to a Bridge Pro by the Hue app's migration: remembered first (devices by MAC,
+                                rooms/zones by name, scenes by group and name), then the old bridge leaves HA and what arrived
+                                takes over its entity ids, names and areas
   bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
                                 (its button); Wi-Fi bridges are put on the network by the Hue app
   automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
@@ -280,7 +284,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves, the move as it goes,
-                                lights not found), entertainment, integration (options),
+                                lights not found), bridge-transfer (a whole bridge to a Bridge Pro: get ready, the Hue app, finish), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers

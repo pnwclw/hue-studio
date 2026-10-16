@@ -7,6 +7,7 @@ import type {
   Gallery,
   BridgesMessage,
   MoveState,
+  TransferState,
   Hass,
   HassState,
   HueDeviceInfo,
@@ -615,6 +616,17 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }, 900 + i * 2200)),
     );
   };
+  // A whole bridge to a Bridge Pro (?bridges=two: the Garden Bridge to the Hue Bridge Pro);
+  // ?transfer=waiting|done starts with one. Devices "arrive" a few seconds after "Get ready".
+  const transferListeners = new Set<(m: unknown) => void>();
+  let transfer: TransferState | null = null;
+  const pushTransfer = () => setTimeout(() => transferListeners.forEach((cb) => cb(structuredClone(transfer))), 30);
+  const transferOf = (step: TransferState["step"], arrived: number): TransferState => ({
+    step, error: null, source: "hue-entry-2", target: "hue-entry", source_name: "Garden Bridge", target_name: "Hue Bridge",
+    source_connected: step !== "done", devices: { total: 2, arrived }, groups: { total: 1, arrived: Math.min(arrived, 1) },
+    scenes: { total: 2, arrived: Math.min(arrived, 2) }, missing: arrived >= 2 ? [] : ["Candle", "Globe lights"].slice(arrived),
+  });
+  if (twoBridges && params.get("transfer")) transfer = transferOf(params.get("transfer") === "done" ? "done" : "waiting", 1);
   const seedMove = params.get("move");
   if (twoBridges && seedMove) {
     const lights = ["tv_strip", "play_left", "play_right", "candle"];
@@ -1073,6 +1085,23 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         onChange({ ...hass, areas: { ...AREAS } });
         return { area_id: id, name: String(msg.name) } as T;
       }
+      if (msg.type === "hue_studio/bridges/transfer/start") {
+        transfer = transferOf("waiting", 0);
+        pushTransfer();
+        [1, 2].forEach((n) => setTimeout(() => transfer && transfer.step === "waiting" && ((transfer = transferOf("waiting", n)), pushTransfer()), 2500 * n));
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/transfer/finish") {
+        transfer = { ...transfer!, step: "finishing" };
+        pushTransfer();
+        setTimeout(() => ((transfer = { ...transfer!, step: "done" }), pushTransfer()), 2500);
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/transfer/cancel") {
+        transfer = null;
+        pushTransfer();
+        return null as T;
+      }
       if (msg.type === "hue_studio/bridges/move_plan") {
         const lights = movingLights(msg);
         const room = msg.area ? AREAS[String(msg.area)]?.name ?? null : null;
@@ -1235,6 +1264,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             timers.push(setTimeout(() => send({ step: "done", hue_entry_id: "hue-entry-2", name: "Hue Bridge Pro" }), 9000));
           }
           return () => timers.forEach(clearTimeout);
+        }
+        if (msg.type === "hue_studio/bridges/transfer/subscribe") {
+          transferListeners.add(send);
+          setTimeout(() => send(structuredClone(transfer)), 30);
+          return () => {
+            transferListeners.delete(send);
+          };
         }
         if (msg.type === "hue_studio/bridges/move/subscribe") {
           moveListeners.add(send);

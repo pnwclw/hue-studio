@@ -62,6 +62,7 @@ from .rooms import async_align, async_track_areas
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
 from .sync_link import SyncBoxLink
+from .transfer import async_setup_transfer
 from .websocket import async_setup_websocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
     await async_setup_moves(hass)
+    await async_setup_transfer(hass)
     await async_setup_automations(hass)
     return True
 

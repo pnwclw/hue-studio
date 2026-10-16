@@ -192,6 +192,22 @@ export interface MoveState {
   lights: { entity_id: string | null; name: string; found: boolean }[];
 }
 
+/** A whole bridge moved to a Bridge Pro by the Hue app (hue_studio/bridges/transfer/subscribe); null: none. */
+export interface TransferState {
+  step: "waiting" | "finishing" | "done" | "failed";
+  error: string | null;
+  source: string;
+  target: string;
+  source_name: string;
+  target_name: string;
+  source_connected: boolean;
+  devices: { total: number; arrived: number };
+  groups: { total: number; arrived: number };
+  scenes: { total: number; arrived: number };
+  /** Devices not on the Bridge Pro yet, by name. */
+  missing: string[];
+}
+
 /** Steps of linking a bridge (hue_studio/bridges/link). */
 export type BridgeLinkEvent =
   | { step: "connecting" }

@@ -57,15 +57,22 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
   room searches on the room's bridge.
 - The rooms payload (`hue_studio/rooms/subscribe`) carries `bridges`, `bridge_of` (light,
   room, zone and scene entities) and `split_areas`.
-- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): a
-  whole bridge moves with the Hue app's own transfer. Hue Studio moves a room (from the
+- **A whole bridge** (`transfer.py`, a bridge's page → "Move everything to <Bridge Pro>")
+  moves with the Hue app's own migration (Settings → Bridges → the bridge → Migrate; to a
+  Bridge Pro only). Hue Studio remembers the bridge first (devices by Zigbee MAC with
+  their entities, rooms and zones by name, scenes by room or zone and name), shows what
+  has arrived on the Bridge Pro while the Hue app works, and on "Finish" removes the old
+  bridge from HA, after which everything that arrived takes over its entity ids, names,
+  areas and light positions.
+- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): Hue Studio moves a room (from the
   bridge next to "Lights" on its page) and a light that goes to a room on another bridge
   (its room picker, or a room's note about lights on another bridge):
   - everything is remembered first, in a Store (`hue_studio.move`), so a restart in
     between loses nothing;
   - a light joins the new bridge only once it is reset: by its serial number (the new
     bridge resets it over touchlink, which reaches only lights close to that bridge) or
-    by hand (the Hue app over Bluetooth, a dimmer switch). Deleting a light on its bridge
+    by hand (the Hue app over Bluetooth, a dimmer switch); some lights only look for a
+    bridge after being switched off at the wall for about 10 seconds. Deleting a light on its bridge
     does not reset it (tried live: it ended up on neither bridge), so the new bridge
     searches first (a few rounds of about a minute), knows each light again by its
     Zigbee MAC, and only then the old bridge forgets it; a light not found stays where

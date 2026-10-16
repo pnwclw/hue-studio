@@ -106,7 +106,7 @@ class Selection:
     room: str | None
 
 
-def _mac(bridge: HueBridgeV2, device_id: str) -> str | None:
+def device_mac(bridge: HueBridgeV2, device_id: str) -> str | None:
     connectivity = bridge.devices.get_zigbee_connectivity(device_id)
     return getattr(connectivity, "mac_address", None) if connectivity else None
 
@@ -298,7 +298,7 @@ def _strings(values: Iterable[Any]) -> list[str]:
 
 
 @callback
-def _remember_entity(hass: HomeAssistant, entity_id: str | None) -> dict[str, Any]:
+def remember_entity(hass: HomeAssistant, entity_id: str | None) -> dict[str, Any]:
     entry = er.async_get(hass).async_get(entity_id) if entity_id else None
     if entry is None:
         return {"entity_id": entity_id}
@@ -314,13 +314,13 @@ def _remember_entity(hass: HomeAssistant, entity_id: str | None) -> dict[str, An
     }
 
 
-def _service_keys(device: Any) -> list[tuple[str, str]]:
-    """(key, resource id) of a device's services other than lights; the key (type and
-    index among that type) is the same for the device on any bridge."""
+def service_keys(device: Any, *, lights: bool = False) -> list[tuple[str, str]]:
+    """(key, resource id) of a device's services (lights only with `lights`); the key
+    (type and index among that type) is the same for the device on any bridge."""
     seen: dict[str, int] = {}
     keys = []
     for service in device.services:
-        if service.rtype == ResourceTypes.LIGHT:
+        if service.rtype == ResourceTypes.LIGHT and not lights:
             continue
         index = seen[service.rtype.value] = seen.get(service.rtype.value, -1) + 1
         keys.append((f"{service.rtype.value}:{index}", service.rid))
@@ -355,7 +355,7 @@ def _remember_scenes(
     return [
         {
             "id": scene.id,
-            "entity": _remember_entity(
+            "entity": remember_entity(
                 hass, entities.async_get_entity_id(SCENE_DOMAIN, HUE_DOMAIN, scene.id)
             ),
             "body": _scene_body(scene),
@@ -376,7 +376,7 @@ def _remember_group(
         "name": group.metadata.name,
         "archetype": group.metadata.archetype.value,
         "lights": [c.rid for c in group.children if c.rtype == ResourceTypes.LIGHT],
-        "entity": _remember_entity(
+        "entity": remember_entity(
             hass,
             entities.async_get_entity_id(LIGHT_DOMAIN, HUE_DOMAIN, grouped)
             if grouped
@@ -413,7 +413,7 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
                     "id": rid,
                     "function": function,
                     "power_on": power_on,
-                    "entity": _remember_entity(
+                    "entity": remember_entity(
                         hass,
                         entities.async_get_entity_id(LIGHT_DOMAIN, HUE_DOMAIN, rid),
                     ),
@@ -422,7 +422,7 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
         devices.append(
             {
                 "id": device_id,
-                "mac": _mac(bridge, device_id),
+                "mac": device_mac(bridge, device_id),
                 "name": device.metadata.name,
                 "archetype": device.metadata.archetype.value,
                 "lights": lights,
@@ -431,9 +431,9 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
                     {
                         "key": key,
                         "domain": entry.domain,
-                        "entity": _remember_entity(hass, entry.entity_id),
+                        "entity": remember_entity(hass, entry.entity_id),
                     }
-                    for key, rid in _service_keys(device)
+                    for key, rid in service_keys(device)
                     for entry in by_unique_id.get(rid, [])
                 ],
                 "ha_device": {
@@ -697,7 +697,8 @@ def _match(bridge: HueBridgeV2, devices: list[dict[str, Any]]) -> None:
     by_mac = {
         mac: device
         for device in bridge.devices
-        if not is_bridge_device(bridge, device) and (mac := _mac(bridge, device.id))
+        if not is_bridge_device(bridge, device)
+        and (mac := device_mac(bridge, device.id))
     }
     for memo in devices:
         device = by_mac.get(memo["mac"] or "")
@@ -710,7 +711,7 @@ def _match(bridge: HueBridgeV2, devices: list[dict[str, Any]]) -> None:
             for index, light in enumerate(memo["lights"])
             if index < len(new)
         }
-        memo["new_services"] = dict(_service_keys(device))
+        memo["new_services"] = dict(service_keys(device))
 
 
 async def _async_remove(source: HueBridgeV2 | None, device: dict[str, Any]) -> None:
@@ -767,7 +768,7 @@ async def _async_until(check: Callable[[], bool]) -> bool:
     return True
 
 
-async def _async_take_over(
+async def async_take_over(
     hass: HomeAssistant,
     domain: str,
     unique_id: str,
@@ -831,12 +832,12 @@ async def _async_restore_ha(
             if (rid := device["new_lights"].get(light["id"])) is None:
                 continue
             # A light moved to another area follows its device (no area of its own).
-            await _async_take_over(
+            await async_take_over(
                 hass, LIGHT_DOMAIN, rid, light["entity"], keep_area=not memo["area"]
             )
         for other in device.get("others", []):
             if (rid := device.get("new_services", {}).get(other["key"])) is not None:
-                await _async_take_over(hass, other["domain"], rid, other["entity"])
+                await async_take_over(hass, other["domain"], rid, other["entity"])
         ha_device = devices_reg.async_get_device_by_identifier(
             (HUE_DOMAIN, device["new_id"]), memo["target"]
         )
@@ -904,7 +905,7 @@ async def _async_take_over_scenes(
     hass: HomeAssistant, copies: list[tuple[str, dict[str, Any]]]
 ) -> None:
     for rid, old in copies:
-        await _async_take_over(hass, SCENE_DOMAIN, rid, old)
+        await async_take_over(hass, SCENE_DOMAIN, rid, old)
 
 
 async def _async_copy_groups(
@@ -945,7 +946,7 @@ async def _async_copy_groups(
                 if old is not None and not old.children:
                     await _async_request(source, "delete", f"{ROOM_PATH}/{room['id']}")
                     if new_room.grouped_light:
-                        await _async_take_over(
+                        await async_take_over(
                             hass, LIGHT_DOMAIN, new_room.grouped_light, room["entity"]
                         )
             await _async_take_over_scenes(hass, copies)
@@ -987,7 +988,7 @@ async def _async_copy_groups(
         if source is not None and source.groups.zone.get(zone["id"]) is not None:
             await _async_request(source, "delete", f"{ZONE_PATH}/{zone['id']}")
         if new_zone.grouped_light:
-            await _async_take_over(
+            await async_take_over(
                 hass, LIGHT_DOMAIN, new_zone.grouped_light, zone["entity"]
             )
         await _async_take_over_scenes(hass, copies)

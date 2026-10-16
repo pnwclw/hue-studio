@@ -103,6 +103,13 @@ from .sync import (
     SyncBoxCoordinator,
     async_sync_boxes,
 )
+from .transfer import (
+    async_cancel_transfer,
+    async_finish_transfer,
+    async_start_transfer,
+    async_track_transfer,
+    async_transfer_payload,
+)
 
 
 @callback
@@ -139,6 +146,10 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_move_retry,
         ws_move_finish,
         ws_subscribe_move,
+        ws_transfer_start,
+        ws_transfer_finish,
+        ws_transfer_cancel,
+        ws_subscribe_transfer,
         ws_configure_sync_box,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -1084,6 +1095,81 @@ def ws_subscribe_move(
         lambda: async_move_payload(hass),
         [SIGNAL_MOVE_UPDATED],
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/transfer/start",
+        vol.Required("source"): str,
+        vol.Required("target"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_transfer_start(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Remember a whole bridge before the Hue app moves it to a Bridge Pro."""
+    await _ws_call(
+        connection, msg, async_start_transfer(hass, msg["source"], msg["target"])
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/transfer/finish"}
+)
+@websocket_api.async_response
+async def ws_transfer_finish(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Remove the old bridge from HA; what arrived on the Bridge Pro takes over."""
+    await _ws_call(connection, msg, async_finish_transfer(hass))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/transfer/cancel"}
+)
+@websocket_api.async_response
+async def ws_transfer_cancel(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Forget a bridge transfer (or a finished one)."""
+    await _ws_call(connection, msg, async_cancel_transfer(hass))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/transfer/subscribe"}
+)
+@callback
+def ws_subscribe_transfer(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The bridge transfer and what has arrived on the Bridge Pro
+    (transfer.async_transfer_payload; null: none)."""
+    last: dict[str, Any] = {}
+
+    @callback
+    def send() -> None:
+        data = async_transfer_payload(hass)
+        if "payload" in last and data == last["payload"]:
+            return
+        last["payload"] = data
+        connection.send_message(websocket_api.event_message(msg["id"], data))
+
+    connection.subscriptions[msg["id"]] = async_track_transfer(hass, send)
+    connection.send_result(msg["id"])
+    send()
 
 
 @websocket_api.require_admin

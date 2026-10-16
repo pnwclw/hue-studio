@@ -226,6 +226,9 @@
     },
     "move_busy": {
       "message": "Inne przenoszenie na mostek jeszcze się nie skończyło."
+    },
+    "transfer_needs_pro": {
+      "message": "Cały mostek może przejąć tylko Hue Bridge Pro (migracja w aplikacji Hue)."
     }
   },
   "services": {
