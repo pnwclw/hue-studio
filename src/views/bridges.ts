@@ -14,6 +14,7 @@ import { wifiKey } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
+import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature, statusKey } from "../sync.ts";
 import type { BridgeInfo, BridgesMessage, MotionArea, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
@@ -87,7 +88,7 @@ export class BridgesView extends StudioView {
     return html`<h2 class="label">${t("settings.bridges")}</h2>
       <div class="rows">
         ${Object.entries(bridges).map(([id, b]) =>
-          row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : [b.model, b.host].filter(Boolean).join(" · "), b.connected === false),
+          row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : this.summary(b), b.connected === false),
         )}
         ${ctx.hass.user?.is_admin
           ? html`<button class="item" @click=${() => ctx.go("/settings/bridges/add")}>
@@ -115,6 +116,43 @@ export class BridgesView extends StudioView {
         </button>
       </div>
       <p class="lead small">${t("bridges.hint")}</p>`;
+  }
+
+  /** What a connected bridge is and holds: "Hue Bridge Pro · 9 lights · 6 rooms". */
+  private summary(b: BridgeInfo): string {
+    const { t } = this.ctx;
+    return [
+      b.model,
+      b.lights != null ? this.lightsCount(b.lights) : null,
+      b.rooms != null ? (b.rooms === 1 ? t("bridges.one_room") : t("bridges.rooms_count", { count: b.rooms })) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  private lightsCount(n: number): string {
+    return n === 1 ? this.ctx.t("rooms.one_light") : this.ctx.t("rooms.lights_count", { count: n });
+  }
+
+  /** A bridge's rooms (the HA areas whose lights it has), each opening the room. */
+  private rooms(id: string): TemplateResult | typeof nothing {
+    const { ctx } = this;
+    const { t } = ctx;
+    const areas = bridgeAreas(ctx.rooms, id);
+    const split = ctx.rooms?.split_areas || {};
+    if (!areas.length) return nothing;
+    return html`<h2 class="label">${t("bridges.rooms")}</h2>
+      <div class="rows">
+        ${areas.map((area) => {
+          const lights = ctx.home.rooms.find((r) => r.key === `area.${area}`)?.lights.filter((l) => bridgeOf(ctx.rooms, l) === id) || [];
+          const sub = split[area] ? t("bridges.room_split") : this.lightsCount(lights.length);
+          return html`<button class="item" @click=${() => ctx.go(`/room/${encodeURIComponent(`area.${area}`)}`)}>
+            <ha-icon icon=${ctx.hass.areas?.[area]?.icon || "mdi:sofa-outline"}></ha-icon>
+            <div class="grow">${ctx.hass.areas?.[area]?.name || area}<div class=${classMap({ "dim small": true, warn: !!split[area] })}>${sub}</div></div>
+            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+          </button>`;
+        })}
+      </div>`;
   }
 
   /** A box paired with Hue Studio (not one used through HACS huesyncbox). */
@@ -181,7 +219,9 @@ export class BridgesView extends StudioView {
       html`${this.hero("mdi:router-wireless", b.name, status, online)}
         ${online
           ? html`<div class="rows">
-              ${this.link("mdi:lightbulb-group-outline", t("settings.devices"), t("bridges.devices_count", { devices: b.devices ?? 0, lights: b.lights ?? 0 }), () => ctx.go("/settings/devices"))}
+              ${this.link("mdi:lightbulb-group-outline", t("settings.devices"), t("bridges.devices_count", { devices: b.devices ?? 0, lights: b.lights ?? 0 }), () =>
+                ctx.go(`/settings/devices?bridge=${encodeURIComponent(id)}`),
+              )}
               ${this.link("mdi:television-ambient-light", t("settings.entertainment"), "", () => ctx.go("/settings/entertainment"))}
               ${areas
                 ? this.link("mdi:motion-sensor", t("settings.motionaware"), t("bridges.motion_count", { count: areas.length }), () =>
@@ -190,6 +230,7 @@ export class BridgesView extends StudioView {
                 : nothing}
             </div>`
           : html`<p class="lead">${t("bridges.offline_hint")}</p>`}
+        ${online ? this.rooms(id) : nothing}
         <h2 class="label">${t("bridges.about")}</h2>
         <div class="rows">
           ${this.fact("bridges.model", b.model)} ${this.fact("bridges.address", b.host)} ${this.fact("bridges.software", b.software)} ${this.fact("bridges.id", b.id)}

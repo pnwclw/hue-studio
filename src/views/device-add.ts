@@ -12,6 +12,7 @@ import { type AddKind, areaOfRoom, deviceIcon, type FoundDevice, MAX_SERIALS, ne
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup } from "../model.ts";
+import { groupBridge } from "../rooms.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -101,10 +102,13 @@ export class DeviceAddView extends StudioView {
     return Object.entries(this.devices || {});
   }
 
-  /** The bridge to search on: the one picked, else the first that can search. */
+  /** The bridge to search on: the one picked, else the room's (an area is on one bridge), else the first that can search. */
   private get bridgeId(): string | null {
     const all = this.bridges;
     if (this.bridge && this.devices?.[this.bridge]) return this.bridge;
+    const group = this.room ? findGroup(this.ctx.home, this.room) : undefined;
+    const own = group ? groupBridge(this.ctx.rooms, group) : null;
+    if (own && this.devices?.[own]) return own;
     return (all.find(([, b]) => b.searching !== null) ?? all[0])?.[0] ?? null;
   }
 

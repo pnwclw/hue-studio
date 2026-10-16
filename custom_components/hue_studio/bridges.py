@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 from aiohttp import ClientError
+from aiohue import HueBridgeV2
 from aiohue.errors import AiohueException
 from aiohue.v2.models.device import DeviceMetaDataPut, DevicePut
 from homeassistant.core import HomeAssistant, callback
@@ -30,9 +31,20 @@ NAME_MAX = 32
 
 
 @callback
+def bridge_name(hass: HomeAssistant, hue_entry_id: str, bridge: HueBridgeV2) -> str:
+    """The bridge's name (as set in the Hue app), else its `hue` entry's title."""
+    device = bridge.config.bridge_device
+    name = getattr(getattr(device, "metadata", None), "name", None)
+    if isinstance(name, str) and name:
+        return name
+    entry = hass.config_entries.async_get_entry(hue_entry_id)
+    return entry.title if entry else "Hue Bridge"
+
+
+@callback
 def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
     """{hue entry id: {"name", "connected", "host", "id", "model", "software", "pro",
-                        "ha_device", "devices", "lights",
+                        "ha_device", "devices", "lights", "rooms", "zones",
                         "motion_areas": [{"id", "name", "group", "enabled", "health",
                                           "lights": [{"entity_id", "health"}]}] | None}}
     Every bridge of the native integration; one Hue Studio is not connected to (yet)
@@ -53,6 +65,8 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
                 "ha_device": None,
                 "devices": None,
                 "lights": None,
+                "rooms": None,
+                "zones": None,
                 "motion_areas": None,
             }
     for hue_entry_id, bridge in bridges.items():
@@ -90,7 +104,6 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
                         ],
                     }
                 )
-        name = getattr(getattr(device, "metadata", None), "name", None)
         native = (
             dr.async_get(hass).async_get_device_by_identifier(
                 (HUE_DOMAIN, str(device.id)), hue_entry_id
@@ -99,9 +112,7 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
             else None
         )
         payload[hue_entry_id] = {
-            "name": name
-            if isinstance(name, str) and name
-            else (entry.title if entry else "Hue Bridge"),
+            "name": bridge_name(hass, hue_entry_id, bridge),
             "connected": True,
             "host": entry.data.get("host") if entry else None,
             "id": bridge.config.bridge_id,
@@ -115,6 +126,8 @@ def async_bridges_payload(hass: HomeAssistant) -> dict[str, Any]:
                 if not d.product_data.product_archetype.value.startswith("bridge")
             ),
             "lights": sum(1 for _ in bridge.lights),
+            "rooms": sum(1 for _ in bridge.groups.room),
+            "zones": sum(1 for _ in bridge.groups.zone),
             "motion_areas": areas,
         }
     return payload

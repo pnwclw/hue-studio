@@ -128,6 +128,9 @@ export interface BridgeInfo {
   /** How many devices (lights, switches, sensors) and lights it has. */
   devices?: number | null;
   lights?: number | null;
+  /** How many Hue rooms and zones it has. */
+  rooms?: number | null;
+  zones?: number | null;
   /** null: no MotionAware on this bridge. */
   motion_areas: MotionArea[] | null;
 }
@@ -275,6 +278,8 @@ export interface RoomTarget {
   /** The existing room's grouped light entity. */
   group: string | null;
   lights: string[];
+  /** The bridge (native hue entry id) the room is on. */
+  bridge?: string;
 }
 
 /** Lights (of one device) going to the room of an area. */
@@ -325,6 +330,12 @@ export interface RoomsPlan {
   splits: RoomSplit[];
   /** Light entity id -> its Hue room's name. */
   hue_rooms: Record<string, string>;
+  /** The connected bridges: native hue entry id -> name. */
+  bridges?: Record<string, string>;
+  /** Light, Hue room/zone (grouped light) or scene entity id -> its bridge. */
+  bridge_of?: Record<string, string>;
+  /** Areas with lights on several bridges (an area belongs to one bridge) -> those bridges. */
+  split_areas?: Record<string, string[]>;
 }
 
 /** A palette or gallery scene. */

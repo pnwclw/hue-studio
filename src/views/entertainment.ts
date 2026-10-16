@@ -2,7 +2,7 @@
 // Hue app's sync or a game streams to). They are not rooms or zones: their own sets of
 // lights with places. List, create, rename, change type and lights, arrange, delete.
 
-import { html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
@@ -81,7 +81,9 @@ export class EntertainmentView extends StudioView {
       Object.values(ctx.boxes)
         .filter((b) => b.area === id)
         .map((b) => b.name || "Sync Box");
-    const areas = Object.values(data).flatMap((b) => b.areas);
+    // Several bridges: each area says whose it is (an area holds one bridge's lights).
+    const several = Object.keys(data).length > 1;
+    const areas = Object.values(data).flatMap((b) => b.areas.map((a) => ({ ...a, bridgeName: several ? b.name : "" })));
     return this.screen(
       this.subHead(t("settings.entertainment"), () => ctx.go("/settings")),
       html`<p class="lead">${t("ent.intro")}</p>
@@ -91,6 +93,7 @@ export class EntertainmentView extends StudioView {
             const sub = [
               t(`ent.type_${a.type}` as StringKey),
               t("ent.lights_count", { count: Object.keys(a.lights).length }),
+              a.bridgeName,
               a.streaming ? t("ent.streaming") : "",
               boxes.length ? t("ent.used_by", { name: boxes.join(", ") }) : "",
             ].filter(Boolean);
@@ -107,6 +110,25 @@ export class EntertainmentView extends StudioView {
         </div>`,
       "settings-page",
     );
+  }
+
+  /**
+   * Which bridge's lights the area holds, with several bridges: picked for a new area
+   * (its lights start over), shown for an existing one.
+   */
+  private bridgePick(draft: Draft, set: (patch: Partial<Draft>) => void): TemplateResult | typeof nothing {
+    const { t } = this.ctx;
+    const bridges = Object.entries(this.data || {});
+    if (bridges.length < 2) return nothing;
+    if (draft.id) return html`<p class="lead small">${t("ent.on_bridge", { bridge: this.data?.[draft.bridge ?? ""]?.name ?? "" })}</p>`;
+    return html`<h2 class="label">${t("add_device.bridge")}</h2>
+      <div class="chips wrap">
+        ${bridges.map(
+          ([id, b]) => html`<button class=${classMap({ chip: true, on: id === draft.bridge })} @click=${() => id !== draft.bridge && set({ bridge: id, lights: [] })}>
+            <ha-icon icon="mdi:router-wireless"></ha-icon>${b.name}
+          </button>`,
+        )}
+      </div>`;
   }
 
   private editor(draft: Draft, area: EntertainmentArea | null) {
@@ -152,6 +174,7 @@ export class EntertainmentView extends StudioView {
               ?disabled=${streaming} @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })} />
           </div>
         </div>
+        ${this.bridgePick(draft, set)}
         <h2 class="label">${t("ent.type")}</h2>
         <div class="chips wrap">
           ${TYPES.map(

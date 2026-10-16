@@ -221,6 +221,8 @@ async def test_bridges_without_pro(
         "ha_device": None,
         "devices": None,
         "lights": None,
+        "rooms": None,
+        "zones": None,
         "motion_areas": None,
     }
     # A Bridge Pro without MotionAware areas yet: an empty list.

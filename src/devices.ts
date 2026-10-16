@@ -122,16 +122,19 @@ export interface DeviceFilter {
   area: string | null;
   /** A product name, or null: every type. */
   type: string | null;
+  /** A bridge (native hue entry id), or null/absent: every bridge. */
+  bridge?: string | null;
 }
 
 /** Devices that match the search (name or product) and the filters. */
-export function filterDevices(list: HueDeviceInfo[], f: DeviceFilter): HueDeviceInfo[] {
+export function filterDevices<T extends HueDeviceInfo & { bridge?: string }>(list: T[], f: DeviceFilter): T[] {
   const q = fold(f.query.trim());
   return list.filter(
     (d) =>
       (!q || fold(d.name).includes(q) || fold(d.product).includes(q)) &&
       (f.area === null || (d.area ?? NO_AREA) === f.area) &&
-      (f.type === null || d.product === f.type),
+      (f.type === null || d.product === f.type) &&
+      (f.bridge == null || d.bridge === f.bridge),
   );
 }
 

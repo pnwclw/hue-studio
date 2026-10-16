@@ -41,6 +41,28 @@ left alone.
 - **Scenes and zones: the bridge.** Hue Studio and the Hue app both write there; HA and
   the panel read them through the native integration. There is no copy, so no drift.
 
+## Several bridges
+
+Each bridge is its own Hue system, as in the Hue app: rooms, zones, scenes, entertainment
+areas and accessories never span two bridges. Hue Studio keeps them apart the same way.
+
+- **An area belongs to one bridge.** Its Hue room is on that bridge; the room is synced
+  from HA to it, and the sync shows up as the room's entity in the Philips Hue
+  integration. An area with lights on two bridges is a mismatch the panel lists (Rooms
+  and zones, the room's page), not a supported state. Alignment still works per bridge.
+- **Where things are is shown only with several bridges:** a bridge's page lists its
+  rooms and links to its devices (Settings → Devices filters by bridge); a room shows its
+  bridge next to "Lights"; zones and entertainment areas say whose they are, and a new one
+  picks its bridge first (its lights come from that bridge only). Adding devices from a
+  room searches on the room's bridge.
+- The rooms payload (`hue_studio/rooms/subscribe`) carries `bridges`, `bridge_of` (light,
+  room, zone and scene entities) and `split_areas`.
+- **Moving between bridges** (planned): a whole bridge moves with the Hue app's own
+  transfer. Hue Studio moves a room or a zone with everything tied to it, and a light when
+  it goes to a room on another bridge; Home Assistant keeps the entity ids, areas and
+  names (the light is recognized by its Zigbee MAC). A zone whose rooms move only in part
+  is split: the moved lights get a zone of the same name on the new bridge.
+
 ## HA -> bridge (Hue Studio)
 
 ### Room alignment

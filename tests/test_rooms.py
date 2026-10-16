@@ -24,6 +24,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.const import CONF_AUTO_ALIGN, DOMAIN
 from custom_components.hue_studio.options import async_frontend_config
+from custom_components.hue_studio.rooms import merge_payloads
 
 from .conftest import SCENES
 
@@ -94,6 +95,7 @@ async def test_dry_run(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
     """The plan names lights, rooms and scenes by entity id; nothing is sent."""
     plan = await _align(hass, dry_run=True)
     rooms_bridge.request.assert_not_awaited()
+    hue_entry_id = hass.config_entries.async_entries("hue")[0].entry_id
     assert plan["changed"] is True
     rooms = {r["area"]: r for r in plan["rooms"]}
     assert rooms["living_room"] == {
@@ -104,6 +106,7 @@ async def test_dry_run(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
         "current_name": "Living room",
         "group": "light.room",
         "lights": ["light.strip"],
+        "bridge": hue_entry_id,
     }
     assert rooms["kitchen"]["create"] is True
     assert rooms["kitchen"]["lights"] == ["light.bulb"]
@@ -123,6 +126,12 @@ async def test_dry_run(hass: HomeAssistant, rooms_bridge: MagicMock) -> None:
         "light.bulb": "Living room",
     }
     assert plan["empty"] == [] and plan["conflicts"] == []
+    # Which bridge has what; one bridge, so no area is on several.
+    assert list(plan["bridges"]) == [hue_entry_id]
+    assert {
+        e: plan["bridge_of"][e] for e in ("light.strip", "light.room", "scene.sunset")
+    } == dict.fromkeys(("light.strip", "light.room", "scene.sunset"), hue_entry_id)
+    assert plan["split_areas"] == {}
     # The room is split (strip stays, bulb goes): its name stays with the room.
     assert plan["splits"] == [
         {
@@ -422,3 +431,34 @@ async def test_ws_set_gallery_seasons(
             {"type": "hue_studio/config/set", "gallery_rules": {"halloween": bad}}
         )
         assert not (await client.receive_json())["success"]
+
+
+def test_split_areas() -> None:
+    """An area with lights on two bridges is reported; a room without lights is not."""
+
+    def payload(bridge: str, rooms: list[tuple[str, list[str]]]) -> dict:
+        return {
+            "rooms": [
+                {
+                    "area": area,
+                    "create": False,
+                    "rename": False,
+                    "lights": lights,
+                    "bridge": bridge,
+                }
+                for area, lights in rooms
+            ],
+            "moves": [],
+            "bridges": {bridge: bridge.title()},
+            "bridge_of": {light: bridge for _, lights in rooms for light in lights},
+        }
+
+    merged = merge_payloads(
+        [
+            payload("one", [("office", ["light.desk"]), ("kitchen", ["light.bulb"])]),
+            payload("two", [("office", ["light.lamp"]), ("kitchen", [])]),
+        ]
+    )
+    assert merged["split_areas"] == {"office": ["one", "two"]}
+    assert merged["bridges"] == {"one": "One", "two": "Two"}
+    assert merged["bridge_of"]["light.lamp"] == "two"

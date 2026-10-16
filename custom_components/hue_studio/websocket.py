@@ -328,13 +328,18 @@ def ws_subscribe_rooms(
     Event payload (always complete), entity ids throughout:
         {"changed": bool,
          "rooms": [{"area", "name", "create", "rename", "current_name",
-                    "group": room entity | None, "lights": [...]}],
+                    "group": room entity | None, "lights": [...], "bridge"}],
          "moves": [{"lights", "area", "from": room name | None, "from_group",
                     "from_area": area whose room the lights are in now | None}],
          "empty": [{"name", "group", "scenes": count}],
          "scenes": [{"entity_id", "name", "group_name", "lost", "missing"}],
          "conflicts": [light entity ids],
-         "hue_rooms": {light entity id: its Hue room's name}}
+         "hue_rooms": {light entity id: its Hue room's name},
+         "bridges": {hue entry id: bridge name},
+         "bridge_of": {light, room, zone or scene entity id: hue entry id},
+         "split_areas": {area id: [hue entry ids]} — areas with lights on several
+                        bridges (an area belongs to one bridge)}
+    Each room has its "bridge" (hue entry id) too.
     """
     last: dict[str, Any] = {}
 

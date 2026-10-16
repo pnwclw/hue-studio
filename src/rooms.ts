@@ -63,3 +63,37 @@ export function lightsByArea(hass: HassData): [string | null, string[]][] {
 
 /** Whether the plan asks for anything at all (changes, rooms to delete or conflicts to look at). */
 export const planHasNews = (plan: RoomsPlan | null): boolean => !!plan && (plan.changed || plan.empty.length > 0);
+
+// Several bridges: each is its own Hue system (rooms, zones, scenes, entertainment areas
+// stay on one bridge), and an area belongs to one bridge. The panel names bridges only
+// when there is more than one.
+
+/** Whether Hue Studio has more than one bridge (then the panel says which one has what). */
+export const severalBridges = (plan: RoomsPlan | null): boolean => Object.keys(plan?.bridges || {}).length > 1;
+
+/** The bridge (native hue entry id) of a light, Hue room/zone or scene entity, if known. */
+export const bridgeOf = (plan: RoomsPlan | null, entityId: string): string | null => plan?.bridge_of?.[entityId] ?? null;
+
+/** A bridge's name, if known. */
+export const bridgeName = (plan: RoomsPlan | null, id: string | null | undefined): string | null => (id && plan?.bridges?.[id]) || null;
+
+/** Lights by the bridge they are on, the bridge with most of them first (ties: the plan's order). */
+export function lightsByBridge(plan: RoomsPlan | null, lights: string[]): [string, string[]][] {
+  const order = Object.keys(plan?.bridges || {});
+  const by = new Map<string, string[]>();
+  for (const light of lights) {
+    const bridge = bridgeOf(plan, light);
+    if (bridge) by.set(bridge, [...(by.get(bridge) || []), light]);
+  }
+  return [...by].sort(([a, x], [b, y]) => y.length - x.length || order.indexOf(a) - order.indexOf(b));
+}
+
+/** The bridge a room or zone is on: the one most of its lights are on, else its Hue group's. */
+export function groupBridge(plan: RoomsPlan | null, group: Pick<Group, "lights" | "group">): string | null {
+  return lightsByBridge(plan, group.lights)[0]?.[0] ?? (group.group ? bridgeOf(plan, group.group) : null);
+}
+
+/** The areas of a bridge's rooms after alignment, in the plan's order. */
+export const bridgeAreas = (plan: RoomsPlan | null, bridge: string): string[] => [
+  ...new Set((plan?.rooms || []).filter((r) => r.bridge === bridge && r.lights.length).map((r) => r.area)),
+];

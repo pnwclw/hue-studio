@@ -23,7 +23,7 @@ import {
   sensorReadings,
   splitSensors,
 } from "../model.ts";
-import { type Mismatch, mismatchesIn } from "../rooms.ts";
+import { bridgeName, groupBridge, lightsByBridge, type Mismatch, mismatchesIn, severalBridges } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
 import type { RoomSensors, SceneInfo, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
@@ -84,10 +84,12 @@ export class RoomView extends StudioView {
         : nothing}
       <div class="section-head">
         <h2 class="label">${t("room.lights")}</h2>
+        ${this.bridgeTag(g)}
         ${g.kind === "area" && g.lights.length > 1
           ? html`<button class="pill shuffle" @click=${() => ctx.go(`/room/${room}/space`)}>${icon("rooms")}${t("space.arrange")}</button>`
           : nothing}
       </div>
+      ${this.splitNote(g)}
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
       ${sensors.devices.length
@@ -283,6 +285,38 @@ export class RoomView extends StudioView {
       style: surface.style,
       click: apply,
     });
+  }
+
+  /** With several bridges: the bridge the room is on. */
+  private bridgeTag(g: Group) {
+    const plan = this.ctx.rooms;
+    const name = severalBridges(plan) ? bridgeName(plan, groupBridge(plan, g)) : null;
+    return name ? html`<span class="bridge-tag"><ha-icon icon="mdi:router-wireless"></ha-icon>${name}</span>` : nothing;
+  }
+
+  /**
+   * A room whose lights are on several bridges. An area belongs to one bridge (each bridge
+   * is its own Hue system: rooms, scenes and entertainment areas never span two), so the
+   * lights away from the room's bridge are named.
+   */
+  private splitNote(g: Group) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const plan = ctx.rooms;
+    if (g.kind !== "area" || !plan?.split_areas?.[g.key.slice("area.".length)]) return nothing;
+    const [main, ...others] = lightsByBridge(plan, g.lights);
+    if (!main || !others.length) return nothing;
+    return html`<div class="mismatch">
+      ${others.map(
+        ([bridge, lights]) =>
+          html`<p>${t("room.split_note", {
+            lights: lights.map((l) => friendlyName(ctx.hass, l)).join(", "),
+            bridge: bridgeName(plan, bridge) ?? "",
+            main: bridgeName(plan, main[0]) ?? "",
+          })}</p>`,
+      )}
+      <div class="buttons"><button class="pill" @click=${() => ctx.go("/rooms")}>${t("rooms.title")}</button></div>
+    </div>`;
   }
 
   /**

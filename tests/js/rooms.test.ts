@@ -2,7 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildHome } from "../../src/model.ts";
-import { hueZones, lightsByArea, lightsWithoutArea, mismatchesIn, planHasNews } from "../../src/rooms.ts";
+import {
+  bridgeAreas,
+  bridgeName,
+  bridgeOf,
+  groupBridge,
+  hueZones,
+  lightsByArea,
+  lightsByBridge,
+  lightsWithoutArea,
+  mismatchesIn,
+  planHasNews,
+  severalBridges,
+} from "../../src/rooms.ts";
 import type { HassData, RoomsPlan } from "../../src/types.ts";
 
 const light = (name: string, attrs = {}) => ({ state: "on", attributes: { friendly_name: name, ...attrs } });
@@ -81,4 +93,36 @@ test("plan news", () => {
   assert.equal(planHasNews(plan), true);
   assert.equal(planHasNews({ ...plan, changed: false }), false);
   assert.equal(planHasNews({ ...plan, changed: false, empty: [{ name: "Old", group: null, scenes: 0 }] }), true);
+});
+
+test("several bridges: which bridge has what", () => {
+  const two: RoomsPlan = {
+    ...plan,
+    rooms: [
+      { area: "office", name: "Office", create: false, rename: false, current_name: "Office", group: "light.office", lights: ["light.desk", "light.lamp"], bridge: "a" },
+      { area: "office", name: "Office", create: true, rename: false, current_name: null, group: null, lights: ["light.spot"], bridge: "b" },
+      { area: "balcony", name: "Balcony", create: false, rename: false, current_name: "Balcony", group: "light.balcony", lights: ["light.globe"], bridge: "b" },
+      { area: "hall", name: "Hall", create: false, rename: false, current_name: "Hall", group: "light.hall", lights: [], bridge: "b" },
+    ],
+    bridges: { a: "Upstairs", b: "Garden" },
+    bridge_of: { "light.desk": "a", "light.lamp": "a", "light.spot": "b", "light.globe": "b", "light.office": "a", "light.tv_zone": "b" },
+    split_areas: { office: ["a", "b"] },
+  };
+  assert.equal(severalBridges(two), true);
+  assert.equal(severalBridges(plan), false);
+  assert.equal(severalBridges(null), false);
+  assert.equal(bridgeOf(two, "light.spot"), "b");
+  assert.equal(bridgeOf(two, "light.unknown"), null);
+  assert.equal(bridgeName(two, "b"), "Garden");
+  assert.equal(bridgeName(two, null), null);
+  // Most lights first; ties keep the plan's order of bridges.
+  assert.deepEqual(lightsByBridge(two, ["light.spot", "light.desk", "light.lamp"]), [["a", ["light.desk", "light.lamp"]], ["b", ["light.spot"]]]);
+  assert.deepEqual(lightsByBridge(two, ["light.spot", "light.desk"]).map(([b]) => b), ["a", "b"]);
+  assert.equal(groupBridge(two, { lights: ["light.spot", "light.desk", "light.lamp"], group: null }), "a");
+  // A zone without lights the plan knows: its Hue group's bridge.
+  assert.equal(groupBridge(two, { lights: [], group: "light.tv_zone" }), "b");
+  assert.equal(groupBridge(two, { lights: [], group: null }), null);
+  // Rooms of a bridge: areas with lights on it, once each.
+  assert.deepEqual(bridgeAreas(two, "b"), ["office", "balcony"]);
+  assert.deepEqual(bridgeAreas(two, "a"), ["office"]);
 });

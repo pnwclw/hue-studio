@@ -21,6 +21,7 @@
 //   /settings/daylight         light of the day: mood, phase times, sources, scene pool
 //   /settings/devices          Hue devices by kind (lights, switches, sensors, other); new ones
 //   /settings/devices/<kind>   one kind (lights|switches|sensors|other) by room: search, filters
+//                              (?bridge=<hue entry id>: that bridge's, from its page)
 //   /settings/devices/device/<id>     a device's settings (its bridge id): name, room, function, power on, delete
 //   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
@@ -88,7 +89,7 @@ type Route =
   | { name: "experimental" }
   | { name: "gallerySettings" }
   | { name: "daylight" }
-  | { name: "devices"; list: DeviceGroup | null }
+  | { name: "devices"; list: DeviceGroup | null; bridge: string | null }
   | { name: "device"; device: string }
   | { name: "deviceSensor"; device: string }
   | { name: "deviceAdd"; room: string | null }
@@ -144,7 +145,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "daylight") return { name: "daylight" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "device" && parts[3]) return { name: "device", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
-  if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null };
+  if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null, bridge: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "add") return { name: "bridgeAdd" };
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
@@ -297,7 +298,7 @@ export class HueStudioPanel extends LitElement {
       case "integration":
         return html`<hue-studio-integration-view .ctx=${ctx} .rev=${rev}></hue-studio-integration-view>`;
       case "devices":
-        return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev} .list=${route.list}></hue-studio-devices-view>`;
+        return html`<hue-studio-devices-view .ctx=${ctx} .rev=${rev} .list=${route.list} .bridge=${route.bridge}></hue-studio-devices-view>`;
       case "device":
         return html`<hue-studio-device-view .ctx=${ctx} .rev=${rev} .device=${route.device}></hue-studio-device-view>`;
       case "deviceSensor":

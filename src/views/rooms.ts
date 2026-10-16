@@ -8,7 +8,7 @@ import { classMap } from "lit/directives/class-map.js";
 
 import type { StudioContext } from "../context.ts";
 import { friendlyName, lightIcon } from "../model.ts";
-import { hueZones, lightsByArea, lightsWithoutArea, type Zone } from "../rooms.ts";
+import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, lightsByBridge, lightsWithoutArea, severalBridges, type Zone } from "../rooms.ts";
 import type { RoomsPlan } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -16,6 +16,8 @@ import { StudioView } from "./base.ts";
 /** The zone editor: an existing zone (entity id) or a new one (null). */
 interface ZoneDraft {
   zone: string | null;
+  /** The bridge whose lights the zone holds (null: not known, every light is offered). */
+  bridge: string | null;
   name: string;
   lights: string[];
   confirmDelete: boolean;
@@ -76,8 +78,9 @@ export class RoomsView extends StudioView {
     const loose = noRoomRows(ctx);
     return html`${this.screen(
         this.subHead(t("rooms.title"), () => ctx.go("/settings")),
-        html`<h2 class="label">${t("rooms.bridge")}</h2>
+        html`<h2 class="label">${t(severalBridges(ctx.rooms) ? "rooms.bridges" : "rooms.bridge")}</h2>
         ${this.plan(ctx.rooms)}
+        ${this.splitAreas(ctx.rooms)}
         <h2 class="label">${t("rooms.zones")}</h2>
         <p class="lead">${t("rooms.zones_hint")}</p>
         <div class="rows zones">
@@ -108,7 +111,7 @@ export class RoomsView extends StudioView {
     if (!plan.changed && !plan.empty.length) {
       return html`<div class="rows">
           ${row("mdi:check-circle-outline", t("rooms.aligned"))}
-          ${plan.rooms.map((r) => row(ctx.hass.areas?.[r.area]?.icon || "mdi:sofa-outline", r.name, lightsCount(ctx, r.lights.length)))}
+          ${plan.rooms.map((r) => row(ctx.hass.areas?.[r.area]?.icon || "mdi:sofa-outline", r.name, this.onBridge(lightsCount(ctx, r.lights.length), r.bridge)))}
         </div>
         ${this.conflicts(plan)} ${auto}`;
     }
@@ -119,7 +122,7 @@ export class RoomsView extends StudioView {
     const items: TemplateResult[] = [
       ...plan.rooms
         .filter((r) => r.create)
-        .map((r) => row(ctx.hass.areas?.[r.area]?.icon || "mdi:plus", t("rooms.create", { name: r.name }), lightsCount(ctx, r.lights.length))),
+        .map((r) => row(ctx.hass.areas?.[r.area]?.icon || "mdi:plus", t("rooms.create", { name: r.name }), this.onBridge(lightsCount(ctx, r.lights.length), r.bridge))),
       ...plan.rooms
         .filter((r) => r.rename)
         .map((r) => row("mdi:form-textbox", t("rooms.rename", { from: r.current_name || "", to: r.name }))),
@@ -163,6 +166,36 @@ export class RoomsView extends StudioView {
       ${auto}`;
   }
 
+  /** "2 lights · Garden Bridge" with several bridges, else just the text. */
+  private onBridge(text: string, bridge: string | null | undefined): string {
+    const name = severalBridges(this.ctx.rooms) ? bridgeName(this.ctx.rooms, bridge) : null;
+    return name ? `${text} · ${name}` : text;
+  }
+
+  /**
+   * Areas with lights on several bridges. An area belongs to one bridge (each bridge is its
+   * own Hue system), so each is listed with which lights are where.
+   */
+  private splitAreas(plan: RoomsPlan | null) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const split = Object.keys(plan?.split_areas || {});
+    if (!split.length) return nothing;
+    return html`<h2 class="label">${t("rooms.split_title")}</h2>
+      <p class="lead">${t("rooms.split_hint")}</p>
+      <div class="rows conflicts">
+        ${split.map((area) => {
+          const lights = ctx.home.rooms.find((r) => r.key === `area.${area}`)?.lights || [];
+          const where = lightsByBridge(plan, lights).map(([bridge, ids]) => `${bridgeName(plan, bridge)}: ${names(ctx, ids)}`);
+          return html`<button class="item" @click=${() => ctx.go(`/room/${encodeURIComponent(`area.${area}`)}`)}>
+            <ha-icon icon="mdi:alert-outline"></ha-icon>
+            <div class="grow">${areaName(ctx, area)}<div class="dim small">${where.join(" · ")}</div></div>
+            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+          </button>`;
+        })}
+      </div>`;
+  }
+
   private conflicts(plan: RoomsPlan) {
     if (!plan.conflicts.length) return nothing;
     const { ctx } = this;
@@ -183,7 +216,10 @@ export class RoomsView extends StudioView {
 
   private zoneRow(z: Zone) {
     const { ctx } = this;
-    const meta = ctx.t("rooms.zone_meta", { lights: lightsCount(ctx, z.lights.length), scenes: scenesCount(ctx, z.scenes) });
+    const meta = this.onBridge(
+      ctx.t("rooms.zone_meta", { lights: lightsCount(ctx, z.lights.length), scenes: scenesCount(ctx, z.scenes) }),
+      groupBridge(ctx.rooms, { lights: z.lights, group: z.entity_id }),
+    );
     return html`<button class="item" @click=${() => this.edit(z)}>
       <ha-icon icon="mdi:texture-box"></ha-icon>
       <div class="grow">${z.name}<div class="dim small">${meta}</div></div>
@@ -192,8 +228,25 @@ export class RoomsView extends StudioView {
   }
 
   private edit(zone: Zone | null): void {
-    this.draft = { zone: zone?.entity_id ?? null, name: zone?.name ?? "", lights: zone ? [...zone.lights] : [], confirmDelete: false };
+    const plan = this.ctx.rooms;
+    const bridge = zone ? groupBridge(plan, { lights: zone.lights, group: zone.entity_id }) : (Object.keys(plan?.bridges || {})[0] ?? null);
+    this.draft = { zone: zone?.entity_id ?? null, bridge, name: zone?.name ?? "", lights: zone ? [...zone.lights] : [], confirmDelete: false };
     this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet input")?.focus());
+  }
+
+  /** With several bridges: the bridge of a new zone (its lights start over), or the zone's. */
+  private zoneBridge(draft: ZoneDraft, set: (patch: Partial<ZoneDraft>) => void) {
+    const { ctx } = this;
+    const plan = ctx.rooms;
+    if (!severalBridges(plan)) return nothing;
+    if (draft.zone) return html`<p class="lead small">${ctx.t("zone.on_bridge", { bridge: bridgeName(plan, draft.bridge) ?? "" })}</p>`;
+    return html`<div class="chips wrap zone-bridges">
+      ${Object.entries(plan!.bridges!).map(
+        ([id, name]) => html`<button class=${classMap({ chip: true, on: id === draft.bridge })} @click=${() => id !== draft.bridge && set({ bridge: id, lights: [] })}>
+          <ha-icon icon="mdi:router-wireless"></ha-icon>${name}
+        </button>`,
+      )}
+    </div>`;
   }
 
   /** Name and lights of a zone; saved to the bridge at once (create_zone / update_zone). */
@@ -250,7 +303,12 @@ export class RoomsView extends StudioView {
             @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })}
           />
         </div>
-        ${lightsByArea(ctx.hass).map(
+        ${this.zoneBridge(draft, set)}
+        ${lightsByArea(ctx.hass)
+          // A zone holds one bridge's lights.
+          .map(([area, lights]): [string | null, string[]] => [area, lights.filter((l) => !draft.bridge || !bridgeOf(ctx.rooms, l) || bridgeOf(ctx.rooms, l) === draft.bridge)])
+          .filter(([, lights]) => lights.length)
+          .map(
           ([area, lights]) => html`<h2 class="label">${area ? areaName(ctx, area) : t("home.no_room")}</h2>
             <div class="rows pick">
               ${lights.map(

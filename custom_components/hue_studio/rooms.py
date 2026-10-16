@@ -27,9 +27,11 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 from homeassistant.helpers.debounce import Debouncer
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from . import alignment
-from .const import DOMAIN, HUE_DOMAIN
+from .bridges import bridge_name
+from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
 from .lights import LIGHT_DOMAIN, async_all_lights, async_bridges
 from .scenes import SCENE_DOMAIN, completed_actions, scene_post_json
 
@@ -48,6 +50,8 @@ class BridgeRooms:
 
     hue_entry_id: str
     bridge: HueBridgeV2
+    # The bridge's name (bridges.bridge_name).
+    name: str
     areas: list[alignment.Area]
     lights: list[alignment.Light]
     rooms: list[alignment.Room]
@@ -56,6 +60,8 @@ class BridgeRooms:
     light_entities: dict[str, str]
     scene_entities: dict[str, str]
     room_entities: dict[str, str]
+    # Zones, via their grouped light.
+    zone_entities: dict[str, str]
     # Names of the bridge's zones (avoided when naming zones for split rooms).
     zone_names: list[str]
 
@@ -114,6 +120,14 @@ def async_bridge_rooms(hass: HomeAssistant) -> list[BridgeRooms]:
                 )
             ):
                 room_entities[room.id] = entity_id
+        zone_entities: dict[str, str] = {}
+        for zone in bridge.groups.zone:
+            if (grouped := zone.grouped_light) is not None and (
+                entity_id := entities.async_get_entity_id(
+                    LIGHT_DOMAIN, HUE_DOMAIN, grouped
+                )
+            ):
+                zone_entities[zone.id] = entity_id
         scenes: list[alignment.Scene] = []
         scene_entities: dict[str, str] = {}
         for scene in bridge.scenes.scene:
@@ -136,6 +150,7 @@ def async_bridge_rooms(hass: HomeAssistant) -> list[BridgeRooms]:
             BridgeRooms(
                 hue_entry_id=hue_entry_id,
                 bridge=bridge,
+                name=bridge_name(hass, hue_entry_id, bridge),
                 areas=areas,
                 lights=[
                     alignment.Light(
@@ -152,6 +167,7 @@ def async_bridge_rooms(hass: HomeAssistant) -> list[BridgeRooms]:
                 light_entities=light_entities,
                 scene_entities=scene_entities,
                 room_entities=room_entities,
+                zone_entities=zone_entities,
                 zone_names=[zone.metadata.name for zone in bridge.groups.zone],
             )
         )
@@ -191,6 +207,7 @@ def plan_payload(side: BridgeRooms, plan: alignment.Plan) -> dict[str, Any]:
                 "current_name": target.current_name,
                 "group": side.room_entities.get(target.room or ""),
                 "lights": device_entities(target.devices),
+                "bridge": side.hue_entry_id,
             }
             for target in plan.rooms
         ],
@@ -241,6 +258,16 @@ def plan_payload(side: BridgeRooms, plan: alignment.Plan) -> dict[str, Any]:
             for device, room_id in plan.current.items()
             for entity_id in lights_of.get(device, [])
         },
+        "bridges": {side.hue_entry_id: side.name},
+        "bridge_of": dict.fromkeys(
+            [
+                *side.light_entities.values(),
+                *side.room_entities.values(),
+                *side.zone_entities.values(),
+                *side.scene_entities.values(),
+            ],
+            side.hue_entry_id,
+        ),
     }
 
 
@@ -254,6 +281,8 @@ def merge_payloads(payloads: list[dict[str, Any]]) -> dict[str, Any]:
         "conflicts": [],
         "splits": [],
         "hue_rooms": {},
+        "bridges": {},
+        "bridge_of": {},
     }
     for payload in payloads:
         for key, value in payload.items():
@@ -264,6 +293,14 @@ def merge_payloads(payloads: list[dict[str, Any]]) -> dict[str, Any]:
     merged["changed"] = bool(merged["moves"]) or any(
         room["create"] or room["rename"] for room in merged["rooms"]
     )
+    # An area belongs to one bridge: one with lights on several is a mismatch.
+    on: dict[str, list[str]] = {}
+    for room in merged["rooms"]:
+        if room["lights"] and room["bridge"] not in on.setdefault(room["area"], []):
+            on[room["area"]].append(room["bridge"])
+    merged["split_areas"] = {
+        area: bridges for area, bridges in on.items() if len(bridges) > 1
+    }
     return merged
 
 
@@ -563,8 +600,8 @@ def async_track_rooms(
 ) -> Callable[[], None]:
     """Call `on_change` (debounced) when anything the plan depends on changes.
 
-    Areas (as in `async_track_areas`) and, on every connected bridge, rooms, lights
-    added or removed, and scenes.
+    Areas (as in `async_track_areas`), bridges connecting, going away or renamed, and
+    on every connected bridge rooms, zones, lights added or removed, and scenes.
     """
     debouncer: Debouncer[None] = Debouncer(
         hass, _LOGGER, cooldown=TRACK_COOLDOWN, immediate=False, function=on_change
@@ -574,21 +611,41 @@ def async_track_rooms(
     def bridge_changed(*_: Any) -> None:
         debouncer.async_schedule_call()
 
-    unsubs = [async_track_areas(hass, debouncer.async_schedule_call)]
-    for bridge in async_bridges(hass).values():
-        unsubs.append(bridge.groups.room.subscribe(bridge_changed))
-        unsubs.append(
-            bridge.lights.subscribe(
-                bridge_changed,
-                event_filter=(EventType.RESOURCE_ADDED, EventType.RESOURCE_DELETED),
+    # Per bridge; redone when a bridge connects, goes away or is renamed.
+    watched: list[Callable[[], None]] = []
+
+    @callback
+    def watch_bridges() -> None:
+        while watched:
+            watched.pop()()
+        for bridge in async_bridges(hass).values():
+            watched.append(bridge.groups.room.subscribe(bridge_changed))
+            watched.append(
+                bridge.lights.subscribe(
+                    bridge_changed,
+                    event_filter=(EventType.RESOURCE_ADDED, EventType.RESOURCE_DELETED),
+                )
             )
-        )
-        unsubs.append(bridge.scenes.scene.subscribe(bridge_changed))
+            watched.append(bridge.scenes.scene.subscribe(bridge_changed))
+            watched.append(bridge.groups.zone.subscribe(bridge_changed))
+
+    @callback
+    def bridges_changed() -> None:
+        watch_bridges()
+        debouncer.async_schedule_call()
+
+    watch_bridges()
+    unsubs = [
+        async_track_areas(hass, debouncer.async_schedule_call),
+        async_dispatcher_connect(hass, SIGNAL_BRIDGES_UPDATED, bridges_changed),
+    ]
 
     @callback
     def unsubscribe() -> None:
         for unsub in unsubs:
             unsub()
+        while watched:
+            watched.pop()()
         debouncer.async_cancel()
 
     return unsubscribe

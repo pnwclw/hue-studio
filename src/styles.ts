@@ -495,6 +495,10 @@ export const CSS = `
   .hero.dark-text .name-input { background: rgba(255, 255, 255, 0.4); }
   .section-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
   .section-head h2.label { margin: 0 2px; }
+  /* The room's bridge, with several bridges: next to "Lights". */
+  .bridge-tag { display: inline-flex; align-items: center; gap: 4px; margin: 0 auto 0 8px; color: var(--text-2); font-size: 13px; }
+  .bridge-tag ha-icon { --mdc-icon-size: 16px; }
+  .zone-bridges { margin: 14px 16px 0; }
   .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; }
   .pill.shuffle svg { width: 18px; height: 18px; }
   .section-head + .grid { margin-top: 10px; }

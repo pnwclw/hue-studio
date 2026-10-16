@@ -530,6 +530,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
+  // ?bridges=two: a second bridge with the balcony's lights; &split=1 puts the candle there too
+  // (its living room then has lights on two bridges).
+  const params = new URLSearchParams(location.search);
+  const twoBridges = params.get("bridges") === "two";
+  const onSecond = new Set(twoBridges ? ["globe_lights", ...(params.get("split") === "1" ? ["candle"] : [])] : []);
+  const lightBridge = (entityId: string) => (onSecond.has(entityId.replace("light.", "")) ? "hue-entry-2" : "hue-entry");
+  const groupBridge = (group: string) => (GROUPS[group]?.[2].length && GROUPS[group][2].every((l) => onSecond.has(l)) ? "hue-entry-2" : "hue-entry");
   // Add devices: a switch and a sensor without an area; the search finds a lamp.
   const hueDevices: HueDeviceInfo[] = [
     { id: "dev-dial", name: "Hue tap dial switch 1", product: "Hue tap dial switch", model: "RDM002", archetype: "unknown_archetype", kind: "switch", new: false, found: null, area: null, lights: [], ha_device: null, sensitivity: null, software: "2.47.8", reachable: false },
@@ -556,8 +563,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     { id: "ent-desk", name: "Desk", type: "monitor", streaming: false, lights: { "light.desk_lamp": [[0, 0.6, 0.2]] } },
   ];
   const entListeners = new Set<(m: unknown) => void>();
-  const entMessage = () => ({ "hue-entry": { name: "Hue Bridge", areas: structuredClone(entAreas),
-    lights: ["light.candle", "light.desk_lamp", "light.globe_lights", "light.play_left", "light.play_right", "light.tv_strip"] } });
+  const entLights = ["light.candle", "light.desk_lamp", "light.globe_lights", "light.play_left", "light.play_right", "light.tv_strip"];
+  const entMessage = () => ({
+    "hue-entry": { name: "Hue Bridge", areas: structuredClone(entAreas), lights: entLights.filter((l) => lightBridge(l) === "hue-entry") },
+    ...(twoBridges ? { "hue-entry-2": { name: "Garden Bridge", areas: [], lights: entLights.filter((l) => lightBridge(l) === "hue-entry-2") } } : {}),
+  });
   const pushEnt = () => setTimeout(() => entListeners.forEach((cb) => cb(entMessage())), 60);
   // ?bridges=basic: no Hue Bridge Pro (no MotionAware).
   const pro = new URLSearchParams(location.search).get("bridges") !== "basic";
@@ -566,14 +576,25 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       software: "1.70.1970", pro, ha_device: "dev_bridge", devices: 14, lights: 11,
       motion_areas: pro ? [{ id: "ma-1", name: "Living room", group: "Living room", enabled: true, health: "healthy",
         lights: [{ entity_id: "light.play_left", health: "healthy" }, { entity_id: "light.play_right", health: "healthy" }] }] : null },
-    "hue-entry-2": { name: "Garden Bridge", connected: false, host: "192.0.2.11", id: "001788fffe000001", model: null, software: null,
-      pro: false, ha_device: null, devices: null, lights: null, motion_areas: null },
+    "hue-entry-2": twoBridges
+      ? { name: "Garden Bridge", connected: true, host: "192.0.2.11", id: "001788fffe000001", model: "Hue Bridge", software: "1.70.1970",
+          pro: false, ha_device: null, devices: onSecond.size, lights: onSecond.size, rooms: 1, zones: 0, motion_areas: null }
+      : { name: "Garden Bridge", connected: false, host: "192.0.2.11", id: "001788fffe000001", model: null, software: null,
+          pro: false, ha_device: null, devices: null, lights: null, motion_areas: null },
   };
+  bridgesMessage["hue-entry"].lights = Object.keys(LIGHTS).filter((l) => !onSecond.has(l)).length;
+  bridgesMessage["hue-entry"].rooms = Object.entries(GROUPS).filter(([g, v]) => v[1] === "room" && groupBridge(g) === "hue-entry").length;
+  bridgesMessage["hue-entry"].zones = Object.values(GROUPS).filter((v) => v[1] === "zone").length;
   const bridgeListeners = new Set<(m: unknown) => void>();
   const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
   const deviceListeners = new Set<(m: unknown) => void>();
   const devicesMessage = () => ({
-    "hue-entry": { name: "Hue Bridge", searching, search_started: searching ? searchStarted : null, other_brands: true, devices: structuredClone(hueDevices) },
+    "hue-entry": { name: "Hue Bridge", searching, search_started: searching ? searchStarted : null, other_brands: true,
+      devices: structuredClone(hueDevices.filter((d) => !d.lights.some((l) => lightBridge(l) === "hue-entry-2"))) },
+    ...(twoBridges
+      ? { "hue-entry-2": { name: "Garden Bridge", searching: false, search_started: null, other_brands: false,
+          devices: structuredClone(hueDevices.filter((d) => d.lights.some((l) => lightBridge(l) === "hue-entry-2"))) } }
+      : {}),
   });
   const pushDevices = () => setTimeout(() => deviceListeners.forEach((cb) => cb(devicesMessage())), 60);
   /** A small copy of the backend's alignment plan (alignment.py), one light per device. */
@@ -600,7 +621,19 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       current_name: assigned[a] ? GROUPS[assigned[a]][0] : null,
       group: assigned[a] ? `light.${assigned[a]}` : null,
       lights: ids.filter((l) => areaOf(l) === a).map((l) => `light.${l}`),
+      bridge: assigned[a] ? groupBridge(assigned[a]) : "hue-entry",
     }));
+    // Several bridges (?bridges=two): which bridge has what, areas with lights on two.
+    const bridgeOf: Record<string, string> = {
+      ...Object.fromEntries(ids.map((l) => [`light.${l}`, lightBridge(`light.${l}`)])),
+      ...Object.fromEntries(Object.keys(GROUPS).map((g) => [`light.${g}`, groupBridge(g)])),
+      ...Object.fromEntries(Object.entries(SCENES).flatMap(([g, list]) => list.map((n) => [sceneId(g, n), groupBridge(g)]))),
+    };
+    const splitAreas = Object.fromEntries(
+      areas
+        .map((a): [string, string[]] => [a, [...new Set(ids.filter((l) => areaOf(l) === a).map((l) => lightBridge(`light.${l}`)))]])
+        .filter(([, b]) => b.length > 1),
+    );
     const leaving = new Set(moves.flatMap((m) => m.lights.map((x) => x.replace("light.", ""))));
     const empty = hueRooms
       .filter(([r, g]) => !areaOfRoom(r) && g[2].every((l) => leaving.has(l) || !areaOf(l)) && g[2].some((l) => leaving.has(l)))
@@ -635,6 +668,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       conflicts: [],
       splits,
       hue_rooms: Object.fromEntries(ids.filter(roomOf).map((l) => [`light.${l}`, GROUPS[roomOf(l)!][0]])),
+      bridges: twoBridges ? { "hue-entry": "Hue Bridge", "hue-entry-2": "Garden Bridge" } : { "hue-entry": "Hue Bridge" },
+      bridge_of: bridgeOf,
+      split_areas: splitAreas,
     };
   };
   const pushRooms = () => setTimeout(() => roomListeners.forEach((cb) => cb(planRooms())), 120);

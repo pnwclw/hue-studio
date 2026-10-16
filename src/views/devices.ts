@@ -29,7 +29,7 @@ import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
-type Picker = "location" | "type";
+type Picker = "location" | "type" | "bridge";
 
 /** Where a device's settings are: a Hue sensor HA has gets the sensor's own page. */
 export function devicePath(ctx: StudioView["ctx"], d: HueDeviceInfo): string {
@@ -41,6 +41,8 @@ export function devicePath(ctx: StudioView["ctx"], d: HueDeviceInfo): string {
 export class DevicesView extends StudioView {
   /** A kind's list, or null: the overview. */
   @property() accessor list: DeviceGroup | null = null;
+  /** A bridge to show the devices of (`?bridge=`, from its page), or null: every bridge. */
+  @property() accessor bridge: string | null = null;
 
   @state() private accessor devices: DevicesMessage | null = null;
   @state() private accessor filter: DeviceFilter = { query: "", area: null, type: null };
@@ -57,8 +59,17 @@ export class DevicesView extends StudioView {
     this.stop?.();
   }
 
+  protected override willUpdate(changed: Map<PropertyKey, unknown>): void {
+    if (changed.has("bridge")) this.filter = { ...this.filter, bridge: this.bridge };
+  }
+
   protected override render() {
     return this.list ? this.renderList(this.list) : this.renderOverview();
+  }
+
+  /** Several bridges: their devices can be told apart (filter, the bridge under a name). */
+  private get severalBridges(): boolean {
+    return Object.keys(this.devices || {}).length > 1;
   }
 
   private addButton(): TemplateResult {
@@ -85,7 +96,10 @@ export class DevicesView extends StudioView {
   private renderOverview(): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
-    const all = allDevices(this.devices);
+    // From a bridge's page: that bridge's devices.
+    const only = this.bridge && this.devices?.[this.bridge] ? this.bridge : null;
+    const all = allDevices(this.devices).filter((d) => !only || d.bridge === only);
+    const query = only ? `?bridge=${encodeURIComponent(only)}` : "";
     const searching = Object.values(this.devices || {}).some((b) => b.searching);
     const fresh = all.filter((d) => d.new);
     const count = (g: DeviceGroup) => all.filter((d) => groupOf(d.kind) === g).length;
@@ -94,6 +108,10 @@ export class DevicesView extends StudioView {
     return this.screen(
       this.subHead(t("settings.devices"), () => ctx.go("/settings"), this.addButton()),
       html`${!this.devices ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}
+        ${only
+          ? html`<p class="lead small">${t("devices.on_bridge", { bridge: this.devices![only].name })}
+              <button class="text-link" @click=${() => ctx.go("/settings/devices")}>${t("devices.all_bridges")}</button></p>`
+          : nothing}
         ${searching
           ? html`<button class="notice" @click=${() => ctx.go("/settings/devices/add")}>
               <span class="dot-badge live" aria-hidden="true"></span><span class="grow">${t("devices.searching")}</span><ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
@@ -106,7 +124,7 @@ export class DevicesView extends StudioView {
         ${this.devices
           ? html`<div class="rows device-list kinds">
               ${groups.map(
-                (g) => html`<button class="item" @click=${() => ctx.go(`/settings/devices/${g}`)}>
+                (g) => html`<button class="item" @click=${() => ctx.go(`/settings/devices/${g}${query}`)}>
                   <ha-icon icon=${GROUP_ICONS[g]}></ha-icon>
                   <div class="grow">${t(`devices.${g}` as StringKey)}</div>
                   ${unreachable(g) ? html`<span class="dot-badge warn" aria-hidden="true"></span>` : nothing}
@@ -128,7 +146,8 @@ export class DevicesView extends StudioView {
     const mine: FoundDevice[] = allDevices(this.devices).filter((d) => groupOf(d.kind) === group);
     const shown = filterDevices(mine, this.filter);
     const sections = byLocation(shown, areaName, t("devices.no_area"));
-    const { area, type, query } = this.filter;
+    const { area, type, query, bridge } = this.filter;
+    const bridgeSub = (d: FoundDevice) => (this.severalBridges && !bridge ? this.devices?.[d.bridge]?.name : "") || "";
     const chip = (which: Picker, label: string, on: boolean) =>
       html`<button class=${classMap({ chip: true, "filter-chip": true, on })} aria-haspopup="dialog" @click=${() => this.openPicker(which)}>
         <span>${label}</span><ha-icon icon="mdi:chevron-down"></ha-icon>
@@ -152,6 +171,7 @@ export class DevicesView extends StudioView {
       <div class="chips filters">
         ${chip("location", area === null ? t("devices.location") : area === NO_AREA ? t("devices.no_area") : (areaName(area) ?? area), area !== null)}
         ${chip("type", type ?? t("devices.type"), type !== null)}
+        ${this.severalBridges ? chip("bridge", (bridge && this.devices?.[bridge]?.name) || t("devices.bridge_filter"), !!bridge) : nothing}
       </div>
       ${!this.devices ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}
       ${this.devices && !shown.length ? html`<p class="empty">${t(mine.length ? "devices.no_matches" : "devices.none")}</p>` : nothing}
@@ -160,9 +180,9 @@ export class DevicesView extends StudioView {
             <h2 class="label">${s.name}</h2>
             <span class="count">${s.devices.length}</span>
           </div>
-          <div class="rows device-list">${s.devices.map((d) => this.deviceRow(d))}</div>`,
+          <div class="rows device-list">${s.devices.map((d) => this.deviceRow(d, bridgeSub(d as FoundDevice)))}</div>`,
       )}`;
-    return html`<div class="screen-head">${this.subHead(t(`devices.${group}` as StringKey), () => ctx.go("/settings/devices"), this.addButton())}</div>
+    return html`<div class="screen-head">${this.subHead(t(`devices.${group}` as StringKey), () => ctx.go(this.bridge ? `/settings/devices?bridge=${encodeURIComponent(this.bridge)}` : "/settings/devices"), this.addButton())}</div>
       <div class="screen-body"><div class="page settings-page devices-page">${body}</div></div>
       ${this.picker ? this.renderPicker(this.picker, mine) : nothing}`;
   }
@@ -178,10 +198,11 @@ export class DevicesView extends StudioView {
     const { t } = ctx;
     const done = () => (this.picker = null);
     const areas = ctx.hass.areas || {};
-    const current = which === "location" ? this.filter.area : this.filter.type;
+    const current = which === "location" ? this.filter.area : which === "type" ? this.filter.type : (this.filter.bridge ?? null);
     const set = (value: string | null) => {
       haptic("selection");
-      this.filter = which === "location" ? { ...this.filter, area: value } : { ...this.filter, type: value };
+      const key = which === "location" ? "area" : which;
+      this.filter = { ...this.filter, [key]: value };
       done();
     };
     const options: [string | null, string][] =
@@ -192,8 +213,10 @@ export class DevicesView extends StudioView {
               .map((id): [string, string] => [id, id === NO_AREA ? t("devices.no_area") : areas[id]!.name])
               .sort(([a, x], [b, y]) => (a === NO_AREA ? 1 : 0) - (b === NO_AREA ? 1 : 0) || x.localeCompare(y)),
           ]
-        : [[null, t("devices.all_types")], ...deviceTypes(mine).map((p): [string, string] => [p, p])];
-    const title = t(which === "location" ? "devices.location" : "devices.type");
+        : which === "type"
+          ? [[null, t("devices.all_types")], ...deviceTypes(mine).map((p): [string, string] => [p, p])]
+          : [[null, t("devices.all_bridges")], ...Object.entries(this.devices || {}).map(([id, b]): [string, string] => [id, b.name])];
+    const title = t(which === "location" ? "devices.location" : which === "type" ? "devices.type" : "devices.bridge_filter");
     return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && done()}>
       <div class="box form sensor-sheet" role="dialog" aria-label=${title}>
         <div class="sheet-bar">
