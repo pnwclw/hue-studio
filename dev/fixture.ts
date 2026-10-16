@@ -1106,6 +1106,27 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             entListeners.delete(send);
           };
         }
+        if (msg.type === "hue_studio/bridges/discover") {
+          // Searching, then a new Bridge Pro on the network.
+          const pro = { id: "001788000001", host: "192.0.2.20", name: "Hue Bridge Pro", model: "Hue Bridge Pro", supported: true };
+          const t1 = setTimeout(() => send({ searching: true, bridges: [] }), 30);
+          const t2 = setTimeout(() => send({ searching: false, bridges: [pro] }), 1200);
+          return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+          };
+        }
+        if (msg.type === "hue_studio/bridges/link") {
+          // Connecting, then the button; an address ending in .99 does not answer.
+          const host = String((msg as Record<string, unknown>).host ?? "");
+          const timers = [setTimeout(() => send({ step: "connecting" }), 20)];
+          if (host.endsWith(".99")) timers.push(setTimeout(() => send({ step: "failed", reason: "cannot_connect" }), 900));
+          else {
+            timers.push(setTimeout(() => send({ step: "press", timeout: 60 }), 700));
+            timers.push(setTimeout(() => send({ step: "done", hue_entry_id: "hue-entry-2", name: "Hue Bridge Pro" }), 9000));
+          }
+          return () => timers.forEach(clearTimeout);
+        }
         if (msg.type === "hue_studio/bridges/subscribe") {
           bridgeListeners.add(send);
           setTimeout(() => send(structuredClone(bridgesMessage)), 40);

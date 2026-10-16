@@ -132,6 +132,29 @@ export interface BridgeInfo {
   motion_areas: MotionArea[] | null;
 }
 
+/** A bridge on the network the Philips Hue integration does not have yet (hue_studio/bridges/discover). */
+export interface FoundBridge {
+  id: string;
+  host: string;
+  name: string;
+  /** Product name ("Hue Bridge Pro"), when the bridge told it. */
+  model: string | null;
+  /** false: too old for Hue Studio (the first, round bridge). */
+  supported: boolean;
+}
+
+export interface BridgeDiscoverMessage {
+  searching: boolean;
+  bridges: FoundBridge[];
+}
+
+/** Steps of linking a bridge (hue_studio/bridges/link). */
+export type BridgeLinkEvent =
+  | { step: "connecting" }
+  | { step: "press"; timeout: number }
+  | { step: "done"; hue_entry_id: string; name: string }
+  | { step: "failed"; reason: string };
+
 export interface MotionArea {
   id: string;
   name: string;

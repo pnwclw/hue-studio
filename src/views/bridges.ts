@@ -1,4 +1,5 @@
-// Settings → Bridges: the bridges and the Sync Boxes, one row each; each opens its own page.
+// Settings → Bridges: the bridges and the Sync Boxes, one row each; each opens its own page,
+// "Add a bridge" opens bridge-add.ts.
 // A bridge: its name (renamed on the bridge), what it is, its devices, entertainment and (a
 // Bridge Pro) MotionAware areas. A Sync Box: its name, LED, following the TV (paired
 // directly), what it is, how it is connected, its sync controls.
@@ -88,6 +89,13 @@ export class BridgesView extends StudioView {
         ${Object.entries(bridges).map(([id, b]) =>
           row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : [b.model, b.host].filter(Boolean).join(" · "), b.connected === false),
         )}
+        ${ctx.hass.user?.is_admin
+          ? html`<button class="item" @click=${() => ctx.go("/settings/bridges/add")}>
+              <ha-icon icon="mdi:plus"></ha-icon>
+              <div class="grow">${t("bridge_add.title")}<div class="dim small">${t("bridge_add.row_sub")}</div></div>
+              <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+            </button>`
+          : nothing}
       </div>
       <h2 class="label">${t("bridges.sync_boxes")}</h2>
       <div class="rows">

@@ -25,6 +25,7 @@
 //   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
+//   /settings/bridges/add      add a bridge (Ethernet or Wi-Fi; found, or by address; the link button)
 //   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
 //   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
 //   /settings/integration      the integration's options
@@ -46,6 +47,7 @@ import { icon, type IconName, keepTouchInside } from "./ui.ts";
 import "./views/automation-edit.ts";
 import "./views/automations.ts";
 import "./views/daylight-settings.ts";
+import "./views/bridge-add.ts";
 import "./views/bridges.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
@@ -91,6 +93,7 @@ type Route =
   | { name: "deviceSensor"; device: string }
   | { name: "deviceAdd"; room: string | null }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
+  | { name: "bridgeAdd" }
   | { name: "entertainment"; area: string | null; arrange: boolean }
   | { name: "integration" }
   | { name: "automations" }
@@ -142,6 +145,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "device" && parts[3]) return { name: "device", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null };
+  if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "add") return { name: "bridgeAdd" };
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
@@ -208,6 +212,7 @@ export class HueStudioPanel extends LitElement {
               route.name === "deviceSensor" ||
               route.name === "deviceAdd" ||
               route.name === "bridges" ||
+              route.name === "bridgeAdd" ||
               route.name === "entertainment" ||
               route.name === "integration"
             ? "settings"
@@ -281,6 +286,8 @@ export class HueStudioPanel extends LitElement {
         ></hue-studio-automation-edit-view>`;
       case "settings":
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
+      case "bridgeAdd":
+        return html`<hue-studio-bridge-add-view .ctx=${ctx} .rev=${rev}></hue-studio-bridge-add-view>`;
       case "bridges":
         return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode} .item=${route.item}></hue-studio-bridges-view>`;
       case "entertainment":

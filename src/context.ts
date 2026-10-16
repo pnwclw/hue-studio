@@ -211,14 +211,14 @@ export class StudioContext {
    * Subscribe while a screen needs it (admin-only data such as the device setup).
    * Returns the unsubscribe function; failures show a toast.
    */
-  watch<T>(type: string, onEvent: (msg: T) => void): () => void {
+  watch<T>(type: string, onEvent: (msg: T) => void, params: Record<string, unknown> = {}): () => void {
     const conn = this.raw?.connection;
     if (!conn) return () => {};
     const sub = conn
       .subscribeMessage<T>((msg) => {
         onEvent(msg);
         this.onChange();
-      }, { type })
+      }, { ...params, type })
       .catch((err) => {
         this.toast(String(err?.message || err));
         return () => {};

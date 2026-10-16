@@ -226,13 +226,15 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
-                                hue_studio/bridges/subscribe|motion_area|rename, hue_studio/sync/configure
+                                hue_studio/bridges/subscribe|motion_area|rename|discover|link, hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   devices.py                    adding devices: Zigbee search (serials, other brands), all devices, name + area + Hue room,
                                 a light's function and power-on preset, delete
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
+  bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
+                                (its button); Wi-Fi bridges are put on the network by the Hue app
   automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
                                 (keeps up with the day until changed), label/category/area of our automations,
                                 hue_studio/automations/subscribe|organize|preview|legacy_auto_light
@@ -272,7 +274,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
-                                MotionAware), entertainment, integration (options),
+                                MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers

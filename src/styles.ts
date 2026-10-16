@@ -991,6 +991,41 @@ export const CSS = `
   .rows button.item:disabled { opacity: 0.5; }
   .seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 260px); }
 
+  .rows.add-row { margin-top: 10px; }
+  .bridge-add .seg.two { width: 100%; box-sizing: border-box; }
+  .steps-list { margin: 10px 0 0; padding: 0; list-style: none; }
+  .steps-list .item { align-items: flex-start; font-size: 15px; line-height: 1.4; }
+  .step-no { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 50%;
+             background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 600; }
+  .scan-state { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; font-size: 12px; color: var(--text-2); }
+  .spinner { width: 12px; height: 12px; flex: none; box-sizing: border-box; border: 2px solid rgba(235, 235, 245, 0.25); border-top-color: var(--text-2);
+             border-radius: 50%; animation: spin 0.9s linear infinite; }
+  .spinner.big { width: 28px; height: 28px; border-width: 3px; }
+  .bridge-add .item.col .line { align-items: center; margin-top: 0; }
+  .bridge-add .item.col .field { flex: 1; min-width: 0; margin-top: 0; font-size: 16px; }
+  .bridge-add .item.col .dim.small { margin-top: 8px; }
+  .link-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 28px auto 0; text-align: center; }
+  .link-state .lead { margin: 6px 0 0; }
+  .link-title { margin: 18px 0 0; font-size: 20px; font-weight: 600; line-height: 1.25; }
+  .link-art { width: 132px; height: 132px; }
+  .bridge-art { width: 100%; height: 100%; }
+  .bridge-art .body { fill: #e9e9ee; }
+  .bridge-art .button { fill: #f6f6f9; stroke: rgba(0, 0, 0, 0.08); stroke-width: 1.5; }
+  .bridge-art .ring { fill: none; stroke: #6c9dff; stroke-width: 4; opacity: 0; transform-origin: 60px 60px; }
+  .link-art.press .ring { animation: bridge-press 1.6s var(--ease) infinite; }
+  @keyframes bridge-press { 0% { opacity: 0.9; transform: scale(0.75); } 100% { opacity: 0; transform: scale(1.35); } }
+  @media (prefers-reduced-motion: reduce) { .link-art.press .ring { animation: none; opacity: 0.9; } .spinner { animation-duration: 2.4s; } }
+  .countdown { width: min(100%, 260px); height: 4px; margin-top: 22px; border-radius: 2px; overflow: hidden; background: rgba(120, 120, 128, 0.32); }
+  .countdown span { display: block; height: 100%; background: #6c9dff; transform-origin: left; transition: transform 0.5s linear; }
+  .link-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; }
+  .link-icon.ok { background: #30d158; color: #fff; }
+  .link-icon.ok svg { width: 34px; height: 34px; fill: currentColor; }
+  .link-icon.fail { background: rgba(255, 107, 94, 0.18); color: #ff6b5e; }
+  .link-icon.fail ha-icon { --mdc-icon-size: 34px; }
+  .link-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; }
+  .link-actions .pill { min-width: 200px; }
+  .link-actions .pill:not(.go) { height: 40px; border-radius: 20px; text-transform: none; letter-spacing: 0; font-size: 15px; }
+
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
   .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
   .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

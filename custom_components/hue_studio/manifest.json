@@ -2,7 +2,8 @@
   "domain": "hue_studio",
   "name": "Hue Studio",
   "after_dependencies": [
-    "automation"
+    "automation",
+    "zeroconf"
   ],
   "codeowners": [
     "@pnwclw"
@@ -25,7 +26,7 @@
   "requirements": [
     "aiohuesyncbox>=0.1.6,<0.2"
   ],
-  "version": "0.10.0-alpha.2",
+  "version": "0.10.0-alpha.3",
   "zeroconf": [
     "_huesync._tcp.local."
   ]

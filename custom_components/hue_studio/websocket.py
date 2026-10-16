@@ -16,6 +16,12 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
+from .bridge_setup import (
+    BridgeDiscovery,
+    LinkFailed,
+    async_link,
+    async_track_hue_entries,
+)
 from .bridges import (
     NAME_MAX as BRIDGE_NAME_MAX,
     async_bridges_payload,
@@ -114,6 +120,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_delete_entertainment,
         ws_entertainment_positions,
         ws_subscribe_bridges,
+        ws_discover_bridges,
+        ws_link_bridge,
         ws_set_motion_area,
         ws_rename_bridge,
         ws_configure_sync_box,
@@ -818,6 +826,85 @@ def ws_subscribe_bridges(
         lambda: async_bridges_payload(hass),
         [SIGNAL_BRIDGES_UPDATED],
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/bridges/discover"})
+@websocket_api.async_response
+async def ws_discover_bridges(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Bridges on the network that the Philips Hue integration does not have yet,
+    while subscribed (bridge_setup.BridgeDiscovery.payload)."""
+    last: dict[str, Any] = {}
+    discovery: BridgeDiscovery
+
+    @callback
+    def send() -> None:
+        data = discovery.payload()
+        if data == last.get("payload"):
+            return
+        last["payload"] = data
+        connection.send_message(websocket_api.event_message(msg["id"], data))
+
+    discovery = BridgeDiscovery(hass, send)
+    unsub_entries = async_track_hue_entries(hass, send)
+
+    @callback
+    def unsubscribe() -> None:
+        unsub_entries()
+        hass.async_create_background_task(
+            discovery.async_stop(), "hue_studio_discovery_stop"
+        )
+
+    connection.subscriptions[msg["id"]] = unsubscribe
+    connection.send_result(msg["id"])
+    send()
+    await discovery.async_start()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/link",
+        vol.Optional("host"): vol.All(str, vol.Strip, vol.Length(min=1)),
+        vol.Optional("bridge_id"): str,
+    }
+)
+@callback
+def ws_link_bridge(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Link a bridge with the Philips Hue integration, while subscribed.
+
+    Events: {"step": "connecting"}, {"step": "press", "timeout": s} (waiting for the
+    bridge's button), then {"step": "done", "hue_entry_id", "name"} or
+    {"step": "failed", "reason"}. Unsubscribing gives up. Hue Studio connects to the
+    new bridge by itself (connections.py).
+    """
+
+    @callback
+    def step(data: dict[str, Any]) -> None:
+        connection.send_message(websocket_api.event_message(msg["id"], data))
+
+    async def run() -> None:
+        try:
+            entry = await async_link(
+                hass, step, host=msg.get("host"), bridge_id=msg.get("bridge_id")
+            )
+        except LinkFailed as err:
+            step({"step": "failed", "reason": err.reason})
+            return
+        step({"step": "done", "hue_entry_id": entry.entry_id, "name": entry.title})
+
+    # The result goes first: the task starts eagerly and may be done at once.
+    connection.send_result(msg["id"])
+    task = hass.async_create_background_task(run(), "hue_studio_link_bridge")
+    connection.subscriptions[msg["id"]] = task.cancel
 
 
 @websocket_api.require_admin
