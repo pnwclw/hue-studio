@@ -560,11 +560,37 @@ class Mover:
         return self.task is not None and not self.task.done()
 
 
+def _upgrade(memo: dict[str, Any]) -> dict[str, Any] | None:
+    """A move stored by an earlier version, in today's form (None: forget it, nothing
+    of it had happened yet)."""
+    if "rooms" in memo:
+        return memo
+    if not any(d.get("removed") or d.get("new_id") for d in memo["devices"]):
+        return None
+    room = memo.pop("room", None)
+    memo.update(
+        rooms=[{**room, "devices": [d["id"] for d in memo["devices"]], "new_id": None}]
+        if room
+        else [],
+        whole_bridge=False,
+        ready=True,
+        entertainment=[],
+    )
+    for device in memo["devices"]:
+        device.setdefault("light", bool(device["lights"]))
+        device.setdefault("others", [])
+        device.setdefault("new_services", {})
+    return memo
+
+
 async def async_setup_moves(hass: HomeAssistant) -> None:
     """Load a move left unfinished (by a restart): it waits for the user."""
     mover = Mover(hass, Store(hass, STORAGE_VERSION, STORAGE_KEY, private=True))
     hass.data[STORAGE_KEY] = mover
-    memo = await mover.store.async_load()
+    stored = await mover.store.async_load()
+    memo = _upgrade(stored) if stored else None
+    if stored and memo is None:
+        await mover.store.async_remove()
     if memo:
         mover.memo = memo
         if memo.get("step") not in ("done", "failed", "power_cycle"):

@@ -707,3 +707,31 @@ async def test_subscribe_without_move(
     assert (await client.receive_json())["success"]
     event = await client.receive_json()
     assert event["type"] == "event" and event["event"] is None
+
+
+async def test_move_of_an_earlier_version(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """A move stored by an earlier version: forgotten when nothing of it had happened,
+    else brought into today's form."""
+    mover = hass.data[migration.STORAGE_KEY]
+    device = {"id": "a-desk", "mac": MAC["desk"], "name": "Desk", "lights": []}
+    old = {
+        "source": "a",
+        "target": "b",
+        "area": None,
+        "room": {"id": "a-office", "name": "Office", "scenes": []},
+        "zones": [],
+        "devices": [{**device, "removed": False, "new_id": None, "restored": False}],
+        "step": "waiting",
+        "error": "not_found",
+        "serials": [],
+    }
+    await mover.store.async_save(old)
+    await migration.async_setup_moves(hass)
+    assert migration.async_move_payload(hass) is None
+    old["devices"][0]["removed"] = True
+    await hass.data[migration.STORAGE_KEY].store.async_save(old)
+    await migration.async_setup_moves(hass)
+    payload = migration.async_move_payload(hass)
+    assert (payload["rooms"], payload["devices"][0]["found"]) == (["Office"], False)
