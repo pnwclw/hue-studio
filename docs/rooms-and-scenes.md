@@ -57,37 +57,30 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
   room searches on the room's bridge.
 - The rooms payload (`hue_studio/rooms/subscribe`) carries `bridges`, `bridge_of` (light,
   room, zone and scene entities) and `split_areas`.
-- **A whole bridge** (`transfer.py`, a bridge's page → "Move everything to <Bridge Pro>")
-  moves with the Hue app's own migration (Settings → Bridges → the bridge → Migrate; to a
-  Bridge Pro only). Hue Studio remembers the bridge first (devices by Zigbee MAC with
-  their entities, rooms and zones by name, scenes by room or zone and name), shows what
-  has arrived on the Bridge Pro while the Hue app works, and on "Finish" removes the old
-  bridge from HA, after which everything that arrived takes over its entity ids, names,
-  areas and light positions.
-- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): Hue Studio moves a room (from the
-  bridge next to "Lights" on its page) and a light that goes to a room on another bridge
-  (its room picker, or a room's note about lights on another bridge):
+- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): a
+  whole bridge (its page → "Move everything"), a room (the bridge next to "Lights" on
+  its page; it moves with its switches and sensors) or a light that goes to a room on
+  another bridge (its room picker, or a room's note about lights elsewhere):
   - everything is remembered first, in a Store (`hue_studio.move`), so a restart in
-    between loses nothing;
-  - a light joins the new bridge only once it is reset: by its serial number (the new
-    bridge resets it over touchlink, which reaches only lights close to that bridge) or
-    by hand (the Hue app over Bluetooth, a dimmer switch); some lights only look for a
-    bridge after being switched off at the wall for about 10 seconds. Deleting a light on its bridge
-    does not reset it (tried live: it ended up on neither bridge), so the new bridge
-    searches first (a few rounds of about a minute), knows each light again by its
-    Zigbee MAC, and only then the old bridge forgets it; a light not found stays where
-    it was;
-  - name, archetype, function and power-on come back on the bridge, and in HA every
-    entity of the device (the light, its Zigbee connectivity sensor, …) takes the old
-    entity id, name, icon, labels, area, and enabled/hidden state;
-  - the room on the new bridge comes from room alignment; a whole room's scenes are
-    copied there, and only then its old scenes (and the room, when nothing is left in it)
-    are deleted and the copies take over their entity ids. A zone whose lights all moved
-    goes the same way; a zone left behind in part is split (a zone of its name over the
-    moved lights);
-  - lights not found leave the move waiting: search again (serial numbers, or after a
-    reset by hand), or stop waiting (they stay on the old bridge). Sensors and switches stay (they need a reset);
-    entertainment areas lose the lights that leave.
+    between loses nothing: devices (Zigbee MAC, names, light settings, every HA entity),
+    the rooms that move whole, zones, scenes, entertainment areas;
+  - the old bridge lets the devices go (deleted there). Moving part of a bridge, the
+    move then pauses until the user has switched the lights off at the wall for about 10
+    seconds and on again (switches and sensors: reset with their setup button) — tried
+    live: a light that was only deleted did not look for a new bridge. A whole bridge
+    searches at once;
+  - the new bridge searches (a few rounds of about a minute; serial numbers are passed
+    on) and knows each device again by its Zigbee MAC; name, archetype, function and
+    power-on come back, and in HA every entity of a device takes the old entity id, name,
+    icon, labels, area and enabled/hidden state;
+  - a room that moved whole is made again on the new bridge (name, archetype, devices);
+    lights going to another area follow room alignment. Scenes are copied, zones and
+    entertainment areas whose lights all moved are copied (positions kept) and deleted
+    on the old bridge, those left behind in part are split; only then the old scenes and
+    emptied rooms go, and the copies take over their entity ids;
+  - devices not found leave the move waiting: search again (serial numbers), put them
+    back on the old bridge (they rejoin their scenes, zones and entertainment areas
+    there), or stop waiting.
 
 ## HA -> bridge (Hue Studio)
 

@@ -151,29 +151,30 @@ export interface BridgeDiscoverMessage {
   bridges: FoundBridge[];
 }
 
-/** What moving lights or a room to another bridge does (hue_studio/bridges/move_plan). */
+/** What a move to another bridge does (hue_studio/bridges/move_plan). */
 export interface MovePlan {
   source: string;
   target: string;
   source_name: string;
   target_name: string;
+  /** Everything of the source bridge moves. */
+  whole_bridge: boolean;
   /** The light entities that move. */
   lights: string[];
-  /** The Hue room that moves as a whole, or null. */
-  room: string | null;
-  /** Scenes copied (the room's and the zones'). */
+  /** Switches and sensors that move (reset by their setup button), by name. */
+  accessories: string[];
+  /** Hue rooms that move whole, by name. */
+  rooms: string[];
+  /** Scenes copied (the rooms' and the zones'). */
   scenes: number;
-  /** Zones of the moving lights: moved (whole) or split. */
+  /** Zones and entertainment areas of the moving lights: moved (whole) or split. */
   zones: { name: string; whole: boolean }[];
-  /** Entertainment areas the lights leave. */
-  entertainment: string[];
-  /** Other devices of the room (sensors, switches) that stay on the old bridge. */
-  staying: string[];
+  entertainment: { name: string; whole: boolean }[];
   /** The target bridge would hold more lights than it can. */
   over_limit: boolean;
 }
 
-export type MoveStep = "saving" | "removing" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
+export type MoveStep = "saving" | "removing" | "power_cycle" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
 
 /** A move to another bridge as it goes (hue_studio/bridges/move/subscribe); null: none. */
 export interface MoveState {
@@ -184,28 +185,13 @@ export interface MoveState {
   target: string;
   source_name: string;
   target_name: string;
-  room: string | null;
+  rooms: string[];
+  whole_bridge: boolean;
   area: string | null;
   /** When the current search ends (seconds since epoch). */
   searching_until: number | null;
   running: boolean;
-  lights: { entity_id: string | null; name: string; found: boolean }[];
-}
-
-/** A whole bridge moved to a Bridge Pro by the Hue app (hue_studio/bridges/transfer/subscribe); null: none. */
-export interface TransferState {
-  step: "waiting" | "finishing" | "done" | "failed";
-  error: string | null;
-  source: string;
-  target: string;
-  source_name: string;
-  target_name: string;
-  source_connected: boolean;
-  devices: { total: number; arrived: number };
-  groups: { total: number; arrived: number };
-  scenes: { total: number; arrived: number };
-  /** Devices not on the Bridge Pro yet, by name. */
-  missing: string[];
+  devices: { entity_id: string | null; name: string; light: boolean; found: boolean }[];
 }
 
 /** Steps of linking a bridge (hue_studio/bridges/link). */

@@ -502,6 +502,11 @@ export const CSS = `
   .bridge-tag .chevron { --mdc-icon-size: 14px; opacity: 0.7; }
   .move-steps .step-no svg { width: 14px; height: 14px; }
   .move-steps .item.dim { color: var(--text-2); }
+  .power-cycle { display: flex; flex-direction: column; align-items: center; margin: 18px 0 14px; padding: 20px 16px; border-radius: 16px;
+    background: rgba(108, 157, 255, 0.14); text-align: center; }
+  .power-cycle > ha-icon { --mdc-icon-size: 40px; color: #6c9dff; }
+  .power-cycle .link-title { margin: 10px 0 0; }
+  .power-cycle .lead { margin: 6px 0 0; }
   .zone-bridges { margin: 14px 16px 0; }
   .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; }
   .pill.shuffle svg { width: 18px; height: 18px; }

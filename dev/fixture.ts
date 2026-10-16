@@ -7,7 +7,6 @@ import type {
   Gallery,
   BridgesMessage,
   MoveState,
-  TransferState,
   Hass,
   HassState,
   HueDeviceInfo,
@@ -588,25 +587,33 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   bridgesMessage["hue-entry"].rooms = Object.entries(GROUPS).filter(([g, v]) => v[1] === "room" && groupBridge(g) === "hue-entry").length;
   bridgesMessage["hue-entry"].zones = Object.values(GROUPS).filter((v) => v[1] === "zone").length;
   const bridgeListeners = new Set<(m: unknown) => void>();
-  // Moving to another bridge (?bridges=two): a simulated run; ?move=searching|waiting|done
-  // starts the page with a move in that state (the living room's lights to the Garden Bridge).
+  // Moving to another bridge (?bridges=two): a simulated run (the old bridge lets go, then
+  // it waits for "Continue"); ?move=power_cycle|searching|waiting|done starts the page with
+  // a move in that state (the living room to the Garden Bridge); &movefail=1: one not found.
   const moveListeners = new Set<(m: unknown) => void>();
   const moveTimers: ReturnType<typeof setTimeout>[] = [];
   const movingLights = (msg: Record<string, unknown>): string[] =>
-    Array.isArray(msg.lights) ? (msg.lights as string[]) : Object.keys(LIGHTS).filter((l) => devices[`dev_${l}`].area_id === msg.area).map((l) => `light.${l}`);
+    msg.bridge
+      ? Object.keys(LIGHTS).map((l) => `light.${l}`)
+      : Array.isArray(msg.lights)
+        ? (msg.lights as string[])
+        : Object.keys(LIGHTS).filter((l) => devices[`dev_${l}`].area_id === msg.area).map((l) => `light.${l}`);
+  const moveDevices = (lights: string[], found: (i: number) => boolean): MoveState["devices"] =>
+    lights.map((l, i) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: found(i) }));
   let move: MoveState | null = null;
   const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
-  const runMove = (from: number, missing: number) => {
-    const steps: MoveState["step"][] = ["searching", "removing", "restoring", "rooms", "scenes", "done"];
+  /** Steps from `from` on, `missing` devices never found; stops at the pause unless past it. */
+  const runMove = (steps: MoveState["step"][], missing: number) => {
     moveTimers.splice(0).forEach(clearTimeout);
-    steps.slice(from).forEach((step, i) =>
+    steps.forEach((step, i) =>
       moveTimers.push(setTimeout(() => {
         if (!move) return;
         const searching = step === "searching";
-        move = { ...move, step, running: step !== "done", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
-        if (searching) move.lights = move.lights.map((l, j) => ({ ...l, found: j < move!.lights.length - missing && j === 0 }));
+        move = { ...move, step, running: step !== "done" && step !== "power_cycle", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
+        const total = move.devices.length;
+        if (searching) move.devices = move.devices.map((d, j) => ({ ...d, found: j === 0 && total - missing > 0 }));
         if (step === "restoring") {
-          move.lights = move.lights.map((l, j) => ({ ...l, found: j < move!.lights.length - missing }));
+          move.devices = move.devices.map((d, j) => ({ ...d, found: j < total - missing }));
           if (missing) {
             move = { ...move, step: "waiting", running: false, error: "not_found" };
             moveTimers.splice(0).forEach(clearTimeout);
@@ -616,25 +623,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }, 900 + i * 2200)),
     );
   };
-  // A whole bridge to a Bridge Pro (?bridges=two: the Garden Bridge to the Hue Bridge Pro);
-  // ?transfer=waiting|done starts with one. Devices "arrive" a few seconds after "Get ready".
-  const transferListeners = new Set<(m: unknown) => void>();
-  let transfer: TransferState | null = null;
-  const pushTransfer = () => setTimeout(() => transferListeners.forEach((cb) => cb(structuredClone(transfer))), 30);
-  const transferOf = (step: TransferState["step"], arrived: number): TransferState => ({
-    step, error: null, source: "hue-entry-2", target: "hue-entry", source_name: "Garden Bridge", target_name: "Hue Bridge",
-    source_connected: step !== "done", devices: { total: 2, arrived }, groups: { total: 1, arrived: Math.min(arrived, 1) },
-    scenes: { total: 2, arrived: Math.min(arrived, 2) }, missing: arrived >= 2 ? [] : ["Candle", "Globe lights"].slice(arrived),
-  });
-  if (twoBridges && params.get("transfer")) transfer = transferOf(params.get("transfer") === "done" ? "done" : "waiting", 1);
   const seedMove = params.get("move");
   if (twoBridges && seedMove) {
-    const lights = ["tv_strip", "play_left", "play_right", "candle"];
+    const lights = ["tv_strip", "play_left", "play_right", "candle"].map((l) => `light.${l}`);
     move = {
       step: seedMove as MoveState["step"], error: seedMove === "waiting" ? "not_found" : null, source: "hue-entry", target: "hue-entry-2",
-      source_name: "Hue Bridge", target_name: "Garden Bridge", room: "Living room", area: "living_room",
+      source_name: "Hue Bridge", target_name: "Garden Bridge", rooms: ["Living room"], whole_bridge: false, area: "living_room",
       searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching",
-      lights: lights.map((l, i) => ({ entity_id: `light.${l}`, name: LIGHTS[l][0], found: seedMove === "done" || i < (seedMove === "waiting" ? 3 : 2) })),
+      devices: moveDevices(lights, (i) => seedMove === "done" || (seedMove !== "power_cycle" && i < (seedMove === "waiting" ? 3 : 2))),
     };
   }
   const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
@@ -1085,49 +1081,35 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         onChange({ ...hass, areas: { ...AREAS } });
         return { area_id: id, name: String(msg.name) } as T;
       }
-      if (msg.type === "hue_studio/bridges/transfer/start") {
-        transfer = transferOf("waiting", 0);
-        pushTransfer();
-        [1, 2].forEach((n) => setTimeout(() => transfer && transfer.step === "waiting" && ((transfer = transferOf("waiting", n)), pushTransfer()), 2500 * n));
-        return null as T;
-      }
-      if (msg.type === "hue_studio/bridges/transfer/finish") {
-        transfer = { ...transfer!, step: "finishing" };
-        pushTransfer();
-        setTimeout(() => ((transfer = { ...transfer!, step: "done" }), pushTransfer()), 2500);
-        return null as T;
-      }
-      if (msg.type === "hue_studio/bridges/transfer/cancel") {
-        transfer = null;
-        pushTransfer();
-        return null as T;
-      }
       if (msg.type === "hue_studio/bridges/move_plan") {
         const lights = movingLights(msg);
-        const room = msg.area ? AREAS[String(msg.area)]?.name ?? null : null;
+        const rooms = msg.bridge ? Object.values(GROUPS).filter((g) => g[1] === "room").map((g) => g[0]) : msg.area ? [AREAS[String(msg.area)]?.name] : [];
         return {
-          source: "hue-entry", target: String(msg.target), source_name: "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
-          lights, room, scenes: room ? 4 : 0,
-          zones: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: room !== null }] : [],
-          entertainment: lights.includes("light.tv_strip") ? ["TV area"] : [], staying: room === "Office" ? ["Office sensor"] : [], over_limit: false,
+          source: msg.bridge ? String(msg.bridge) : "hue-entry", target: String(msg.target), source_name: msg.bridge ? bridgesMessage[String(msg.bridge)]?.name : "Hue Bridge",
+          target_name: bridgesMessage[String(msg.target)]?.name ?? "", whole_bridge: !!msg.bridge,
+          lights, accessories: msg.bridge || msg.area === "office" ? ["Office sensor"] : [], rooms, scenes: rooms.length ? 4 : 0,
+          zones: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [],
+          entertainment: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [], over_limit: false,
         } as T;
       }
       if (msg.type === "hue_studio/bridges/move") {
         const lights = movingLights(msg);
         move = {
-          step: "saving", error: null, source: "hue-entry", target: String(msg.target), source_name: "Hue Bridge",
-          target_name: bridgesMessage[String(msg.target)]?.name ?? "", room: msg.area ? AREAS[String(msg.area)]?.name ?? null : null,
-          area: String(msg.area ?? msg.to_area ?? ""), searching_until: null, running: true,
-          lights: lights.map((l) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, found: false })),
+          step: "saving", error: null, source: msg.bridge ? String(msg.bridge) : "hue-entry", target: String(msg.target),
+          source_name: msg.bridge ? bridgesMessage[String(msg.bridge)]?.name : "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
+          rooms: msg.area ? [AREAS[String(msg.area)]?.name] : [], whole_bridge: !!msg.bridge, area: msg.area || msg.to_area ? String(msg.area ?? msg.to_area) : null,
+          searching_until: null, running: true, devices: moveDevices(lights, () => false),
         };
         pushMove();
-        runMove(0, params.get("movefail") === "1" ? 1 : 0);
+        // A whole bridge searches at once; part of one waits for the lights to be switched off and on.
+        runMove(msg.bridge ? ["removing", "searching", "restoring", "rooms", "scenes", "done"] : ["removing", "power_cycle"], 0);
         return null as T;
       }
-      if (msg.type === "hue_studio/bridges/move/retry") {
-        if (move) move = { ...move, running: true, error: null };
+      if (msg.type === "hue_studio/bridges/move/continue" || msg.type === "hue_studio/bridges/move/retry") {
+        if (move) move = { ...move, running: true, error: null, ...(msg.target ? { target: String(msg.target), target_name: "Hue Bridge" } : {}) };
         pushMove();
-        runMove(0, 0);
+        const fail = msg.type === "hue_studio/bridges/move/continue" && params.get("movefail") === "1" ? 1 : 0;
+        runMove(["searching", "restoring", "rooms", "scenes", "done"], fail);
         return null as T;
       }
       if (msg.type === "hue_studio/bridges/move/finish") {
@@ -1264,13 +1246,6 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             timers.push(setTimeout(() => send({ step: "done", hue_entry_id: "hue-entry-2", name: "Hue Bridge Pro" }), 9000));
           }
           return () => timers.forEach(clearTimeout);
-        }
-        if (msg.type === "hue_studio/bridges/transfer/subscribe") {
-          transferListeners.add(send);
-          setTimeout(() => send(structuredClone(transfer)), 30);
-          return () => {
-            transferListeners.delete(send);
-          };
         }
         if (msg.type === "hue_studio/bridges/move/subscribe") {
           moveListeners.add(send);

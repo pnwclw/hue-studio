@@ -16,7 +16,7 @@ import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature, statusKey } from "../sync.ts";
-import type { BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo, TransferState } from "../types.ts";
+import type { BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -32,8 +32,6 @@ export class BridgesView extends StudioView {
   @state() private accessor bridges: BridgesMessage | null = null;
   /** A move to another bridge in progress or waiting (admins). */
   @state() private accessor move: MoveState | null = null;
-  /** A whole bridge being moved to a Bridge Pro (admins). */
-  @state() private accessor transfer: TransferState | null = null;
   /** The name being typed (null: not renaming). */
   @state() private accessor name: string | null = null;
   @state() private accessor busy = false;
@@ -44,11 +42,7 @@ export class BridgesView extends StudioView {
     super.connectedCallback();
     this.stop = this.ctx.watch<BridgesMessage>("hue_studio/bridges/subscribe", (m) => (this.bridges = m));
     if (this.ctx.hass.user?.is_admin) {
-      const stops = [
-        this.ctx.watch<MoveState | null>("hue_studio/bridges/move/subscribe", (m) => (this.move = m)),
-        this.ctx.watch<TransferState | null>("hue_studio/bridges/transfer/subscribe", (m) => (this.transfer = m)),
-      ];
-      this.stopMove = () => stops.forEach((stop) => stop());
+      this.stopMove = this.ctx.watch<MoveState | null>("hue_studio/bridges/move/subscribe", (m) => (this.move = m));
     }
   }
 
@@ -99,15 +93,7 @@ export class BridgesView extends StudioView {
         <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
       </button>`;
     const move = this.move;
-    const transfer = this.transfer;
-    return html`${transfer
-        ? html`<button class="notice" @click=${() => ctx.go(`/settings/bridges/transfer?from=${encodeURIComponent(transfer.source)}`)}>
-            ${transfer.step === "finishing" ? html`<span class="dot-badge live" aria-hidden="true"></span>` : html`<ha-icon icon="mdi:swap-horizontal"></ha-icon>`}
-            <span class="grow">${t(transfer.step === "done" ? "transfer.notice_done" : "transfer.notice", { from: transfer.source_name, to: transfer.target_name })}</span>
-            <ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
-          </button>`
-        : nothing}
-      ${move
+    return html`${move
         ? html`<button class="notice" @click=${() => ctx.go("/settings/bridges/move")}>
             ${move.running ? html`<span class="dot-badge live" aria-hidden="true"></span>` : html`<ha-icon icon="mdi:alert-outline"></ha-icon>`}
             <span class="grow">${t(move.step === "done" ? "move.notice_done" : move.running ? "move.notice" : "move.notice_waiting", { bridge: move.target_name })}</span>
@@ -147,13 +133,13 @@ export class BridgesView extends StudioView {
       <p class="lead small">${t("bridges.hint")}</p>`;
   }
 
-  /** "Move everything to <Bridge Pro>" (admins, when another bridge is a Bridge Pro). */
-  private transferLink(id: string): TemplateResult | typeof nothing {
+  /** "Move everything to another bridge" (admins, with another bridge connected). */
+  private moveAllLink(id: string, b: BridgeInfo): TemplateResult | typeof nothing {
     const { ctx } = this;
-    const pro = Object.entries(this.bridges || {}).filter(([other, b]) => other !== id && b.pro && b.connected !== false);
-    if (!ctx.hass.user?.is_admin || !pro.length) return nothing;
-    return this.link("mdi:swap-horizontal", ctx.t("transfer.row", { to: pro.length === 1 ? pro[0][1].name : ctx.t("transfer.a_pro") }), ctx.t("transfer.row_sub"), () =>
-      ctx.go(`/settings/bridges/transfer?from=${encodeURIComponent(id)}`),
+    const others = Object.entries(this.bridges || {}).filter(([other, o]) => other !== id && o.connected !== false);
+    if (!ctx.hass.user?.is_admin || !others.length || !b.devices) return nothing;
+    return this.link("mdi:swap-horizontal", ctx.t("move.all_row", { to: others.length === 1 ? others[0][1].name : ctx.t("move.all_another") }), ctx.t("move.all_row_sub"), () =>
+      ctx.go(`/settings/bridges/move?bridge=${encodeURIComponent(id)}`),
     );
   }
 
@@ -267,7 +253,7 @@ export class BridgesView extends StudioView {
                     ctx.go(`/settings/motionaware?bridge=${encodeURIComponent(id)}`),
                   )
                 : nothing}
-              ${this.transferLink(id)}
+              ${this.moveAllLink(id, b)}
             </div>`
           : html`<p class="lead">${t("bridges.offline_hint")}</p>`}
         ${online ? this.rooms(id) : nothing}

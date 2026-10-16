@@ -226,9 +226,6 @@
     },
     "move_busy": {
       "message": "Another move to a bridge is not finished yet."
-    },
-    "transfer_needs_pro": {
-      "message": "Only a Hue Bridge Pro can take over a whole bridge (the Hue app's migration)."
     }
   },
   "services": {

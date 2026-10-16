@@ -27,9 +27,9 @@
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
 //   /settings/bridges/add      add a bridge (Ethernet or Wi-Fi; found, or by address; the link button)
-//   /settings/bridges/move     move to another bridge: ?area=<id> (a room) or ?lights=<ids>&to_area=<id>,
+//   /settings/bridges/move     move to another bridge: ?bridge=<hue entry id> (all of it), ?area=<id> (a room)
+//                              or ?lights=<ids>&to_area=<id>,
 //                              optionally &to=<hue entry id>; without them the move in progress
-//   /settings/bridges/transfer?from=<hue entry id>   a whole bridge to a Bridge Pro (the Hue app's migration)
 //   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
 //   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
 //   /settings/integration      the integration's options
@@ -53,7 +53,6 @@ import "./views/automations.ts";
 import "./views/daylight-settings.ts";
 import "./views/bridge-add.ts";
 import "./views/bridge-move.ts";
-import "./views/bridge-transfer.ts";
 import "./views/bridges.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
@@ -100,8 +99,7 @@ type Route =
   | { name: "deviceAdd"; room: string | null }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
   | { name: "bridgeAdd" }
-  | { name: "bridgeMove"; area: string | null; lights: string[] | null; toArea: string | null; to: string | null }
-  | { name: "bridgeTransfer"; from: string | null }
+  | { name: "bridgeMove"; bridge: string | null; area: string | null; lights: string[] | null; toArea: string | null; to: string | null }
   | { name: "entertainment"; area: string | null; arrange: boolean }
   | { name: "integration" }
   | { name: "automations" }
@@ -154,10 +152,9 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null, bridge: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "add") return { name: "bridgeAdd" };
-  if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "transfer") return { name: "bridgeTransfer", from: params.get("from") };
   if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "move") {
     const lights = params.get("lights");
-    return { name: "bridgeMove", area: params.get("area"), lights: lights ? lights.split(",") : null, toArea: params.get("to_area"), to: params.get("to") };
+    return { name: "bridgeMove", bridge: params.get("bridge"), area: params.get("area"), lights: lights ? lights.split(",") : null, toArea: params.get("to_area"), to: params.get("to") };
   }
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
@@ -227,7 +224,6 @@ export class HueStudioPanel extends LitElement {
               route.name === "bridges" ||
               route.name === "bridgeAdd" ||
               route.name === "bridgeMove" ||
-              route.name === "bridgeTransfer" ||
               route.name === "entertainment" ||
               route.name === "integration"
             ? "settings"
@@ -303,10 +299,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "bridgeAdd":
         return html`<hue-studio-bridge-add-view .ctx=${ctx} .rev=${rev}></hue-studio-bridge-add-view>`;
-      case "bridgeTransfer":
-        return html`<hue-studio-bridge-transfer-view .ctx=${ctx} .rev=${rev} .from=${route.from}></hue-studio-bridge-transfer-view>`;
       case "bridgeMove":
-        return html`<hue-studio-bridge-move-view .ctx=${ctx} .rev=${rev} .area=${route.area} .lights=${route.lights} .toArea=${route.toArea} .to=${route.to}></hue-studio-bridge-move-view>`;
+        return html`<hue-studio-bridge-move-view .ctx=${ctx} .rev=${rev} .bridge=${route.bridge} .area=${route.area} .lights=${route.lights} .toArea=${route.toArea} .to=${route.to}></hue-studio-bridge-move-view>`;
       case "bridges":
         return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode} .item=${route.item}></hue-studio-bridges-view>`;
       case "entertainment":

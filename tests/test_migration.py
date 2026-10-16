@@ -1,8 +1,10 @@
-"""Moving lights and rooms to another bridge (migration.py), with two fake bridges.
+"""Moving a bridge, rooms and lights to another bridge (migration.py), with two fake
+bridges.
 
-The fake bridges keep devices, lights, rooms, zones and scenes, answer CLIP requests
-the way a bridge does (a deleted device leaves its rooms, zones and scenes), and stand
-in for the native integration: resources get entities in HA's registry, and lose them.
+The fake bridges keep devices, lights, rooms, zones, scenes and entertainment areas,
+answer CLIP requests the way a bridge does (a deleted device leaves its rooms, zones,
+scenes and areas), and stand in for the native integration: resources get entities in
+HA's registry, and lose them.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from homeassistant.helpers import (
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.hue_studio import migration, transfer
+from custom_components.hue_studio import migration
 from custom_components.hue_studio.lights import HueLight
 from custom_components.hue_studio.positions import (
     async_setup_positions,
@@ -66,6 +68,33 @@ class Controller:
         return iter(list(self.items.values()))
 
 
+class Services:
+    """A bridge's entertainment services: one per light."""
+
+    def __init__(self, lights: Controller) -> None:
+        self.lights = lights
+
+    def __iter__(self):
+        return iter(
+            SimpleNamespace(
+                id=f"{rid}-ent", renderer_reference=_ref(rid, ResourceTypes.LIGHT)
+            )
+            for rid in list(self.lights.items)
+        )
+
+
+def _locations(locations: list[dict[str, Any]]) -> SimpleNamespace:
+    return SimpleNamespace(
+        service_locations=[
+            SimpleNamespace(
+                service=_ref(loc["service"]["rid"], ResourceTypes.ENTERTAINMENT),
+                positions=[SimpleNamespace(**p) for p in loc["positions"]],
+            )
+            for loc in locations
+        ]
+    )
+
+
 class FakeBridge:
     """Just enough of HueBridgeV2 and the CLIP API for a move."""
 
@@ -85,14 +114,16 @@ class FakeBridge:
         self.lights = Controller()
         self.groups = SimpleNamespace(room=Controller(), zone=Controller())
         self.scenes = SimpleNamespace(scene=Controller())
+        self.areas = Controller()
         self.config = SimpleNamespace(
             bridge_device=SimpleNamespace(
                 id=f"{name}-bridge",
                 metadata=SimpleNamespace(name=f"Bridge {name.upper()}"),
                 product_data=SimpleNamespace(model_id="BSB002"),
             ),
-            entertainment_configuration=[],
-            entertainment=[],
+            entertainment_configuration=self.areas,
+            # Entertainment service `<light>-ent` of every light.
+            entertainment=Services(self.lights),
         )
 
     def new_id(self, kind: str) -> str:
@@ -170,8 +201,26 @@ class FakeBridge:
         self.on_add(self, "scene", rid)
         return scene
 
+    def add_area(self, rid: str, name: str, lights: list[str]) -> None:
+        self.areas.items[rid] = SimpleNamespace(
+            id=rid,
+            metadata=SimpleNamespace(name=name),
+            configuration_type=SimpleNamespace(value="screen"),
+            locations=_locations(
+                [
+                    {
+                        "service": {"rid": f"{light}-ent"},
+                        "positions": [{"x": float(i), "y": 0.5, "z": 0.0}],
+                    }
+                    for i, light in enumerate(lights)
+                ]
+            ),
+        )
+        self.on_add(self, "area", rid)
+
     def delete_device(self, device_id: str) -> None:
         device = self.devices.items.pop(device_id)
+        self.macs.pop(device_id, None)
         lights = [s.rid for s in device.services if s.rtype == ResourceTypes.LIGHT]
         for room in self.groups.room:
             room.children = [c for c in room.children if c.rid != device_id]
@@ -179,6 +228,13 @@ class FakeBridge:
             zone.children = [c for c in zone.children if c.rid not in lights]
         for scene in self.scenes.scene:
             scene.actions = [a for a in scene.actions if a.target.rid not in lights]
+        gone = {f"{rid}-ent" for rid in lights}
+        for area in self.areas:
+            area.locations.service_locations = [
+                loc
+                for loc in area.locations.service_locations
+                if loc.service.rid not in gone
+            ]
         for rid in lights:
             del self.lights.items[rid]
             self.on_remove(self, "light", rid)
@@ -194,6 +250,9 @@ class FakeBridge:
             elif kind == "scene":
                 del self.scenes.scene.items[rid]
                 self.on_remove(self, "scene", rid)
+            elif kind == "entertainment_configuration":
+                del self.areas.items[rid]
+                self.on_remove(self, "area", rid)
             else:
                 group = getattr(self.groups, kind).items.pop(rid)
                 for scene in [s for s in self.scenes.scene if s.group.rid == rid]:
@@ -207,12 +266,36 @@ class FakeBridge:
                 self.add_scene(
                     new, json["metadata"]["name"], json["group"]["rid"], lights
                 )
+            elif kind == "entertainment_configuration":
+                locations = json["locations"]["service_locations"]
+                lights = [
+                    loc["service"]["rid"].removesuffix("-ent") for loc in locations
+                ]
+                self.add_area(new, json["metadata"]["name"], lights)
+                self.areas.items[new].locations = _locations(locations)
             else:
                 children = [c["rid"] for c in json["children"]]
                 self.add_group(kind, new, json["metadata"]["name"], children)
             return [{"rid": new, "rtype": kind}]
         elif method == "put" and kind == "device":
             self.devices.items[rid].metadata.name = json["metadata"]["name"]
+        elif method == "put" and kind in ("room", "zone"):
+            rtype = ResourceTypes.DEVICE if kind == "room" else ResourceTypes.LIGHT
+            getattr(self.groups, kind).items[rid].children = [
+                _ref(c["rid"], rtype) for c in json["children"]
+            ]
+        elif method == "put" and kind == "scene":
+            self.scenes.scene.items[rid].actions = [
+                Action(
+                    target=_ref(a["target"]["rid"], ResourceTypes.LIGHT),
+                    action=ActionAction(on=OnFeature(on=True)),
+                )
+                for a in json["actions"]
+            ]
+        elif method == "put" and kind == "entertainment_configuration":
+            self.areas.items[rid].locations = _locations(
+                json["locations"]["service_locations"]
+            )
         return []
 
 
@@ -222,7 +305,6 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     integration would have it."""
     await async_setup_positions(hass)
     await migration.async_setup_moves(hass)
-    await transfer.async_setup_transfer(hass)
     entities = er.async_get(hass)
     devices = dr.async_get(hass)
     office = ar.async_get(hass).async_create("Office")
@@ -231,7 +313,13 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     for name in ("a", "b"):
         entries[name] = MockConfigEntry(domain=HUE, title=f"Bridge {name}", data={})
         entries[name].add_to_hass(hass)
-    domains = {"light": "light", "group": "light", "scene": "scene", "sensor": "sensor"}
+    domains = {
+        "light": "light",
+        "group": "light",
+        "scene": "scene",
+        "sensor": "sensor",
+        "area": "binary_sensor",
+    }
 
     def on_add(
         bridge: FakeBridge, kind: str, rid: str, device_id: str | None = None
@@ -302,6 +390,8 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     a.add_scene("a-evening", "Evening", "a-all", ["a-desk-light", "a-other-light"])
     name_entity("scene", "a-read", "office_read")
     name_entity("scene", "a-focus", "work_focus")
+    a.add_area("a-tv", "TV", ["a-desk-light", "a-lamp-light"])
+    name_entity("binary_sensor", "a-tv", "tv_area")
     await position_store(hass).async_update({"a-desk-light": [[0.1, 0.2, 0.0]]})
 
     def all_lights(_hass: HomeAssistant) -> list[HueLight]:
@@ -315,13 +405,18 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     searches: list[tuple[str, list[str], bool]] = []
 
     async def search(_hass: HomeAssistant, entry_id: str, serials: list[str]) -> None:
-        """Lights that were reset (by serial number or by hand: `joining`) join the
-        searching bridge; deleting a light on its bridge does not reset it."""
+        """Devices let go by their bridge and switched off and on (`joining`) join the
+        searching bridge; with serial numbers it takes them from another bridge too."""
         # Whether the old bridge still had the desk when the search started.
         searches.append((entry_id, serials, a.devices.get("a-desk") is not None))
         target = bridges[entry_id]
         for key in world.joining:
-            if MAC[key] not in target.macs.values():
+            elsewhere = any(
+                MAC[key] in b.macs.values()
+                and any(b.macs.get(d.id) == MAC[key] for d in b.devices)
+                for b in bridges.values()
+            )
+            if (serials or not elsewhere) and MAC[key] not in target.macs.values():
                 target.add_device(key)
 
     async def align(_hass: HomeAssistant, *, only: set[str], hue_entry_id: str) -> None:
@@ -355,7 +450,6 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, drop_state)
     with (
         patch.object(migration, "async_bridges", lambda _h: bridges),
-        patch.object(transfer, "async_bridges", lambda _h: bridges),
         patch.object(migration, "async_all_lights", all_lights),
         patch.object(migration, "async_search", search),
         patch.object(migration, "async_align", align),
@@ -366,11 +460,22 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
         yield world
 
 
-async def _run(hass: HomeAssistant, **kwargs: Any) -> dict[str, Any]:
+async def _run(hass: HomeAssistant) -> dict[str, Any]:
     mover = hass.data[migration.STORAGE_KEY]
     await mover.task
     await hass.async_block_till_done()
     return mover.memo
+
+
+async def _move(
+    hass: HomeAssistant, selection: migration.Selection, serials: list[str] = ()
+) -> dict[str, Any]:
+    """Start, let the old bridge let go, switch the lights off and on, search."""
+    await migration.async_start_move(hass, selection, list(serials))
+    memo = await _run(hass)
+    assert memo["step"] == "power_cycle"
+    await migration.async_continue_move(hass, [])
+    return await _run(hass)
 
 
 def _unique_id(hass: HomeAssistant, entity_id: str) -> tuple[str, str]:
@@ -380,66 +485,82 @@ def _unique_id(hass: HomeAssistant, entity_id: str) -> tuple[str, str]:
 
 
 async def test_plan(hass: HomeAssistant, world: SimpleNamespace) -> None:
-    """What moving the office would do: its lights, scenes, zones moved or split."""
+    """What moving the office would do: its lights, scenes, zones and entertainment
+    areas moved or split."""
     b = world.entries["b"].entry_id
     selection = migration.async_select(hass, b, area=world.office)
-    assert selection.room == "a-office"
+    assert selection.rooms == ["a-office"]
     plan = migration.async_move_plan(hass, selection)
     assert plan["lights"] == ["light.desk", "light.lamp"]
-    assert (plan["room"], plan["scenes"]) == ("Office", 3)
+    assert (plan["rooms"], plan["scenes"]) == (["Office"], 3)
     assert plan["zones"] == [
         {"name": "Work", "whole": True},
         {"name": "All", "whole": False},
     ]
+    assert plan["entertainment"] == [{"name": "TV", "whole": True}]
     assert (plan["target_name"], plan["over_limit"]) == ("Bridge B", False)
     # One light into another area: no room moves with it.
     one = migration.async_select(hass, b, lights=["light.desk"], to_area=world.hall)
-    assert (one.devices, one.room, one.area) == (["a-desk"], None, world.hall)
+    assert (one.devices, one.rooms, one.area) == (["a-desk"], [], world.hall)
     # Everything is on bridge a already: nothing to move there.
     with pytest.raises(ServiceValidationError):
         migration.async_select(hass, world.entries["a"].entry_id, area=world.office)
     with pytest.raises(ServiceValidationError):
         migration.async_select(hass, b, area=world.hall)
+    whole = migration.async_select_bridge(hass, world.entries["a"].entry_id, b)
+    assert (whole.devices, whole.rooms) == (
+        ["a-desk", "a-lamp", "a-other"],
+        ["a-office"],
+    )
 
 
 async def test_move_room(hass: HomeAssistant, world: SimpleNamespace) -> None:
-    """The office moves: HA keeps entity ids, names and area; scenes and the zone that
-    moved whole take over theirs; the zone left behind in part is split."""
+    """The office moves: the old bridge lets go first, the lights are switched off and
+    on, then the new bridge finds them; HA keeps entity ids, names and areas; the room
+    is made again, scenes, the zone and the entertainment area that moved whole take
+    over their entities; the zone left behind in part is split."""
     b_id = world.entries["b"].entry_id
     selection = migration.async_select(hass, b_id, area=world.office)
-    await migration.async_start_move(hass, selection, [])
-    memo = await _run(hass)
+    memo = await _move(hass, selection)
     assert (memo["step"], memo["error"]) == ("done", None)
-    # Found by MAC first (reset by hand: no serials), then the old bridge forgets.
-    assert world.searches == [(b_id, [], True)]
-    assert ("delete", "clip/v2/resource/device/a-desk", None) in world.a.requests
+    # Let go first, then searched (the old bridge no longer had the desk).
+    assert world.searches == [(b_id, [], False)]
     desk = next(d for d in memo["devices"] if d["id"] == "a-desk")
     new_desk = desk["new_lights"]["a-desk-light"]
+    new_lamp = memo["devices"][1]["new_lights"]["a-lamp-light"]
     assert _unique_id(hass, "light.desk") == (b_id, new_desk)
     entry = er.async_get(hass).async_get("light.desk")
     assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
-    # The device's other entities keep their ids too.
     assert _unique_id(hass, "sensor.desk_zigbee") == (b_id, f"{desk['new_id']}-zc")
     assert world.b.devices.get(desk["new_id"]).metadata.name == "Hue lamp a-desk"
-    ha_device = dr.async_get(hass).async_get(entry.device_id)
-    assert ha_device.area_id == world.office
-    # The room's scene and its entity id; the old room is gone (nothing left in it).
+    assert dr.async_get(hass).async_get(entry.device_id).area_id == world.office
+    # The room, made again by name; its scene and entity ids.
     assert world.a.groups.room.get("a-office") is None
-    assert _unique_id(hass, "light.office")[0] == b_id
+    (room,) = world.b.groups.room
+    assert room.metadata.name == "Office"
+    assert {c.rid for c in room.children} == {
+        desk["new_id"],
+        memo["devices"][1]["new_id"],
+    }
+    assert _unique_id(hass, "light.office") == (b_id, f"{room.id}-group")
     read = _unique_id(hass, "scene.office_read")
     assert read[0] == b_id
     copy = world.b.scenes.scene.get(read[1])
-    assert {a.target.rid for a in copy.actions} == {
-        new_desk,
-        memo["devices"][1]["new_lights"]["a-lamp-light"],
-    }
-    # Work moved whole (copied, deleted, taken over); All was split.
+    assert {a.target.rid for a in copy.actions} == {new_desk, new_lamp}
+    # Work moved whole; All was split.
     assert world.a.groups.zone.get("a-work") is None
     assert _unique_id(hass, "light.work")[0] == b_id
     assert _unique_id(hass, "scene.work_focus")[0] == b_id
     assert world.a.groups.zone.get("a-all") is not None
     split = [z for z in world.b.groups.zone if z.metadata.name == "All"]
     assert [[c.rid for c in z.children] for z in split] == [[new_desk]]
+    # The entertainment area: copied with the lights where they were, entity kept.
+    assert world.a.areas.get("a-tv") is None
+    (tv,) = world.b.areas
+    assert [
+        (loc.service.rid, loc.positions[0].x) for loc in tv.locations.service_locations
+    ] == [(f"{new_desk}-ent", 0.0), (f"{new_lamp}-ent", 1.0)]
+    assert _unique_id(hass, "binary_sensor.tv_area") == (b_id, tv.id)
     # Positions follow the light's new id.
     assert position_store(hass).lights == {new_desk: [[0.1, 0.2, 0.0]]}
     assert migration.async_move_payload(hass)["step"] == "done"
@@ -447,20 +568,39 @@ async def test_move_room(hass: HomeAssistant, world: SimpleNamespace) -> None:
     assert migration.async_move_payload(hass) is None
 
 
+async def test_move_bridge(hass: HomeAssistant, world: SimpleNamespace) -> None:
+    """Everything of a bridge moves: every device, the room by name, every zone
+    whole, and the old bridge is left empty."""
+    a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
+    world.joining = ["desk", "lamp", "other"]
+    # A whole bridge searches at once: no pause to switch the lights off and on.
+    await migration.async_start_move(
+        hass, migration.async_select_bridge(hass, a_id, b_id), []
+    )
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    assert not list(world.a.devices) and not list(world.a.groups.zone)
+    assert {
+        _unique_id(hass, e)[0] for e in ("light.desk", "light.lamp", "light.other")
+    } == {b_id}
+    assert sorted(z.metadata.name for z in world.b.groups.zone) == ["All", "Work"]
+    assert _unique_id(hass, "light.office")[0] == b_id
+    assert [r.metadata.name for r in world.b.groups.room] == ["Office"]
+
+
 async def test_move_light_with_serials(
     hass: HomeAssistant, world: SimpleNamespace
 ) -> None:
-    """With serial numbers the new bridge takes the light first, then the old one
-    forgets it; a light moved to another area follows its device there."""
+    """A light moved to another area follows its device there; serial numbers go to
+    the search."""
     b_id = world.entries["b"].entry_id
     world.joining = ["desk"]
     selection = migration.async_select(
         hass, b_id, lights=["light.desk"], to_area=world.hall
     )
-    await migration.async_start_move(hass, selection, ["ABC123"])
-    memo = await _run(hass)
+    memo = await _move(hass, selection, ["ABC123"])
     assert memo["step"] == "done"
-    assert world.searches == [(b_id, ["ABC123"], True)]
+    assert world.searches == [(b_id, ["ABC123"], False)]
     assert world.a.devices.get("a-desk") is None
     entry = er.async_get(hass).async_get("light.desk")
     assert entry.config_entry_id == b_id and entry.area_id is None
@@ -473,22 +613,15 @@ async def test_not_found_then_retry(
     hass: HomeAssistant, world: SimpleNamespace
 ) -> None:
     """A light the search does not find leaves the move waiting; another search
-    (e.g. with its serial number) finishes it."""
+    finishes it."""
     b_id = world.entries["b"].entry_id
     world.joining = ["desk"]
     selection = migration.async_select(hass, b_id, area=world.office)
-    await migration.async_start_move(hass, selection, [])
-    memo = await _run(hass)
+    memo = await _move(hass, selection)
     assert (memo["step"], memo["error"]) == ("waiting", "not_found")
     assert len(world.searches) == migration.SEARCH_ROUNDS
-    # The lamp was not found: still on the old bridge, as it was.
-    assert world.a.devices.get("a-lamp") is not None
-    assert _unique_id(hass, "light.lamp") == (
-        world.entries["a"].entry_id,
-        "a-lamp-light",
-    )
     payload = migration.async_move_payload(hass)
-    assert [(x["entity_id"], x["found"]) for x in payload["lights"]] == [
+    assert [(x["entity_id"], x["found"]) for x in payload["devices"]] == [
         ("light.desk", True),
         ("light.lamp", False),
     ]
@@ -504,10 +637,34 @@ async def test_not_found_then_retry(
     assert _unique_id(hass, "scene.office_read")[0] == b_id
 
 
+async def test_put_back(hass: HomeAssistant, world: SimpleNamespace) -> None:
+    """Not found on the new bridge: the lights go back to the old one, into their
+    room, zones, scenes and entertainment areas there."""
+    a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
+    world.joining = []
+    selection = migration.async_select(hass, b_id, area=world.office)
+    memo = await _move(hass, selection)
+    assert memo["step"] == "waiting"
+    world.joining = ["desk", "lamp"]
+    await migration.async_retry_move(hass, [], a_id)
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    new_desk = memo["devices"][0]["new_lights"]["a-desk-light"]
+    assert _unique_id(hass, "light.desk") == (a_id, new_desk)
+    assert new_desk in {
+        a.target.rid for a in world.a.scenes.scene.get("a-read").actions
+    }
+    assert new_desk in {c.rid for c in world.a.groups.zone.get("a-all").children}
+    assert f"{new_desk}-ent" in {
+        loc.service.rid for loc in world.a.areas.get("a-tv").locations.service_locations
+    }
+    assert _unique_id(hass, "scene.office_read") == (a_id, "a-read")
+
+
 async def test_unfinished_after_restart(
     hass: HomeAssistant, world: SimpleNamespace
 ) -> None:
-    """A move a restart interrupted waits for another search."""
+    """A move a restart interrupted waits for the user."""
     b_id = world.entries["b"].entry_id
     mover = hass.data[migration.STORAGE_KEY]
     memo = migration.async_remember(
@@ -550,50 +707,3 @@ async def test_subscribe_without_move(
     assert (await client.receive_json())["success"]
     event = await client.receive_json()
     assert event["type"] == "event" and event["event"] is None
-
-
-async def test_transfer_bridge(hass: HomeAssistant, world: SimpleNamespace) -> None:
-    """The Hue app moves bridge a to the Bridge Pro b; Hue Studio remembered a first,
-    and on finishing a leaves HA and b's devices, rooms, zones and scenes take over."""
-    a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
-    with pytest.raises(ServiceValidationError):
-        # The Hue app migrates to a Bridge Pro only.
-        await transfer.async_start_transfer(hass, a_id, b_id)
-    world.b.config.bridge_device.product_data.model_id = "BSB003"
-    await transfer.async_start_transfer(hass, a_id, b_id)
-    payload = transfer.async_transfer_payload(hass)
-    assert (payload["step"], payload["devices"], payload["source_connected"]) == (
-        "waiting",
-        {"total": 3, "arrived": 0},
-        True,
-    )
-    # The Hue app's migration: the same devices (by MAC), rooms, zones and scenes.
-    new = {key: world.b.add_device(key) for key in ("desk", "lamp")}
-    world.b.add_group("room", "b-office", "Office", list(new.values()))
-    world.b.add_group("zone", "b-work", "Work", [f"{d}-light" for d in new.values()])
-    world.b.add_scene(
-        "b-read", "Read", "b-office", [f"{d}-light" for d in new.values()]
-    )
-    payload = transfer.async_transfer_payload(hass)
-    assert payload["devices"] == {"total": 3, "arrived": 2}
-    assert payload["missing"] == ["Hue lamp a-other"]
-    assert (payload["groups"]["arrived"], payload["scenes"]["arrived"]) == (2, 1)
-
-    await transfer.async_finish_transfer(hass)
-    await hass.data[transfer.STORAGE_KEY].task
-    await hass.async_block_till_done()
-    assert transfer.async_transfer_payload(hass)["step"] == "done"
-    assert hass.config_entries.async_get_entry(a_id) is None
-    assert _unique_id(hass, "light.desk") == (b_id, f"{new['desk']}-light")
-    assert _unique_id(hass, "sensor.desk_zigbee") == (b_id, f"{new['desk']}-zc")
-    entry = er.async_get(hass).async_get("light.desk")
-    assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
-    assert dr.async_get(hass).async_get(entry.device_id).area_id == world.office
-    assert _unique_id(hass, "light.office") == (b_id, "b-office-group")
-    assert _unique_id(hass, "light.work") == (b_id, "b-work-group")
-    assert _unique_id(hass, "scene.office_read") == (b_id, "b-read")
-    # The other light did not arrive: it went with the old bridge.
-    assert er.async_get(hass).async_get("light.other") is None
-    assert position_store(hass).lights == {f"{new['desk']}-light": [[0.1, 0.2, 0.0]]}
-    await transfer.async_cancel_transfer(hass)
-    assert transfer.async_transfer_payload(hass) is None
