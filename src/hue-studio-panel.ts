@@ -25,6 +25,7 @@
 //   /settings/devices/device/<id>     a device's settings (its bridge id): name, room, function, power on, delete
 //   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
+//   /settings/devices/lost     devices a move let go that no bridge took: look for them again, forget
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
 //   /settings/bridges/add      add a bridge (Ethernet or Wi-Fi; found, or by address; the link button)
 //   /settings/bridges/move     move to another bridge: ?bridge=<hue entry id> (all of it), ?area=<id> (a room)
@@ -64,6 +65,7 @@ import "./views/experimental.ts";
 import "./views/gallery.ts";
 import "./views/gallery-settings.ts";
 import "./views/home.ts";
+import "./views/lost.ts";
 import "./views/room.ts";
 import "./views/rooms.ts";
 import "./views/settings.ts";
@@ -97,6 +99,7 @@ type Route =
   | { name: "device"; device: string }
   | { name: "deviceSensor"; device: string }
   | { name: "deviceAdd"; room: string | null }
+  | { name: "lost" }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
   | { name: "bridgeAdd" }
   | { name: "bridgeMove"; bridge: string | null; area: string | null; lights: string[] | null; toArea: string | null; to: string | null }
@@ -147,6 +150,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "add") return { name: "deviceAdd", room: params.get("room") };
+  if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "lost") return { name: "lost" };
   if (parts[0] === "settings" && parts[1] === "daylight") return { name: "daylight" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "device" && parts[3]) return { name: "device", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
@@ -221,6 +225,7 @@ export class HueStudioPanel extends LitElement {
               route.name === "device" ||
               route.name === "deviceSensor" ||
               route.name === "deviceAdd" ||
+              route.name === "lost" ||
               route.name === "bridges" ||
               route.name === "bridgeAdd" ||
               route.name === "bridgeMove" ||
@@ -315,6 +320,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-device-view .ctx=${ctx} .rev=${rev} .device=${route.device}></hue-studio-device-view>`;
       case "deviceSensor":
         return html`<hue-studio-sensor-view .ctx=${ctx} .rev=${rev} .device=${route.device} .back=${"/settings/devices/sensors"}></hue-studio-sensor-view>`;
+      case "lost":
+        return html`<hue-studio-lost-view .ctx=${ctx} .rev=${rev}></hue-studio-lost-view>`;
       case "deviceAdd":
         return html`<hue-studio-device-add-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-device-add-view>`;
       case "experimental":

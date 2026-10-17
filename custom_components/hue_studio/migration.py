@@ -76,7 +76,10 @@ _LOGGER = logging.getLogger(__name__)
 
 SIGNAL_MOVE_UPDATED = f"{DOMAIN}_move_updated"
 STORAGE_KEY = f"{DOMAIN}.move"
+LOST_KEY = f"{DOMAIN}.lost"
 STORAGE_VERSION = 1
+# Entries of a move's journal kept (the oldest go first).
+LOG_LIMIT = 200
 
 # A bridge searches for about a minute; a move searches a few times before it waits.
 SEARCH_TIME = 60.0
@@ -284,7 +287,9 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
      "zones": [{"name", "whole"}], "entertainment": [{"name", "whole"}],
      "staying": [names of other devices of a room that stay], "over_limit": bool,
      "macs": {Zigbee MAC: name} of the moving devices (to match their QR codes),
-     "install_codes": whether the target bridge lets devices in by their QR code}
+     "install_codes": whether the target bridge lets devices in by their QR code,
+     "devices": [{"mac", "name", "light", "entity_id"}] (serial numbers and QR codes
+     are given per device)}
     """
     bridges = async_bridges(hass)
     bridge = bridges[selection.source]
@@ -323,6 +328,26 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
             if (mac := device_mac(bridge, d.id))
         },
         "install_codes": takes_install_codes(target),
+        "devices": [
+            {
+                "mac": mac.upper() if (mac := device_mac(bridge, d.id)) else None,
+                "name": d.metadata.name,
+                "light": bool(_light_ids(d)),
+                "entity_id": next(
+                    (
+                        e
+                        for rid in _light_ids(d)
+                        if (
+                            e := entities.async_get_entity_id(
+                                LIGHT_DOMAIN, HUE_DOMAIN, rid
+                            )
+                        )
+                    ),
+                    None,
+                ),
+            }
+            for d in moving
+        ],
     }
 
 
@@ -469,12 +494,16 @@ class _Remember:
             }
             if ha_device is not None
             else None,
+            # How it is found (serial number, QR code's install code), set before.
+            "prep": {},
             # Filled in as the move goes.
+            "method": None,
             "removed": False,
             "new_id": None,
             "new_lights": {},
             "new_services": {},
             "restored": False,
+            "skipped": False,
         }
 
     def entertainment(self, config: Any, whole: bool) -> dict[str, Any]:
@@ -534,7 +563,9 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
         "started": time.time(),
         "error": None,
         "searching_until": None,
-        "serials": [],
+        # The device being moved now (its old id) and what happened so far.
+        "current": None,
+        "log": [],
     }
 
 
@@ -547,14 +578,21 @@ class Mover:
 
     hass: HomeAssistant
     store: Store[dict[str, Any]]
+    lost_store: Store[list[dict[str, Any]]]
     memo: dict[str, Any] | None = None
     task: asyncio.Task[None] | None = None
+    # Devices a move let go that no bridge took (found again later, or forgotten).
+    lost: list[dict[str, Any]] = field(default_factory=list)
 
     async def async_save(self) -> None:
         if self.memo is None:
             await self.store.async_remove()
         else:
             await self.store.async_save(self.memo)
+        async_dispatcher_send(self.hass, SIGNAL_MOVE_UPDATED)
+
+    async def async_save_lost(self) -> None:
+        await self.lost_store.async_save(self.lost)
         async_dispatcher_send(self.hass, SIGNAL_MOVE_UPDATED)
 
     async def async_step(self, step: str, **changes: Any) -> None:
@@ -571,7 +609,7 @@ def _upgrade(memo: dict[str, Any]) -> dict[str, Any] | None:
     """A move stored by an earlier version, in today's form (None: forget it, nothing
     of it had happened yet)."""
     if "rooms" in memo:
-        return memo
+        return _complete(memo)
     if not any(d.get("removed") or d.get("new_id") for d in memo["devices"]):
         return None
     room = memo.pop("room", None)
@@ -586,13 +624,29 @@ def _upgrade(memo: dict[str, Any]) -> dict[str, Any] | None:
         device.setdefault("light", bool(device["lights"]))
         device.setdefault("others", [])
         device.setdefault("new_services", {})
+    return _complete(memo)
+
+
+def _complete(memo: dict[str, Any]) -> dict[str, Any]:
+    """Fields a move stored before moving device by device lacks."""
+    memo.setdefault("current", None)
+    memo.setdefault("log", [])
+    for device in memo["devices"]:
+        device.setdefault("prep", {})
+        device.setdefault("method", None)
+        device.setdefault("skipped", False)
     return memo
 
 
 async def async_setup_moves(hass: HomeAssistant) -> None:
     """Load a move left unfinished (by a restart): it waits for the user."""
-    mover = Mover(hass, Store(hass, STORAGE_VERSION, STORAGE_KEY, private=True))
+    mover = Mover(
+        hass,
+        Store(hass, STORAGE_VERSION, STORAGE_KEY, private=True),
+        Store(hass, STORAGE_VERSION, LOST_KEY, private=True),
+    )
     hass.data[STORAGE_KEY] = mover
+    mover.lost = await mover.lost_store.async_load() or []
     stored = await mover.store.async_load()
     memo = _upgrade(stored) if stored else None
     if stored and memo is None:
@@ -612,21 +666,28 @@ def _mover(hass: HomeAssistant) -> Mover:
     return mover
 
 
-@callback
+def _entity_id(device: dict[str, Any]) -> str | None:
+    """The entity a device is shown by: its (first) light, else its first other one."""
+    if device["lights"]:
+        return device["lights"][0]["entity"]["entity_id"]
+    return next((o["entity"]["entity_id"] for o in device["others"]), None)
+
+
 def async_move_payload(hass: HomeAssistant) -> dict[str, Any] | None:
     """The move the panel shows, or None:
 
     {"step", "error", "source", "target", "source_name", "target_name", "rooms",
      "whole_bridge", "area", "searching_until", "running", "install_codes" (the target
-     lets devices in by their QR code), "devices": [{"entity_id", "name", "light",
-     "found", "mac", "qr" (its QR code read)}]}
+     lets devices in by their QR code), "current" (the device being moved, its id),
+     "devices": [{"id", "entity_id", "name", "light", "found", "mac", "qr" (its QR
+     code given), "serial", "method", "removed", "skipped"}],
+     "log": [{"at", "event", "name", …}]}
     """
     mover: Mover | None = hass.data.get(STORAGE_KEY)
     if mover is None or mover.memo is None:
         return None
     memo = mover.memo
     bridges = async_bridges(hass)
-    scanned = {c["mac"] for c in memo.get("install_codes", [])}
 
     def name(entry_id: str) -> str:
         bridge = bridges.get(entry_id)
@@ -634,11 +695,6 @@ def async_move_payload(hass: HomeAssistant) -> dict[str, Any] | None:
             return bridge_name(hass, entry_id, bridge)
         entry = hass.config_entries.async_get_entry(entry_id)
         return entry.title if entry else entry_id
-
-    def entity_id(device: dict[str, Any]) -> str | None:
-        if device["lights"]:
-            return device["lights"][0]["entity"]["entity_id"]
-        return next((o["entity"]["entity_id"] for o in device["others"]), None)
 
     return {
         "step": memo["step"],
@@ -654,17 +710,24 @@ def async_move_payload(hass: HomeAssistant) -> dict[str, Any] | None:
         "running": mover.busy,
         "install_codes": (target := bridges.get(memo["target"])) is not None
         and takes_install_codes(target),
+        "current": memo.get("current"),
         "devices": [
             {
-                "entity_id": entity_id(device),
+                "id": device["id"],
+                "entity_id": _entity_id(device),
                 "name": device["name"],
                 "light": device["light"],
                 "found": device["new_id"] is not None,
                 "mac": (device["mac"] or "").upper() or None,
-                "qr": (device["mac"] or "").upper() in scanned,
+                "qr": bool(device["prep"].get("code")),
+                "serial": device["prep"].get("serial"),
+                "method": device.get("method"),
+                "removed": device["removed"],
+                "skipped": device["skipped"],
             }
             for device in memo["devices"]
         ],
+        "log": memo["log"],
     }
 
 
@@ -686,29 +749,50 @@ def _check_idle(mover: Mover, *, memo: bool) -> None:
         )
 
 
-def _with_codes(
-    known: list[dict[str, str]], new: Iterable[dict[str, str]]
-) -> list[dict[str, str]]:
-    """Install codes (from QR codes) so far plus new ones, one per device."""
-    codes = {c["mac"]: c for c in known}
-    codes.update((c["mac"], c) for c in (install_code(**k) for k in new))
-    return list(codes.values())
+def _prepare(memo: dict[str, Any], prepared: Iterable[dict[str, str]]) -> None:
+    """Serial numbers and QR codes' install codes given for devices, by Zigbee MAC."""
+    by_mac = {(d["mac"] or "").upper(): d for d in memo["devices"]}
+    for item in prepared:
+        mac = install_code(item["mac"], "")["mac"]
+        device = by_mac.get(mac)
+        if device is None:
+            continue
+        if item.get("serial"):
+            device["prep"]["serial"] = item["serial"].strip().upper()
+        if item.get("code"):
+            device["prep"]["code"] = install_code(mac, item["code"])["code"]
+
+
+def _log(
+    memo: dict[str, Any], event: str, device: dict[str, Any] | None = None, **data: Any
+) -> None:
+    """A line of the move's journal (the panel shows it; HA's log gets it too)."""
+    name = device["name"] if device else None
+    memo["log"] = [
+        *memo["log"][-(LOG_LIMIT - 1) :],
+        {"at": time.time(), "event": event, "name": name, **data},
+    ]
+    _LOGGER.info(
+        "Moving to another bridge: %s%s%s",
+        event,
+        f" {name}" if name else "",
+        "".join(f", {k}={v}" for k, v in data.items()),
+    )
 
 
 async def async_start_move(
     hass: HomeAssistant,
     selection: Selection,
-    serials: list[str],
-    install_codes: Iterable[dict[str, str]] = (),
+    prepared: Iterable[dict[str, str]] = (),
 ) -> None:
-    """Start a move (one at a time): the old bridge lets the devices go, the new one
-    searches (meanwhile the lights are switched off and on); install codes from the
-    devices' QR codes let them into the new bridge where it takes them."""
+    """Start a move (one at a time): device by device, the old bridge lets it go and
+    the new one finds it (by its serial number first, where one was given, while the
+    old bridge still has it); then rooms, scenes, zones and entertainment areas."""
     mover = _mover(hass)
     _check_idle(mover, memo=False)
     memo = async_remember(hass, selection)
-    memo["serials"] = serials
-    memo["install_codes"] = _with_codes([], install_codes)
+    _prepare(memo, prepared)
+    _log(memo, "start", count=len(memo["devices"]))
     mover.memo = memo
     await mover.async_save()
     _start(mover)
@@ -716,42 +800,179 @@ async def async_start_move(
 
 async def async_retry_move(
     hass: HomeAssistant,
-    serials: list[str],
+    prepared: Iterable[dict[str, str]] = (),
     target: str | None = None,
-    install_codes: Iterable[dict[str, str]] = (),
+    *,
+    release: bool = False,
 ) -> None:
-    """Search again for the devices not found yet (with serial numbers), or on another
-    bridge (e.g. the old one, to put them back while none has been found)."""
+    """Search again for the device not found (with a serial number or QR code given
+    now); `release`: one looked for by its serial number is let go by the old bridge
+    first this time; `target`: the old bridge, to put the devices back while none has
+    been found."""
     mover = _mover(hass)
     _check_idle(mover, memo=True)
-    assert mover.memo is not None
-    if target is not None and target != mover.memo["target"]:
+    memo = mover.memo
+    assert memo is not None
+    if target is not None and target != memo["target"]:
         if target not in async_bridges(hass):
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="hue_entry_missing"
             )
-        if any(d["new_id"] for d in mover.memo["devices"]):
+        if any(d["new_id"] for d in memo["devices"]):
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="move_busy"
             )
-        mover.memo["target"] = target
-    mover.memo.update(
-        serials=serials,
-        install_codes=_with_codes(mover.memo.get("install_codes", []), install_codes),
-        error=None,
-    )
+        memo["target"] = target
+        _log(memo, "back")
+    _prepare(memo, prepared)
+    if release and (device := _current(memo)) is not None:
+        device["prep"]["release"] = True
+    memo["error"] = None
     _start(mover)
 
 
+async def async_skip_move_device(hass: HomeAssistant) -> None:
+    """Go on without the device not found: it stays on the old bridge if that still
+    has it, else it is kept among the lost devices (found again later)."""
+    mover = _mover(hass)
+    _check_idle(mover, memo=True)
+    memo = mover.memo
+    assert memo is not None
+    if (device := _current(memo)) is not None:
+        device["skipped"] = True
+        _log(memo, "skipped", device)
+    memo["error"] = None
+    _start(mover)
+
+
+def _current(memo: dict[str, Any]) -> dict[str, Any] | None:
+    return next((d for d in memo["devices"] if d["id"] == memo["current"]), None)
+
+
 async def async_finish_move(hass: HomeAssistant) -> None:
-    """Forget a finished move, or stop waiting for devices that were not found."""
+    """Forget a finished move, or stop waiting: devices the old bridge let go and no
+    bridge took are kept among the lost devices."""
     mover = _mover(hass)
     if mover.busy:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="move_busy"
         )
+    if mover.memo is not None:
+        await _async_keep_lost(mover, mover.memo)
     mover.memo = None
     await mover.async_save()
+
+
+# --- lost devices -----------------------------------------------------------------
+
+
+async def _async_keep_lost(mover: Mover, memo: dict[str, Any]) -> None:
+    """Remember the devices of a move that are on no bridge now; forget those found."""
+    found = {(d["mac"] or "").upper() for d in memo["devices"] if d["new_id"]}
+    lost = [x for x in mover.lost if x["device"]["mac"].upper() not in found]
+    known = {x["device"]["mac"].upper() for x in lost}
+    for device in memo["devices"]:
+        mac = (device["mac"] or "").upper()
+        if device["removed"] and device["new_id"] is None and mac and mac not in known:
+            area = memo["area"] or (device["ha_device"] or {}).get("area_id")
+            lost.append(
+                {
+                    "device": device,
+                    "source": memo["source"],
+                    "target": memo["target"],
+                    "area": area,
+                    "at": time.time(),
+                }
+            )
+    if lost != mover.lost:
+        mover.lost = lost
+        await mover.async_save_lost()
+
+
+@callback
+def async_lost_payload(hass: HomeAssistant) -> list[dict[str, Any]]:
+    """Devices a move let go that no bridge took:
+    [{"mac", "name", "light", "entity_id", "target", "area", "at"}]."""
+    mover: Mover | None = hass.data.get(STORAGE_KEY)
+    if mover is None:
+        return []
+    return [
+        {
+            "mac": x["device"]["mac"].upper(),
+            "name": x["device"]["name"],
+            "light": x["device"]["light"],
+            "entity_id": _entity_id(x["device"]),
+            "target": x["target"],
+            "area": x["area"],
+            "at": x["at"],
+        }
+        for x in mover.lost
+    ]
+
+
+def _lost(mover: Mover, mac: str) -> dict[str, Any]:
+    wanted = install_code(mac, "")["mac"]
+    item = next((x for x in mover.lost if x["device"]["mac"].upper() == wanted), None)
+    if item is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_hue_device",
+            translation_placeholders={"device": mac},
+        )
+    return item
+
+
+async def async_find_lost(
+    hass: HomeAssistant,
+    mac: str,
+    target: str,
+    prepared: Iterable[dict[str, str]] = (),
+) -> None:
+    """Look for a lost device on a bridge (a move of that one device): found, it gets
+    its settings, entities, area and room back."""
+    mover = _mover(hass)
+    _check_idle(mover, memo=False)
+    _check_target(hass, target)
+    item = _lost(mover, mac)
+    device = {
+        **item["device"],
+        "prep": dict(item["device"].get("prep") or {}),
+        "removed": True,
+        "new_id": None,
+        "new_lights": {},
+        "new_services": {},
+        "restored": False,
+        "skipped": False,
+    }
+    memo = {
+        "source": item["source"],
+        "target": target,
+        "area": item["area"],
+        "whole_bridge": False,
+        "devices": [device],
+        "rooms": [],
+        "zones": [],
+        "entertainment": [],
+        "step": "saving",
+        "started": time.time(),
+        "error": None,
+        "searching_until": None,
+        "current": None,
+        "log": [],
+    }
+    _prepare(memo, prepared)
+    _log(memo, "start", count=1)
+    mover.memo = memo
+    await mover.async_save()
+    _start(mover)
+
+
+async def async_forget_lost(hass: HomeAssistant, mac: str) -> None:
+    """Stop keeping a lost device (its HA entities went with it)."""
+    mover = _mover(hass)
+    item = _lost(mover, mac)
+    mover.lost = [x for x in mover.lost if x is not item]
+    await mover.async_save_lost()
 
 
 class MoveError(HomeAssistantError):
@@ -769,6 +990,8 @@ async def _async_run(mover: Mover) -> None:
     try:
         await _async_move(hass, mover, memo)
     except MoveError as err:
+        if err.reason != "not_found":
+            _log(memo, "failed", reason=err.reason)
         await mover.async_step(
             "waiting" if err.reason == "not_found" else "failed",
             error=err.reason,
@@ -776,6 +999,7 @@ async def _async_run(mover: Mover) -> None:
         )
     except (AiohueException, ClientError, TimeoutError, HomeAssistantError) as err:
         _LOGGER.warning("Moving to another bridge stopped: %s", err)
+        _log(memo, "failed", reason="bridge")
         await mover.async_step("failed", error="bridge", searching_until=None)
     except asyncio.CancelledError:
         await mover.async_step("waiting", error="interrupted", searching_until=None)
@@ -798,35 +1022,21 @@ async def _async_move(hass: HomeAssistant, mover: Mover, memo: dict[str, Any]) -
         raise MoveError("target_offline")
     # Devices the target has already (an earlier round).
     _match(target, memo["devices"])
-    pending = [d for d in memo["devices"] if d["new_id"] is None]
-
-    # The old bridge lets them go first: a light joins another bridge only once its
-    # own has forgotten it (and, switched off and on, finds the search open).
-    if any(not d["removed"] for d in pending):
-        if source is None:
-            raise MoveError("source_offline")
-        await mover.async_step("removing")
-        for device in pending:
-            await _async_remove(source, device)
-        await mover.async_save()
-    if pending:
-        await _async_search(hass, mover, target, memo)
-    found = [d for d in memo["devices"] if d["new_id"] is not None]
-
-    await mover.async_step("restoring")
-    for device in found:
-        if not device["restored"]:
-            await _async_restore_bridge(target, device)
-    await _async_restore_ha(hass, memo, found)
-    for device in found:
-        device["restored"] = True
-    await mover.async_save()
+    for device in memo["devices"]:
+        if device["new_id"] is not None and not device["restored"]:
+            await _async_restore(hass, mover, memo, source, target, device)
+    # One device at a time: never more than one on no bridge. Lights first; switches
+    # and sensors (reset by their button) after them.
+    queue = sorted(
+        (d for d in memo["devices"] if d["new_id"] is None and not d["skipped"]),
+        key=lambda d: not d["light"],
+    )
+    for device in queue:
+        await _async_move_one(hass, mover, memo, source, target, device)
+    memo["current"] = None
 
     await mover.async_step("rooms")
     await _async_rooms(hass, target, memo)
-    if any(d["new_id"] is None for d in memo["devices"]):
-        # Scenes, zones and entertainment areas wait for every device (copied once).
-        raise MoveError("not_found")
 
     await mover.async_step("scenes")
     if memo["target"] == memo["source"]:
@@ -834,8 +1044,72 @@ async def _async_move(hass: HomeAssistant, mover: Mover, memo: dict[str, Any]) -
     else:
         await _async_copy_groups(hass, source, target, memo)
         await _async_copy_entertainment(hass, source, target, memo)
-    async_forget_new(hass, [d["new_id"] for d in found])
+    async_forget_new(hass, [d["new_id"] for d in memo["devices"] if d["new_id"]])
+    await _async_keep_lost(mover, memo)
+    _log(memo, "done")
     await mover.async_step("done", error=None, searching_until=None)
+
+
+def _method(device: dict[str, Any], takes_codes: bool) -> str:
+    """How a device is found: by its serial number while the old bridge still has it
+    (the new one resets it), else let go first and found by its QR code's install
+    code, by being switched off and on (a light), or by its setup button."""
+    prep = device["prep"]
+    if not device["light"]:
+        return "button"
+    if prep.get("serial") and not prep.get("release") and not device["removed"]:
+        return "serial"
+    if prep.get("code") and takes_codes:
+        return "qr"
+    return "power"
+
+
+async def _async_move_one(
+    hass: HomeAssistant,
+    mover: Mover,
+    memo: dict[str, Any],
+    source: HueBridgeV2 | None,
+    target: HueBridgeV2,
+    device: dict[str, Any],
+) -> None:
+    """Move one device: found by the new bridge, let go by the old one, restored."""
+    method = _method(device, takes_install_codes(target))
+    memo["current"] = device["id"]
+    device["method"] = method
+    _log(memo, "device", device, method=method)
+    if method != "serial" and not device["removed"]:
+        if source is None:
+            raise MoveError("source_offline")
+        await mover.async_step("removing")
+        await _async_remove(source, device)
+        _log(memo, "removed", device)
+        await mover.async_save()
+    seconds = await _async_search_for(hass, mover, target, memo, device)
+    if device["new_id"] is None:
+        _log(memo, "not_found", device)
+        raise MoveError("not_found")
+    _log(memo, "found", device, seconds=seconds)
+    await _async_restore(hass, mover, memo, source, target, device)
+
+
+async def _async_restore(
+    hass: HomeAssistant,
+    mover: Mover,
+    memo: dict[str, Any],
+    source: HueBridgeV2 | None,
+    target: HueBridgeV2,
+    device: dict[str, Any],
+) -> None:
+    """A device found on the new bridge: the old one forgets it (found by its serial
+    number, it still lists it), its settings and HA entities come back."""
+    if not device["removed"] and source is not None and source is not target:
+        await _async_remove(source, device)
+    await mover.async_step("restoring")
+    await _async_restore_bridge(target, device)
+    await _async_restore_ha(hass, memo, [device])
+    device["restored"] = True
+    _log(memo, "restored", device)
+    await mover.async_save()
 
 
 def _match(bridge: HueBridgeV2, devices: list[dict[str, Any]]) -> None:
@@ -869,29 +1143,38 @@ async def _async_remove(source: HueBridgeV2, device: dict[str, Any]) -> None:
     device["removed"] = True
 
 
-async def _async_search(
-    hass: HomeAssistant, mover: Mover, target: HueBridgeV2, memo: dict[str, Any]
-) -> None:
-    """Let the target bridge search until every device is back (a few rounds)."""
-    wanted = [d for d in memo["devices"] if d["new_id"] is None]
-    for _round in range(SEARCH_ROUNDS):
-        await async_search(
-            hass,
-            memo["target"],
-            memo["serials"],
-            install_codes=memo.get("install_codes"),
-        )
+async def _async_search_for(
+    hass: HomeAssistant,
+    mover: Mover,
+    target: HueBridgeV2,
+    memo: dict[str, Any],
+    device: dict[str, Any],
+) -> int:
+    """Let the target bridge search for one device (a few rounds), with its serial
+    number and install code if it has them; the seconds it took."""
+    prep = device["prep"]
+    serials = [prep["serial"]] if prep.get("serial") else []
+    codes = (
+        [{"mac": device["mac"], "code": prep["code"]}]
+        if prep.get("code") and device["mac"]
+        else None
+    )
+    started = time.time()
+    for search in range(1, SEARCH_ROUNDS + 1):
+        _match(target, [device])
+        if device["new_id"] is not None:
+            break
+        await async_search(hass, memo["target"], serials, install_codes=codes)
         until = time.time() + SEARCH_TIME
+        _log(memo, "search", device, round=search)
         await mover.async_step("searching", searching_until=until)
         while time.time() < until:
-            before = sum(d["new_id"] is not None for d in wanted)
-            _match(target, wanted)
-            if all(d["new_id"] is not None for d in wanted):
-                return
-            if sum(d["new_id"] is not None for d in wanted) > before:
-                await mover.async_save()
+            _match(target, [device])
+            if device["new_id"] is not None:
+                break
             await asyncio.sleep(POLL)
-    _match(target, wanted)
+    _match(target, [device])
+    return round(time.time() - started)
 
 
 async def _async_restore_bridge(target: HueBridgeV2, device: dict[str, Any]) -> None:
@@ -1133,7 +1416,13 @@ async def _async_copy_groups(
             target, room["scenes"], {"rid": new_room.id, "rtype": "room"}, lights
         )
         taking += [(SCENE_DOMAIN, rid, old) for rid, old in copies]
-        if source is None:
+        # A device of the room that stayed (skipped, still on the old bridge) keeps
+        # the room and its scenes there.
+        stayed = any(
+            d["id"] in room["devices"] and d["new_id"] is None and not d["removed"]
+            for d in memo["devices"]
+        )
+        if source is None or stayed:
             continue
         for scene in room["scenes"]:
             if source.scenes.scene.get(scene["id"]) is not None:
@@ -1176,7 +1465,8 @@ async def _async_copy_groups(
         copies = await _async_copy_scenes(
             target, zone["scenes"], {"rid": new_zone.id, "rtype": "zone"}, lights
         )
-        if not zone["whole"]:
+        # Whole: every light of it moved (none was skipped).
+        if not zone["whole"] or any(rid not in lights for rid in zone["lights"]):
             continue
         if source is not None and source.groups.zone.get(zone["id"]) is not None:
             await _async_request(source, "delete", f"{ZONE_PATH}/{zone['id']}")
@@ -1223,7 +1513,10 @@ async def _async_copy_entertainment(
                 "locations": {"service_locations": locations},
             },
         )
-        if not area["whole"] or source is None:
+        whole = area["whole"] and all(
+            light["id"] in lights for light in area["lights"] if light["id"]
+        )
+        if not whole or source is None:
             continue
         if any(c.id == area["id"] for c in source.config.entertainment_configuration):
             await _async_request(source, "delete", f"{ENTERTAINMENT_PATH}/{area['id']}")

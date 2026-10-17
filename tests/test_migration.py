@@ -476,10 +476,12 @@ async def _run(hass: HomeAssistant) -> dict[str, Any]:
 
 
 async def _move(
-    hass: HomeAssistant, selection: migration.Selection, serials: list[str] = ()
+    hass: HomeAssistant,
+    selection: migration.Selection,
+    prepared: list[dict[str, str]] = (),
 ) -> dict[str, Any]:
-    """Start: the old bridge lets go, the new one searches."""
-    await migration.async_start_move(hass, selection, list(serials))
+    """Start: device by device, the old bridge lets go and the new one searches."""
+    await migration.async_start_move(hass, selection, list(prepared))
     return await _run(hass)
 
 
@@ -529,8 +531,19 @@ async def test_move_room(hass: HomeAssistant, world: SimpleNamespace) -> None:
     selection = migration.async_select(hass, b_id, area=world.office)
     memo = await _move(hass, selection)
     assert (memo["step"], memo["error"]) == ("done", None)
-    # Let go first, then searched (the old bridge no longer had the desk).
-    assert world.searches == [(b_id, [], False)]
+    # One device at a time, each let go first, then searched (the old bridge no
+    # longer had the desk).
+    assert world.searches == [(b_id, [], False), (b_id, [], False)]
+    events = [(e["event"], e["name"]) for e in memo["log"]]
+    assert events[:6] == [
+        ("start", None),
+        ("device", "Hue lamp a-desk"),
+        ("removed", "Hue lamp a-desk"),
+        ("search", "Hue lamp a-desk"),
+        ("found", "Hue lamp a-desk"),
+        ("restored", "Hue lamp a-desk"),
+    ]
+    assert events[-1] == ("done", None)
     desk = next(d for d in memo["devices"] if d["id"] == "a-desk")
     new_desk = desk["new_lights"]["a-desk-light"]
     new_lamp = memo["devices"][1]["new_lights"]["a-lamp-light"]
@@ -580,7 +593,7 @@ async def test_move_bridge(hass: HomeAssistant, world: SimpleNamespace) -> None:
     a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
     world.joining = ["desk", "lamp", "other"]
     await migration.async_start_move(
-        hass, migration.async_select_bridge(hass, a_id, b_id), []
+        hass, migration.async_select_bridge(hass, a_id, b_id)
     )
     memo = await _run(hass)
     assert memo["step"] == "done"
@@ -603,9 +616,11 @@ async def test_move_light_with_serials(
     selection = migration.async_select(
         hass, b_id, lights=["light.desk"], to_area=world.hall
     )
-    memo = await _move(hass, selection, ["ABC123"])
+    memo = await _move(hass, selection, [{"mac": MAC["desk"], "serial": "abc123"}])
     assert memo["step"] == "done"
-    assert world.searches == [(b_id, ["ABC123"], False)]
+    # Found by its serial number while the old bridge still had it; let go after.
+    assert world.searches == [(b_id, ["ABC123"], True)]
+    assert memo["devices"][0]["method"] == "serial"
     assert world.a.devices.get("a-desk") is None
     entry = er.async_get(hass).async_get("light.desk")
     assert entry.config_entry_id == b_id and entry.area_id is None
@@ -624,20 +639,21 @@ async def test_not_found_then_retry(
     selection = migration.async_select(hass, b_id, area=world.office)
     memo = await _move(hass, selection)
     assert (memo["step"], memo["error"]) == ("waiting", "not_found")
-    assert len(world.searches) == migration.SEARCH_ROUNDS
+    assert len(world.searches) == 1 + migration.SEARCH_ROUNDS
     payload = migration.async_move_payload(hass)
     assert [(x["entity_id"], x["found"]) for x in payload["devices"]] == [
         ("light.desk", True),
         ("light.lamp", False),
     ]
+    assert payload["current"] == "a-lamp"
     # The found light is restored already.
     assert _unique_id(hass, "light.desk")[0] == b_id
     with pytest.raises(ServiceValidationError):
-        await migration.async_start_move(hass, selection, [])
+        await migration.async_start_move(hass, selection)
     world.joining = ["desk", "lamp"]
     # The lamp's QR code: its MAC and install code go to the search.
     qr = {"mac": MAC["lamp"].replace(":", "").lower(), "code": "ab" * 18}
-    await migration.async_retry_move(hass, ["XYZ789"], install_codes=[qr])
+    await migration.async_retry_move(hass, [qr])
     memo = await _run(hass)
     assert memo["step"] == "done"
     assert world.codes[-1] == [{"mac": MAC["lamp"].upper(), "code": "AB" * 18}]
@@ -745,3 +761,73 @@ async def test_move_of_an_earlier_version(
     await migration.async_setup_moves(hass)
     payload = migration.async_move_payload(hass)
     assert (payload["rooms"], payload["devices"][0]["found"]) == (["Office"], False)
+
+
+async def test_serial_not_found_stays(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """A light looked for by its serial number and not found stays on the old bridge;
+    let go and looked for again, it moves."""
+    b_id = world.entries["b"].entry_id
+    world.joining = []
+    selection = migration.async_select(
+        hass, b_id, lights=["light.desk"], to_area=world.hall
+    )
+    memo = await _move(hass, selection, [{"mac": MAC["desk"], "serial": "ABC123"}])
+    assert (memo["step"], memo["error"]) == ("waiting", "not_found")
+    assert world.a.devices.get("a-desk") is not None
+    world.joining = ["desk"]
+    await migration.async_retry_move(hass, release=True)
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    assert memo["devices"][0]["method"] == "power"
+    assert _unique_id(hass, "light.desk")[0] == b_id
+
+
+async def test_skip_and_lost(hass: HomeAssistant, world: SimpleNamespace) -> None:
+    """A light not found is skipped: the move goes on without it, and it is kept as
+    lost (the old bridge let it go); found later, it gets its entity back."""
+    b_id = world.entries["b"].entry_id
+    world.joining = ["desk"]
+    selection = migration.async_select(hass, b_id, area=world.office)
+    memo = await _move(hass, selection)
+    assert memo["current"] == "a-lamp"
+    await migration.async_skip_move_device(hass)
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    assert [e["event"] for e in memo["log"]].count("skipped") == 1
+    # The room keeps going on the new bridge with the desk; the zone "Work" lost a
+    # light, so it stays on the old bridge (split).
+    assert world.a.groups.zone.get("a-work") is not None
+    (lost,) = migration.async_lost_payload(hass)
+    assert (lost["mac"], lost["name"], lost["area"]) == (
+        MAC["lamp"].upper(),
+        "Hue lamp a-lamp",
+        world.office,
+    )
+    await migration.async_finish_move(hass)
+
+    world.joining = ["desk", "lamp"]
+    await migration.async_find_lost(hass, MAC["lamp"], b_id)
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    assert _unique_id(hass, "light.lamp")[0] == b_id
+    assert migration.async_lost_payload(hass) == []
+
+
+async def test_stop_waiting_keeps_lost(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """Stopping a move that waits for a light the old bridge let go keeps it as lost;
+    it can be forgotten."""
+    b_id = world.entries["b"].entry_id
+    world.joining = []
+    selection = migration.async_select(
+        hass, b_id, lights=["light.desk"], to_area=world.hall
+    )
+    await _move(hass, selection)
+    await migration.async_finish_move(hass)
+    (lost,) = migration.async_lost_payload(hass)
+    assert lost["name"] == "Hue lamp a-desk"
+    await migration.async_forget_lost(hass, MAC["desk"])
+    assert migration.async_lost_payload(hass) == []

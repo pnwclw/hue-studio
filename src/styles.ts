@@ -507,6 +507,15 @@ export const CSS = `
   .power-cycle > ha-icon { --mdc-icon-size: 40px; color: #6c9dff; }
   .power-cycle .link-title { margin: 10px 0 0; }
   .power-cycle .lead { margin: 6px 0 0; }
+  .power-cycle.calm { background: rgba(255, 255, 255, 0.06); }
+  .power-cycle.calm > ha-icon { color: var(--text-2); }
+  .rows .item.current { background: rgba(108, 157, 255, 0.12); }
+  .rows .item > .spinner { flex: none; margin: 0 2px; }
+  .move-log { margin: 8px 0 0; padding: 0 4px; list-style: none; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+  .move-log li { display: flex; gap: 10px; }
+  .move-log time { flex: none; font-variant-numeric: tabular-nums; color: var(--text-3, rgba(255, 255, 255, 0.45)); }
+  .sheet .sheet-actions { padding: 14px 0 0; }
+  .notice.warn ha-icon { flex: none; color: #ffb340; }
   .zone-bridges { margin: 14px 16px 0; }
   .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; }
   .pill.shuffle svg { width: 18px; height: 18px; }

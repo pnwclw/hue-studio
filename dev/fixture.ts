@@ -6,6 +6,9 @@ import { predictSync } from "../src/sync.ts";
 import type {
   Gallery,
   BridgesMessage,
+  LostDevice,
+  MoveLogEntry,
+  MoveMethod,
   MoveState,
   Hass,
   HassState,
@@ -587,10 +590,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   bridgesMessage["hue-entry"].rooms = Object.entries(GROUPS).filter(([g, v]) => v[1] === "room" && groupBridge(g) === "hue-entry").length;
   bridgesMessage["hue-entry"].zones = Object.values(GROUPS).filter((v) => v[1] === "zone").length;
   const bridgeListeners = new Set<(m: unknown) => void>();
-  // Moving to another bridge (?bridges=two): a simulated run; ?move=searching|waiting|done
-  // starts the page with a move in that state (the living room to the Garden Bridge);
-  // &movefail=1: one not found.
+  // Moving to another bridge (?bridges=two): a simulated run, one device at a time;
+  // ?move=searching|waiting|done starts the page with a move in that state (the living
+  // room to the Garden Bridge); &movefail=1: the last light is not found until let go
+  // or given a QR code; &lost=1: a lost device (Settings → Devices → Lost devices).
   const moveListeners = new Set<(m: unknown) => void>();
+  const lostListeners = new Set<(m: unknown) => void>();
   const moveTimers: ReturnType<typeof setTimeout>[] = [];
   const movingLights = (msg: Record<string, unknown>): string[] =>
     msg.bridge
@@ -600,40 +605,109 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         : Object.keys(LIGHTS).filter((l) => devices[`dev_${l}`].area_id === msg.area).map((l) => `light.${l}`);
   /** A light's made-up Zigbee MAC (its QR code in the harness: `HUE:Z:<36 × 0> M:<MAC without colons>`). */
   const fakeMac = (light: string): string => `00:17:88:01:00:00:00:${(Object.keys(LIGHTS).indexOf(light.replace("light.", "")) + 16).toString(16).toUpperCase().padStart(2, "0")}`;
-  const moveDevices = (lights: string[], found: (i: number) => boolean, qr: string[] = []): MoveState["devices"] =>
-    lights.map((l, i) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: found(i), mac: fakeMac(l), qr: qr.includes(fakeMac(l)) }));
+  type MoveDevice = MoveState["devices"][number];
+  const moveDevices = (lights: string[], prepared: { mac: string; serial?: string; code?: string }[] = []): MoveDevice[] =>
+    lights.map((l) => {
+      const prep = prepared.find((p) => p.mac === fakeMac(l));
+      return { id: `dev_${l.replace("light.", "")}`, entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: false, mac: fakeMac(l),
+        qr: !!prep?.code, serial: prep?.serial?.toUpperCase() ?? null, method: null, removed: false, skipped: false };
+    });
   let move: MoveState | null = null;
+  /** Devices never found until let go (serial) or given a QR code. */
+  const failing = new Set<string>();
+  let lost: LostDevice[] =
+    params.get("lost") === "1"
+      ? [{ mac: fakeMac("candle"), name: "Candle", light: true, entity_id: "light.candle", target: "hue-entry-2", area: "living_room", at: Date.now() / 1000 - 3600 }]
+      : [];
   const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
-  /** These steps one after another, `missing` devices never found. */
-  const runMove = (steps: MoveState["step"][], missing: number) => {
-    moveTimers.splice(0).forEach(clearTimeout);
-    steps.forEach((step, i) =>
-      moveTimers.push(setTimeout(() => {
-        if (!move) return;
-        const searching = step === "searching";
-        move = { ...move, step, running: step !== "done", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
-        const total = move.devices.length;
-        if (searching) move.devices = move.devices.map((d, j) => ({ ...d, found: j === 0 && total - missing > 0 }));
-        if (step === "restoring") {
-          move.devices = move.devices.map((d, j) => ({ ...d, found: j < total - missing }));
-          if (missing) {
-            move = { ...move, step: "waiting", running: false, error: "not_found" };
-            moveTimers.splice(0).forEach(clearTimeout);
-          }
-        }
+  const pushLost = () => setTimeout(() => lostListeners.forEach((cb) => cb(structuredClone(lost))), 30);
+  const journal = (event: MoveLogEntry["event"], d: MoveDevice | null = null, extra: Partial<MoveLogEntry> = {}) =>
+    move!.log.push({ at: Date.now() / 1000, event, name: d?.name ?? null, ...extra });
+  const methodOf = (d: MoveDevice): MoveMethod => (!d.light ? "button" : d.serial && !d.removed ? "serial" : d.qr && move!.install_codes ? "qr" : "power");
+  /** One step of the simulated move every 1.5 s (as migration._async_move goes). */
+  const tick = () => {
+    const m = move;
+    if (!m || m.step === "done" || m.step === "waiting") return;
+    const d = m.devices.find((x) => x.id === m.current && !x.found);
+    if (m.step === "rooms") m.step = "scenes";
+    else if (m.step === "scenes") {
+      m.step = "done";
+      m.running = false;
+      lost = [...lost.filter((x) => !m.devices.some((y) => y.found && y.mac === x.mac)), ...m.devices.filter((x) => x.skipped && x.removed && !x.found).map((x) => ({ mac: x.mac!, name: x.name, light: x.light, entity_id: x.entity_id, target: m.target, area: m.area, at: Date.now() / 1000 }))];
+      pushLost();
+      journal("done");
+    } else if (!d) {
+      const next = m.devices.find((x) => !x.found && !x.skipped);
+      if (!next) {
+        m.current = null;
+        m.step = "rooms";
+      } else {
+        m.current = next.id;
+        next.method = methodOf(next);
+        journal("device", next, { method: next.method });
+        m.step = next.method !== "serial" && !next.removed ? "removing" : "searching";
+        if (m.step === "searching") journal("search", next, { round: 1 });
+        m.searching_until = m.step === "searching" ? Date.now() / 1000 + 60 : null;
+      }
+    } else if (m.step === "removing") {
+      d.removed = true;
+      journal("removed", d);
+      m.step = "searching";
+      m.searching_until = Date.now() / 1000 + 60;
+      journal("search", d, { round: 1 });
+    } else if (m.step === "searching") {
+      if (failing.has(d.id) && !(d.qr && m.install_codes)) {
+        journal("not_found", d);
+        Object.assign(m, { step: "waiting", error: "not_found", running: false, searching_until: null });
         pushMove();
-      }, 900 + i * 2200)),
-    );
+        return;
+      }
+      d.found = true;
+      journal("found", d, { seconds: 7 });
+      m.step = "restoring";
+      m.searching_until = null;
+    } else if (m.step === "restoring") {
+      journal("restored", d);
+      m.current = null;
+      m.step = "saving";
+    }
+    pushMove();
+    moveTimers.push(setTimeout(tick, 1500));
+  };
+  const runMove = () => {
+    moveTimers.splice(0).forEach(clearTimeout);
+    if (!move) return;
+    Object.assign(move, { running: true, error: null });
+    pushMove();
+    moveTimers.push(setTimeout(tick, 900));
   };
   const seedMove = params.get("move");
   if (twoBridges && seedMove) {
     const lights = ["tv_strip", "play_left", "play_right", "candle"].map((l) => `light.${l}`);
+    const list = moveDevices(lights, [{ mac: fakeMac("play_right"), serial: "a1b2c3" }, { mac: fakeMac("tv_strip"), code: "0".repeat(36) }]);
+    const reached = seedMove === "done" ? 4 : 2;
+    list.forEach((d, i) => Object.assign(d, { found: i < reached, removed: i < reached && !d.serial, method: i <= reached ? (d.serial ? "serial" : d.qr ? "qr" : "power") : null }));
+    if (seedMove === "done") Object.assign(list[3], { found: false, skipped: true, removed: true });
     move = {
       step: seedMove as MoveState["step"], error: seedMove === "waiting" ? "not_found" : null, source: "hue-entry", target: "hue-entry-2",
       source_name: "Hue Bridge", target_name: "Garden Bridge", rooms: ["Living room"], whole_bridge: false, area: "living_room", install_codes: true,
-      searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching",
-      devices: moveDevices(lights, (i) => seedMove === "done" || i < (seedMove === "waiting" ? 3 : 2)),
+      searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching", current: seedMove === "done" ? null : list[2].id,
+      devices: list,
+      log: [],
     };
+    const at = Date.now() / 1000 - 60;
+    move.log = [
+      { at, event: "start", name: null, count: 4 },
+      ...list.slice(0, reached).flatMap((d, i): MoveLogEntry[] => [
+        { at: at + i * 12, event: "device", name: d.name, method: d.method! },
+        { at: at + i * 12 + 1, event: "removed", name: d.name },
+        { at: at + i * 12 + 2, event: "search", name: d.name, round: 1 },
+        { at: at + i * 12 + 9, event: "found", name: d.name, seconds: 7 },
+        { at: at + i * 12 + 10, event: "restored", name: d.name },
+      ]),
+      ...(seedMove === "done" ? [] : [{ at: at + 30, event: "device" as const, name: list[2].name, method: "serial" as const }]),
+      ...(seedMove === "waiting" ? [{ at: at + 50, event: "not_found" as const, name: list[2].name }] : []),
+    ];
   }
   const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
   const deviceListeners = new Set<(m: unknown) => void>();
@@ -1124,31 +1198,86 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           zones: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [],
           entertainment: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [], over_limit: false,
           macs: Object.fromEntries(lights.map((l) => [fakeMac(l), LIGHTS[l.replace("light.", "")]?.[0] ?? l])), install_codes: msg.target === "hue-entry-2",
+          devices: [
+            ...lights.map((l) => ({ mac: fakeMac(l), name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, entity_id: l })),
+            ...(msg.bridge || msg.area === "office" ? [{ mac: "00:17:88:01:00:00:00:F0", name: "Office sensor", light: false, entity_id: null }] : []),
+          ],
         } as T;
       }
       if (msg.type === "hue_studio/bridges/move") {
         const lights = movingLights(msg);
+        const list = moveDevices(lights, (msg.prepared ?? []) as { mac: string; serial?: string; code?: string }[]);
+        failing.clear();
+        if (!msg.bridge && params.get("movefail") === "1") failing.add(list[list.length - 1].id);
         move = {
           step: "saving", error: null, source: msg.bridge ? String(msg.bridge) : "hue-entry", target: String(msg.target),
           source_name: msg.bridge ? bridgesMessage[String(msg.bridge)]?.name : "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
           rooms: msg.area ? [AREAS[String(msg.area)]?.name] : [], whole_bridge: !!msg.bridge, area: msg.area || msg.to_area ? String(msg.area ?? msg.to_area) : null,
-          searching_until: null, running: true, install_codes: msg.target === "hue-entry-2",
-          devices: moveDevices(lights, () => false, ((msg.install_codes ?? []) as { mac: string }[]).map((c) => c.mac)),
+          searching_until: null, running: true, install_codes: msg.target === "hue-entry-2", current: null, devices: list, log: [],
         };
-        pushMove();
-        runMove(["removing", "searching", "restoring", "rooms", "scenes", "done"], !msg.bridge && params.get("movefail") === "1" ? 1 : 0);
+        journal("start", null, { count: list.length });
+        runMove();
         return null as T;
       }
-      if (msg.type === "hue_studio/bridges/move/retry") {
-        if (move) move = { ...move, running: true, error: null, ...(msg.target ? { target: String(msg.target), target_name: "Hue Bridge" } : {}) };
-        pushMove();
-        runMove(["searching", "restoring", "rooms", "scenes", "done"], 0);
+      if (msg.type === "hue_studio/bridges/move/retry" && move) {
+        for (const p of (msg.prepared ?? []) as { mac: string; serial?: string; code?: string }[]) {
+          const d = move.devices.find((x) => x.mac === p.mac);
+          if (d && p.serial) d.serial = p.serial.toUpperCase();
+          if (d && p.code) d.qr = true;
+        }
+        const d = move.devices.find((x) => x.id === move!.current);
+        if (msg.release && d) {
+          d.serial = null;
+          failing.delete(d.id);
+        }
+        if (msg.target) {
+          Object.assign(move, { target: String(msg.target), target_name: move.source_name });
+          journal("back");
+          failing.clear();
+        }
+        if (d) Object.assign(move, { step: "saving" });
+        if (d) move.current = null;
+        runMove();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/move/skip" && move) {
+        const d = move.devices.find((x) => x.id === move!.current);
+        if (d) {
+          d.skipped = true;
+          journal("skipped", d);
+        }
+        Object.assign(move, { current: null, step: "saving" });
+        runMove();
         return null as T;
       }
       if (msg.type === "hue_studio/bridges/move/finish") {
         moveTimers.splice(0).forEach(clearTimeout);
+        if (move) {
+          const left = move.devices.filter((x) => x.removed && !x.found && !lost.some((y) => y.mac === x.mac));
+          lost = [...lost, ...left.map((x) => ({ mac: x.mac!, name: x.name, light: x.light, entity_id: x.entity_id, target: move!.target, area: move!.area, at: Date.now() / 1000 }))];
+          pushLost();
+        }
         move = null;
         pushMove();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/lost/find") {
+        const item = lost.find((x) => x.mac === msg.mac);
+        if (!item) throw new Error("Unknown device");
+        const list = moveDevices([item.entity_id ?? "light.candle"], (msg.prepared ?? []) as { mac: string; serial?: string; code?: string }[]);
+        list[0].removed = true;
+        failing.clear();
+        move = {
+          step: "saving", error: null, source: "hue-entry", target: String(msg.target), source_name: "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
+          rooms: [], whole_bridge: false, area: item.area, searching_until: null, running: true, install_codes: msg.target === "hue-entry-2", current: null, devices: list, log: [],
+        };
+        journal("start", null, { count: 1 });
+        runMove();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/bridges/lost/forget") {
+        lost = lost.filter((x) => x.mac !== msg.mac);
+        pushLost();
         return null as T;
       }
       if (msg.type === "hue_studio/bridges/rename") {
@@ -1279,6 +1408,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             timers.push(setTimeout(() => send({ step: "done", hue_entry_id: "hue-entry-2", name: "Hue Bridge Pro" }), 9000));
           }
           return () => timers.forEach(clearTimeout);
+        }
+        if (msg.type === "hue_studio/bridges/lost/subscribe") {
+          lostListeners.add(send);
+          setTimeout(() => send(structuredClone(lost)), 30);
+          return () => {
+            lostListeners.delete(send);
+          };
         }
         if (msg.type === "hue_studio/bridges/move/subscribe") {
           moveListeners.add(send);

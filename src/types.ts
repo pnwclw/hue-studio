@@ -178,6 +178,36 @@ export interface MovePlan {
   macs: Record<string, string>;
   /** The target bridge lets devices in by the install code of their QR code. */
   install_codes: boolean;
+  /** The moving devices (serial numbers and QR codes are given per device). */
+  devices: { mac: string | null; name: string; light: boolean; entity_id: string | null }[];
+}
+
+/** How a device of a move is found (migration._method). */
+export type MoveMethod = "serial" | "qr" | "power" | "button";
+
+/** A line of a move's journal. */
+export interface MoveLogEntry {
+  /** Seconds since epoch. */
+  at: number;
+  event: "start" | "device" | "removed" | "search" | "found" | "not_found" | "restored" | "skipped" | "back" | "done" | "failed";
+  name: string | null;
+  method?: MoveMethod;
+  seconds?: number;
+  round?: number;
+  count?: number;
+  reason?: string;
+}
+
+/** A device a move let go that no bridge took (hue_studio/bridges/lost/subscribe). */
+export interface LostDevice {
+  mac: string;
+  name: string;
+  light: boolean;
+  entity_id: string | null;
+  /** The bridge it was going to. */
+  target: string;
+  area: string | null;
+  at: number;
 }
 
 export type MoveStep = "saving" | "removing" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
@@ -199,8 +229,23 @@ export interface MoveState {
   running: boolean;
   /** The target bridge lets devices in by the install code of their QR code. */
   install_codes: boolean;
-  /** `qr`: its QR code was read. */
-  devices: { entity_id: string | null; name: string; light: boolean; found: boolean; mac: string | null; qr: boolean }[];
+  /** The device being moved now (its old id). */
+  current: string | null;
+  /** `qr`: its QR code was given; `removed`: the old bridge let it go. */
+  devices: {
+    id: string;
+    entity_id: string | null;
+    name: string;
+    light: boolean;
+    found: boolean;
+    mac: string | null;
+    qr: boolean;
+    serial: string | null;
+    method: MoveMethod | null;
+    removed: boolean;
+    skipped: boolean;
+  }[];
+  log: MoveLogEntry[];
 }
 
 /** Steps of linking a bridge (hue_studio/bridges/link). */

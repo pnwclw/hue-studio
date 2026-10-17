@@ -226,7 +226,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
-                                hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/finish|move/subscribe,
+                                hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/skip|move/finish|move/subscribe,
+                                hue_studio/bridges/lost/subscribe|find|forget,
                                 hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
@@ -236,9 +237,11 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
   migration.py                  moving a whole bridge, a room (with its switches, sensors, scenes, zones, entertainment areas)
-                                or lights going to a room on another bridge: remembered in a Store, let go by the old bridge,
-                                found by the new one by Zigbee MAC (the lights switched off and on while it searches), settings and
-                                rooms restored, scenes/zones/entertainment areas copied; HA keeps entity ids/names/areas;
+                                or lights going to a room on another bridge: remembered in a Store, one device at a time,
+                                each found its own way (serial number before the old bridge lets it go, QR code's install
+                                code, switched off and on while the new one searches, setup button), by Zigbee MAC;
+                                settings and HA entities restored per device; rooms, scenes/zones/entertainment areas after;
+                                a journal of every step; devices let go and not found kept as lost (found again later);
                                 one move at a time, in the background
   bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
                                 (its button); Wi-Fi bridges are put on the network by the Hue app
@@ -281,8 +284,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
-                                MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves, the move as it goes,
-                                lights not found), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
+                                MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves and how each device is found, the move
+                                device by device, its journal, a device not found), lost (lost devices: look again, forget), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers

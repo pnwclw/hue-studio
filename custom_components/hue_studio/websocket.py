@@ -73,12 +73,16 @@ from .lights import (
 from .migration import (
     SIGNAL_MOVE_UPDATED,
     Selection,
+    async_find_lost,
     async_finish_move,
+    async_forget_lost,
+    async_lost_payload,
     async_move_payload,
     async_move_plan,
     async_retry_move,
     async_select,
     async_select_bridge,
+    async_skip_move_device,
     async_start_move,
 )
 from .options import (
@@ -140,7 +144,11 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_move,
         ws_move_retry,
         ws_move_finish,
+        ws_move_skip,
         ws_subscribe_move,
+        ws_subscribe_lost,
+        ws_find_lost,
+        ws_forget_lost,
         ws_configure_sync_box,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -999,6 +1007,18 @@ MOVE_SCHEMA = {
     vol.Optional("to_area"): str,
 }
 SERIALS = vol.All([cv.string], vol.Length(max=MAX_SERIALS))
+# How each device of a move is found: by Zigbee MAC, its serial number and/or the
+# install code of its QR code.
+PREPARED = vol.All(
+    [
+        {
+            vol.Required("mac"): vol.Match(MAC_PATTERN),
+            vol.Optional("serial"): vol.Match(r"^[0-9A-Fa-f]{6}$"),
+            vol.Optional("code"): vol.Match(r"^[0-9A-Fa-f]{36}$"),
+        }
+    ],
+    vol.Length(max=500),
+)
 
 
 def _selection(hass: HomeAssistant, msg: dict[str, Any]) -> Selection:
@@ -1038,8 +1058,7 @@ def ws_move_plan(
     {
         vol.Required("type"): "hue_studio/bridges/move",
         **MOVE_SCHEMA,
-        vol.Optional("serials", default=list): SERIALS,
-        vol.Optional("install_codes", default=list): INSTALL_CODES,
+        vol.Optional("prepared", default=list): PREPARED,
     }
 )
 @websocket_api.async_response
@@ -1048,9 +1067,8 @@ async def ws_move(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Start moving a bridge, a room or lights to another bridge (watched with
-    hue_studio/bridges/move/subscribe): the old bridge lets them go, the new one
-    searches."""
+    """Start moving a bridge, a room or lights to another bridge, device by device
+    (watched with hue_studio/bridges/move/subscribe)."""
     try:
         selection = _selection(hass, msg)
     except HomeAssistantError as err:
@@ -1059,7 +1077,7 @@ async def ws_move(
     await _ws_call(
         connection,
         msg,
-        async_start_move(hass, selection, msg["serials"], msg["install_codes"]),
+        async_start_move(hass, selection, msg["prepared"]),
     )
 
 
@@ -1067,9 +1085,9 @@ async def ws_move(
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "hue_studio/bridges/move/retry",
-        vol.Optional("serials", default=list): SERIALS,
-        vol.Optional("install_codes", default=list): INSTALL_CODES,
+        vol.Optional("prepared", default=list): PREPARED,
         vol.Optional("target"): str,
+        vol.Optional("release", default=False): bool,
     }
 )
 @websocket_api.async_response
@@ -1078,13 +1096,86 @@ async def ws_move_retry(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Search again for the devices a move has not found (serial numbers), or on
-    another bridge (`target`: the old one, while none has been found)."""
+    """Search again for the device a move has not found (a serial number or QR code
+    given now; `release`: let go by the old bridge first), or on another bridge
+    (`target`: the old one, while none has been found)."""
     await _ws_call(
         connection,
         msg,
-        async_retry_move(hass, msg["serials"], msg.get("target"), msg["install_codes"]),
+        async_retry_move(
+            hass, msg["prepared"], msg.get("target"), release=msg["release"]
+        ),
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/bridges/move/skip"})
+@websocket_api.async_response
+async def ws_move_skip(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Go on without the device not found (it stays on the old bridge, or is kept
+    among the lost devices)."""
+    await _ws_call(connection, msg, async_skip_move_device(hass))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/bridges/lost/subscribe"}
+)
+@callback
+def ws_subscribe_lost(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Devices a move let go that no bridge took (migration.async_lost_payload)."""
+    _subscribe(
+        hass, connection, msg, lambda: async_lost_payload(hass), [SIGNAL_MOVE_UPDATED]
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/lost/find",
+        vol.Required("mac"): vol.Match(MAC_PATTERN),
+        vol.Required("target"): str,
+        vol.Optional("prepared", default=list): PREPARED,
+    }
+)
+@websocket_api.async_response
+async def ws_find_lost(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Look for a lost device on a bridge (a move of that device, watched with
+    hue_studio/bridges/move/subscribe)."""
+    await _ws_call(
+        connection,
+        msg,
+        async_find_lost(hass, msg["mac"], msg["target"], msg["prepared"]),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/bridges/lost/forget",
+        vol.Required("mac"): vol.Match(MAC_PATTERN),
+    }
+)
+@websocket_api.async_response
+async def ws_forget_lost(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Stop keeping a lost device."""
+    await _ws_call(connection, msg, async_forget_lost(hass, msg["mac"]))
 
 
 @websocket_api.require_admin
