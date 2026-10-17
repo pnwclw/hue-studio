@@ -159,8 +159,9 @@ const SYNC_BOX: SyncBoxInfo = {
   video_supported: true,
   audio_supported: true,
   connection: "connected",
+  bridge: "hue-entry",
   features: ["palette", "background_lighting", "presets", "settings", "ir"],
-  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
+  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
   palette: "neutral",
   background_lighting: { video: false, game: true },
   presets: [
@@ -1397,6 +1398,19 @@ export function createHass({ language = "en", onChange }: { language?: string; o
             clearTimeout(t1);
             clearTimeout(t2);
           };
+        }
+        if (msg.type === "hue_studio/sync/link_bridge") {
+          // The bridge's button is "pressed" after 4 s; the box connects 2 s later.
+          const timers = [setTimeout(() => send({ step: "press", timeout: 60 }), 300)];
+          timers.push(setTimeout(() => send({ step: "connecting" }), 4000));
+          timers.push(
+            setTimeout(() => {
+              box = { ...box, bridge: String((msg as { hue_entry_id?: string }).hue_entry_id) };
+              setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 50);
+              send({ step: "done", area: "TV area" });
+            }, 6000),
+          );
+          return () => timers.forEach(clearTimeout);
         }
         if (msg.type === "hue_studio/bridges/link") {
           // Connecting, then the button; an address ending in .99 does not answer.

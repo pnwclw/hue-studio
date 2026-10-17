@@ -529,12 +529,20 @@ export class BridgeMoveView extends StudioView {
     const { t } = this.ctx;
     const lost = s.devices.filter((d) => d.skipped && d.removed && !d.found);
     const stayed = s.devices.filter((d) => d.skipped && !d.removed && !d.found);
+    // Sync Boxes still syncing with the old bridge: their entertainment areas moved.
+    const boxes = Object.entries(this.ctx.boxes).filter(([, box]) => box.bridge === s.source && s.source !== s.target);
     return html`<div class="link-state">
         <div class="link-icon ok">${icon("check")}</div>
         <h2 class="link-title">${t(s.whole_bridge ? "move.done_all" : "move.done", { what, bridge: s.target_name, from: s.source_name })}</h2>
         <p class="lead center-text">${t("move.done_sub")}</p>
         ${stayed.length ? html`<p class="lead small center-text">${t("move.done_stayed", { names: stayed.map((d) => this.nameOf(d)).join(", "), from: s.source_name })}</p>` : nothing}
         ${lost.length ? html`<p class="lead small center-text warn">${t("move.done_lost", { names: lost.map((d) => this.nameOf(d)).join(", ") })}</p>` : nothing}
+        ${boxes.map(
+          ([id, box]) => html`<button class="notice" @click=${() => this.finish(`/settings/bridges/${encodeURIComponent(id)}`)}>
+            <ha-icon icon="mdi:television-box"></ha-icon><span class="grow">${t("move.box_follow", { box: box.name || "Sync Box", from: s.source_name, to: s.target_name })}</span>
+            <ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
+          </button>`,
+        )}
         <div class="link-actions">
           <button class="pill go" @click=${() => this.finish()}>${t("move.finish")}</button>
           ${lost.length ? html`<button class="pill" @click=${() => this.finish("/settings/devices/lost")}>${t("lost.title")}</button>` : nothing}

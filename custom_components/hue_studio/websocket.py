@@ -106,7 +106,9 @@ from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
     LED_MODES,
     NAME_MAX as SYNC_NAME_MAX,
+    BoxBridgeFailed,
     SyncBoxCoordinator,
+    async_link_box_bridge,
     async_sync_boxes,
 )
 
@@ -150,6 +152,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_find_lost,
         ws_forget_lost,
         ws_configure_sync_box,
+        ws_link_sync_box_bridge,
         ws_set_group_area,
         ws_set_room_sensors,
     ):
@@ -1221,6 +1224,7 @@ def ws_subscribe_move(
         vol.Optional("name"): vol.All(str, vol.Length(min=1, max=SYNC_NAME_MAX)),
         vol.Optional("led"): vol.In(list(LED_MODES)),
         vol.Optional("tv_power"): bool,
+        vol.Optional("bluetooth"): bool,
     }
 )
 @websocket_api.async_response
@@ -1242,9 +1246,61 @@ async def ws_configure_sync_box(
         connection,
         msg,
         box.async_configure(
-            name=msg.get("name"), led=msg.get("led"), tv_power=msg.get("tv_power")
+            name=msg.get("name"),
+            led=msg.get("led"),
+            tv_power=msg.get("tv_power"),
+            bluetooth=msg.get("bluetooth"),
         ),
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/sync/link_bridge",
+        vol.Required("entry_id"): str,
+        vol.Required("hue_entry_id"): str,
+    }
+)
+@callback
+def ws_link_sync_box_bridge(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Move a Sync Box (paired directly) to another bridge, while subscribed.
+
+    Events: {"step": "press", "timeout": s} (waiting for the bridge's button),
+    {"step": "connecting"}, then {"step": "done", "area"} or {"step": "failed",
+    "reason"}. Unsubscribing gives up.
+    """
+    box = async_sync_boxes(hass).get(msg["entry_id"])
+    if not isinstance(box, SyncBoxCoordinator):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_FOUND,
+            "Not a Sync Box paired with Hue Studio",
+        )
+        return
+
+    @callback
+    def step(data: dict[str, Any]) -> None:
+        connection.send_message(websocket_api.event_message(msg["id"], data))
+
+    async def run() -> None:
+        try:
+            area = await async_link_box_bridge(hass, box, msg["hue_entry_id"], step)
+        except BoxBridgeFailed as err:
+            step({"step": "failed", "reason": err.reason})
+            return
+        except HomeAssistantError:
+            step({"step": "failed", "reason": "box"})
+            return
+        step({"step": "done", "area": area})
+
+    connection.send_result(msg["id"])
+    task = hass.async_create_background_task(run(), "hue_studio_link_sync_box")
+    connection.subscriptions[msg["id"]] = task.cancel
 
 
 @websocket_api.require_admin

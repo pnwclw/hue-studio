@@ -9,7 +9,8 @@ configurations, which tells which Hue lights are being synced.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable
+import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
 import logging
@@ -44,6 +45,7 @@ from aiohuesyncbox.models import BehaviorUpdate, ExecutionUpdate
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -160,6 +162,10 @@ class SyncDevice(Device):
     async def set_name(self, name: str) -> None:
         """Rename the box."""
         await self._put(DeviceUpdate(name=name).to_dict())
+
+    async def set_bluetooth(self, enabled: bool) -> None:
+        """Let the Hue Sync app find the box over Bluetooth (to change its Wi-Fi)."""
+        await self._put(DeviceUpdate(bluetooth=enabled).to_dict())
 
 
 class SyncBehavior(Behavior):
@@ -384,8 +390,10 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         name: str | None = None,
         led: str | None = None,
         tv_power: bool | None = None,
+        bluetooth: bool | None = None,
     ) -> None:
-        """The box's own settings: its name, its LED and following the TV."""
+        """The box's own settings: its name, its LED, following the TV and its
+        Bluetooth (the Hue Sync app changes its Wi-Fi over it)."""
         if name is not None:
             name = name.strip()[:NAME_MAX]
             if name and name != self.api.device.name:
@@ -400,6 +408,10 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         if tv_power is not None and self.api.behavior is not None:
             await self.async_command(
                 SyncBehavior(self.api.behavior).set_cec_powersave(tv_power)
+            )
+        if bluetooth is not None and bluetooth != self.api.device.bluetooth:
+            await self.async_command(
+                SyncDevice(self.api.device).set_bluetooth(bluetooth)
             )
 
     @property
@@ -420,6 +432,118 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
             **self.mode_changes(state.mode),
         )
         return update.to_dict()
+
+
+# How long the bridge's button is waited for, and the box's connection to the bridge.
+LINK_TIMEOUT = 60
+CONNECT_TIMEOUT = 45
+# Hue's error "link button not pressed".
+LINK_BUTTON_NOT_PRESSED = 101
+
+
+class BoxBridgeFailed(Exception):
+    """Linking a box with a bridge failed: `reason` is shown in the panel."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def bridge_entry_of(hass: HomeAssistant, box_bridge_id: str | None) -> str | None:
+    """The native `hue` entry of the bridge a box uses. A box names it by its 16-digit
+    id (`ECB5FAFFFE8FCCC4`); the entry's unique id is that without `fffe`."""
+    if not box_bridge_id or len(box_bridge_id) != 16:
+        return None
+    short = (box_bridge_id[:6] + box_bridge_id[10:]).lower()
+    return next(
+        (
+            entry.entry_id
+            for entry in hass.config_entries.async_entries(HUE_DOMAIN)
+            if (entry.unique_id or "").lower() == short
+        ),
+        None,
+    )
+
+
+async def async_link_box_bridge(
+    hass: HomeAssistant,
+    coordinator: SyncBoxCoordinator,
+    hue_entry_id: str,
+    on_step: Callable[[dict[str, Any]], None],
+) -> str | None:
+    """Move a box to another bridge: the bridge's button gives it its own entertainment
+    credentials (they go to the box, never into HA), the box connects, and it streams
+    to the entertainment area of the same name there (else the first). Returns that
+    area's name. `on_step` hears {"step": "press", "timeout"} and
+    {"step": "connecting"}. Raises BoxBridgeFailed."""
+    entry = hass.config_entries.async_get_entry(hue_entry_id)
+    if entry is None or entry.domain != HUE_DOMAIN:
+        raise BoxBridgeFailed("no_bridge")
+    host = entry.data["host"]
+    session = async_get_clientsession(hass, verify_ssl=False)
+    await coordinator.async_refresh()
+    api = coordinator.api
+    current = api.hue.groups_by_id.get(api.hue.group_id or "")
+    area_name = current.name if current else None
+    try:
+        async with session.get(
+            f"https://{host}/api/config", timeout=ClientTimeout(total=10)
+        ) as resp:
+            bridge_id = str((await resp.json(content_type=None)).get("bridgeid") or "")
+    except (ClientError, TimeoutError, ValueError) as err:
+        raise BoxBridgeFailed("bridge") from err
+    if len(bridge_id) != 16:
+        raise BoxBridgeFailed("bridge")
+
+    on_step({"step": "press", "timeout": LINK_TIMEOUT})
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + LINK_TIMEOUT
+    while True:
+        try:
+            async with session.post(
+                f"https://{host}/api",
+                json={"devicetype": "hue_studio#sync_box", "generateclientkey": True},
+                timeout=ClientTimeout(total=10),
+            ) as resp:
+                answer = await resp.json(content_type=None)
+        except (ClientError, TimeoutError, ValueError) as err:
+            raise BoxBridgeFailed("bridge") from err
+        first = answer[0] if isinstance(answer, list) and answer else {}
+        if "success" in first:
+            username = first["success"]["username"]
+            client_key = first["success"]["clientkey"]
+            break
+        if first.get("error", {}).get("type") != LINK_BUTTON_NOT_PRESSED:
+            raise BoxBridgeFailed("bridge")
+        if loop.time() >= deadline:
+            raise BoxBridgeFailed("timeout")
+        await asyncio.sleep(1)
+
+    on_step({"step": "connecting"})
+    try:
+        await api.hue.set_bridge(bridge_id.upper(), username, client_key)
+    except AiohuesyncboxException as err:
+        raise BoxBridgeFailed("box") from err
+    deadline = loop.time() + CONNECT_TIMEOUT
+    while True:
+        await coordinator.async_refresh()
+        hue = api.hue
+        if (
+            (hue.bridge_unique_id or "").upper() == bridge_id.upper()
+            and hue.connection_state.value in ("connected", "streaming")
+            and hue.groups
+        ):
+            break
+        if loop.time() >= deadline:
+            raise BoxBridgeFailed("box")
+        await asyncio.sleep(2)
+    group = next(
+        (g for g in api.hue.groups if area_name and g.name == area_name),
+        api.hue.groups[0],
+    )
+    if group.id != api.hue.group_id:
+        await coordinator.async_command(api.hue.set_group_id(group.id))
+    return group.name
 
 
 class SyncBoxSource(Protocol):
@@ -606,6 +730,8 @@ def sync_box_info(
             if update and update != api.device.firmware_version
             else None,
             "wifi": int(wifi.strength) if wifi else None,
+            "wifi_name": wifi.ssid if wifi else None,
+            "bluetooth": api.device.bluetooth,
             "led": led_mode(api),
             "tv_power": api.behavior.cec_powersave if api.behavior else None,
             "ha_device": device.id if device else None,
@@ -614,6 +740,8 @@ def sync_box_info(
         "video_supported": hdmi.video_sync_supported if hdmi else True,
         "audio_supported": hdmi.audio_sync_supported if hdmi else True,
         "connection": api.hue.connection_state.value,
+        # The native `hue` entry of the bridge it streams to.
+        "bridge": bridge_entry_of(hass, api.hue.bridge_unique_id),
     }
 
 

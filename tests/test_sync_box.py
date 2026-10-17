@@ -37,6 +37,7 @@ from custom_components.hue_studio.const import (
 from custom_components.hue_studio.sync import (
     SyncBoxNotFound,
     async_get_box_id,
+    async_link_box_bridge,
     ir_action,
     ir_execution,
 )
@@ -137,6 +138,20 @@ class FakeBox:
             if not self.button_held or self._attempts < self.button_held:
                 raise InvalidState("16: Invalid state")
             return {"registrationId": "7", "accessToken": "new-token"}
+        if method == "put" and path == "/hue" and data:
+            hue = self.state["hue"]
+            if "bridgeUniqueId" in data:
+                # Connected to the other bridge: its entertainment areas.
+                hue.update(
+                    bridgeUniqueId=data["bridgeUniqueId"],
+                    groupId=None,
+                    groups={
+                        "new-desk": {"name": "Desk", "numLights": 2, "active": False},
+                        "new-tv": {"name": "TV area", "numLights": 1, "active": False},
+                    },
+                )
+            if "groupId" in data:
+                hue["groupId"] = data["groupId"]
         return None
 
     def sent(self, method: str = "put", path: str = "/execution") -> list[Any]:
@@ -690,6 +705,8 @@ async def test_subscribe_sync(
         "firmware": "2.5.4",
         "update": None,
         "wifi": 3,
+        "wifi_name": "example",
+        "bluetooth": None,
         "led": "normal",
         "tv_power": True,
         "ha_device": None,
@@ -778,3 +795,46 @@ async def test_configure(
         {"type": "hue_studio/sync/configure", "entry_id": "nope", "led": "off"}
     )
     assert not (await client.receive_json())["success"]
+
+
+async def test_move_box_to_bridge(
+    hass: HomeAssistant,
+    sync_box: FakeBox,
+    box_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """The bridge's button gives the box its own credentials for another bridge; the
+    box connects there and streams to the area of the same name."""
+    bridge = MockConfigEntry(
+        domain="hue", unique_id="0017881a2b3c", data={"host": "192.0.2.30"}
+    )
+    bridge.add_to_hass(hass)
+    sync_box.state["hue"]["groupId"] = "ent-tv"
+    aioclient_mock.get(
+        "https://192.0.2.30/api/config", json={"bridgeid": "001788FFFE1A2B3C"}
+    )
+    aioclient_mock.post(
+        "https://192.0.2.30/api",
+        json=[{"success": {"username": "app-key", "clientkey": "0" * 32}}],
+    )
+    coordinator = box_entry.runtime_data.sync
+    steps: list[dict[str, Any]] = []
+    area = await async_link_box_bridge(hass, coordinator, bridge.entry_id, steps.append)
+    assert area == "TV area"
+    assert [s["step"] for s in steps] == ["press", "connecting"]
+    sent = sync_box.sent("put", "/hue")
+    assert sent[0] == {
+        "bridgeUniqueId": "001788FFFE1A2B3C",
+        "username": "app-key",
+        "clientKey": "0" * 32,
+    }
+    assert sent[-1] == {"groupId": "new-tv"}
+    assert coordinator.panel_info()["bridge"] == bridge.entry_id
+
+
+async def test_box_bluetooth(
+    hass: HomeAssistant, sync_box: FakeBox, box_entry: MockConfigEntry
+) -> None:
+    """The box's Bluetooth goes on (the Hue Sync app changes its Wi-Fi over it)."""
+    await box_entry.runtime_data.sync.async_configure(bluetooth=True)
+    assert sync_box.sent("put", "/device") == [{"bluetooth": True}]

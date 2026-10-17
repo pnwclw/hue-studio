@@ -16,7 +16,7 @@ import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature, statusKey } from "../sync.ts";
-import type { BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
+import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -35,8 +35,16 @@ export class BridgesView extends StudioView {
   /** The name being typed (null: not renaming). */
   @state() private accessor name: string | null = null;
   @state() private accessor busy = false;
+  /** A Sync Box's sheet: its bridge or its Wi-Fi. */
+  @state() private accessor boxSheet: "bridge" | "wifi" | null = null;
+  /** The bridge the box goes to, and how linking it goes (`until`: the button's deadline, ms). */
+  @state() private accessor boxTarget: string | null = null;
+  @state() private accessor boxLink: { event: BoxBridgeEvent; until: number } | null = null;
+  @state() private accessor now = Date.now();
   private stop?: () => void;
   private stopMove?: () => void;
+  private stopBoxLink?: () => void;
+  private ticker?: ReturnType<typeof setInterval>;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -50,6 +58,7 @@ export class BridgesView extends StudioView {
     super.disconnectedCallback();
     this.stop?.();
     this.stopMove?.();
+    this.cancelBoxLink();
   }
 
   protected override render() {
@@ -65,7 +74,8 @@ export class BridgesView extends StudioView {
     }
     if (this.item) {
       const box = ctx.boxes[this.item];
-      if (box) return this.boxPage(this.item, box);
+      // The box's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
+      if (box) return html`${this.boxPage(this.item, box)}${this.boxSheet ? this.renderBoxSheet(this.item, box) : nothing}`;
       const bridge = this.bridges?.[this.item];
       if (bridge) return this.bridgePage(this.item, bridge);
       return this.screen(
@@ -319,6 +329,20 @@ export class BridgesView extends StudioView {
             </div>
           </div>
           ${!this.direct(box) ? this.link("mdi:link-plus", t("bridges.box_pair"), t("bridges.box_pair_sub"), () => ctx.openSettings(), true) : nothing}
+          ${settings
+            ? html`${this.link(
+                "mdi:router-wireless",
+                t("bridges.box_bridge", { bridge: this.bridgeLabel(box.bridge) }),
+                t("bridges.box_bridge_sub"),
+                () => this.openBoxSheet("bridge", box),
+              )}
+              ${this.link(
+                "mdi:wifi",
+                t("bridges.box_wifi", { network: device.wifi_name || t("bridges.wifi_none") }),
+                wifi ? t(`bridges.wifi_${wifi}` as StringKey) : "",
+                () => this.openBoxSheet("wifi", box),
+              )}`
+            : nothing}
         </div>
         <h2 class="label">${t("bridges.about")}</h2>
         <div class="rows">
@@ -336,6 +360,115 @@ export class BridgesView extends StudioView {
           : nothing}`,
       "settings-page",
     );
+  }
+
+  private bridgeLabel(id: string | null | undefined): string {
+    return (id && (this.bridges?.[id]?.name ?? this.ctx.rooms?.bridges?.[id])) || this.ctx.t("bridges.box_bridge_unknown");
+  }
+
+  private openBoxSheet(sheet: "bridge" | "wifi", box: SyncBoxInfo): void {
+    haptic("selection");
+    this.cancelBoxLink();
+    this.boxSheet = sheet;
+    this.boxTarget = Object.keys(this.bridges ?? {}).find((id) => id !== box.bridge) ?? null;
+  }
+
+  private closeBoxSheet(): void {
+    this.cancelBoxLink();
+    this.boxSheet = null;
+  }
+
+  private cancelBoxLink(): void {
+    clearInterval(this.ticker);
+    this.stopBoxLink?.();
+    this.stopBoxLink = undefined;
+    this.boxLink = null;
+  }
+
+  /** Move the box to the bridge picked: its button, then the box connects. */
+  private linkBox(entryId: string, target: string): void {
+    haptic("light");
+    this.cancelBoxLink();
+    this.boxLink = { event: { step: "connecting" }, until: 0 };
+    this.ticker = setInterval(() => (this.now = Date.now()), 500);
+    this.stopBoxLink = this.ctx.watch<BoxBridgeEvent>(
+      "hue_studio/sync/link_bridge",
+      (event) => {
+        if (!this.boxLink) return;
+        const until = event.step === "press" ? Date.now() + event.timeout * 1000 : this.boxLink.until;
+        this.boxLink = { event, until };
+        if (event.step === "done" || event.step === "failed") {
+          clearInterval(this.ticker);
+          this.stopBoxLink?.();
+          this.stopBoxLink = undefined;
+          haptic(event.step === "done" ? "success" : "failure");
+        }
+      },
+      { entry_id: entryId, hue_entry_id: target },
+    );
+  }
+
+  private renderBoxSheet(id: string, box: SyncBoxInfo): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const device: Partial<SyncBoxDevice> = box.device ?? {};
+    const title = t(this.boxSheet === "bridge" ? "bridges.box_bridge_title" : "bridges.box_wifi_title");
+    let content: TemplateResult;
+    if (this.boxSheet === "wifi") {
+      content = html`<p class="hint">${t("bridges.box_wifi_text", { network: device.wifi_name || t("bridges.wifi_none") })}</p>
+        <div class="rows">
+          <div class="item">
+            <ha-icon icon="mdi:bluetooth"></ha-icon>
+            <div class="grow">${t("bridges.box_bluetooth")}<div class="dim small">${t("bridges.box_bluetooth_sub")}</div></div>
+            ${toggle(!!device.bluetooth, t("bridges.box_bluetooth"), () => {
+              haptic("selection");
+              void ctx.ws({ type: "hue_studio/sync/configure", entry_id: id, bluetooth: !device.bluetooth });
+            })}
+          </div>
+        </div>
+        <p class="hint">${t("bridges.box_wifi_follow")}</p>`;
+    } else {
+      const others = Object.entries(this.bridges ?? {}).filter(([bid]) => bid !== box.bridge);
+      const target = this.boxTarget;
+      const link = this.boxLink;
+      const name = this.bridgeLabel(target);
+      const left = link?.event.step === "press" ? Math.max(0, Math.ceil((link.until - this.now) / 1000)) : 0;
+      content = link
+        ? html`<div class="link-state">
+            ${link.event.step === "done"
+              ? html`<div class="link-icon ok">${icon("check")}</div>
+                  <p class="lead center-text">${t("bridges.box_moved", { bridge: name, area: link.event.area ?? "" })}</p>
+                  <div class="link-actions"><button class="pill go" @click=${() => this.closeBoxSheet()}>${t("qr.done")}</button></div>`
+              : link.event.step === "failed"
+                ? html`<p class="lead center-text error">${t(`bridges.box_link_${link.event.reason}` as StringKey, { bridge: name })}</p>
+                    <div class="link-actions"><button class="pill go" @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_link_again")}</button></div>`
+                : html`<span class="spinner big"></span>
+                    <p class="lead center-text">${link.event.step === "press" ? t("bridges.box_press", { bridge: name, seconds: left }) : t("bridges.box_connecting", { bridge: name })}</p>
+                    <div class="link-actions"><button class="pill" @click=${() => this.cancelBoxLink()}>${t("bridge_add.cancel")}</button></div>`}
+          </div>`
+        : html`<p class="hint">${t("bridges.box_bridge_text", { bridge: this.bridgeLabel(box.bridge) })}</p>
+            ${others.length
+              ? html`<div class="chips wrap">
+                    ${others.map(
+                      ([bid, b]) => html`<button class=${classMap({ chip: true, on: bid === target })} @click=${() => (this.boxTarget = bid)}>
+                        <ha-icon icon="mdi:router-wireless"></ha-icon>${b.name}
+                      </button>`,
+                    )}
+                  </div>
+                  <div class="center sheet-actions">
+                    <button class="pill go" ?disabled=${!target} @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_move", { bridge: name })}</button>
+                  </div>`
+              : html`<p class="hint">${t("bridges.box_no_other")}</p>`}`;
+    }
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && this.closeBoxSheet()}>
+      <div class="box form sensor-sheet" role="dialog" aria-label=${title}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${() => this.closeBoxSheet()}>${icon("close")}</button>
+          <div class="grow">${title}</div>
+        </div>
+        <div class="form-body">${content}</div>
+      </div>
+    </div>`;
   }
 
   private motionAreas(bridges: BridgesMessage): TemplateResult {

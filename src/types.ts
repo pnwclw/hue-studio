@@ -248,6 +248,13 @@ export interface MoveState {
   log: MoveLogEntry[];
 }
 
+/** Steps of moving a Sync Box to another bridge (hue_studio/sync/link_bridge). */
+export type BoxBridgeEvent =
+  | { step: "press"; timeout: number }
+  | { step: "connecting" }
+  | { step: "done"; area: string | null }
+  | { step: "failed"; reason: string };
+
 /** Steps of linking a bridge (hue_studio/bridges/link). */
 export type BridgeLinkEvent =
   | { step: "connecting" }
@@ -501,6 +508,8 @@ export interface SyncBoxInfo {
   video_supported?: boolean;
   audio_supported?: boolean;
   connection?: string | null;
+  /** The native hue entry of the bridge it streams to (paired directly). */
+  bridge?: string | null;
   /** Direct pairing only (not a box linked through huesyncbox). */
   features?: ("palette" | "background_lighting" | "presets" | "ir" | "settings")[];
   /** The box itself (settings only for a box paired directly). */
@@ -539,6 +548,10 @@ export interface SyncBoxDevice {
   update: string | null;
   /** Wi-Fi strength 0 (none) to 4, or null (wired or unknown). */
   wifi: number | null;
+  /** The Wi-Fi network's name. */
+  wifi_name?: string | null;
+  /** Its Bluetooth is on (the Hue Sync app changes its Wi-Fi over it). */
+  bluetooth?: boolean | null;
   led: "off" | "dimmed" | "normal" | null;
   /** Turns on and off with the TV (HDMI CEC). */
   tv_power: boolean | null;
