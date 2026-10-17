@@ -8,6 +8,8 @@ import type { BridgeDevices, BridgesMessage, DevicesMessage, HassData, HueDevice
 export const MAX_SERIALS = 10;
 /** How long a search takes, about (the bridge says when it is over). */
 export const SEARCH_MS = 60_000;
+/** Searches in a row while nothing joined (a light may be switched off and on meanwhile). */
+export const SEARCH_ROUNDS = 3;
 /** A search the bridge never reported as running is over after this. */
 const SEARCH_SILENT_MS = 10_000;
 /** A search the bridge keeps reporting as running is shown as over after this. */

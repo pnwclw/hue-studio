@@ -18,6 +18,7 @@ import {
   newDevices,
   parseSerials,
   searchOver,
+  SEARCH_ROUNDS,
   searchProgress,
   withCodes,
 } from "../devices.ts";
@@ -71,6 +72,10 @@ export class DeviceAddView extends StudioView {
   @state() private accessor scanning = false;
   /** When the search started (ms) and whether the bridge reported it running since. */
   @state() private accessor started = 0;
+  /** Searches in a row (another starts while nothing joined) and when the first started (ms). */
+  @state() private accessor round = 1;
+  private firstStarted = 0;
+  private searchMsg: ({ type: string } & Record<string, unknown>) | null = null;
   private seenActive = false;
   @state() private accessor now = Date.now();
   /** The device being set up, its draft and the devices set up so far. */
@@ -111,6 +116,7 @@ export class DeviceAddView extends StudioView {
     this.bridge = searching[0];
     this.seenActive = true;
     this.started = (searching[1].search_started ?? Date.now() / 1000) * 1000;
+    this.firstStarted = this.started;
     this.go("search");
   }
 
@@ -145,6 +151,11 @@ export class DeviceAddView extends StudioView {
     const bridge = this.devices?.[this.bridgeId ?? ""];
     if (bridge?.searching) this.seenActive = true;
     if (searchOver(bridge, this.started, Date.now(), this.seenActive)) {
+      // Nothing joined yet: search again, a few times (a light may come on meanwhile).
+      if (this.searchMsg && this.round < SEARCH_ROUNDS && !newDevices(this.devices, this.firstStarted - 5000).length) {
+        void this.searchAgain();
+        return;
+      }
       haptic("success");
       this.go("results");
     }
@@ -278,7 +289,7 @@ export class DeviceAddView extends StudioView {
     const { t } = this.ctx;
     const progress = searchProgress(this.started, this.now);
     const left = Math.max(0, Math.ceil((60_000 - (this.now - this.started)) / 1000));
-    const found = newDevices(this.devices, this.started - 5000);
+    const found = newDevices(this.devices, (this.firstStarted || this.started) - 5000);
     const r = 54;
     const c = 2 * Math.PI * r;
     return html`<div class="search-ring" role="status" aria-live="polite">
@@ -292,6 +303,14 @@ export class DeviceAddView extends StudioView {
         </div>
       </div>
       <p class="lead center-text">${t("add_device.searching_hint")}</p>
+      ${this.round > 1 ? html`<p class="lead small center-text dim">${t("add_device.round", { round: this.round, rounds: SEARCH_ROUNDS })}</p>` : nothing}
+      ${this.kind !== "accessory" && !found.length
+        ? html`<div class="power-cycle">
+            <ha-icon icon="mdi:power-cycle"></ha-icon>
+            <h2 class="link-title">${t("add_device.power_title")}</h2>
+            <p class="lead center-text">${t("add_device.power_text")}</p>
+          </div>`
+        : nothing}
       ${found.length
         ? html`<h2 class="label">${t("add_device.found_count", { count: found.length })}</h2>
             <div class="rows">${found.map((d) => this.deviceRow(d, false))}</div>
@@ -434,21 +453,37 @@ export class DeviceAddView extends StudioView {
     const bridge = this.bridgeId;
     if (!bridge) return;
     this.busy = true;
-    const ok = await ctx.ws({
+    const msg = {
       type: "hue_studio/devices/search",
       hue_entry_id: bridge,
       serials: parseSerials(this.serials).codes,
       install_codes: withCodes(this.qr, parseSerials(this.serials).qr),
       other_brands: this.kind === "other",
-    });
+    };
+    const ok = await ctx.ws(msg);
     this.busy = false;
     if (!ok) return;
     haptic("success");
     this.bridge = bridge;
+    this.searchMsg = msg;
+    this.round = 1;
     this.started = Date.now();
+    this.firstStarted = this.started;
     this.now = this.started;
     this.seenActive = false;
     this.go("search");
+  }
+
+  /** The next search of a few in a row. */
+  private async searchAgain(): Promise<void> {
+    if (!this.searchMsg || this.busy) return;
+    this.busy = true;
+    this.round += 1;
+    this.started = Date.now();
+    this.seenActive = false;
+    const ok = await this.ctx.ws(this.searchMsg);
+    this.busy = false;
+    if (!ok) this.go("results");
   }
 
   private async save(d: FoundDevice): Promise<void> {
