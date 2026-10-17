@@ -470,11 +470,8 @@ async def _run(hass: HomeAssistant) -> dict[str, Any]:
 async def _move(
     hass: HomeAssistant, selection: migration.Selection, serials: list[str] = ()
 ) -> dict[str, Any]:
-    """Start, let the old bridge let go, switch the lights off and on, search."""
+    """Start: the old bridge lets go, the new one searches."""
     await migration.async_start_move(hass, selection, list(serials))
-    memo = await _run(hass)
-    assert memo["step"] == "power_cycle"
-    await migration.async_continue_move(hass, [])
     return await _run(hass)
 
 
@@ -573,7 +570,6 @@ async def test_move_bridge(hass: HomeAssistant, world: SimpleNamespace) -> None:
     whole, and the old bridge is left empty."""
     a_id, b_id = world.entries["a"].entry_id, world.entries["b"].entry_id
     world.joining = ["desk", "lamp", "other"]
-    # A whole bridge searches at once: no pause to switch the lights off and on.
     await migration.async_start_move(
         hass, migration.async_select_bridge(hass, a_id, b_id), []
     )

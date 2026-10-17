@@ -64,13 +64,14 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
   - everything is remembered first, in a Store (`hue_studio.move`), so a restart in
     between loses nothing: devices (Zigbee MAC, names, light settings, every HA entity),
     the rooms that move whole, zones, scenes, entertainment areas;
-  - the old bridge lets the devices go (deleted there). Moving part of a bridge, the
-    move then pauses until the user has switched the lights off at the wall for about 10
-    seconds and on again (switches and sensors: reset with their setup button) — tried
-    live: a light that was only deleted did not look for a new bridge. A whole bridge
-    searches at once;
+  - the old bridge lets the devices go (deleted there);
   - the new bridge searches (a few rounds of about a minute; serial numbers are passed
-    on) and knows each device again by its Zigbee MAC; name, archetype, function and
+    on). A light that was let go looks for a bridge open to it only as it is switched
+    on (a Zigbee device steers into an open network as it starts) — tried live: one only
+    deleted joined neither bridge — so moving part of a bridge the panel asks, while the search runs,
+    to switch the lights off at the wall for about 10 seconds and on again (switches and
+    sensors: reset with their setup button). The new bridge knows each device again by
+    its Zigbee MAC; name, archetype, function and
     power-on come back, and in HA every entity of a device takes the old entity id, name,
     icon, labels, area and enabled/hidden state;
   - a room that moved whole is made again on the new bridge (name, archetype, devices);

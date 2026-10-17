@@ -174,7 +174,7 @@ export interface MovePlan {
   over_limit: boolean;
 }
 
-export type MoveStep = "saving" | "removing" | "power_cycle" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
+export type MoveStep = "saving" | "removing" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
 
 /** A move to another bridge as it goes (hue_studio/bridges/move/subscribe); null: none. */
 export interface MoveState {

@@ -587,9 +587,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   bridgesMessage["hue-entry"].rooms = Object.entries(GROUPS).filter(([g, v]) => v[1] === "room" && groupBridge(g) === "hue-entry").length;
   bridgesMessage["hue-entry"].zones = Object.values(GROUPS).filter((v) => v[1] === "zone").length;
   const bridgeListeners = new Set<(m: unknown) => void>();
-  // Moving to another bridge (?bridges=two): a simulated run (the old bridge lets go, then
-  // it waits for "Continue"); ?move=power_cycle|searching|waiting|done starts the page with
-  // a move in that state (the living room to the Garden Bridge); &movefail=1: one not found.
+  // Moving to another bridge (?bridges=two): a simulated run; ?move=searching|waiting|done
+  // starts the page with a move in that state (the living room to the Garden Bridge);
+  // &movefail=1: one not found.
   const moveListeners = new Set<(m: unknown) => void>();
   const moveTimers: ReturnType<typeof setTimeout>[] = [];
   const movingLights = (msg: Record<string, unknown>): string[] =>
@@ -602,14 +602,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     lights.map((l, i) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: found(i) }));
   let move: MoveState | null = null;
   const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
-  /** Steps from `from` on, `missing` devices never found; stops at the pause unless past it. */
+  /** These steps one after another, `missing` devices never found. */
   const runMove = (steps: MoveState["step"][], missing: number) => {
     moveTimers.splice(0).forEach(clearTimeout);
     steps.forEach((step, i) =>
       moveTimers.push(setTimeout(() => {
         if (!move) return;
         const searching = step === "searching";
-        move = { ...move, step, running: step !== "done" && step !== "power_cycle", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
+        move = { ...move, step, running: step !== "done", error: null, searching_until: searching ? Date.now() / 1000 + 60 : null };
         const total = move.devices.length;
         if (searching) move.devices = move.devices.map((d, j) => ({ ...d, found: j === 0 && total - missing > 0 }));
         if (step === "restoring") {
@@ -630,7 +630,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       step: seedMove as MoveState["step"], error: seedMove === "waiting" ? "not_found" : null, source: "hue-entry", target: "hue-entry-2",
       source_name: "Hue Bridge", target_name: "Garden Bridge", rooms: ["Living room"], whole_bridge: false, area: "living_room",
       searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching",
-      devices: moveDevices(lights, (i) => seedMove === "done" || (seedMove !== "power_cycle" && i < (seedMove === "waiting" ? 3 : 2))),
+      devices: moveDevices(lights, (i) => seedMove === "done" || i < (seedMove === "waiting" ? 3 : 2)),
     };
   }
   const pushBridges = () => setTimeout(() => bridgeListeners.forEach((cb) => cb(structuredClone(bridgesMessage))), 60);
@@ -1101,15 +1101,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           searching_until: null, running: true, devices: moveDevices(lights, () => false),
         };
         pushMove();
-        // A whole bridge searches at once; part of one waits for the lights to be switched off and on.
-        runMove(msg.bridge ? ["removing", "searching", "restoring", "rooms", "scenes", "done"] : ["removing", "power_cycle"], 0);
+        runMove(["removing", "searching", "restoring", "rooms", "scenes", "done"], !msg.bridge && params.get("movefail") === "1" ? 1 : 0);
         return null as T;
       }
-      if (msg.type === "hue_studio/bridges/move/continue" || msg.type === "hue_studio/bridges/move/retry") {
+      if (msg.type === "hue_studio/bridges/move/retry") {
         if (move) move = { ...move, running: true, error: null, ...(msg.target ? { target: String(msg.target), target_name: "Hue Bridge" } : {}) };
         pushMove();
-        const fail = msg.type === "hue_studio/bridges/move/continue" && params.get("movefail") === "1" ? 1 : 0;
-        runMove(["searching", "restoring", "rooms", "scenes", "done"], fail);
+        runMove(["searching", "restoring", "rooms", "scenes", "done"], 0);
         return null as T;
       }
       if (msg.type === "hue_studio/bridges/move/finish") {

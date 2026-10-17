@@ -10,15 +10,15 @@ the Hue app's own steps go, and Home Assistant keeps their entity ids, names and
    (name, archetype, devices, scenes), the zones and entertainment areas of the moving
    lights.
 2. The old bridge lets the devices go (they are deleted there).
-3. Moving part of a bridge (a room, lights), a pause: the user switches the lights
-   off at the wall for about 10 seconds and on again (such a light only looks for a new
-   bridge after that) and resets switches and sensors with their setup button. A whole
-   bridge searches at once.
-4. The new bridge searches (about a minute, a few times) and knows each device again by
-   its Zigbee MAC; serial numbers let it reset lights close to it itself.
-5. Name, archetype, function and power-on are set again; in HA every entity of a device
+3. The new bridge searches (about a minute, a few times) and knows each device again by
+   its Zigbee MAC. A light let go looks for a bridge open to it only as it is switched
+   on, so moving part of a bridge (a room, lights) the panel asks, while the search
+   runs, to switch the lights off at the wall for about 10 seconds and on again (and to
+   reset switches and sensors with their setup button); serial numbers let the new
+   bridge reset lights close to it itself.
+4. Name, archetype, function and power-on are set again; in HA every entity of a device
    takes over the old entity id, name, icon, labels, area and enabled/hidden state.
-6. Rooms: a room that moves whole is made again on the new bridge (its name, archetype
+5. Rooms: a room that moves whole is made again on the new bridge (its name, archetype
    and devices; a room of that name there takes them in); lights going to another area
    follow room alignment. Then the scenes of moved rooms are copied, zones and
    entertainment areas whose lights all moved are copied (and deleted on the old
@@ -521,9 +521,6 @@ def async_remember(hass: HomeAssistant, selection: Selection) -> dict[str, Any]:
             for config, whole in _entertainment_touched(bridge, light_ids)
         ],
         "step": "saving",
-        # Moving part of a bridge, the move pauses until the user switched the lights
-        # off and on (and reset switches and sensors); a whole bridge searches at once.
-        "ready": selection.whole_bridge,
         "started": time.time(),
         "error": None,
         "searching_until": None,
@@ -573,7 +570,6 @@ def _upgrade(memo: dict[str, Any]) -> dict[str, Any] | None:
         if room
         else [],
         whole_bridge=False,
-        ready=True,
         entertainment=[],
     )
     for device in memo["devices"]:
@@ -593,7 +589,7 @@ async def async_setup_moves(hass: HomeAssistant) -> None:
         await mover.store.async_remove()
     if memo:
         mover.memo = memo
-        if memo.get("step") not in ("done", "failed", "power_cycle"):
+        if memo.get("step") not in ("done", "failed"):
             memo.update(step="waiting", error="interrupted", searching_until=None)
 
 
@@ -677,25 +673,14 @@ def _check_idle(mover: Mover, *, memo: bool) -> None:
 async def async_start_move(
     hass: HomeAssistant, selection: Selection, serials: list[str]
 ) -> None:
-    """Start a move (one at a time): the old bridge lets the devices go, then the move
-    waits for the lights to be switched off and on (async_continue_move)."""
+    """Start a move (one at a time): the old bridge lets the devices go, the new one
+    searches (meanwhile the lights are switched off and on)."""
     mover = _mover(hass)
     _check_idle(mover, memo=False)
     memo = async_remember(hass, selection)
     memo["serials"] = serials
     mover.memo = memo
     await mover.async_save()
-    _start(mover)
-
-
-async def async_continue_move(hass: HomeAssistant, serials: list[str]) -> None:
-    """The lights were switched off and on (switches and sensors reset): search."""
-    mover = _mover(hass)
-    _check_idle(mover, memo=True)
-    assert mover.memo is not None
-    mover.memo.update(ready=True, error=None)
-    if serials:
-        mover.memo["serials"] = serials
     _start(mover)
 
 
@@ -717,7 +702,7 @@ async def async_retry_move(
                 translation_domain=DOMAIN, translation_key="move_busy"
             )
         mover.memo["target"] = target
-    mover.memo.update(serials=serials, error=None, ready=True)
+    mover.memo.update(serials=serials, error=None)
     _start(mover)
 
 
@@ -779,7 +764,7 @@ async def _async_move(hass: HomeAssistant, mover: Mover, memo: dict[str, Any]) -
     pending = [d for d in memo["devices"] if d["new_id"] is None]
 
     # The old bridge lets them go first: a light joins another bridge only once its
-    # own has forgotten it (and it was switched off and on).
+    # own has forgotten it (and, switched off and on, finds the search open).
     if any(not d["removed"] for d in pending):
         if source is None:
             raise MoveError("source_offline")
@@ -787,10 +772,6 @@ async def _async_move(hass: HomeAssistant, mover: Mover, memo: dict[str, Any]) -
         for device in pending:
             await _async_remove(source, device)
         await mover.async_save()
-    if pending and not memo["ready"]:
-        await mover.async_step("power_cycle")
-        return
-
     if pending:
         await _async_search(hass, mover, target, memo)
     found = [d for d in memo["devices"] if d["new_id"] is not None]

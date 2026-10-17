@@ -72,7 +72,6 @@ from .lights import (
 from .migration import (
     SIGNAL_MOVE_UPDATED,
     Selection,
-    async_continue_move,
     async_finish_move,
     async_move_payload,
     async_move_plan,
@@ -141,7 +140,6 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_move_retry,
         ws_move_finish,
         ws_subscribe_move,
-        ws_move_continue,
         ws_configure_sync_box,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -1030,8 +1028,8 @@ async def ws_move(
     msg: dict[str, Any],
 ) -> None:
     """Start moving a bridge, a room or lights to another bridge (watched with
-    hue_studio/bridges/move/subscribe): the old bridge lets them go, then the move
-    waits for hue_studio/bridges/move/continue."""
+    hue_studio/bridges/move/subscribe): the old bridge lets them go, the new one
+    searches."""
     try:
         selection = _selection(hass, msg)
     except HomeAssistantError as err:
@@ -1059,23 +1057,6 @@ async def ws_move_retry(
     await _ws_call(
         connection, msg, async_retry_move(hass, msg["serials"], msg.get("target"))
     )
-
-
-@websocket_api.require_admin
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "hue_studio/bridges/move/continue",
-        vol.Optional("serials", default=list): SERIALS,
-    }
-)
-@websocket_api.async_response
-async def ws_move_continue(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """The lights were switched off and on (switches and sensors reset): search."""
-    await _ws_call(connection, msg, async_continue_move(hass, msg["serials"]))
 
 
 @websocket_api.require_admin

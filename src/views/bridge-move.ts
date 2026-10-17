@@ -2,9 +2,9 @@
 // (its page → "Move everything"), a room (its bridge next to "Lights") or lights going to
 // a room on another bridge. First what moves: lights, switches and sensors, rooms, scenes
 // copied, zones and entertainment areas moved or split. Then the move as it goes: the old
-// bridge lets the devices go, the user switches the lights off and on (and resets switches
-// and sensors) and continues, the new bridge finds them, and names, rooms, scenes and
-// their Home Assistant entities come back. Devices not found leave it waiting: search
+// bridge lets the devices go, the new bridge searches while the user switches the lights
+// off and on (and resets switches and sensors), and names, rooms, scenes and their Home
+// Assistant entities come back. Devices not found leave it waiting: search
 // again (serial numbers), put them back on the old bridge, or stop waiting. The move runs
 // in Home Assistant: this screen only watches it (Settings → Bridges shows it too).
 
@@ -21,9 +21,8 @@ import type { MovePlan, MoveState, MoveStep } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
-/** The steps shown while a move goes, in order (a whole bridge has no power-cycle pause). */
-const STEPS: MoveStep[] = ["removing", "power_cycle", "searching", "restoring", "rooms", "scenes"];
-const STEPS_ALL = STEPS.filter((step) => step !== "power_cycle");
+/** The steps shown while a move goes, in order. */
+const STEPS: MoveStep[] = ["removing", "searching", "restoring", "rooms", "scenes"];
 const ERRORS = ["not_found", "interrupted", "bridge", "target_offline", "source_offline"];
 
 @customElement("hue-studio-bridge-move-view")
@@ -56,7 +55,7 @@ export class BridgeMoveView extends StudioView {
       const was = this.state?.step;
       this.state = m;
       if (m && was && was !== m.step) {
-        haptic(m.step === "done" ? "success" : m.step === "waiting" || m.step === "failed" ? "failure" : m.step === "power_cycle" ? "warning" : "light");
+        haptic(m.step === "done" ? "success" : m.step === "waiting" || m.step === "failed" ? "failure" : m.step === "searching" && !m.whole_bridge ? "warning" : "light");
       }
     });
     this.ticker = setInterval(() => (this.now = Date.now()), 1000);
@@ -187,7 +186,7 @@ export class BridgeMoveView extends StudioView {
             </div>
             ${plan.over_limit ? html`<div class="rows conflicts">${this.row("mdi:alert-outline", t("move.over_limit", { bridge: plan.target_name }))}</div>` : nothing}
             <h2 class="label">${t("move.how")}</h2>
-            ${this.steps(this.bridge ? ["move.how_1", "move.how_all_2", "move.how_3", "move.how_4"] : ["move.how_1", "move.how_2", "move.how_3", "move.how_4"], params)}
+            ${this.steps(this.bridge ? ["move.how_1", "move.how_3", "move.how_all_2", "move.how_4"] : ["move.how_1", "move.how_3", "move.how_2", "move.how_4"], params)}
             <p class="lead small">${t("move.meanwhile", params)}</p>
             <div class="rows">${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
             <div class="center">
@@ -246,8 +245,7 @@ export class BridgeMoveView extends StudioView {
       </div>`;
     }
     const stuck = s.step === "waiting" || s.step === "failed";
-    const steps = s.whole_bridge ? STEPS_ALL : STEPS;
-    const reached = stuck ? -1 : steps.indexOf(s.step);
+    const reached = stuck ? -1 : STEPS.indexOf(s.step);
     const left = s.searching_until ? Math.max(0, Math.round(s.searching_until - this.now / 1000)) : 0;
     const parsed = parseSerials(this.serials);
     const bad = parsed.invalid.length > 0 || parsed.tooMany;
@@ -257,18 +255,18 @@ export class BridgeMoveView extends StudioView {
       ${stuck
         ? html`<div class="mismatch"><p>${t(`move.error_${reason}` as StringKey, params)}</p></div>`
         : html`<ol class="rows steps-list move-steps">
-            ${steps.map((step, i) => {
+            ${STEPS.map((step, i) => {
               const done = i < reached;
               const now = i === reached;
               return html`<li class=${classMap({ item: true, dim: !done && !now })}>
-                <span class="step-no">${done ? icon("check") : now && step !== "power_cycle" ? html`<span class="spinner"></span>` : i + 1}</span>
+                <span class="step-no">${done ? icon("check") : now ? html`<span class="spinner"></span>` : i + 1}</span>
                 <div class="grow">${t(`move.step_${step}` as StringKey, params)}
                   ${now && step === "searching" ? html`<div class="dim small">${t("move.searching", { found, count: s.devices.length, seconds: left })}</div>` : nothing}
                 </div>
               </li>`;
             })}
           </ol>`}
-      ${s.step === "power_cycle" ? this.powerCycle(s, parsed, bad, accessories) : nothing}
+      ${s.step === "searching" && !s.whole_bridge ? this.powerCycle(s, accessories) : nothing}
       <h2 class="label">${t("move.devices")}</h2>
       <div class="rows">
         ${s.devices.map(
@@ -300,22 +298,17 @@ export class BridgeMoveView extends StudioView {
         : nothing}`;
   }
 
-  /** The pause after the old bridge let go: switch the lights off and on, then continue. */
-  private powerCycle(s: MoveState, parsed: ReturnType<typeof parseSerials>, bad: boolean, accessories: boolean): TemplateResult {
+  /** While the new bridge searches: switch the lights off and on now (a light let go
+   * looks for a bridge open to it as it is switched on). */
+  private powerCycle(s: MoveState, accessories: boolean): TemplateResult {
     const { t } = this.ctx;
     const params = { from: s.source_name, to: s.target_name };
     return html`<div class="power-cycle">
-        <ha-icon icon="mdi:power-cycle"></ha-icon>
-        <h2 class="link-title">${t("move.power_title")}</h2>
-        <p class="lead center-text">${t("move.power_text", params)}</p>
-        ${accessories ? html`<p class="lead small center-text">${t("move.power_accessories")}</p>` : nothing}
-      </div>
-      <div class="rows">${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
-      <div class="center">
-        <button class="pill go" ?disabled=${this.busy || bad || s.running} @click=${() => this.send({ type: "hue_studio/bridges/move/continue", serials: parsed.codes })}>
-          ${t("move.continue", { bridge: s.target_name })}
-        </button>
-      </div>`;
+      <ha-icon icon="mdi:power-cycle"></ha-icon>
+      <h2 class="link-title">${t("move.power_title")}</h2>
+      <p class="lead center-text">${t("move.power_text", params)}</p>
+      ${accessories ? html`<p class="lead small center-text">${t("move.power_accessories")}</p>` : nothing}
+    </div>`;
   }
 
   private async finish(): Promise<void> {

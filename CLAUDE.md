@@ -226,7 +226,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
-                                hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/continue|move/retry|move/finish|move/subscribe,
+                                hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/finish|move/subscribe,
                                 hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
@@ -236,7 +236,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
   migration.py                  moving a whole bridge, a room (with its switches, sensors, scenes, zones, entertainment areas)
                                 or lights going to a room on another bridge: remembered in a Store, let go by the old bridge,
-                                a pause to switch the lights off and on, found by the new one by Zigbee MAC, settings and
+                                found by the new one by Zigbee MAC (the lights switched off and on while it searches), settings and
                                 rooms restored, scenes/zones/entertainment areas copied; HA keeps entity ids/names/areas;
                                 one move at a time, in the background
   bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
