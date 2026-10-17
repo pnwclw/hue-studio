@@ -8,7 +8,19 @@ import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import { type AddKind, areaOfRoom, deviceIcon, type FoundDevice, MAX_SERIALS, newDevices, parseSerials, searchOver, searchProgress } from "../devices.ts";
+import {
+  type AddKind,
+  areaOfRoom,
+  deviceIcon,
+  type FoundDevice,
+  type InstallCode,
+  MAX_SERIALS,
+  newDevices,
+  parseSerials,
+  searchOver,
+  searchProgress,
+  withCodes,
+} from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup } from "../model.ts";
@@ -16,6 +28,7 @@ import { groupBridge } from "../rooms.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { qrRows } from "./qr-scan.ts";
 
 type Step = "kind" | "prepare" | "search" | "results" | "setup";
 
@@ -53,6 +66,9 @@ export class DeviceAddView extends StudioView {
   @state() private accessor bridge: string | null = null;
   @state() private accessor serials = "";
   @state() private accessor showSerials = false;
+  /** Devices' QR codes read (their install codes), and whether the scanner is open. */
+  @state() private accessor qr: InstallCode[] = [];
+  @state() private accessor scanning = false;
   /** When the search started (ms) and whether the bridge reported it running since. */
   @state() private accessor started = 0;
   private seenActive = false;
@@ -169,7 +185,11 @@ export class DeviceAddView extends StudioView {
     else if (this.step === "results") body = this.results();
     else if (this.step === "setup" && this.current) body = this.setup(this.current);
     else body = this.kinds();
-    return this.screen(this.subHead(titles[this.step], back, end), body, "settings-page add-device");
+    // The scanner's sheet sits outside the scrolling body: a scroller (iOS) would clip it.
+    return html`${this.screen(this.subHead(titles[this.step], back, end), body, "settings-page add-device")}
+      <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning}
+        @qr-code=${(e: CustomEvent<InstallCode>) => (this.qr = withCodes(this.qr, [e.detail]))}
+        @close=${() => (this.scanning = false)}></hue-studio-qr-scan>`;
   }
 
   /** Step 1: what is added (and on which bridge). */
@@ -224,6 +244,14 @@ export class DeviceAddView extends StudioView {
       </ol>
       ${this.kind === "other" ? html`<p class="lead small">${t("add_device.other_note")}</p>` : nothing}
       <div class="rows">
+        ${this.devices?.[this.bridgeId ?? ""]?.install_codes
+          ? qrRows(ctx, {
+              codes: this.qr,
+              sub: t("qr.scan_sub"),
+              scan: () => (this.scanning = true),
+              remove: (mac) => (this.qr = this.qr.filter((c) => c.mac !== mac)),
+            })
+          : nothing}
         ${this.showSerials
           ? html`<div class="item col">
               <div class="line"><span>${t("devices.serials")}</span><span class="dim">${parsed.codes.length}/${MAX_SERIALS}</span></div>
@@ -410,6 +438,7 @@ export class DeviceAddView extends StudioView {
       type: "hue_studio/devices/search",
       hue_entry_id: bridge,
       serials: parseSerials(this.serials).codes,
+      install_codes: withCodes(this.qr, parseSerials(this.serials).qr),
       other_brands: this.kind === "other",
     });
     this.busy = false;

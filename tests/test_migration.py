@@ -403,12 +403,19 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
         return found
 
     searches: list[tuple[str, list[str], bool]] = []
+    codes: list[list[dict[str, str]]] = []
 
-    async def search(_hass: HomeAssistant, entry_id: str, serials: list[str]) -> None:
+    async def search(
+        _hass: HomeAssistant,
+        entry_id: str,
+        serials: list[str],
+        install_codes: list[dict[str, str]] | None = None,
+    ) -> None:
         """Devices let go by their bridge and switched off and on (`joining`) join the
         searching bridge; with serial numbers it takes them from another bridge too."""
         # Whether the old bridge still had the desk when the search started.
         searches.append((entry_id, serials, a.devices.get("a-desk") is not None))
+        codes.append(install_codes or [])
         target = bridges[entry_id]
         for key in world.joining:
             elsewhere = any(
@@ -438,6 +445,7 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
         office=office.id,
         hall=hall.id,
         searches=searches,
+        codes=codes,
         joining=["desk", "lamp"],
     )
 
@@ -495,6 +503,7 @@ async def test_plan(hass: HomeAssistant, world: SimpleNamespace) -> None:
         {"name": "All", "whole": False},
     ]
     assert plan["entertainment"] == [{"name": "TV", "whole": True}]
+    assert set(plan["macs"]) == {MAC["desk"].upper(), MAC["lamp"].upper()}
     assert (plan["target_name"], plan["over_limit"]) == ("Bridge B", False)
     # One light into another area: no room moves with it.
     one = migration.async_select(hass, b, lights=["light.desk"], to_area=world.hall)
@@ -626,9 +635,14 @@ async def test_not_found_then_retry(
     with pytest.raises(ServiceValidationError):
         await migration.async_start_move(hass, selection, [])
     world.joining = ["desk", "lamp"]
-    await migration.async_retry_move(hass, ["XYZ789"])
+    # The lamp's QR code: its MAC and install code go to the search.
+    qr = {"mac": MAC["lamp"].replace(":", "").lower(), "code": "ab" * 18}
+    await migration.async_retry_move(hass, ["XYZ789"], install_codes=[qr])
     memo = await _run(hass)
     assert memo["step"] == "done"
+    assert world.codes[-1] == [{"mac": MAC["lamp"].upper(), "code": "AB" * 18}]
+    payload = migration.async_move_payload(hass)
+    assert [x["qr"] for x in payload["devices"]] == [False, True]
     assert _unique_id(hass, "light.lamp")[0] == b_id
     assert _unique_id(hass, "scene.office_read")[0] == b_id
 

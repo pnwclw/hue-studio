@@ -215,3 +215,57 @@ export function reserveBottom(px: number | null): void {
   if (px === null) style.removeProperty("--safe-area-inset-bottom");
   else style.setProperty("--safe-area-inset-bottom", `calc(env(safe-area-inset-bottom, 0px) + ${px}px)`);
 }
+
+/** The companion app's message bus (`hass.auth.external`, HA's ExternalMessaging). */
+interface ExternalBus {
+  config?: { hasBarCodeScanner?: number };
+  fireMessage(msg: Record<string, unknown>): void;
+  receiveMessage(msg: { id: number; type: string; command?: string; payload?: { rawValue?: string } }): void;
+}
+
+const externalBus = (hass: unknown): ExternalBus | undefined => (hass as { auth?: { external?: ExternalBus } })?.auth?.external;
+
+/** Whether the companion app scans QR codes itself (HA's QR scanner then uses it too). */
+export const appScansQr = (hass: unknown): boolean => Boolean(externalBus(hass)?.config?.hasBarCodeScanner);
+
+/**
+ * Scan QR codes with the companion app's own scanner, the way HA's `ha-qr-scanner` does
+ * (`bar_code/scan`, answered by `bar_code/scan_result` / `bar_code/aborted` commands).
+ * HA's bus has one command handler, which forwards scan results only to its own
+ * listeners, so the bus's `receiveMessage` is wrapped while the scanner is open.
+ * `take(raw)` gets every code read: a message keeps the scanner open and is shown in it
+ * (a code that is not right, or one taken while more can follow), null closes it.
+ * Resolves when the scanner closes.
+ */
+export function scanQrWithApp(
+  hass: unknown,
+  text: { title: string; description: string },
+  take: (raw: string) => string | null,
+): Promise<void> {
+  const bus = externalBus(hass);
+  if (!bus) return Promise.resolve();
+  return new Promise((resolve) => {
+    const own = Object.prototype.hasOwnProperty.call(bus, "receiveMessage");
+    const original = bus.receiveMessage;
+    const close = () => {
+      if (own) bus.receiveMessage = original;
+      else delete (bus as Partial<ExternalBus>).receiveMessage;
+      resolve();
+    };
+    bus.receiveMessage = function (msg) {
+      if (msg.type !== "command" || (msg.command !== "bar_code/scan_result" && msg.command !== "bar_code/aborted")) {
+        return original.call(this, msg);
+      }
+      bus.fireMessage({ id: msg.id, type: "result", success: true, result: null });
+      if (msg.command === "bar_code/aborted") return close();
+      const message = take(msg.payload?.rawValue ?? "");
+      if (message !== null) {
+        bus.fireMessage({ type: "bar_code/notify", payload: { message } });
+        return;
+      }
+      bus.fireMessage({ type: "bar_code/close" });
+      close();
+    };
+    bus.fireMessage({ type: "bar_code/scan", payload: text });
+  });
+}

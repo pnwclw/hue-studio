@@ -35,7 +35,13 @@ from aiohue.v2.models.device import Device, DeviceMetaDataPut, DevicePut
 from aiohue.v2.models.feature import MotionSensingFeatureSensitivityPut
 from aiohue.v2.models.motion import MotionPut
 from aiohue.v2.models.resource import ResourceTypes
-from aiohue.v2.models.zigbee_device_discovery import SearchActionType
+from aiohue.v2.models.zigbee_device_discovery import (
+    AddInstallCodes,
+    InstallCode,
+    SearchActionType,
+    ZigbeeDeviceDiscoveryActionPut,
+    ZigbeeDeviceDiscoveryPut,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import (
@@ -54,6 +60,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SIGNAL_DEVICES_UPDATED = f"{DOMAIN}_devices_updated"
 MAX_SERIALS = 10
+MAX_INSTALL_CODES = 50
 NAME_MAX = 32
 LIGHT_FUNCTIONS = ("functional", "decorative", "mixed")
 # Power-up presets the panel can pick; "custom" (set in the Hue app) is shown, not set.
@@ -342,6 +349,7 @@ def async_devices_payload(hass: HomeAssistant) -> dict[str, Any]:
             if searching
             else None,
             "other_brands": _other_brands(bridge),
+            "install_codes": takes_install_codes(bridge),
             "devices": listed,
         }
     return payload
@@ -358,17 +366,36 @@ def _bridge(hass: HomeAssistant, hue_entry_id: str | None) -> dict[str, HueBridg
     return {hue_entry_id: bridges[hue_entry_id]}
 
 
+def install_code(mac: str, code: str) -> dict[str, str]:
+    """A device's Zigbee MAC and install code (from its QR code) as the bridge takes
+    them: `AA:BB:CC:DD:EE:FF:00:11` and 36 hex digits."""
+    digits = "".join(c for c in mac if c not in ":-. ").upper()
+    return {
+        "mac": ":".join(digits[i : i + 2] for i in range(0, len(digits), 2)),
+        "code": code.strip().upper(),
+    }
+
+
+def takes_install_codes(bridge: HueBridgeV2) -> bool:
+    """Whether the bridge lets devices join by their install code (Bridge Pro)."""
+    items = _discovery(bridge)
+    return bool(items) and getattr(items[0], "add_install_codes", None) is not None
+
+
 async def async_search(
     hass: HomeAssistant,
     hue_entry_id: str | None,
     serials: list[str],
     other_brands: bool = False,
+    install_codes: list[dict[str, str]] | None = None,
 ) -> None:
     """Let new devices join (about a minute); serial numbers find reset or far ones,
-    `other_brands` also lets Zigbee lights of other brands join."""
+    `other_brands` also lets Zigbee lights of other brands join, install codes (a
+    device's QR code) let those devices in where the bridge takes them."""
     async_watch_bridges(hass)
     setup = _setup(hass)
     codes = [s.strip().upper() for s in serials if s.strip()][:MAX_SERIALS]
+    keys = [install_code(c["mac"], c["code"]) for c in install_codes or []]
     for entry_id, bridge in _bridge(hass, hue_entry_id).items():
         items = _discovery(bridge)
         if not items:
@@ -378,10 +405,29 @@ async def async_search(
         extra: dict[str, Any] = {}
         if other_brands and _other_brands(bridge):
             extra["action_type"] = SearchActionType.SEARCH_ALLOW_DEFAULT_LINK_KEY
+        discovery = bridge.config.zigbee_device_discovery
         try:
-            await bridge.config.zigbee_device_discovery.search(
-                items[0].id, search_codes=codes or None, **extra
-            )
+            if keys and takes_install_codes(bridge):
+                # The bridge takes install codes only together with a search.
+                await discovery.update(
+                    items[0].id,
+                    ZigbeeDeviceDiscoveryPut(
+                        action=ZigbeeDeviceDiscoveryActionPut(
+                            action_type=extra.get(
+                                "action_type", SearchActionType.SEARCH
+                            ),
+                            search_codes=codes or None,
+                        ),
+                        add_install_codes=AddInstallCodes(
+                            install_codes=[
+                                InstallCode(mac_address=k["mac"], ic=k["code"])
+                                for k in keys[:MAX_INSTALL_CODES]
+                            ]
+                        ),
+                    ),
+                )
+            else:
+                await discovery.search(items[0].id, search_codes=codes or None, **extra)
         except (AiohueException, ClientError, TimeoutError) as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN, translation_key="search_failed"

@@ -42,6 +42,7 @@ from .const import (
 )
 from .devices import (
     LIGHT_FUNCTIONS,
+    MAX_INSTALL_CODES,
     MAX_SERIALS,
     POWER_ON_PRESETS,
     SIGNAL_DEVICES_UPDATED,
@@ -570,6 +571,20 @@ async def _ws_call(
     connection.send_result(msg["id"])
 
 
+# A device's Zigbee MAC (16 hex digits, separators allowed) and install code (36 hex
+# digits), read from its QR code.
+MAC_PATTERN = r"^(?:[0-9A-Fa-f]{2}[:\-]?){7}[0-9A-Fa-f]{2}$"
+INSTALL_CODES = vol.All(
+    [
+        {
+            vol.Required("mac"): vol.Match(MAC_PATTERN),
+            vol.Required("code"): vol.Match(r"^[0-9A-Fa-f]{36}$"),
+        }
+    ],
+    vol.Length(max=MAX_INSTALL_CODES),
+)
+
+
 @websocket_api.require_admin
 @websocket_api.websocket_command(
     {
@@ -578,6 +593,7 @@ async def _ws_call(
         vol.Optional("serials", default=list): vol.All(
             [cv.string], vol.Length(max=MAX_SERIALS)
         ),
+        vol.Optional("install_codes", default=list): INSTALL_CODES,
         vol.Optional("other_brands", default=False): bool,
     }
 )
@@ -592,7 +608,11 @@ async def ws_search_devices(
         connection,
         msg,
         async_search(
-            hass, msg.get("hue_entry_id"), msg["serials"], msg["other_brands"]
+            hass,
+            msg.get("hue_entry_id"),
+            msg["serials"],
+            msg["other_brands"],
+            msg["install_codes"],
         ),
     )
 
@@ -1019,6 +1039,7 @@ def ws_move_plan(
         vol.Required("type"): "hue_studio/bridges/move",
         **MOVE_SCHEMA,
         vol.Optional("serials", default=list): SERIALS,
+        vol.Optional("install_codes", default=list): INSTALL_CODES,
     }
 )
 @websocket_api.async_response
@@ -1035,7 +1056,11 @@ async def ws_move(
     except HomeAssistantError as err:
         connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
         return
-    await _ws_call(connection, msg, async_start_move(hass, selection, msg["serials"]))
+    await _ws_call(
+        connection,
+        msg,
+        async_start_move(hass, selection, msg["serials"], msg["install_codes"]),
+    )
 
 
 @websocket_api.require_admin
@@ -1043,6 +1068,7 @@ async def ws_move(
     {
         vol.Required("type"): "hue_studio/bridges/move/retry",
         vol.Optional("serials", default=list): SERIALS,
+        vol.Optional("install_codes", default=list): INSTALL_CODES,
         vol.Optional("target"): str,
     }
 )
@@ -1055,7 +1081,9 @@ async def ws_move_retry(
     """Search again for the devices a move has not found (serial numbers), or on
     another bridge (`target`: the old one, while none has been found)."""
     await _ws_call(
-        connection, msg, async_retry_move(hass, msg["serials"], msg.get("target"))
+        connection,
+        msg,
+        async_retry_move(hass, msg["serials"], msg.get("target"), msg["install_codes"]),
     )
 
 

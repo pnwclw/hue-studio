@@ -4,15 +4,16 @@
 // copied, zones and entertainment areas moved or split. Then the move as it goes: the old
 // bridge lets the devices go, the new bridge searches while the user switches the lights
 // off and on (and resets switches and sensors), and names, rooms, scenes and their Home
-// Assistant entities come back. Devices not found leave it waiting: search
-// again (serial numbers), put them back on the old bridge, or stop waiting. The move runs
-// in Home Assistant: this screen only watches it (Settings → Bridges shows it too).
+// Assistant entities come back. Where the new bridge takes them, the lights' QR codes
+// (their install codes) go with the search. Devices not found leave it waiting: search
+// again (serial numbers, QR codes), put them back on the old bridge, or stop waiting. The
+// move runs in Home Assistant: this screen only watches it (Settings → Bridges shows it too).
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import { MAX_SERIALS, parseSerials } from "../devices.ts";
+import { type InstallCode, MAX_SERIALS, parseSerials, withCodes } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
@@ -20,6 +21,7 @@ import { bridgeName, bridgeOf, groupBridge } from "../rooms.ts";
 import type { MovePlan, MoveState, MoveStep } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { qrRows } from "./qr-scan.ts";
 
 /** The steps shown while a move goes, in order. */
 const STEPS: MoveStep[] = ["removing", "searching", "restoring", "rooms", "scenes"];
@@ -43,6 +45,9 @@ export class BridgeMoveView extends StudioView {
   @state() private accessor planError: string | null = null;
   @state() private accessor serials = "";
   @state() private accessor showSerials = false;
+  /** The moving devices' QR codes read (their install codes), and whether the scanner is open. */
+  @state() private accessor qr: InstallCode[] = [];
+  @state() private accessor scanning = false;
   @state() private accessor busy = false;
   @state() private accessor now = Date.now();
   private planKey = "";
@@ -126,7 +131,35 @@ export class BridgeMoveView extends StudioView {
             ? this.planPage()
             : html`<p class="empty">${t("move.nothing")}</p>`;
     const title = t(this.bridge || state?.whole_bridge ? "move.title_all" : "move.title");
-    return this.screen(this.subHead(title, () => this.leave()), body, "settings-page bridge-move");
+    // The scanner's sheet sits outside the scrolling body: a scroller (iOS) would clip it.
+    return html`${this.screen(this.subHead(title, () => this.leave()), body, "settings-page bridge-move")}
+      <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning} .names=${this.qrNames}
+        @qr-code=${(e: CustomEvent<InstallCode>) => (this.qr = withCodes(this.qr, [e.detail]))}
+        @close=${() => (this.scanning = false)}></hue-studio-qr-scan>`;
+  }
+
+  /** Names of the devices whose QR codes may be read, by MAC: the moving ones, or those not found yet. */
+  private get qrNames(): Record<string, string> {
+    const s = this.state;
+    if (!s) return this.plan?.macs ?? {};
+    const { hass } = this.ctx;
+    return Object.fromEntries(
+      s.devices
+        .filter((d) => d.mac && !d.found)
+        .map((d) => [d.mac!, d.entity_id && d.light && hass.states[d.entity_id] ? friendlyName(hass, d.entity_id) : d.name]),
+    );
+  }
+
+  /** "Scan QR codes" where the target bridge takes them. */
+  private qrPart(takes: boolean, to: string): TemplateResult | typeof nothing {
+    if (!takes) return nothing;
+    return qrRows(this.ctx, {
+      codes: this.qr,
+      names: this.qrNames,
+      sub: this.ctx.t("qr.scan_sub_move", { to }),
+      scan: () => (this.scanning = true),
+      remove: (mac) => (this.qr = this.qr.filter((c) => c.mac !== mac)),
+    });
   }
 
   private leave(): void {
@@ -188,9 +221,10 @@ export class BridgeMoveView extends StudioView {
             <h2 class="label">${t("move.how")}</h2>
             ${this.steps(this.bridge ? ["move.how_1", "move.how_3", "move.how_all_2", "move.how_4"] : ["move.how_1", "move.how_3", "move.how_2", "move.how_4"], params)}
             <p class="lead small">${t("move.meanwhile", params)}</p>
-            <div class="rows">${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
+            <div class="rows">${this.qrPart(plan.install_codes, plan.target_name)}${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
             <div class="center">
-              <button class="pill go" ?disabled=${this.busy || bad} @click=${() => this.send({ type: "hue_studio/bridges/move", ...this.request, serials: parsed.codes })}>
+              <button class="pill go" ?disabled=${this.busy || bad} @click=${() =>
+                this.send({ type: "hue_studio/bridges/move", ...this.request, serials: parsed.codes, install_codes: withCodes(this.qr, parsed.qr) })}>
                 ${t("move.start", { bridge: plan.target_name })}
               </button>
             </div>`
@@ -224,6 +258,7 @@ export class BridgeMoveView extends StudioView {
     if (ok) {
       this.serials = "";
       this.showSerials = false;
+      this.qr = [];
     }
     return ok;
   }
@@ -273,7 +308,7 @@ export class BridgeMoveView extends StudioView {
           (d) => html`<div class="item">
             <ha-icon icon=${d.found ? "mdi:check-circle-outline" : d.light ? "mdi:lightbulb-question-outline" : "mdi:help-circle-outline"}></ha-icon>
             <div class="grow">${d.entity_id && d.light && ctx.hass.states[d.entity_id] ? friendlyName(ctx.hass, d.entity_id) : d.name}
-              <div class="dim small">${d.found ? t("move.found_on", { bridge: s.target_name }) : t("move.not_yet")}</div>
+              <div class="dim small">${d.found ? t("move.found_on", { bridge: s.target_name }) : t(d.qr ? "move.not_yet_qr" : "move.not_yet")}</div>
             </div>
           </div>`,
         )}
@@ -283,9 +318,10 @@ export class BridgeMoveView extends StudioView {
               [...(s.whole_bridge ? [] : ["move.tip_power" as const]), ...(accessories ? ["move.tip_accessories" as const] : []), "move.tip_close" as const],
               params,
             )}
-            <div class="rows">${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
+            <div class="rows">${this.qrPart(s.install_codes, s.target_name)}${this.serialField(parsed, bad, t("move.serials_sub", params))}</div>
             <div class="link-actions">
-              <button class="pill go" ?disabled=${this.busy || bad || s.running} @click=${() => this.send({ type: "hue_studio/bridges/move/retry", serials: parsed.codes })}>
+              <button class="pill go" ?disabled=${this.busy || bad || s.running} @click=${() =>
+                this.send({ type: "hue_studio/bridges/move/retry", serials: parsed.codes, install_codes: withCodes(this.qr, parsed.qr) })}>
                 ${t("move.again", { bridge: s.target_name })}
               </button>
               ${found === 0 && s.source !== s.target

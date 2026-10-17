@@ -11,7 +11,9 @@ import {
   hasPro,
   newDevices,
   NO_AREA,
+  parseQr,
   parseSerials,
+  withCodes,
   searchOver,
   searchProgress,
   wifiKey,
@@ -37,9 +39,9 @@ const device = (id: string, extra: Partial<HueDeviceInfo> = {}): HueDeviceInfo =
 const bridge = (extra: Partial<BridgeDevices> = {}): BridgeDevices => ({ name: "Hue Bridge", searching: false, devices: [], ...extra });
 
 test("serial numbers: 6 hex characters, upper case, no repeats, up to 10", () => {
-  assert.deepEqual(parseSerials(" a1b2c3, A1B2C3;d4e5f6\n"), { codes: ["A1B2C3", "D4E5F6"], invalid: [], tooMany: false });
+  assert.deepEqual(parseSerials(" a1b2c3, A1B2C3;d4e5f6\n"), { codes: ["A1B2C3", "D4E5F6"], qr: [], invalid: [], tooMany: false });
   assert.deepEqual(parseSerials("abc, 12345g").invalid, ["ABC", "12345G"]);
-  assert.deepEqual(parseSerials(""), { codes: [], invalid: [], tooMany: false });
+  assert.deepEqual(parseSerials(""), { codes: [], qr: [], invalid: [], tooMany: false });
   const many = parseSerials(Array.from({ length: 11 }, (_, i) => `ABCD${String(i).padStart(2, "0")}`).join(" "));
   assert.equal(many.codes.length, 10);
   assert.equal(many.tooMany, true);
@@ -127,4 +129,22 @@ test("a device's picture: own icon, product, shape, kind", () => {
   assert.equal(deviceIcon(hass, device("d", { archetype: "nothing_known" })), "mdi:lightbulb-on-outline");
   assert.equal(deviceIcon(hass, device("e", { kind: "sensor", product: "Hue outdoor motion sensor", sensitivity: { value: 2, max: 4 } })), "hue-studio:outdoor-motion");
   assert.equal(deviceIcon(hass, device("f", { kind: "switch" })), "mdi:light-switch");
+});
+
+test("a device's QR code: its MAC and install code", () => {
+  const code = "0123456789ABCDEF0123456789ABCDEF0123";
+  const hue = `HUE:Z:${code.toLowerCase()} M:0017880100000042 D:X1Y23 A:1000`;
+  const lamp = { mac: "00:17:88:01:00:00:00:42", code };
+  assert.deepEqual(parseQr(hue), lamp);
+  assert.deepEqual(parseQr(`Z:0017880100000043$I:${code}%G$M:1234`), { mac: "00:17:88:01:00:00:00:43", code });
+  assert.equal(parseQr("A1B2C3"), null);
+  assert.equal(parseQr("https://example.com/"), null);
+  assert.equal(parseQr(`HUE:Z:${code.slice(2)} M:0017880100000042`), null);
+  // Pasted among serial numbers.
+  const parsed = parseSerials(`a1b2c3, ${hue}, ${hue}`);
+  assert.deepEqual([parsed.codes, parsed.qr, parsed.invalid], [["A1B2C3"], [lamp], []]);
+  assert.deepEqual(withCodes([lamp], [{ ...lamp, code: "F".repeat(36) }, { mac: "AA", code }]), [
+    { ...lamp, code: "F".repeat(36) },
+    { mac: "AA", code },
+  ]);
 });

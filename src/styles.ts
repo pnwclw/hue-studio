@@ -807,6 +807,14 @@ export const CSS = `
   .sensor-sheet .rows { border-radius: 12px; background: #333336; }
   .sensor-sheet .form-body { padding-bottom: 16px; }
   .sensor-sheet .hint { margin: 0 2px 12px; font-size: 15px; }
+  /* QR scanner sheet (views/qr-scan.ts): the camera, a frame to aim with, what was read */
+  .qr-sheet .qr-camera { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; overflow: hidden; background: #000; }
+  .qr-sheet .qr-camera video { width: 100%; height: 100%; object-fit: cover; }
+  .qr-sheet .qr-frame { position: absolute; inset: 20%; border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 18px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.35); }
+  .qr-sheet .qr-camera p { padding: 24px; }
+  .qr-sheet .hint { margin: 14px 16px; font-size: 15px; }
+  .qr-sheet .hint.ok { color: #6fd38a; }
+  .qr-sheet .center { padding: 0 16px 16px; }
   .sensor-sheet .tick { display: flex; color: var(--accent); }
   .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: 34px; font-weight: 700; }
   .sensor-sheet .sheet-bar { padding: 14px 16px; font-size: 18px; }

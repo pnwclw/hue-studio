@@ -16,15 +16,55 @@ const SEARCH_MAX_MS = 3 * 60_000;
 /** What can be added: Hue lights, accessories (switches, sensors), other brands' Zigbee lights. */
 export type AddKind = "light" | "accessory" | "other";
 
-/** Serial numbers in what the user typed: 6 hex characters each, upper case, no repeats. */
-export function parseSerials(text: string): { codes: string[]; invalid: string[]; tooMany: boolean } {
-  const tokens = text
+/** A device's Zigbee MAC (`AA:BB:…`, 8 bytes) and install code (36 hex digits), from its QR code. */
+export interface InstallCode {
+  mac: string;
+  code: string;
+}
+
+const HUE_QR = /HUE:Z:([0-9A-F]{36})\s+M:([0-9A-F]{16})(?:\s+[A-Z]:[^\s,;]*)*/gi;
+const ZIGBEE_QR = /Z:([0-9A-F]{16})\$I:([0-9A-F]{36})[^\s,;]*/gi;
+
+const macOf = (hex: string): string => hex.toUpperCase().match(/../g)!.join(":");
+
+/**
+ * The install codes in a text: QR codes of Hue devices (`HUE:Z:<install code> M:<MAC> …`)
+ * or of other Zigbee devices (`Z:<MAC>$I:<install code>…`); the rest of the text stays.
+ */
+export function takeQrCodes(text: string): { codes: InstallCode[]; rest: string } {
+  const codes: InstallCode[] = [];
+  const rest = text
+    .replace(HUE_QR, (_m, code: string, mac: string) => (codes.push({ mac: macOf(mac), code: code.toUpperCase() }), " "))
+    .replace(ZIGBEE_QR, (_m, mac: string, code: string) => (codes.push({ mac: macOf(mac), code: code.toUpperCase() }), " "));
+  return { codes, rest };
+}
+
+/** The install code in one QR code, or null if it is not a device's Zigbee QR code. */
+export function parseQr(raw: string): InstallCode | null {
+  const { codes, rest } = takeQrCodes(raw.trim());
+  return codes.length === 1 && !rest.trim() ? codes[0] : null;
+}
+
+/** Install codes so far plus new ones, one per device (the newest wins). */
+export function withCodes(known: InstallCode[], added: InstallCode[]): InstallCode[] {
+  const byMac = new Map(known.map((c) => [c.mac, c]));
+  for (const c of added) byMac.set(c.mac, c);
+  return [...byMac.values()];
+}
+
+/**
+ * Serial numbers in what the user typed: 6 hex characters each, upper case, no repeats;
+ * a pasted QR code's text gives its install code (`qr`).
+ */
+export function parseSerials(text: string): { codes: string[]; qr: InstallCode[]; invalid: string[]; tooMany: boolean } {
+  const { codes: qr, rest } = takeQrCodes(text);
+  const tokens = rest
     .split(/[\s,;]+/)
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
   const codes = [...new Set(tokens.filter((s) => /^[0-9A-F]{6}$/.test(s)))];
   const invalid = tokens.filter((s) => !/^[0-9A-F]{6}$/.test(s));
-  return { codes: codes.slice(0, MAX_SERIALS), invalid, tooMany: codes.length > MAX_SERIALS };
+  return { codes: codes.slice(0, MAX_SERIALS), qr: withCodes([], qr), invalid, tooMany: codes.length > MAX_SERIALS };
 }
 
 /**

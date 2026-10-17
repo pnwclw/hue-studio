@@ -230,7 +230,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/sync/configure
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
-  devices.py                    adding devices: Zigbee search (serials, other brands), all devices, name + area + Hue room,
+  devices.py                    adding devices: Zigbee search (serials, other brands, install codes from QR codes where the
+                                bridge takes them), all devices, name + area + Hue room,
                                 a light's function and power-on preset, delete
   entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
   bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
@@ -281,7 +282,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves, the move as it goes,
-                                lights not found), entertainment, integration (options),
+                                lights not found), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
@@ -291,7 +292,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 splitting settings from before 0.10
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
   sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
-  devices.ts                    pure: adding devices (serial numbers, search progress, found devices), Bridge Pro, Wi-Fi;
+  devices.ts                    pure: adding devices (serial numbers, QR codes -> MAC + install code, search progress,
+                                found devices), Bridge Pro, Wi-Fi;
                                 Settings → Devices (kinds, search and filters, by room, a device's picture)
   seasons.ts                    pure: seasonal gallery (a rule per category: seasons and/or dates; season source)
   effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
@@ -300,7 +302,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
   ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
   i18n.ts                       UI strings (en is the source; same keys in every locale)
-  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets)
+  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets,
+                                the companion app's QR scanner)
   hue-icons.ts, hue-icons-data.ts   the Hue app's light icons as the `hue-studio:` icon set (data generated,
                                 do not edit), matched to lights by archetype and product in model.ts
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/

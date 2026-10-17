@@ -60,9 +60,11 @@ from .const import DOMAIN, HUE_DOMAIN
 from .devices import (
     async_forget_new,
     async_search,
+    install_code,
     is_bridge_device,
     light_settings,
     put_light_settings,
+    takes_install_codes,
 )
 from .entertainment import entertainment_services
 from .lights import LIGHT_DOMAIN, async_all_lights, async_bridges
@@ -280,7 +282,9 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
      "lights": [light entity ids], "accessories": [names of switches and sensors],
      "rooms": [names of rooms moving whole], "scenes": count copied,
      "zones": [{"name", "whole"}], "entertainment": [{"name", "whole"}],
-     "staying": [names of other devices of a room that stay], "over_limit": bool}
+     "staying": [names of other devices of a room that stay], "over_limit": bool,
+     "macs": {Zigbee MAC: name} of the moving devices (to match their QR codes),
+     "install_codes": whether the target bridge lets devices in by their QR code}
     """
     bridges = async_bridges(hass)
     bridge = bridges[selection.source]
@@ -313,6 +317,12 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
         "staying": [],
         "over_limit": sum(1 for _ in target.lights) + len(light_ids)
         > _light_limit(target),
+        "macs": {
+            mac.upper(): d.metadata.name
+            for d in moving
+            if (mac := device_mac(bridge, d.id))
+        },
+        "install_codes": takes_install_codes(target),
     }
 
 
@@ -607,14 +617,16 @@ def async_move_payload(hass: HomeAssistant) -> dict[str, Any] | None:
     """The move the panel shows, or None:
 
     {"step", "error", "source", "target", "source_name", "target_name", "rooms",
-     "whole_bridge", "area", "searching_until", "running",
-     "devices": [{"entity_id", "name", "light", "found"}]}
+     "whole_bridge", "area", "searching_until", "running", "install_codes" (the target
+     lets devices in by their QR code), "devices": [{"entity_id", "name", "light",
+     "found", "mac", "qr" (its QR code read)}]}
     """
     mover: Mover | None = hass.data.get(STORAGE_KEY)
     if mover is None or mover.memo is None:
         return None
     memo = mover.memo
     bridges = async_bridges(hass)
+    scanned = {c["mac"] for c in memo.get("install_codes", [])}
 
     def name(entry_id: str) -> str:
         bridge = bridges.get(entry_id)
@@ -640,12 +652,16 @@ def async_move_payload(hass: HomeAssistant) -> dict[str, Any] | None:
         "area": memo.get("area"),
         "searching_until": memo.get("searching_until"),
         "running": mover.busy,
+        "install_codes": (target := bridges.get(memo["target"])) is not None
+        and takes_install_codes(target),
         "devices": [
             {
                 "entity_id": entity_id(device),
                 "name": device["name"],
                 "light": device["light"],
                 "found": device["new_id"] is not None,
+                "mac": (device["mac"] or "").upper() or None,
+                "qr": (device["mac"] or "").upper() in scanned,
             }
             for device in memo["devices"]
         ],
@@ -670,22 +686,39 @@ def _check_idle(mover: Mover, *, memo: bool) -> None:
         )
 
 
+def _with_codes(
+    known: list[dict[str, str]], new: Iterable[dict[str, str]]
+) -> list[dict[str, str]]:
+    """Install codes (from QR codes) so far plus new ones, one per device."""
+    codes = {c["mac"]: c for c in known}
+    codes.update((c["mac"], c) for c in (install_code(**k) for k in new))
+    return list(codes.values())
+
+
 async def async_start_move(
-    hass: HomeAssistant, selection: Selection, serials: list[str]
+    hass: HomeAssistant,
+    selection: Selection,
+    serials: list[str],
+    install_codes: Iterable[dict[str, str]] = (),
 ) -> None:
     """Start a move (one at a time): the old bridge lets the devices go, the new one
-    searches (meanwhile the lights are switched off and on)."""
+    searches (meanwhile the lights are switched off and on); install codes from the
+    devices' QR codes let them into the new bridge where it takes them."""
     mover = _mover(hass)
     _check_idle(mover, memo=False)
     memo = async_remember(hass, selection)
     memo["serials"] = serials
+    memo["install_codes"] = _with_codes([], install_codes)
     mover.memo = memo
     await mover.async_save()
     _start(mover)
 
 
 async def async_retry_move(
-    hass: HomeAssistant, serials: list[str], target: str | None = None
+    hass: HomeAssistant,
+    serials: list[str],
+    target: str | None = None,
+    install_codes: Iterable[dict[str, str]] = (),
 ) -> None:
     """Search again for the devices not found yet (with serial numbers), or on another
     bridge (e.g. the old one, to put them back while none has been found)."""
@@ -702,7 +735,11 @@ async def async_retry_move(
                 translation_domain=DOMAIN, translation_key="move_busy"
             )
         mover.memo["target"] = target
-    mover.memo.update(serials=serials, error=None)
+    mover.memo.update(
+        serials=serials,
+        install_codes=_with_codes(mover.memo.get("install_codes", []), install_codes),
+        error=None,
+    )
     _start(mover)
 
 
@@ -838,7 +875,12 @@ async def _async_search(
     """Let the target bridge search until every device is back (a few rounds)."""
     wanted = [d for d in memo["devices"] if d["new_id"] is None]
     for _round in range(SEARCH_ROUNDS):
-        await async_search(hass, memo["target"], memo["serials"])
+        await async_search(
+            hass,
+            memo["target"],
+            memo["serials"],
+            install_codes=memo.get("install_codes"),
+        )
         until = time.time() + SEARCH_TIME
         await mover.async_step("searching", searching_until=until)
         while time.time() < until:

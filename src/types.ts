@@ -92,6 +92,8 @@ export interface BridgeDevices {
   search_started?: number | null;
   /** The search can also let other brands' Zigbee lights join. */
   other_brands?: boolean;
+  /** The bridge lets devices in by the install code of their QR code (Bridge Pro). */
+  install_codes?: boolean;
   devices: HueDeviceInfo[];
 }
 
@@ -172,6 +174,10 @@ export interface MovePlan {
   entertainment: { name: string; whole: boolean }[];
   /** The target bridge would hold more lights than it can. */
   over_limit: boolean;
+  /** Names of the moving devices by Zigbee MAC (`AA:BB:…`), to match their QR codes. */
+  macs: Record<string, string>;
+  /** The target bridge lets devices in by the install code of their QR code. */
+  install_codes: boolean;
 }
 
 export type MoveStep = "saving" | "removing" | "searching" | "restoring" | "rooms" | "scenes" | "done" | "waiting" | "failed";
@@ -191,7 +197,10 @@ export interface MoveState {
   /** When the current search ends (seconds since epoch). */
   searching_until: number | null;
   running: boolean;
-  devices: { entity_id: string | null; name: string; light: boolean; found: boolean }[];
+  /** The target bridge lets devices in by the install code of their QR code. */
+  install_codes: boolean;
+  /** `qr`: its QR code was read. */
+  devices: { entity_id: string | null; name: string; light: boolean; found: boolean; mac: string | null; qr: boolean }[];
 }
 
 /** Steps of linking a bridge (hue_studio/bridges/link). */

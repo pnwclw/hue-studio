@@ -598,8 +598,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       : Array.isArray(msg.lights)
         ? (msg.lights as string[])
         : Object.keys(LIGHTS).filter((l) => devices[`dev_${l}`].area_id === msg.area).map((l) => `light.${l}`);
-  const moveDevices = (lights: string[], found: (i: number) => boolean): MoveState["devices"] =>
-    lights.map((l, i) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: found(i) }));
+  /** A light's made-up Zigbee MAC (its QR code in the harness: `HUE:Z:<36 × 0> M:<MAC without colons>`). */
+  const fakeMac = (light: string): string => `00:17:88:01:00:00:00:${(Object.keys(LIGHTS).indexOf(light.replace("light.", "")) + 16).toString(16).toUpperCase().padStart(2, "0")}`;
+  const moveDevices = (lights: string[], found: (i: number) => boolean, qr: string[] = []): MoveState["devices"] =>
+    lights.map((l, i) => ({ entity_id: l, name: LIGHTS[l.replace("light.", "")]?.[0] ?? l, light: true, found: found(i), mac: fakeMac(l), qr: qr.includes(fakeMac(l)) }));
   let move: MoveState | null = null;
   const pushMove = () => setTimeout(() => moveListeners.forEach((cb) => cb(structuredClone(move))), 30);
   /** These steps one after another, `missing` devices never found. */
@@ -628,7 +630,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     const lights = ["tv_strip", "play_left", "play_right", "candle"].map((l) => `light.${l}`);
     move = {
       step: seedMove as MoveState["step"], error: seedMove === "waiting" ? "not_found" : null, source: "hue-entry", target: "hue-entry-2",
-      source_name: "Hue Bridge", target_name: "Garden Bridge", rooms: ["Living room"], whole_bridge: false, area: "living_room",
+      source_name: "Hue Bridge", target_name: "Garden Bridge", rooms: ["Living room"], whole_bridge: false, area: "living_room", install_codes: true,
       searching_until: seedMove === "searching" ? Date.now() / 1000 + 42 : null, running: seedMove === "searching",
       devices: moveDevices(lights, (i) => seedMove === "done" || i < (seedMove === "waiting" ? 3 : 2)),
     };
@@ -639,7 +641,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     "hue-entry": { name: "Hue Bridge", searching, search_started: searching ? searchStarted : null, other_brands: true,
       devices: structuredClone(hueDevices.filter((d) => !d.lights.some((l) => lightBridge(l) === "hue-entry-2"))) },
     ...(twoBridges
-      ? { "hue-entry-2": { name: "Garden Bridge", searching: false, search_started: null, other_brands: false,
+      ? { "hue-entry-2": { name: "Garden Bridge", searching: false, search_started: null, other_brands: false, install_codes: true,
           devices: structuredClone(hueDevices.filter((d) => d.lights.some((l) => lightBridge(l) === "hue-entry-2"))) } }
       : {}),
   });
@@ -760,7 +762,39 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     }
   };
 
-  const hass: Hass = {
+  // &app=1: the companion app's bus (HA's ExternalMessaging) with a QR scanner that reads
+  // the TV strip's code (a made-up one), then a code that is no device's; it closes after.
+  class FakeBus {
+    config = { hasBarCodeScanner: 1 };
+    sent: Record<string, unknown>[] = [];
+    fireMessage(msg: Record<string, unknown>): void {
+      this.sent.push(msg);
+      if (msg.type !== "bar_code/scan") return;
+      const reads = [`HUE:Z:${"0".repeat(36)} M:${fakeMac("tv_strip").replaceAll(":", "")} D:X1 A:1`, "https://example.com/"];
+      reads.forEach((rawValue, i) =>
+        setTimeout(() => this.receiveMessage({ id: 900 + i, type: "command", command: "bar_code/scan_result", payload: { rawValue } }), 600 * (i + 1)),
+      );
+      setTimeout(() => this.receiveMessage({ id: 910, type: "command", command: "bar_code/aborted", payload: { reason: "canceled" } }), 600 * (reads.length + 1));
+    }
+    receiveMessage(msg: Record<string, unknown>): void {
+      console.warn("FakeBus: HA's own handler got", msg);
+    }
+  }
+  const auth = params.get("app") === "1" ? { external: new FakeBus() } : undefined;
+  // &click=<text>: press the first button with that text once the page is up (screenshots
+  // of what opens on a tap, e.g. &click=QR for the QR scanner).
+  const click = params.get("click");
+  if (click) {
+    const buttons = (root: Document | ShadowRoot | Element): HTMLButtonElement[] => [
+      ...root.querySelectorAll<HTMLButtonElement>("button"),
+      ...[...root.querySelectorAll("*")].flatMap((el) => (el.shadowRoot ? buttons(el.shadowRoot) : [])),
+    ];
+    setTimeout(() => buttons(document).find((b) => b.textContent?.includes(click))?.click(), 1500);
+  }
+  (window as { fakeBus?: unknown }).fakeBus = auth?.external;
+
+  const hass: Hass & { auth?: unknown } = {
+    auth,
     language,
     locale: { language },
     config: { location_name: "Home" },
@@ -1090,6 +1124,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           lights, accessories: msg.bridge || msg.area === "office" ? ["Office sensor"] : [], rooms, scenes: rooms.length ? 4 : 0,
           zones: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [],
           entertainment: lights.includes("light.tv_strip") ? [{ name: "TV area", whole: rooms.length > 0 }] : [], over_limit: false,
+          macs: Object.fromEntries(lights.map((l) => [fakeMac(l), LIGHTS[l.replace("light.", "")]?.[0] ?? l])), install_codes: msg.target === "hue-entry-2",
         } as T;
       }
       if (msg.type === "hue_studio/bridges/move") {
@@ -1098,7 +1133,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           step: "saving", error: null, source: msg.bridge ? String(msg.bridge) : "hue-entry", target: String(msg.target),
           source_name: msg.bridge ? bridgesMessage[String(msg.bridge)]?.name : "Hue Bridge", target_name: bridgesMessage[String(msg.target)]?.name ?? "",
           rooms: msg.area ? [AREAS[String(msg.area)]?.name] : [], whole_bridge: !!msg.bridge, area: msg.area || msg.to_area ? String(msg.area ?? msg.to_area) : null,
-          searching_until: null, running: true, devices: moveDevices(lights, () => false),
+          searching_until: null, running: true, install_codes: msg.target === "hue-entry-2",
+          devices: moveDevices(lights, () => false, ((msg.install_codes ?? []) as { mac: string }[]).map((c) => c.mac)),
         };
         pushMove();
         runMove(["removing", "searching", "restoring", "rooms", "scenes", "done"], !msg.bridge && params.get("movefail") === "1" ? 1 : 0);

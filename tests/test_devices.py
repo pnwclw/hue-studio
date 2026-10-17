@@ -19,7 +19,13 @@ from aiohue.v2.models.feature import (
 from aiohue.v2.models.light import LightFunction
 from aiohue.v2.models.motion import Motion
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
-from aiohue.v2.models.zigbee_device_discovery import SearchActionType
+from aiohue.v2.models.zigbee_device_discovery import (
+    AddInstallCodes,
+    InstallCode,
+    SearchActionType,
+    ZigbeeDeviceDiscoveryActionPut,
+    ZigbeeDeviceDiscoveryPut,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr
 import pytest
@@ -402,6 +408,61 @@ async def test_search_other_brands(
     assert state["searching"] is True
     assert state["other_brands"] is True
     assert isinstance(state["search_started"], float)
+
+
+async def test_search_with_install_codes(
+    hass: HomeAssistant,
+    bridge: MagicMock,
+    hue_entry: MockConfigEntry,
+    hass_ws_client: WebSocketGenerator,
+) -> None:
+    """A device's QR code (its MAC and install code) goes to the bridge with the
+    search where the bridge takes install codes; otherwise it searches as usual."""
+    discovery = bridge.config.zigbee_device_discovery
+    item = SimpleNamespace(
+        id="disc-1",
+        status=SimpleNamespace(value="ready"),
+        action=SimpleNamespace(action_type_values=[SearchActionType.SEARCH]),
+        add_install_codes=SimpleNamespace(),
+    )
+    discovery.__iter__.side_effect = lambda: iter([item])
+    discovery.update = AsyncMock()
+    client = await hass_ws_client(hass)
+    qr = {"mac": "0017880100000042", "code": "ab" * 18}
+    reply = await _ws(
+        client,
+        type="hue_studio/devices/search",
+        serials=["AB12CD"],
+        install_codes=[qr],
+    )
+    assert reply["success"]
+    discovery.update.assert_awaited_once_with(
+        "disc-1",
+        ZigbeeDeviceDiscoveryPut(
+            action=ZigbeeDeviceDiscoveryActionPut(
+                action_type=SearchActionType.SEARCH, search_codes=["AB12CD"]
+            ),
+            add_install_codes=AddInstallCodes(
+                install_codes=[
+                    InstallCode(mac_address="00:17:88:01:00:00:00:42", ic="AB" * 18)
+                ]
+            ),
+        ),
+    )
+    discovery.search.assert_not_awaited()
+
+    # A bridge without install codes (an older one) only searches.
+    item.add_install_codes = None
+    discovery.update.reset_mock()
+    reply = await _ws(client, type="hue_studio/devices/search", install_codes=[qr])
+    assert reply["success"]
+    discovery.update.assert_not_awaited()
+    discovery.search.assert_awaited_once_with("disc-1", search_codes=None)
+
+    # Not a QR code's MAC or install code.
+    bad = {"mac": "0017", "code": "ab"}
+    reply = await _ws(client, type="hue_studio/devices/search", install_codes=[bad])
+    assert not reply["success"]
 
 
 async def test_delete_device(
