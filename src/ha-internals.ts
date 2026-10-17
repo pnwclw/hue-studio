@@ -233,8 +233,8 @@ export const appScansQr = (hass: unknown): boolean => Boolean(externalBus(hass)?
  * (`bar_code/scan`, answered by `bar_code/scan_result` / `bar_code/aborted` commands).
  * HA's bus has one command handler, which forwards scan results only to its own
  * listeners, so the bus's `receiveMessage` is wrapped while the scanner is open.
- * `take(raw)` gets every code read: a message keeps the scanner open and is shown in it
- * (a code that is not right, or one taken while more can follow), null closes it.
+ * `take(raw)` gets every code read: a message (a code that is not right) is shown in the
+ * scanner, which stays open; null closes it.
  * Resolves when the scanner closes.
  */
 export function scanQrWithApp(

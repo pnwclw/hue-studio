@@ -762,19 +762,18 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     }
   };
 
-  // &app=1: the companion app's bus (HA's ExternalMessaging) with a QR scanner that reads
-  // the TV strip's code (a made-up one), then a code that is no device's; it closes after.
+  // &app=1: the companion app's bus (HA's ExternalMessaging) with a QR scanner that reads a
+  // code that is no device's, then the TV strip's (a made-up one).
   class FakeBus {
     config = { hasBarCodeScanner: 1 };
     sent: Record<string, unknown>[] = [];
     fireMessage(msg: Record<string, unknown>): void {
       this.sent.push(msg);
       if (msg.type !== "bar_code/scan") return;
-      const reads = [`HUE:Z:${"0".repeat(36)} M:${fakeMac("tv_strip").replaceAll(":", "")} D:X1 A:1`, "https://example.com/"];
+      const reads = ["https://example.com/", `HUE:Z:${"0".repeat(36)} M:${fakeMac("tv_strip").replaceAll(":", "")} D:X1 A:1`];
       reads.forEach((rawValue, i) =>
         setTimeout(() => this.receiveMessage({ id: 900 + i, type: "command", command: "bar_code/scan_result", payload: { rawValue } }), 600 * (i + 1)),
       );
-      setTimeout(() => this.receiveMessage({ id: 910, type: "command", command: "bar_code/aborted", payload: { reason: "canceled" } }), 600 * (reads.length + 1));
     }
     receiveMessage(msg: Record<string, unknown>): void {
       console.warn("FakeBus: HA's own handler got", msg);

@@ -2,10 +2,10 @@
 // install code in a device's QR code let exactly that device into a bridge that takes
 // install codes (Bridge Pro). In the companion app its own scanner reads them (HA's QR
 // scanner does the same); elsewhere a camera sheet decodes the video with the browser's
-// BarcodeDetector, or jsQR where there is none. Codes keep coming until it is closed.
+// BarcodeDetector, or jsQR where there is none. It closes once it read a device's code
+// (one per opening); a code that is not right is said in it and it scans on.
 //
-// <hue-studio-qr-scan .ctx .open .names> fires "qr-code" (an InstallCode) per new device
-// and "close". It renders its sheet itself, so it sits outside the view's scrolling body.
+// <hue-studio-qr-scan .ctx .open .names> fires "qr-code" (an InstallCode) and "close". It renders its sheet itself, so it sits outside the view's scrolling body.
 
 import { html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -19,7 +19,7 @@ import { icon, LightElement } from "../ui.ts";
 /** Frames looked at per second, and the widest frame decoded (px). */
 const SCANS_PER_SECOND = 6;
 const MAX_FRAME = 960;
-/** How long "added" or "not a device's code" stays under the camera (ms). */
+/** How long "not a device's code" stays under the camera (ms). */
 const NOTE_MS = 2500;
 
 type Decode = (frame: HTMLCanvasElement) => Promise<string | null>;
@@ -77,7 +77,6 @@ export class QrScan extends LightElement {
   private stream?: MediaStream;
   private timer?: ReturnType<typeof setTimeout>;
   private noteTimer?: ReturnType<typeof setTimeout>;
-  private seen = new Set<string>();
 
   protected override updated(changed: PropertyValues<this>): void {
     if (!changed.has("open")) return;
@@ -97,26 +96,24 @@ export class QrScan extends LightElement {
     if (!code) return { text: t("qr.not_device"), ok: false };
     const name = this.names[code.mac] ?? code.mac;
     if (Object.keys(this.names).length && !this.names[code.mac]) return { text: t("qr.not_here", { name }), ok: false, code };
-    return { text: t("qr.added", { name }), ok: true, code };
+    return { text: name, ok: true, code };
   }
 
   private found(code: InstallCode): void {
-    if (this.seen.has(code.mac)) return;
-    this.seen.add(code.mac);
     haptic("success");
     this.dispatchEvent(new CustomEvent<InstallCode>("qr-code", { detail: code }));
   }
 
   private async start(): Promise<void> {
     const { ctx } = this;
-    this.seen = new Set();
     this.note = null;
     this.problem = null;
     if (appScansQr(ctx.hass)) {
       await scanQrWithApp(ctx.hass, { title: ctx.t("qr.title"), description: ctx.t("qr.description") }, (raw) => {
         const read = this.take(raw);
-        if (read.code && read.ok) this.found(read.code);
-        return read.text;
+        if (!read.code || !read.ok) return read.text;
+        this.found(read.code);
+        return null;
       });
       this.close();
       return;
@@ -157,8 +154,11 @@ export class QrScan extends LightElement {
 
   private show(raw: string): void {
     const read = this.take(raw);
-    if (read.code && this.seen.has(read.code.mac)) return;
-    if (read.code && read.ok) this.found(read.code);
+    if (read.code && read.ok) {
+      this.found(read.code);
+      this.close();
+      return;
+    }
     this.note = { text: read.text, ok: read.ok };
     clearTimeout(this.noteTimer);
     this.noteTimer = setTimeout(() => (this.note = null), NOTE_MS);
