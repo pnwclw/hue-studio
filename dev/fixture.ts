@@ -579,8 +579,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const bridgesMessage: BridgesMessage = {
     "hue-entry": { name: "Hue Bridge", connected: true, host: "192.0.2.10", id: "001788fffe000000", model: pro ? "Hue Bridge Pro" : "Hue Bridge",
       software: "1.70.1970", pro, ha_device: "dev_bridge", devices: 14, lights: 11,
-      motion_areas: pro ? [{ id: "ma-1", name: "Living room", group: "Living room", enabled: true, health: "healthy",
-        lights: [{ entity_id: "light.play_left", health: "healthy" }, { entity_id: "light.play_right", health: "healthy" }] }] : null },
+      motion_areas: pro ? [{ id: "ma-1", name: "Living room", group: "Living room", group_id: "room-living", group_type: "room", enabled: true,
+        health: "healthy", calibrating: false, calibration_started: null,
+        lights: ["play_left", "play_right", "tv_strip"].map((l) => ({ id: `cand-${l}`, device: `dev-${l}`, entity_id: `light.${l}`, health: "healthy" })),
+        sensitivity: { value: 2, max: 4 }, security_sensitivity: { value: 2, max: 4 }, sensor: null,
+        responses: [{ id: "beh-1", name: "Living room", enabled: true, slots: 3 }] }] : null,
+      motion_lights: pro ? ["play_left", "play_right", "tv_strip", "candle", "desk_lamp"].map((l) => ({ id: `cand-${l}`, device: `dev-${l}`, entity_id: `light.${l}`, name: l })) : null,
+      motion_groups: pro ? [{ id: "room-living", type: "room", name: "Living room", lights: ["cand-play_left", "cand-play_right", "cand-tv_strip", "cand-candle"] },
+        { id: "room-office", type: "room", name: "Office", lights: ["cand-desk_lamp"] }] : null },
     "hue-entry-2": twoBridges
       ? { name: "Garden Bridge", connected: true, host: "192.0.2.11", id: "001788fffe000001", model: "Hue Bridge", software: "1.70.1970",
           pro: false, ha_device: null, devices: onSecond.size, lights: onSecond.size, rooms: 1, zones: 0, motion_areas: null }
@@ -1253,6 +1259,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }
       if (msg.type === "hue_studio/bridges/move/finish") {
         moveTimers.splice(0).forEach(clearTimeout);
+        if (move && move.step === "waiting" && move.devices.some((d) => d.found)) {
+          // Some moved: the rest is skipped, rooms and scenes follow.
+          move.devices.filter((d) => !d.found).forEach((d) => (d.skipped = true));
+          journal("stopped");
+          Object.assign(move, { current: null, step: "saving" });
+          runMove();
+          return null as T;
+        }
         if (move) {
           const left = move.devices.filter((x) => x.removed && !x.found && !lost.some((y) => y.mac === x.mac));
           lost = [...lost, ...left.map((x) => ({ mac: x.mac!, name: x.name, light: x.light, entity_id: x.entity_id, target: move!.target, area: move!.area, at: Date.now() / 1000 }))];

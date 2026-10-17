@@ -54,7 +54,9 @@ from .const import (
     SIGNAL_CONFIG_UPDATED,
     SYNC_BOX_INTEGRATION,
 )
+from .identity import async_setup_identities
 from .migration import async_setup_moves
+from .motion_areas import async_stop_watching as async_stop_motion_areas
 from .panel import async_register_panel, async_unregister_panel
 from .pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
 from .positions import async_setup_positions
@@ -105,6 +107,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
     await async_setup_moves(hass)
+    await async_setup_identities(hass)
     await async_setup_automations(hass)
     return True
 
@@ -291,6 +294,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: HueStudioConfigEntry) -
         return False
     if (connections := entry.runtime_data.connections) is not None:
         await connections.async_stop()
+    async_stop_motion_areas(hass)
     async_unregister_panel(hass)
     return True
 

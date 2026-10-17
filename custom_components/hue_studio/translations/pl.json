@@ -226,6 +226,21 @@
     },
     "move_busy": {
       "message": "Inne przenoszenie na mostek jeszcze się nie skończyło."
+    },
+    "motion_area_lights": {
+      "message": "Obszar MotionAware potrzebuje od {min} do {max} świateł."
+    },
+    "not_motion_light": {
+      "message": "{entity_id} nie może wykrywać ruchu dla MotionAware."
+    },
+    "unknown_hue_group": {
+      "message": "Brak pokoju lub strefy Hue {group} na mostku."
+    },
+    "no_motion_aware": {
+      "message": "Ten mostek nie ma MotionAware (potrzebny Hue Bridge Pro)."
+    },
+    "unknown_motion_response": {
+      "message": "Brak reakcji z aplikacji Hue {id} na mostkach."
     }
   },
   "services": {

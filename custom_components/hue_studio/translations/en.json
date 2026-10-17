@@ -226,6 +226,21 @@
     },
     "move_busy": {
       "message": "Another move to a bridge is not finished yet."
+    },
+    "motion_area_lights": {
+      "message": "A MotionAware area needs {min} to {max} lights."
+    },
+    "not_motion_light": {
+      "message": "{entity_id} cannot sense motion for MotionAware."
+    },
+    "unknown_hue_group": {
+      "message": "No Hue room or zone {group} on the bridge."
+    },
+    "no_motion_aware": {
+      "message": "This bridge has no MotionAware (it needs a Hue Bridge Pro)."
+    },
+    "unknown_motion_response": {
+      "message": "No Hue app response {id} on the bridges."
     }
   },
   "services": {

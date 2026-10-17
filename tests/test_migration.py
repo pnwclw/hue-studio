@@ -35,7 +35,7 @@ from homeassistant.helpers import (
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.hue_studio import migration
+from custom_components.hue_studio import identity, migration
 from custom_components.hue_studio.lights import HueLight
 from custom_components.hue_studio.positions import (
     async_setup_positions,
@@ -458,6 +458,7 @@ async def world(hass: HomeAssistant) -> SimpleNamespace:
     hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, drop_state)
     with (
         patch.object(migration, "async_bridges", lambda _h: bridges),
+        patch.object(identity, "async_bridges", lambda _h: bridges),
         patch.object(migration, "async_all_lights", all_lights),
         patch.object(migration, "async_search", search),
         patch.object(migration, "async_align", align),
@@ -831,3 +832,73 @@ async def test_stop_waiting_keeps_lost(
     assert lost["name"] == "Hue lamp a-desk"
     await migration.async_forget_lost(hass, MAC["desk"])
     assert migration.async_lost_payload(hass) == []
+
+
+async def test_identity_comes_back(hass: HomeAssistant, world: SimpleNamespace) -> None:
+    """A light deleted from its bridge and added again outside a move (on another
+    bridge, with "Add devices" or by the Hue app) gets its entity id, name, area and
+    position back; a room of the same name and its scene get their entity ids back."""
+    b_id = world.entries["b"].entry_id
+    ids = identity.Identities(hass)
+    await ids.async_reconcile()
+    known = ids.devices[MAC["desk"].lower()]
+    assert known["lights"][0]["entity"]["entity_id"] == "light.desk"
+    assert ids.groups["room:Office"]["entity"]["entity_id"] == "light.office"
+
+    await world.a.request("delete", "clip/v2/resource/room/a-office")
+    await world.a.request("delete", "clip/v2/resource/device/a-desk")
+    new = world.b.add_device("desk")
+    world.b.add_group("room", "b-office", "Office", [new])
+    world.b.add_scene("b-read", "Read", "b-office", [f"{new}-light"])
+    await ids.async_reconcile()
+
+    assert _unique_id(hass, "light.desk") == (b_id, f"{new}-light")
+    entry = er.async_get(hass).async_get("light.desk")
+    assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
+    assert dr.async_get(hass).async_get(entry.device_id).area_id == world.office
+    assert _unique_id(hass, "sensor.desk_zigbee") == (b_id, f"{new}-zc")
+    assert world.b.devices.get(new).metadata.name == "Hue lamp a-desk"
+    assert position_store(hass).lights == {f"{new}-light": [[0.1, 0.2, 0.0]]}
+    assert _unique_id(hass, "light.office") == (b_id, "b-office-group")
+    assert _unique_id(hass, "scene.office_read") == (b_id, "b-read")
+    # Remembered as it is now.
+    assert ids.devices[MAC["desk"].lower()]["device_id"] == new
+
+
+async def test_identity_waits_for_the_old_device(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """A device on two bridges at once (still on the old one): nothing is taken over
+    until the old one is gone."""
+    ids = identity.Identities(hass)
+    await ids.async_reconcile()
+    new = world.b.add_device("lamp")
+    await ids.async_reconcile()
+    assert _unique_id(hass, "light.lamp")[1] == "a-lamp-light"
+    await world.a.request("delete", "clip/v2/resource/device/a-lamp")
+    await ids.async_reconcile()
+    assert _unique_id(hass, "light.lamp")[1] == f"{new}-light"
+
+
+async def test_stop_waiting_finishes(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """Stopping a move that waits after some devices moved: the rest is skipped, the
+    room, its scenes and the zone still follow the device that moved."""
+    b_id = world.entries["b"].entry_id
+    world.joining = ["desk"]
+    memo = await _move(hass, migration.async_select(hass, b_id, area=world.office))
+    assert (memo["step"], memo["current"]) == ("waiting", "a-lamp")
+    await migration.async_finish_move(hass)
+    memo = await _run(hass)
+    assert memo["step"] == "done"
+    assert [e["event"] for e in memo["log"]][-2:] == [
+        "stopped",
+        "done",
+    ] or "stopped" in [e["event"] for e in memo["log"]]
+    (room,) = world.b.groups.room
+    assert room.metadata.name == "Office"
+    assert _unique_id(hass, "scene.office_read")[0] == b_id
+    assert [x["name"] for x in migration.async_lost_payload(hass)] == [
+        "Hue lamp a-lamp"
+    ]

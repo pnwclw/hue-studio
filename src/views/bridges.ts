@@ -3,8 +3,9 @@
 // A bridge: its name (renamed on the bridge), what it is, its devices, entertainment and (a
 // Bridge Pro) MotionAware areas. A Sync Box: its name, LED, following the TV (paired
 // directly), what it is, how it is connected, its sync controls.
-// Settings → MotionAware areas (lights as motion sensors, set up in the Hue app; here: health,
-// on/off), only offered with a Hue Bridge Pro.
+// Settings → MotionAware areas (lights as motion sensors, only with a Hue Bridge Pro): each
+// area with how it does and on/off, and "New area"; views/motion-area.ts sets one up and
+// changes it.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -14,6 +15,7 @@ import { wifiKey } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
+import { areaState } from "../motion.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature, statusKey } from "../sync.ts";
 import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
@@ -472,16 +474,21 @@ export class BridgesView extends StudioView {
   }
 
   private motionAreas(bridges: BridgesMessage): TemplateResult {
-    const { t } = this.ctx;
+    const { ctx } = this;
+    const { t } = ctx;
     const shown = Object.entries(bridges).filter(([id, b]) => b.motion_areas !== null && (!this.item || id === this.item));
     const several = shown.length > 1;
     return html`<p class="lead">${t("motion.intro")}</p>
       ${!shown.length ? html`<p class="lead small center-text">${t("motion.unsupported")}</p>` : nothing}
       ${shown.map(
-        ([, b]) => html`${several ? html`<h2 class="label">${b.name}</h2>` : nothing}
-          ${b.motion_areas!.length
-            ? html`<div class="rows">${b.motion_areas!.map((a) => this.motionArea(a))}</div>`
-            : html`<p class="lead small center-text">${t("motion.none")}</p>`}`,
+        ([id, b]) => html`${several ? html`<h2 class="label">${b.name}</h2>` : nothing}
+          <div class="rows">
+            ${b.motion_areas!.map((a) => this.motionArea(a))}
+            <button class="item" @click=${() => ctx.go(`/settings/motionaware/new?bridge=${encodeURIComponent(id)}`)}>
+              <ha-icon icon="mdi:plus"></ha-icon><div class="grow">${t("ma.new")}</div>
+            </button>
+          </div>
+          ${b.motion_areas!.length ? nothing : html`<p class="lead small center-text">${t("motion.none")}</p>`}`,
       )}`;
   }
 
@@ -489,13 +496,15 @@ export class BridgesView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const lights = a.lights.map((l) => (l.entity_id ? friendlyName(ctx.hass, l.entity_id) : "?")).join(", ");
-    const health = ["healthy", "degraded", "recovering", "unrecoverable", "not_running"].includes(a.health) ? a.health : "unknown";
+    const state = areaState(a);
     return html`<div class="item">
-      <ha-icon icon=${a.enabled ? "mdi:motion-sensor" : "mdi:motion-sensor-off"}></ha-icon>
-      <div class="grow">${a.name}
-        <div class="dim small">${[a.group, t(`motion.health_${health}` as StringKey), lights].filter(Boolean).join(" · ")}</div>
-      </div>
-      ${toggle(a.enabled, a.name, () => ctx.ws({ type: "hue_studio/bridges/motion_area", area_id: a.id, enabled: !a.enabled }))}
+      <button class="grow plain row-link" @click=${() => ctx.go(`/settings/motionaware/${encodeURIComponent(a.id)}`)}>
+        <ha-icon icon=${a.enabled ? "mdi:motion-sensor" : "mdi:motion-sensor-off"}></ha-icon>
+        <div class="grow">${a.name}
+          <div class=${classMap({ "dim small": true, warn: state === "problem" })}>${[a.group ?? t("ma.whole_home"), t(`ma.state_${state}` as StringKey), lights].filter(Boolean).join(" · ")}</div>
+        </div>
+      </button>
+      ${toggle(a.enabled, a.name, () => ctx.ws({ type: "hue_studio/motion_areas/update", area_id: a.id, enabled: !a.enabled }))}
     </div>`;
   }
 }

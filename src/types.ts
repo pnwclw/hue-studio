@@ -135,6 +135,9 @@ export interface BridgeInfo {
   zones?: number | null;
   /** null: no MotionAware on this bridge. */
   motion_areas: MotionArea[] | null;
+  /** Lights that can sense (null until the bridge said, or no MotionAware). */
+  motion_lights?: MotionLight[] | null;
+  motion_groups?: MotionGroup[] | null;
 }
 
 /** A bridge on the network the Philips Hue integration does not have yet (hue_studio/bridges/discover). */
@@ -189,7 +192,7 @@ export type MoveMethod = "serial" | "qr" | "power" | "button";
 export interface MoveLogEntry {
   /** Seconds since epoch. */
   at: number;
-  event: "start" | "device" | "removed" | "search" | "found" | "not_found" | "restored" | "skipped" | "back" | "done" | "failed";
+  event: "start" | "device" | "removed" | "search" | "found" | "not_found" | "restored" | "skipped" | "stopped" | "back" | "done" | "failed";
   name: string | null;
   method?: MoveMethod;
   seconds?: number;
@@ -262,13 +265,47 @@ export type BridgeLinkEvent =
   | { step: "done"; hue_entry_id: string; name: string }
   | { step: "failed"; reason: string };
 
+/** A MotionAware area: lights that sense motion together (hue_studio/bridges/subscribe). */
 export interface MotionArea {
   id: string;
   name: string;
+  /** Its Hue room or zone (null: the whole home). */
   group: string | null;
+  group_id: string;
+  group_type: "room" | "zone" | "home";
   enabled: boolean;
   health: string;
-  lights: { entity_id: string | null; health: string }[];
+  /** Switched on or given other lights moments ago, not every light done yet. */
+  calibrating: boolean;
+  /** When that calibration started (seconds since the epoch). */
+  calibration_started: number | null;
+  /** Its lights (motion area candidates); health null until the bridge says. */
+  lights: { id: string; device: string | null; entity_id: string | null; health: string | null }[];
+  /** For lights (convenience) and for Hue Secure alerts (security), 0..max. */
+  sensitivity: { value: number; max: number } | null;
+  security_sensitivity: { value: number; max: number } | null;
+  /** The native binary sensor of the area. */
+  sensor: string | null;
+  /** The Hue app's "what happens on motion": bridge behaviors. */
+  responses: { id: string; name: string | null; enabled: boolean; slots: number }[];
+}
+
+/** A light that can sense motion for MotionAware (a motion area candidate). */
+export interface MotionLight {
+  id: string;
+  /** Its device on the bridge. */
+  device: string;
+  entity_id: string | null;
+  name: string | null;
+}
+
+/** A Hue room or zone with the lights of its that can sense. */
+export interface MotionGroup {
+  id: string;
+  type: "room" | "zone";
+  name: string;
+  /** Motion light (candidate) ids. */
+  lights: string[];
 }
 
 /** A sidebar panel (`hass.panels`). */

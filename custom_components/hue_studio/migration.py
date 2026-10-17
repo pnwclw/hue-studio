@@ -122,7 +122,7 @@ def device_mac(bridge: HueBridgeV2, device_id: str) -> str | None:
     return getattr(connectivity, "mac_address", None) if connectivity else None
 
 
-def _light_ids(device: Any) -> list[str]:
+def device_lights(device: Any) -> list[str]:
     """A device's lights in the order of its services (a stable order to map by)."""
     return [s.rid for s in device.services if s.rtype == ResourceTypes.LIGHT]
 
@@ -147,7 +147,7 @@ def _light_devices(bridge: HueBridgeV2, room: Any) -> set[str]:
     return {
         rid
         for rid in _room_devices(room)
-        if (d := bridge.devices.get(rid)) is not None and _light_ids(d)
+        if (d := bridge.devices.get(rid)) is not None and device_lights(d)
     }
 
 
@@ -296,7 +296,7 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
     target = bridges[selection.target]
     entities = er.async_get(hass)
     moving = [d for rid in selection.devices if (d := bridge.devices.get(rid))]
-    light_ids = {rid for d in moving for rid in _light_ids(d)}
+    light_ids = {rid for d in moving for rid in device_lights(d)}
     rooms = [r for rid in selection.rooms if (r := bridge.groups.room.get(rid))]
     zones = _zones_touched(bridge, light_ids)
     groups = {r.id for r in rooms} | {z.id for z, _whole in zones}
@@ -311,7 +311,7 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
             for rid in light_ids
             if (e := entities.async_get_entity_id(LIGHT_DOMAIN, HUE_DOMAIN, rid))
         ),
-        "accessories": sorted(d.metadata.name for d in moving if not _light_ids(d)),
+        "accessories": sorted(d.metadata.name for d in moving if not device_lights(d)),
         "rooms": sorted(r.metadata.name for r in rooms),
         "scenes": sum(1 for s in bridge.scenes.scene if s.group.rid in groups),
         "zones": [{"name": z.metadata.name, "whole": whole} for z, whole in zones],
@@ -332,11 +332,11 @@ def async_move_plan(hass: HomeAssistant, selection: Selection) -> dict[str, Any]
             {
                 "mac": mac.upper() if (mac := device_mac(bridge, d.id)) else None,
                 "name": d.metadata.name,
-                "light": bool(_light_ids(d)),
+                "light": bool(device_lights(d)),
                 "entity_id": next(
                     (
                         e
-                        for rid in _light_ids(d)
+                        for rid in device_lights(d)
                         if (
                             e := entities.async_get_entity_id(
                                 LIGHT_DOMAIN, HUE_DOMAIN, rid
@@ -454,7 +454,7 @@ class _Remember:
             (HUE_DOMAIN, device.id), self.source
         )
         lights = []
-        for rid in _light_ids(device):
+        for rid in device_lights(device):
             function, power_on = light_settings(self.bridge.lights.get(rid))
             lights.append(
                 {
@@ -850,15 +850,32 @@ def _current(memo: dict[str, Any]) -> dict[str, Any] | None:
 
 
 async def async_finish_move(hass: HomeAssistant) -> None:
-    """Forget a finished move, or stop waiting: devices the old bridge let go and no
-    bridge took are kept among the lost devices."""
+    """Forget a finished move, or stop waiting: with devices moved already, the rest is
+    skipped and the move finishes (rooms, scenes, zones, entertainment areas); devices
+    the old bridge let go and no bridge took are kept among the lost devices."""
     mover = _mover(hass)
     if mover.busy:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="move_busy"
         )
-    if mover.memo is not None:
-        await _async_keep_lost(mover, mover.memo)
+    memo = mover.memo
+    if (
+        memo is not None
+        and memo["step"] == "waiting"
+        and memo["source"] != memo["target"]
+        and any(d["new_id"] for d in memo["devices"])
+    ):
+        # Some moved: the rest is skipped, and rooms, scenes, zones and entertainment
+        # areas still follow the devices that did (the move then ends as done).
+        for device in memo["devices"]:
+            if device["new_id"] is None and not device["skipped"]:
+                device["skipped"] = True
+        _log(memo, "stopped")
+        memo["error"] = None
+        _start(mover)
+        return
+    if memo is not None:
+        await _async_keep_lost(mover, memo)
     mover.memo = None
     await mover.async_save()
 
@@ -1125,7 +1142,7 @@ def _match(bridge: HueBridgeV2, devices: list[dict[str, Any]]) -> None:
         if device is None or memo["new_id"] is not None:
             continue
         memo["new_id"] = device.id
-        new = _light_ids(device)
+        new = device_lights(device)
         memo["new_lights"] = {
             light["id"]: new[index]
             for index, light in enumerate(memo["lights"])

@@ -472,7 +472,7 @@ export class BridgeMoveView extends StudioView {
               ${t("move.back", { bridge: s.source_name })}
             </button>`
           : nothing}
-        <button class="pill" ?disabled=${this.busy || s.running} @click=${() => this.finish()}>${t("move.stop")}</button>
+        <button class="pill" ?disabled=${this.busy || s.running} @click=${() => this.finish()}>${t(found ? "move.stop_finish" : "move.stop")}</button>
       </div>`;
   }
 
@@ -555,6 +555,8 @@ export class BridgeMoveView extends StudioView {
     if (this.busy) return;
     const s = this.state;
     if (!(await this.send({ type: "hue_studio/bridges/move/finish" }))) return;
+    // Stopped after some moved: the move goes on with rooms and scenes; stay to watch.
+    if (s && s.step === "waiting" && s.source !== s.target && s.devices.some((d) => d.found)) return;
     this.planKey = "";
     const area = s?.area || this.area;
     if (to) this.ctx.go(to);

@@ -26,7 +26,6 @@ from .bridges import (
     NAME_MAX as BRIDGE_NAME_MAX,
     async_bridges_payload,
     async_rename_bridge,
-    async_set_motion_area,
 )
 from .const import (
     CONF_AUTO_ALIGN,
@@ -85,6 +84,16 @@ from .migration import (
     async_skip_move_device,
     async_start_move,
 )
+from .motion_areas import (
+    MAX_LIGHTS as MOTION_MAX_LIGHTS,
+    NAME_MAX as MOTION_NAME_MAX,
+    async_create as async_create_motion_area,
+    async_delete as async_delete_motion_area,
+    async_recalibrate as async_recalibrate_motion_area,
+    async_set_response as async_set_motion_response,
+    async_update as async_update_motion_area,
+    async_watch_bridges as async_watch_motion_areas,
+)
 from .options import (
     async_frontend_config,
     async_set_group_area,
@@ -141,6 +150,11 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_discover_bridges,
         ws_link_bridge,
         ws_set_motion_area,
+        ws_create_motion_area,
+        ws_update_motion_area,
+        ws_recalibrate_motion_area,
+        ws_delete_motion_area,
+        ws_set_motion_response,
         ws_rename_bridge,
         ws_move_plan,
         ws_move,
@@ -872,6 +886,7 @@ def ws_subscribe_bridges(
     msg: dict[str, Any],
 ) -> None:
     """The bridges and their MotionAware areas (bridges.async_bridges_payload)."""
+    async_watch_motion_areas(hass)
     _subscribe(
         hass,
         connection,
@@ -974,9 +989,136 @@ async def ws_set_motion_area(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Switch a MotionAware area on or off."""
+    """Switch a MotionAware area on (it calibrates) or off."""
     await _ws_call(
-        connection, msg, async_set_motion_area(hass, msg["area_id"], msg["enabled"])
+        connection,
+        msg,
+        async_update_motion_area(hass, msg["area_id"], enabled=msg["enabled"]),
+    )
+
+
+MOTION_LIGHTS = vol.All([cv.entity_id], vol.Length(min=1, max=MOTION_MAX_LIGHTS))
+MOTION_NAME = vol.All(str, vol.Strip, vol.Length(min=1, max=MOTION_NAME_MAX))
+SENSITIVITY = vol.All(vol.Coerce(int), vol.Range(min=0, max=10))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/motion_areas/create",
+        vol.Required("hue_entry_id"): str,
+        vol.Required("group"): str,
+        vol.Required("lights"): MOTION_LIGHTS,
+        vol.Required("name"): MOTION_NAME,
+    }
+)
+@websocket_api.async_response
+async def ws_create_motion_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """A new MotionAware area in a Hue room or zone; the bridge calibrates it at once.
+    Result: {"area_id"}."""
+    try:
+        area_id = await async_create_motion_area(
+            hass, msg["hue_entry_id"], msg["group"], msg["lights"], msg["name"]
+        )
+    except (HomeAssistantError, ServiceValidationError) as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"], {"area_id": area_id})
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/motion_areas/update",
+        vol.Required("area_id"): str,
+        vol.Optional("name"): MOTION_NAME,
+        vol.Optional("group"): str,
+        vol.Optional("lights"): MOTION_LIGHTS,
+        vol.Optional("enabled"): bool,
+        vol.Optional("sensitivity"): SENSITIVITY,
+        vol.Optional("security_sensitivity"): SENSITIVITY,
+    }
+)
+@websocket_api.async_response
+async def ws_update_motion_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Change a MotionAware area (other lights or switching it on: it calibrates)."""
+    await _ws_call(
+        connection,
+        msg,
+        async_update_motion_area(
+            hass,
+            msg["area_id"],
+            name=msg.get("name"),
+            group_id=msg.get("group"),
+            lights=msg.get("lights"),
+            enabled=msg.get("enabled"),
+            sensitivity=msg.get("sensitivity"),
+            security_sensitivity=msg.get("security_sensitivity"),
+        ),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/motion_areas/recalibrate",
+        vol.Required("area_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_recalibrate_motion_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Calibrate a MotionAware area again (nobody should be in the room)."""
+    await _ws_call(connection, msg, async_recalibrate_motion_area(hass, msg["area_id"]))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/motion_areas/delete",
+        vol.Required("area_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_delete_motion_area(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Remove a MotionAware area from its bridge."""
+    await _ws_call(connection, msg, async_delete_motion_area(hass, msg["area_id"]))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/motion_areas/response",
+        vol.Required("behavior_id"): str,
+        vol.Required("enabled"): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_set_motion_response(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Switch the Hue app's response to a MotionAware area on or off."""
+    await _ws_call(
+        connection,
+        msg,
+        async_set_motion_response(hass, msg["behavior_id"], msg["enabled"]),
     )
 
 

@@ -912,6 +912,23 @@ export const CSS = `
   .delete-btn.confirm { border-color: #c0392b; background: #c0392b; }
   .delete-btn:disabled { opacity: 0.5; }
   .delete-area .hint { max-width: 380px; margin: 0; font-size: 13px; line-height: 1.45; text-align: center; }
+  /* MotionAware areas: a row that opens the area beside its switch, the new area's steps,
+     the art of "leave the room" and "ready", each light's state. */
+  .rows .item > .row-link { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: none; background: none;
+                            font: inherit; color: inherit; text-align: left; cursor: pointer; }
+  .ma-steps { display: flex; gap: 6px; margin-left: auto; }
+  .ma-steps span { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+                   background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .ma-steps span.on { background: var(--accent); color: #fff; }
+  .ma-page h1.ma-title { margin: 6px 2px 8px; }
+  .ma-page .ma-art { --mdc-icon-size: 64px; color: var(--accent); }
+  .ma-page .ma-art.ok { color: #3ddc84; }
+  .ma-page .add-actions.stack { flex-direction: column; align-items: center; }
+  .ma-page .add-actions.stack .pill { min-width: 240px; }
+  .ma-health { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 13px; color: var(--text-2); }
+  .ma-health.ready { color: #3ddc84; }
+  .ma-health.problem { color: #ffb340; }
+  .ma-page .steps-list { margin-top: 18px; }
   .sensor-sheet .rows .item.on[aria-disabled] { cursor: default; }
   /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
   .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }

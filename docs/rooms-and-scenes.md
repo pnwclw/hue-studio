@@ -87,8 +87,10 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
     QR code given now), let it go first (one looked for by its serial number), skip it
     (it stays on the old bridge, or, let go already, it is kept among the lost devices),
     put everything back on the old bridge while nothing has been found (the devices
-    rejoin their scenes, zones and entertainment areas there), or stop waiting (devices
-    let go and not found are kept as lost too);
+    rejoin their scenes, zones and entertainment areas there), or stop waiting: with
+    devices moved already the rest is skipped and rooms, scenes, zones and entertainment
+    areas still follow what moved (tried live: stopped before this, a move left the
+    rooms and scenes behind); devices let go and not found are kept as lost too;
   - then a room that moved whole is made again on the new bridge (name, archetype,
     devices); lights going to another area follow room alignment. Scenes are copied,
     zones and entertainment areas whose lights all moved are copied (positions kept) and
@@ -101,6 +103,15 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
     again on a bridge (QR code, serial number, switched off and on) as a move of that
     one device — found, it gets its settings, entities, area and room back — or
     forgotten.
+  - identity (`identity.py`, `hue_studio.identity`): apart from moves, Hue Studio
+    remembers every device by its Zigbee MAC (its entities' ids, names, icons, areas,
+    labels, enabled/hidden state; the HA device's area, name and labels; its name,
+    archetype and light settings on the bridge) and every room, zone and scene by name.
+    A device that comes back as new bridge resources in any way (added again with "Add
+    devices", migrated by the Hue app, paired anew) takes its entity ids and settings
+    back as soon as the old entities are gone; a room or zone of a remembered name and
+    its scenes likewise. Tried live: lights found late in a move and added again by hand
+    kept the native integration's new ids, as did the rooms.
 
 ## HA -> bridge (Hue Studio)
 

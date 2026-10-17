@@ -32,6 +32,8 @@
 //                              or ?lights=<ids>&to_area=<id>,
 //                              optionally &to=<hue entry id>; without them the move in progress
 //   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
+//   /settings/motionaware/new[?bridge=]      a new area: room or zone, lights, calibration
+//   /settings/motionaware/<id>                an area: on/off, what happens on motion, lights, sensitivity
 //   /settings/entertainment[/new|/<id>[/arrange]]  entertainment areas
 //   /settings/integration      the integration's options
 //   /rooms                     rooms and zones: alignment with HA areas, zone editor
@@ -66,6 +68,7 @@ import "./views/gallery.ts";
 import "./views/gallery-settings.ts";
 import "./views/home.ts";
 import "./views/lost.ts";
+import "./views/motion-area.ts";
 import "./views/room.ts";
 import "./views/rooms.ts";
 import "./views/settings.ts";
@@ -101,6 +104,7 @@ type Route =
   | { name: "deviceAdd"; room: string | null }
   | { name: "lost" }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
+  | { name: "motionArea"; area: string; bridge: string | null }
   | { name: "bridgeAdd" }
   | { name: "bridgeMove"; bridge: string | null; area: string | null; lights: string[] | null; toArea: string | null; to: string | null }
   | { name: "entertainment"; area: string | null; arrange: boolean }
@@ -161,6 +165,7 @@ function parseRoute(path: string, search: string): Route {
     return { name: "bridgeMove", bridge: params.get("bridge"), area: params.get("area"), lights: lights ? lights.split(",") : null, toArea: params.get("to_area"), to: params.get("to") };
   }
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
+  if (parts[0] === "settings" && parts[1] === "motionaware" && parts[2]) return { name: "motionArea", area: parts[2], bridge: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "entertainment") return { name: "entertainment", area: parts[2] || null, arrange: parts[3] === "arrange" };
   if (parts[0] === "settings" && parts[1] === "integration") return { name: "integration" };
@@ -227,6 +232,7 @@ export class HueStudioPanel extends LitElement {
               route.name === "deviceAdd" ||
               route.name === "lost" ||
               route.name === "bridges" ||
+              route.name === "motionArea" ||
               route.name === "bridgeAdd" ||
               route.name === "bridgeMove" ||
               route.name === "entertainment" ||
@@ -308,6 +314,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-bridge-move-view .ctx=${ctx} .rev=${rev} .bridge=${route.bridge} .area=${route.area} .lights=${route.lights} .toArea=${route.toArea} .to=${route.to}></hue-studio-bridge-move-view>`;
       case "bridges":
         return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode} .item=${route.item}></hue-studio-bridges-view>`;
+      case "motionArea":
+        return html`<hue-studio-motion-area-view .ctx=${ctx} .rev=${rev} .area=${route.area} .bridge=${route.bridge}></hue-studio-motion-area-view>`;
       case "entertainment":
         return route.arrange && route.area
           ? html`<hue-studio-space-view .ctx=${ctx} .rev=${rev} .entertainment=${route.area}></hue-studio-space-view>`

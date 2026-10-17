@@ -243,6 +243,10 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 settings and HA entities restored per device; rooms, scenes/zones/entertainment areas after;
                                 a journal of every step; devices let go and not found kept as lost (found again later);
                                 one move at a time, in the background
+  identity.py                   every Hue device remembered by Zigbee MAC (its entities' ids and settings, HA device area,
+                                name, labels; bridge name, archetype, light settings), rooms/zones/scenes by name; a device
+                                or room that comes back as new resources (any way: a move, "Add devices", the Hue app,
+                                pairing again) takes its ids and settings back once the old entities are gone
   bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
                                 (its button); Wi-Fi bridges are put on the network by the Hue app
   automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
