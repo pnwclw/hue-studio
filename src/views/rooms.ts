@@ -12,6 +12,7 @@ import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, lightsByBrid
 import type { RoomsPlan } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { bridgeRow, type Choice, navRow, single } from "./choice.ts";
 
 /** The zone editor: an existing zone (entity id) or a new one (null). */
 interface ZoneDraft {
@@ -37,27 +38,23 @@ const row = (iconName: string, text: string | TemplateResult, sub?: string | Tem
  * Hue lights without an HA area, each with an area picker. Also shown on the home screen.
  * Picking an area moves the light's device there (hue_studio/lights/set_area).
  */
-export function noRoomRows(ctx: StudioContext): TemplateResult | typeof nothing {
+export function noRoomRows(ctx: StudioContext, choose: (choice: Choice) => void): TemplateResult | typeof nothing {
   const lights = lightsWithoutArea(ctx.hass);
   if (!lights.length) return nothing;
   const areas = Object.entries(ctx.hass.areas || {}).sort(([, a], [, b]) => a.name.localeCompare(b.name));
-  const pick = async (light: string, e: Event) => {
-    const area = (e.target as HTMLSelectElement).value;
+  const pick = async (light: string, area: string) => {
     if (area && (await ctx.setArea(light, area))) {
       ctx.toast(ctx.t("rooms.area_set", { light: friendlyName(ctx.hass, light), area: areaName(ctx, area) }));
     }
   };
+  const options = areas.map(([id, area]) => ({ value: id, label: area.name, icon: area.icon || "mdi:sofa-outline" }));
   return html`<div class="rows no-room">
     ${lights.map((light) => {
       const hueRoom = ctx.rooms?.hue_rooms[light];
-      return row(
-        lightIcon(ctx.hass, light, ctx.lightInfo[light]),
-        friendlyName(ctx.hass, light),
-        hueRoom ? ctx.t("rooms.in_hue", { room: hueRoom }) : nothing,
-        html`<select class="select" aria-label=${ctx.t("rooms.pick_area")} @change=${(e: Event) => pick(light, e)}>
-          <option value="">${ctx.t("rooms.pick_area")}</option>
-          ${areas.map(([id, area]) => html`<option value=${id}>${area.name}</option>`)}
-        </select>`,
+      const name = friendlyName(ctx.hass, light);
+      return navRow(
+        { icon: lightIcon(ctx.hass, light, ctx.lightInfo[light]), title: name, sub: hueRoom ? ctx.t("rooms.in_hue", { room: hueRoom }) : undefined, value: ctx.t("rooms.pick_area") },
+        () => choose(single(name, options, "", (area) => void pick(light, area))),
       );
     })}
   </div>`;
@@ -71,11 +68,11 @@ export class RoomsView extends StudioView {
   @state() private accessor busy = false;
   @state() private accessor draft: ZoneDraft | null = null;
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const zones = hueZones(ctx.hass);
-    const loose = noRoomRows(ctx);
+    const loose = noRoomRows(ctx, (c) => this.choose(c));
     return html`${this.screen(
         this.subHead(t("rooms.title"), () => ctx.go("/settings")),
         html`<h2 class="label">${t(severalBridges(ctx.rooms) ? "rooms.bridges" : "rooms.bridge")}</h2>
@@ -240,12 +237,8 @@ export class RoomsView extends StudioView {
     const plan = ctx.rooms;
     if (!severalBridges(plan)) return nothing;
     if (draft.zone) return html`<p class="lead small">${ctx.t("zone.on_bridge", { bridge: bridgeName(plan, draft.bridge) ?? "" })}</p>`;
-    return html`<div class="chips wrap zone-bridges">
-      ${Object.entries(plan!.bridges!).map(
-        ([id, name]) => html`<button class=${classMap({ chip: true, on: id === draft.bridge })} @click=${() => id !== draft.bridge && set({ bridge: id, lights: [] })}>
-          <ha-icon icon="mdi:router-wireless"></ha-icon>${name}
-        </button>`,
-      )}
+    return html`<div class="rows zone-bridges">
+      ${bridgeRow(ctx.t("add_device.bridge"), Object.entries(plan!.bridges!), draft.bridge, (c) => this.choose(c), (id) => id !== draft.bridge && set({ bridge: id, lights: [] }))}
     </div>`;
   }
 

@@ -7,10 +7,13 @@
 // screen opened from another one has a compact bar with a back button and its title.
 
 import { html, nothing, type TemplateResult } from "lit";
-import { property } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import type { StudioContext } from "../context.ts";
+import { haptic } from "../ha-internals.ts";
 import { icon, LightElement } from "../ui.ts";
+import { type Choice, choiceRows, isScreen } from "./choice.ts";
 
 type Slot = TemplateResult | typeof nothing;
 
@@ -19,7 +22,12 @@ export class StudioView extends LightElement {
   /** Bumped by the owner whenever the context changed, so the view re-renders. */
   @property({ attribute: false }) accessor rev = 0;
 
+  /** The choice open over the view (views/choice.ts), shown by `withChoice`. */
+  @state() protected accessor choosing: Choice | null = null;
+
   #headObserver?: ResizeObserver;
+  /** Where the body was scrolled to on the pages below the one shown (`pushPage`). */
+  #scrolls: number[] = [];
 
   /** A tab's header floats over the body: the body starts below it and scrolls under it. */
   protected override updated(changed: Map<PropertyKey, unknown>): void {
@@ -87,6 +95,86 @@ export class StudioView extends LightElement {
     const under = title ? title.getBoundingClientRect().bottom <= head.getBoundingClientRect().bottom + 2 : true;
     head.classList.toggle("scrolled", under);
   };
+
+  /** Views offering choices draw their page here; `render` adds the open choice to it. */
+  protected renderPage(): TemplateResult {
+    return html``;
+  }
+
+  protected override render(): unknown {
+    return this.withChoice(this.renderPage());
+  }
+
+  /** Open a choice: a sheet over the view, or a screen of its own. */
+  protected choose(choice: Choice): void {
+    haptic("selection");
+    if (isScreen(choice)) this.pushPage();
+    this.choosing = { ...choice, lists: choice.lists.map((l) => ({ ...l, selected: [...l.selected] })) };
+  }
+
+  protected closeChoice(): void {
+    const was = this.choosing;
+    this.choosing = null;
+    if (was && isScreen(was)) this.popPage();
+  }
+
+  /**
+   * The view's own page with the open choice: a screen of its own instead of it, or a sheet
+   * after it (outside the scrolling body, which would clip it on iOS).
+   */
+  private withChoice(page: TemplateResult): TemplateResult {
+    const c = this.choosing;
+    if (!c) return page;
+    const { t } = this.ctx;
+    const flip = (index: number, value: string) => {
+      const list = c.lists[index];
+      let selected: string[];
+      if (list.multi) {
+        selected = list.selected.includes(value) ? list.selected.filter((v) => v !== value) : [...list.selected, value];
+        if (selected.length < (list.min ?? 0)) return;
+      } else selected = [value];
+      haptic("selection");
+      list.pick(selected);
+      if (!list.multi && c.lists.length === 1) {
+        this.closeChoice();
+        return;
+      }
+      this.choosing = { ...c, lists: c.lists.map((l, i) => (i === index ? { ...l, selected } : l)) };
+    };
+    const action = c.action;
+    const body = html`${c.hint ? html`<p class="hint">${c.hint}</p>` : nothing}${c.lists.map((l, i) => choiceRows(l, (v) => flip(i, v)))}
+      ${action
+        ? html`<div class="save-area"><button class="pill reset" @click=${() => {
+            haptic("selection");
+            action.run();
+            this.closeChoice();
+          }}>${action.label}</button></div>`
+        : nothing}`;
+    if (isScreen(c)) return this.screen(this.subHead(c.title, () => this.closeChoice()), body, "settings-page choice-page");
+    return html`${page}
+      <div class=${classMap({ sheet: true, bottom: this.ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && this.closeChoice()}>
+        <div class="box form sensor-sheet choice-sheet" role="dialog" aria-label=${c.title}>
+          <div class="sheet-bar">
+            <button class="round close" aria-label=${t("common.close")} @click=${() => this.closeChoice()}>${icon("close")}</button>
+            <div class="grow">${c.title}</div>
+          </div>
+          <div class="form-body">${body}</div>
+        </div>
+      </div>`;
+  }
+
+  /** Before showing a page over the current one: remember the scroll, start the next at the top. */
+  protected pushPage(): void {
+    const body = this.querySelector<HTMLElement>(":scope > .screen-body");
+    this.#scrolls.push(body?.scrollTop ?? 0);
+    void this.updateComplete.then(() => this.querySelector<HTMLElement>(":scope > .screen-body")?.scrollTo(0, 0));
+  }
+
+  /** Back from a page over the current one: the current one where it was scrolled to. */
+  protected popPage(): void {
+    const top = this.#scrolls.pop() ?? 0;
+    void this.updateComplete.then(() => this.querySelector<HTMLElement>(":scope > .screen-body")?.scrollTo(0, top));
+  }
 
   /** Header of a screen opened from another one: back, the title (or `center` instead), actions. */
   protected subHead(title: string, back: () => void, end: Slot = nothing, center: Slot = nothing): TemplateResult {

@@ -633,25 +633,12 @@ export const CSS = `
   .palette .art { width: 34px; height: 34px; flex: none; border-radius: 50%; }
   .select.wide { width: 100%; margin-top: 10px; }
   .rows.mode-extra { margin-top: 10px; }
-  .device-card + .device-card { border-top: 1px solid rgba(255, 255, 255, 0.06); }
-  .device-card > .item { width: 100%; }
-  .device-form { padding: 0 14px 14px 50px; }
   .chips.wrap { flex-wrap: wrap; overflow: visible; }
-  .sensor-kind { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
-  .sensor-kind ha-icon { --mdc-icon-size: 16px; }
   .rows .item .check { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text-2); display: flex; align-items: center; justify-content: center; flex: none; }
   .rows .item .check.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .rows .item .check.on svg { fill: currentColor; opacity: 1; }
   .rows .item .check svg { width: 14px; height: 14px; }
   .dot-badge.live { background: #3ddc84; }
-  /* Phones: the area picker of a Hue room/zone gets a line of its own. */
-  @container (max-width: 560px) {
-    .group-row { flex-wrap: wrap; }
-    .group-row .select { flex: 1 1 100%; max-width: none; width: auto; margin-left: 38px; }
-  }
-  .device-form .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-  .device-form .danger-row { display: flex; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
-  .device-form .hint { margin: 8px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
   .hint.warn, .dim.warn, .small.warn { color: #ffb340; }
   .small.error { color: #ff6b5e; }
   .pill.danger { color: #ff6b5e; }
@@ -757,17 +744,6 @@ export const CSS = `
   .sync-banner .pill { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; background: rgba(255, 255, 255, 0.14); }
   /* Settings → Scene gallery: a category's rule opens under its row; whether it shows now. */
   .rule-row .chevron { flex: none; opacity: 0.5; }
-  .rule-editor { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 4px 16px 14px; }
-  .rule-editor .chips { flex-wrap: wrap; overflow: visible; padding: 0; }
-  .rule-editor .chip:not(.on) { background: rgba(120, 120, 128, 0.24); }
-  .rule-editor .chip ha-icon { --mdc-icon-size: 16px; }
-  .rule-editor .dates { display: flex; flex-wrap: wrap; gap: 10px; }
-  .rule-editor p { margin: 0; }
-  .date-field { display: flex; flex-direction: column; gap: 4px; }
-  .date-value { position: relative; display: flex; align-items: center; min-width: 76px; height: 36px; padding: 0 12px; box-sizing: border-box;
-                border-radius: 10px; background: rgba(120, 120, 128, 0.24); font-size: 16px; cursor: pointer; }
-  .date-value input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: none; opacity: 0; cursor: pointer;
-                      font-size: 16px; color-scheme: dark; }
   .season-state { flex: none; font-size: 12px; font-weight: 600; color: var(--text-2); }
   .season-state.on { color: #3ddc84; }
   .lead { margin: 0 2px 10px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
@@ -882,14 +858,16 @@ export const CSS = `
   .rows.device-list .item .small.warn { font-weight: 500; }
   .rows.device-list .item .value { font-size: 17px; color: var(--text-2); }
   .rows.device-list .item .dot-badge.warn { background: #ffb340; }
-  .devices-page .device-search { display: flex; height: 44px; margin-top: 14px; padding: 0 16px; border-radius: 22px; }
-  .devices-page .section-head { margin: 26px 2px 8px; }
-  .devices-page .section-head .count { font-size: 15px; color: var(--text-2); }
-  .chips.filters { gap: 10px; padding-top: 4px; }
-  .chip.filter-chip { height: 40px; padding: 0 12px 0 18px; border-radius: 20px; border: none; background: rgba(120, 120, 128, 0.28);
-                      font-size: 15px; letter-spacing: 0.6px; text-transform: uppercase; }
-  .chip.filter-chip span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip.filter-chip ha-icon { --mdc-icon-size: 24px; }
+  .devices-page .device-search { display: flex; height: 38px; margin-top: 12px; padding: 0 14px; border-radius: 19px; }
+  :is(.devices-page, .daylight-page) .section-head { margin: 22px 2px 8px; }
+  :is(.devices-page, .daylight-page) .section-head .count { font-size: 15px; color: var(--text-2); }
+  .daylight-page .chips.filters + .hint { margin-top: 12px; }
+  .daylight-page .scene-tiles { margin-top: 12px; }
+  .chips.filters { gap: 8px; padding-top: 2px; }
+  .chip.filter-chip { height: 30px; gap: 2px; padding: 0 6px 0 12px; border-radius: 15px; border: none; background: rgba(120, 120, 128, 0.28);
+                      font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  .chip.filter-chip span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip.filter-chip ha-icon { --mdc-icon-size: 18px; }
   .chip.filter-chip.on { background: var(--accent); }
   @container (max-width: 599px) {
     .rows.device-list { margin-left: -16px; margin-right: -16px; border-radius: 0; }
@@ -942,16 +920,6 @@ export const CSS = `
   .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 500; line-height: 1.25; }
   .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.3; color: var(--text-2); }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
-  .automation-type { display: flex; align-items: center; gap: 8px; margin: 2px 2px 10px; font-size: 13px; color: var(--text-2); }
-  .automation-type ha-icon { --mdc-icon-size: 18px; }
-  .automation-page h3.sublabel { margin: 14px 2px 8px; font-size: 13px; font-weight: 500; color: var(--text-2); }
-  .automation-page .seg + .rows { margin-top: 10px; }
-  .automation-page .seg.kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .automation-page .chips.wrap { flex-wrap: wrap; overflow: visible; }
-  .automation-page .chips.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 10px; overflow: visible; }
-  .automation-page .chips.days .chip { min-width: 0; padding: 0; justify-content: center; }
-  .automation-page .center .pill.apply { min-width: 200px; }
-  .automation-page .rows.pick .item .check { margin-left: auto; }
   /* light of the day (natural light, scene of the day) */
   .rows .item .thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
   .rows .item.wrap { flex-wrap: wrap; }
@@ -981,9 +949,6 @@ export const CSS = `
   .scene-tiles .tile .tile-open { position: absolute; inset: 0; z-index: 1; padding: 0; border: none; background: none; cursor: pointer; }
   .scene-tiles .tile .tile-open ~ span { pointer-events: none; }
   /* Settings → Light of the day */
-  .daylight-page .chips.pool-views { margin-top: 10px; padding-bottom: 0; }
-  .daylight-page .chips.pool-views + .chips.pool-views { margin-top: 8px; }
-  .daylight-page .pill.small-pill { flex: none; height: 32px; padding: 0 14px; font-size: 13px; text-transform: none; letter-spacing: 0; }
   .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 8px; vertical-align: 1px; font-size: 11px; font-weight: 600;
              background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
   .sheet .box.tag-editor { width: min(100%, 560px); }
@@ -1006,12 +971,9 @@ export const CSS = `
                               border-color: rgba(255, 255, 255, 0.7); }
   .picker-grid .tile.on { box-shadow: 0 0 0 2px #fff; }
   .sheet .box.picker { width: min(100%, 560px); }
-  .stepper { display: flex; align-items: center; gap: 6px; flex: none; }
-  .stepper .value { min-width: 64px; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
   .round.mini-step { width: 30px; height: 30px; font-size: 17px; line-height: 1; }
   .round.mini-step:disabled { opacity: 0.35; }
   .round.mini-step svg { width: 16px; height: 16px; }
-  .select.time { max-width: 120px; color-scheme: dark; }
   /* Below 16px iOS zooms the page in when a field or picker gets focus. */
   @media (pointer: coarse) { .select { font-size: 16px; } }
 
@@ -1082,6 +1044,63 @@ export const CSS = `
            background: rgba(60, 60, 64, 0.96); font-size: 14px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
            transition: opacity 0.2s, transform 0.25s var(--spring); }
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+
+  /* Settings and automations, like the Hue app's (the look of Settings → Devices and a
+     MotionAware area): big rows, full width on phones, separators from the text on; a row says
+     what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
+     several. */
+  .settings-page .rows:not(.device-list) .item { min-height: 64px; gap: 16px; font-size: 17px; }
+  .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 28px; color: var(--text); }
+  .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item + .item { position: relative; border-top: none; }
+  .settings-page .rows:not(.device-list) .item + .item::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 60px; }
+  .settings-page h2.label { margin-top: 28px; }
+  .settings-page .section-head h2.label { margin: 0 2px; }
+  .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
+  .settings-page .lead { font-size: 15px; }
+  .settings-page .hint { margin: 10px 2px 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+  .settings-page .rows + .rows { margin-top: 16px; }
+  .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
+  .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 22px; color: var(--text-2); }
+  .rows .item .row-art { flex: none; width: 28px; height: 28px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  .rows .item.time-row { cursor: pointer; }
+  .rows .item .time-value { flex: none; padding: 0; border: none; background: none; color: var(--text-2); font: inherit; font-size: inherit;
+                            font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
+  .rows .item .time-value::-webkit-calendar-picker-indicator { margin-left: 6px; opacity: 0.55; cursor: pointer; }
+  .rows .item .time-value:focus { outline: none; color: var(--text); }
+  .choice-list .item .tick { display: flex; flex: none; color: var(--accent); }
+  .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
+  .choice-list .item .check { margin-left: 4px; }
+  .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
+  .choice-sheet .rows .item { min-height: 56px; font-size: 17px; }
+  .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 26px; }
+  .choice-sheet .rows + h2.label { margin-top: 20px; }
+  .choice-page .rows.choice-list { margin-top: 12px; }
+  .choice-page h2.label + .hint + .rows, .choice-page h2.label + .rows { margin-top: 0; }
+  .choice-page .hint + .rows { margin-top: 12px; }
+  .rows .item.date-row { position: relative; cursor: pointer; }
+  .rows .item.date-row input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .rule-page .lead { margin-top: 14px; }
+  /* A screen's own header picture and name (an automation): the sensor page's hero. */
+  .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 15px; color: var(--text-2); }
+  /* Days of the week: round toggles in a row of their own. */
+  .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
+  .days-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; max-width: 380px; }
+  .days-row button { width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; cursor: pointer; background: rgba(120, 120, 128, 0.24);
+                     color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
+  .days-row button.on { background: var(--accent); color: #fff; }
+  .days-row button:active { transform: scale(0.92); }
+  /* Under a screen's rows: its main button, then "Open in Home Assistant" and "Delete". */
+  .settings-page .save-area { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 30px; }
+  .settings-page .save-area .pill.apply { min-width: 220px; height: 44px; border-radius: 22px; background: var(--accent); color: #fff; font-size: 15px;
+                                          letter-spacing: 0.4px; text-transform: uppercase; }
+  .settings-page .save-area .lead { margin: 4px 0 0; text-align: center; }
+  @container (max-width: 599px) {
+    .settings-page .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+    .settings-page .scene-tiles, .settings-page .today { margin-left: 0; margin-right: 0; }
+  }
 
   @container (min-width: 600px) {
     .cards { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }

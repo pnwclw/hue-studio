@@ -1,5 +1,5 @@
 // Parts shared by the light of the day's settings and an automation's natural light / scene
-// of the day page: steppers, the phase times editor, the "Evening · Winter · …" line and the
+// of the day page: the phase times editor, the "Evening · Winter · …" line and the
 // scene picker sheet.
 
 import { html, nothing } from "lit";
@@ -12,6 +12,7 @@ import { haptic } from "../ha-internals.ts";
 import type { StringKey, Translate } from "../i18n.ts";
 import type { DayPreview, Phase } from "../types.ts";
 import { icon, normalize } from "../ui.ts";
+import { type Choice, single, timeRow } from "./choice.ts";
 
 export const PHASE_ICONS: Record<Phase, string> = {
   morning: "mdi:weather-sunset-up",
@@ -21,43 +22,41 @@ export const PHASE_ICONS: Record<Phase, string> = {
   night: "mdi:weather-night",
 };
 
-/** A − value + stepper. */
-export function stepper(value: number, min: number, max: number, step: number, unit: string, change: (v: number) => void, signed = false) {
-  const set = (v: number) => {
-    haptic("selection");
-    change(Math.min(max, Math.max(min, v)));
-  };
-  return html`<div class="stepper">
-    <button class="round mini-step" aria-label="−" ?disabled=${value <= min} @click=${() => set(value - step)}>−</button>
-    <span class="value">${signed && value > 0 ? "+" : ""}${value} ${unit}</span>
-    <button class="round mini-step" aria-label="+" ?disabled=${value >= max} @click=${() => set(value + step)}>+</button>
-  </div>`;
-}
+/** Minutes after (or before) sunrise or sunset a phase may start at. */
+const SHIFT_STEPS = [-120, -90, -60, -45, -30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30, 40, 50, 60, 75, 90, 120, 180, 240];
 
-/** Phase times: the shifts from sunrise/sunset and when the night starts. */
+/** Phase times: the shifts from sunrise/sunset (each a choice) and when the night starts. */
 export function phaseRows(
   t: Translate,
   times: { night_from: string; shifts: typeof DEFAULT_SHIFTS },
   change: (patch: { night_from?: string; shifts?: typeof DEFAULT_SHIFTS }) => void,
+  choose: (choice: Choice) => void,
   current?: Phase,
 ) {
-  const now = (phase: Phase) => (phase === current ? html`<span class="now-tag">${t("auto.now")}</span>` : nothing);
+  const minutes = (v: number) => `${v < 0 ? "−" : ""}${Math.abs(v)} ${t("automations.min")}`;
+  const title = (phase: Phase) => html`${t(`auto.phase_${phase}` as StringKey)}${phase === current ? html` <span class="now-tag">${t("auto.now")}</span>` : nothing}`;
   return html`<div class="rows">
-    ${SHIFTS.map(
-      (key) => html`<div class="item">
+    ${SHIFTS.map((key) => {
+      const value = times.shifts[key];
+      const values = SHIFT_STEPS.includes(value) ? SHIFT_STEPS : [...SHIFT_STEPS, value].sort((a, b) => a - b);
+      const name = t(`auto.phase_${key}` as StringKey);
+      return html`<button class="item nav" @click=${() =>
+        choose(
+          single(
+            name,
+            values.map((v) => ({ value: String(v), label: minutes(v) })),
+            String(value),
+            (v) => change({ shifts: { ...times.shifts, [key]: Number(v) } }),
+            t(`auto.shift_${key}` as StringKey),
+          ),
+        )}>
         <ha-icon icon=${PHASE_ICONS[key]}></ha-icon>
-        <div class="grow">${t(`auto.phase_${key}` as StringKey)} ${now(key)}<div class="dim small">${t(`auto.shift_${key}` as StringKey)}</div></div>
-        ${stepper(times.shifts[key], -240, 240, 5, t("automations.min"), (v) => change({ shifts: { ...times.shifts, [key]: v } }))}
-      </div>`,
-    )}
-    <div class="item">
-      <ha-icon icon=${PHASE_ICONS.night}></ha-icon>
-      <div class="grow">${t("auto.phase_night")} ${now("night")}<div class="dim small">${t("auto.night_from")}</div></div>
-      <input class="select time" type="time" .value=${times.night_from} @change=${(e: Event) => {
-        const v = (e.target as HTMLInputElement).value;
-        if (/^\d\d:\d\d$/.test(v)) change({ night_from: v });
-      }} />
-    </div>
+        <div class="grow">${title(key)}<div class="dim small">${t(`auto.shift_${key}` as StringKey)}</div></div>
+        <span class="value">${minutes(value)}</span>
+        <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+      </button>`;
+    })}
+    ${timeRow({ icon: PHASE_ICONS.night, title: t("auto.phase_night"), sub: t("auto.night_from") }, times.night_from, (night_from) => change({ night_from }))}
   </div>`;
 }
 
@@ -69,7 +68,7 @@ export function stateLine(t: Translate, p: DayPreview | null, brightness = true)
     p.kelvin ? "" : t(`auto.season_${p.season}` as StringKey),
     t(`auto.weather_${p.weather}` as StringKey),
     p.mood ? t(`auto.mood_${p.mood}` as StringKey) : "",
-    brightness ? `${p.brightness} %` : "",
+    brightness ? `${p.brightness}\u00a0%` : "",
   ]
     .filter(Boolean)
     .join(" · ");

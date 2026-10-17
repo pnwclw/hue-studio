@@ -27,10 +27,17 @@ import {
   seasonNow,
   type Window,
 } from "../seasons.ts";
+import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
 /** Seasons in the order of the year, from spring. */
 const YEAR: Season[] = ["spring", "summer", "autumn", "winter"];
+const SEASON_ICONS: Record<Season, string> = {
+  spring: "mdi:flower-tulip-outline",
+  summer: "mdi:white-balance-sunny",
+  autumn: "mdi:leaf-maple",
+  winter: "mdi:snowflake",
+};
 
 @customElement("hue-studio-gallery-settings-view")
 export class GallerySettingsView extends StudioView {
@@ -50,13 +57,15 @@ export class GallerySettingsView extends StudioView {
     const mode = (on: boolean, title: StringKey, sub: StringKey) =>
       html`<button class=${classMap({ item: true, on: on === seasonal })} role="radio" aria-checked=${on === seasonal} @click=${() => choose(on)}>
         <div class="grow">${t(title)}<div class="dim small">${t(sub)}</div></div>
-        <span class="radio"></span>
+        ${on === seasonal ? html`<span class="tick">${icon("check")}</span>` : nothing}
       </button>`;
 
+    const open = this.editing && ctx.gallery?.categories.find((c) => c.id === this.editing);
+    if (open) return this.screen(this.subHead(open.name, () => this.close()), this.editor(open.id, ruleOf(open.id, ctx.config.gallery_rules)), "settings-page rule-page");
     return this.screen(
       this.subHead(t("settings.gallery"), () => ctx.go("/settings")),
       html`<p class="lead">${t("seasonal.intro")}</p>
-        <div class="rows" role="radiogroup" aria-label=${t("settings.gallery")}>
+        <div class="rows choice-list" role="radiogroup" aria-label=${t("settings.gallery")}>
           ${mode(false, "seasonal.all", "seasonal.all_sub")} ${mode(true, "seasonal.seasonal", "seasonal.seasonal_sub")}
         </div>
         ${seasonal
@@ -71,26 +80,30 @@ export class GallerySettingsView extends StudioView {
     );
   }
 
-  /** A category: when it shows, whether it does now; a tap opens its rule. */
+  private close(): void {
+    this.editing = null;
+    this.popPage();
+  }
+
+  /** A category: when it shows, whether it does now; a tap opens its rule on a screen of its own. */
   private category(id: string, name: string) {
     const { ctx } = this;
     const { t } = ctx;
     const rule = ruleOf(id, ctx.config.gallery_rules);
     const now = new Date();
-    const open = this.editing === id;
     const shown = ruleShows(rule, seasonNow(ctx.hass, now), now);
-    const toggle = () => {
+    const open = () => {
       haptic("selection");
-      this.editing = open ? null : id;
+      this.pushPage();
+      this.editing = id;
     };
-    return html`<button class=${classMap({ item: true, "rule-row": true, open })} aria-expanded=${open} @click=${toggle}>
-        <div class="grow">${name}<div class="dim small">${this.summary(rule)}</div></div>
-        ${isSeasonal(rule)
-          ? html`<span class=${classMap({ "season-state": true, on: shown })}>${t(shown ? "seasonal.shown" : "seasonal.hidden")}</span>`
-          : nothing}
-        <ha-icon class="chevron" icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
-      </button>
-      ${open ? this.editor(id, rule) : nothing}`;
+    return html`<button class="item nav rule-row" @click=${open}>
+      <div class="grow">${name}<div class="dim small">${this.summary(rule)}</div></div>
+      ${isSeasonal(rule)
+        ? html`<span class=${classMap({ "season-state": true, on: shown })}>${t(shown ? "seasonal.shown" : "seasonal.hidden")}</span>`
+        : nothing}
+      <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+    </button>`;
   }
 
   /** "Always", "Winter", "1 Oct – 2 Nov", or both. */
@@ -128,57 +141,62 @@ export class GallerySettingsView extends StudioView {
     const flip = (s: Season) => save({ ...rule, seasons: seasons.includes(s) ? seasons.filter((x) => x !== s) : [...seasons, s] });
     const today = new Date();
     const span: Window = rule.window ?? fallback.window ?? [monthDay(today), monthDay(new Date(today.getTime() + 13 * 86400000))];
-    return html`<div class="rule-editor">
-      <div class="chips">
-        <button class=${classMap({ chip: true, on: !isSeasonal(rule) })} @click=${() => save({})}>${t("seasonal.always")}</button>
-        ${YEAR.map(
-          (s) => html`<button class=${classMap({ chip: true, on: seasons.includes(s) })} aria-pressed=${seasons.includes(s)} @click=${() => flip(s)}>
-            ${t(`auto.season_${s}` as StringKey)}
-          </button>`,
-        )}
-        <button
-          class=${classMap({ chip: true, on: !!rule.window })}
-          aria-pressed=${!!rule.window}
-          @click=${() => save({ ...rule, window: rule.window ? undefined : span })}
-        >
-          <ha-icon icon="mdi:calendar-range"></ha-icon>${t("seasonal.dates")}
+    const always = !isSeasonal(rule);
+    return html`<p class="lead">${this.summary(rule)}</p>
+      <div class="rows choice-list" role="radiogroup">
+        <button class=${classMap({ item: true, on: always })} role="radio" aria-checked=${always} @click=${() => save({})}>
+          <ha-icon icon="mdi:calendar-blank-outline"></ha-icon>
+          <div class="grow">${t("seasonal.always")}</div>
+          ${always ? html`<span class="tick">${icon("check")}</span>` : nothing}
         </button>
       </div>
-      ${rule.window
-        ? html`<div class="dates">
-              ${this.dateField(span[0], t("seasonal.from"), (md) => save({ ...rule, window: [md, span[1]] }))}
-              ${this.dateField(span[1], t("seasonal.to"), (md) => save({ ...rule, window: [span[0], md] }))}
-            </div>
-            <p class="dim small">${t("seasonal.dates_sub")}</p>`
-        : nothing}
-      ${id in rules ? html`<button class="pill" @click=${() => save(fallback)}>${t("seasonal.reset")}</button>` : nothing}
-    </div>`;
+      <h2 class="label">${t("daylight.tag_seasons")}</h2>
+      <div class="rows choice-list" role="group">
+        ${YEAR.map(
+          (s) => html`<button class=${classMap({ item: true, on: seasons.includes(s) })} role="checkbox" aria-checked=${seasons.includes(s)} @click=${() => flip(s)}>
+            <ha-icon icon=${SEASON_ICONS[s]}></ha-icon>
+            <div class="grow">${t(`auto.season_${s}` as StringKey)}</div>
+            <span class="check">${icon("check")}</span>
+          </button>`,
+        )}
+      </div>
+      <h2 class="label">${t("seasonal.dates")}</h2>
+      <div class="rows">
+        <div class="item">
+          <ha-icon icon="mdi:calendar-range"></ha-icon>
+          <div class="grow">${t("seasonal.dates")}<div class="dim small">${t("seasonal.dates_sub")}</div></div>
+          ${toggle(!!rule.window, t("seasonal.dates"), () => save({ ...rule, window: rule.window ? undefined : span }))}
+        </div>
+        ${rule.window
+          ? html`${this.dateRow(span[0], t("seasonal.from"), (md) => save({ ...rule, window: [md, span[1]] }))}
+              ${this.dateRow(span[1], t("seasonal.to"), (md) => save({ ...rule, window: [span[0], md] }))}`
+          : nothing}
+      </div>
+      ${id in rules ? html`<div class="save-area"><button class="pill reset" @click=${() => save(fallback)}>${t("seasonal.reset")}</button></div>` : nothing}`;
   }
 
-  /** A day of the year: shown without a year; the native date picker (invisible, on top) sets it. */
-  private dateField(value: string, label: string, set: (md: string) => void) {
+  /** A day of the year as a row: shown without a year; the native date picker (invisible, on top) sets it. */
+  private dateRow(value: string, label: string, set: (md: string) => void) {
     const year = new Date().getFullYear();
-    return html`<label class="date-field">
-      <span class="dim small">${label}</span>
-      <span class="date-value">
-        ${this.day(value)}
-        <input
-          type="date"
-          aria-label=${label}
-          .value=${`${year}-${value}`}
-          @click=${(e: Event) => {
-            try {
-              (e.target as HTMLInputElement).showPicker();
-            } catch {
-              // Not supported, or already open: the input handles the tap itself.
-            }
-          }}
-          @change=${(e: Event) => {
-            const md = (e.target as HTMLInputElement).value.slice(5);
-            if (isMonthDay(md)) set(md);
-          }}
-        />
-      </span>
+    return html`<label class="item date-row">
+      <div class="grow">${label}</div>
+      <span class="value">${this.day(value)}</span>
+      <input
+        type="date"
+        aria-label=${label}
+        .value=${`${year}-${value}`}
+        @click=${(e: Event) => {
+          try {
+            (e.target as HTMLInputElement).showPicker();
+          } catch {
+            // Not supported, or already open: the input handles the tap itself.
+          }
+        }}
+        @change=${(e: Event) => {
+          const md = (e.target as HTMLInputElement).value.slice(5);
+          if (isMonthDay(md)) set(md);
+        }}
+      />
     </label>`;
   }
 }

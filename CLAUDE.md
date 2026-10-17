@@ -294,7 +294,9 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 device by device, its journal, a device not found), lost (lost devices: look again, forget), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
                                 gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
-                                — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers
+                                — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers;
+                                choice.ts: a row with its value opens the list to pick from (a sheet for one value, a screen
+                                for several) — no <select>, segments or chips inside a section
   space.ts                      pure: placed lights, top-view coordinate mapping
   automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows
   daylight.ts                   pure: scene tags and pool views, an automation's own settings (extra/skipped, own phases, offsets),

@@ -15,6 +15,7 @@ import { friendlyName } from "../model.ts";
 import type { DevicesMessage, LostDevice } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { bridgeRow } from "./choice.ts";
 import "./qr-scan.ts";
 
 @customElement("hue-studio-lost-view")
@@ -58,7 +59,7 @@ export class LostView extends StudioView {
     this.confirmForget = false;
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const body = html`<p class="lead">${t("lost.intro")}</p>
@@ -114,12 +115,8 @@ export class LostView extends StudioView {
     };
     return html`<h2 class="label">${t("lost.look", { name: this.nameOf(d) })}</h2>
       ${bridges.length > 1
-        ? html`<div class="chips wrap">
-            ${bridges.map(
-              ([id, bridge]) => html`<button class=${classMap({ chip: true, on: id === target })} @click=${() => ((this.target = id), (this.code = null))}>
-                <ha-icon icon="mdi:router-wireless"></ha-icon>${bridge}
-              </button>`,
-            )}
+        ? html`<div class="rows">
+            ${bridgeRow(t("add_device.bridge"), bridges, target, (c) => this.choose(c), (id) => ((this.target = id), (this.code = null)))}
           </div>`
         : nothing}
       <p class="lead small">${t(takes ? "lost.how_qr" : "lost.how", { bridge: name })}</p>

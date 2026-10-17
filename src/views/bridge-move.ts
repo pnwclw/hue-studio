@@ -22,6 +22,7 @@ import { bridgeName, bridgeOf, groupBridge } from "../rooms.ts";
 import type { MoveLogEntry, MoveMethod, MovePlan, MoveState, MoveStep } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { bridgeRow } from "./choice.ts";
 import "./qr-scan.ts";
 
 /** The steps shown while a move goes: the devices one by one, rooms, the rest. */
@@ -147,7 +148,7 @@ export class BridgeMoveView extends StudioView {
     });
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const state = this.state;
@@ -298,14 +299,7 @@ export class BridgeMoveView extends StudioView {
     const whole = !!this.bridge;
     return html`<p class="lead">${whole ? t("move.intro_all", params) : t("move.intro", { ...params, what })}</p>
       ${this.targets.length > 1 && !this.to
-        ? html`<h2 class="label">${t("move.to")}</h2>
-            <div class="chips wrap">
-              ${this.targets.map(
-                ([id, name]) => html`<button class=${classMap({ chip: true, on: id === current })} @click=${() => (this.target = id)}>
-                  <ha-icon icon="mdi:router-wireless"></ha-icon>${name}
-                </button>`,
-              )}
-            </div>`
+        ? html`<div class="rows">${bridgeRow(t("move.to"), this.targets, current, (c) => this.choose(c), (id) => (this.target = id))}</div>`
         : nothing}
       ${this.planError ? html`<p class="lead small error">${this.planError}</p>` : nothing}
       ${!plan && !this.planError ? html`<p class="empty">${t("rooms.loading")}</p>` : nothing}

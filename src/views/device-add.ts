@@ -29,6 +29,7 @@ import { groupBridge } from "../rooms.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { bridgeRow } from "./choice.ts";
 import { qrRows } from "./qr-scan.ts";
 
 type Step = "kind" | "prepare" | "search" | "results" | "setup";
@@ -166,7 +167,7 @@ export class DeviceAddView extends StudioView {
     if (changed.has("now")) this.watchSearch();
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const back = (): void => {
@@ -217,14 +218,9 @@ export class DeviceAddView extends StudioView {
     };
     return html`<p class="lead">${t("add_device.intro")}</p>
       ${this.bridges.length > 1
-        ? html`<h2 class="label">${t("add_device.bridge")}</h2>
-            <div class="chips wrap">
-              ${this.bridges.map(
-                ([bid, b]) => html`<button class=${classMap({ chip: true, on: bid === id })} @click=${() => (this.bridge = bid)}>
-                  <ha-icon icon="mdi:router-wireless"></ha-icon>${b.name}
-                </button>`,
-              )}
-            </div>`
+        ? html`<div class="rows">
+            ${bridgeRow(t("add_device.bridge"), this.bridges.map(([bid, b]) => [bid, b.name]), id, (c) => this.choose(c), (bid) => (this.bridge = bid))}
+          </div>`
         : nothing}
       ${bridge?.searching === null
         ? html`<div class="rows"><div class="item"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div class="grow">${t("devices.unsupported")}</div></div></div>`

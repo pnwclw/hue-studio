@@ -123,7 +123,7 @@ export class AutomationsView extends StudioView {
             <ha-icon class="chevron" icon="mdi:open-in-new"></ha-icon>
           </button>
         </div>`,
-      { end: add, cls: "automations-page" },
+      { end: add, cls: "settings-page automations-page" },
     );
   }
 }

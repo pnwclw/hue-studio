@@ -29,42 +29,78 @@ import { thumbUrl } from "../gallery-data.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
-import type { DaylightMessage, Mood, SceneTags } from "../types.ts";
+import type { DaylightMessage, Mood, Phase, SceneTags } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { navRow, single } from "./choice.ts";
 import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine } from "./day-parts.ts";
 
 /** HA's dialog to add an integration (core ones: Season, Met.no). */
 const addIntegration = (domain: string) => `/config/integrations/dashboard/add?domain=${domain}`;
 const SEASON_STATES = ["winter", "spring", "summer", "autumn"];
 
+type Page = "main" | "phases" | "sources" | "pool";
+
 @customElement("hue-studio-daylight-settings-view")
 export class DaylightSettingsView extends StudioView {
+  /** The screen shown: the overview, or one of its parts. */
+  @state() private accessor page: Page = "main";
   /** What the pool editor shows (null: where today's scene comes from). */
   @state() private accessor view: PoolView | null = null;
   /** The scene whose tags are open. */
   @state() private accessor editing: string | null = null;
   @state() private accessor picker: Picker | null = null;
 
-  protected override render() {
+  private open(page: Page): void {
+    haptic("selection");
+    this.pushPage();
+    this.page = page;
+  }
+
+  private back(): void {
+    if (this.page === "main") return this.ctx.go("/settings");
+    this.page = "main";
+    this.popPage();
+  }
+
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const day = ctx.daylight;
-    const body = !day
-      ? html`<p class="empty">${t("rooms.loading")}</p>`
-      : html`<p class="lead">${t("daylight.intro")}</p>
-          ${this.today(day)}
-          ${day.mood_entity ? html`<h2 class="label">${t("daylight.mood")}</h2>${this.moods(day)}` : nothing}
-          <h2 class="label">${t("auto.phases")}</h2>
-          <p class="lead">${t("daylight.phases_hint")}</p>
-          ${phaseRows(t, phaseTimes({}, day.settings), (patch) => ctx.setDaylight(patch), day.now.phase)}
-          <h2 class="label">${t("daylight.sources")}</h2>
-          ${this.sources(day)}
-          <h2 class="label">${t("daylight.pool")}</h2>
-          ${this.pool(day)}`;
-    return html`${this.screen(this.subHead(t("daylight.title"), () => ctx.go("/settings")), body, "settings-page auto-page daylight-page")}
+    const titles: Record<Page, string> = { main: t("daylight.title"), phases: t("auto.phases"), sources: t("daylight.sources"), pool: t("daylight.pool") };
+    let body;
+    if (!day) body = html`<p class="empty">${t("rooms.loading")}</p>`;
+    else if (this.page === "phases")
+      body = html`<p class="lead">${t("daylight.phases_hint")}</p>
+        ${phaseRows(t, phaseTimes({}, day.settings), (patch) => ctx.setDaylight(patch), (c) => this.choose(c), day.now.phase)}`;
+    else if (this.page === "sources") body = this.sources(day);
+    else if (this.page === "pool") body = this.pool(day);
+    else body = this.overview(day);
+    return html`${this.screen(this.subHead(titles[this.page], () => this.back()), body, "settings-page auto-page daylight-page")}
       ${day && this.editing ? this.tagSheet(day, this.editing) : nothing}
       ${this.picker ? pickerSheet(ctx, this.picker, (picker) => (this.picker = picker)) : nothing}`;
+  }
+
+  /** Today's scene, then a row for each part: the mood, the phases, the sources, the pool. */
+  private overview(day: DaylightMessage) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const times = phaseTimes({}, day.settings);
+    const name = (id: string | null | undefined) => (id && ctx.hass.states[id] ? friendlyName(ctx.hass, id) : "");
+    const weather = name(day.settings.weather || day.sources.weather);
+    const season = name(day.settings.season || day.sources.season) || t("daylight.season_none");
+    return html`<p class="lead">${t("daylight.intro")}</p>
+      ${this.today(day)}
+      ${day.mood_entity ? html`<h2 class="label">${t("daylight.mood")}</h2>${this.moods(day)}` : nothing}
+      <h2 class="label">${t("daylight.settings")}</h2>
+      <div class="rows">
+        ${navRow(
+          { icon: PHASE_ICONS[day.now.phase], title: t("auto.phases"), sub: t("daylight.phases_sub", { phase: t(`auto.phase_${day.now.phase}` as StringKey), night: times.night_from }) },
+          () => this.open("phases"),
+        )}
+        ${navRow({ icon: "mdi:weather-partly-cloudy", title: t("daylight.sources"), sub: [weather || t("daylight.not_set"), season].join(" · ") }, () => this.open("sources"))}
+        ${navRow({ icon: "mdi:image-multiple-outline", title: t("daylight.pool"), sub: t("daylight.pool_count", { count: Object.keys(day.tags).length }) }, () => this.open("pool"))}
+      </div>`;
   }
 
   private sceneName(id: string): string {
@@ -92,19 +128,15 @@ export class DaylightSettingsView extends StudioView {
     const { t } = ctx;
     const entity = day.mood_entity!;
     const current = ctx.hass.states[entity]?.state || "auto";
-    const pick = (option: string) => {
-      if (option === current) return;
-      haptic("selection");
-      void ctx.call("select", "select_option", { entity_id: entity, option }, { optimistic: false });
-    };
-    const chip = (option: string, glyph: string, label: string) =>
-      html`<button class=${classMap({ chip: true, on: option === current })} role="radio" aria-checked=${option === current} @click=${() => pick(option)}>
-        <ha-icon icon=${glyph}></ha-icon>${label}
-      </button>`;
-    return html`<p class="lead">${t("daylight.mood_hint")}</p>
-      <div class="chips wrap" role="radiogroup" aria-label=${t("daylight.mood")}>
-        ${chip("auto", "mdi:theme-light-dark", t("daylight.mood_auto"))}
-        ${MOODS.map((m) => chip(m, MOOD_ICONS[m], t(`auto.mood_${m}` as StringKey)))}
+    const label = (m: string) => (m === "auto" ? t("daylight.mood_auto") : t(`auto.mood_${m}` as StringKey));
+    const glyph = (m: string) => (m === "auto" ? "mdi:theme-light-dark" : MOOD_ICONS[m as Mood]);
+    const options = ["auto", ...MOODS].map((m) => ({ value: m, label: label(m), icon: glyph(m) }));
+    return html`<div class="rows">
+        ${navRow({ icon: glyph(current), title: t("daylight.mood"), value: label(current) }, () =>
+          this.choose(
+            single(t("daylight.mood"), options, current, (option) => void ctx.call("select", "select_option", { entity_id: entity, option }, { optimistic: false }), t("daylight.mood_hint")),
+          ),
+        )}
       </div>`;
   }
 
@@ -117,32 +149,40 @@ export class DaylightSettingsView extends StudioView {
     const weather = ids.filter((id) => id.startsWith("weather."));
     const seasons = ids.filter((id) => id.startsWith("sensor.") && (SEASON_STATES.includes(states[id].state) || id === day.settings.season));
     const lux = ids.filter((id) => id.startsWith("sensor.") && states[id].attributes.device_class === "illuminance");
-    const picker = (key: "weather" | "season" | "light_sensor", options: string[], auto: string) =>
-      html`<select class="select" aria-label=${t(`daylight.source_${key}` as StringKey)}
-        @change=${(e: Event) => ctx.setDaylight({ [key]: (e.target as HTMLSelectElement).value || null })}>
-        <option value="" ?selected=${!day.settings[key]}>${auto}</option>
-        ${options.map((id) => html`<option value=${id} ?selected=${day.settings[key] === id}>${friendlyName(ctx.hass, id)}</option>`)}
-      </select>`;
     const found = (key: "weather" | "season") => {
       const id = day.sources[key];
       return id ? t("daylight.found", { name: friendlyName(ctx.hass, id) }) : t(`daylight.${key}_none` as StringKey);
     };
-    const add = (domain: string) =>
-      html`<button class="pill small-pill" @click=${() => ctx.openHa(addIntegration(domain))}>${t("daylight.add")}</button>`;
+    const row = (key: "weather" | "season" | "light_sensor", glyph: string, options: string[], auto: string, sub: string) => {
+      const title = t(`daylight.source_${key}` as StringKey);
+      const current = day.settings[key] || "";
+      return navRow({ icon: glyph, title, sub, value: current ? friendlyName(ctx.hass, current) : auto }, () =>
+        this.choose(
+          single(
+            title,
+            [{ value: "", label: auto }, ...options.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), icon: glyph }))],
+            current,
+            (v) => ctx.setDaylight({ [key]: v || null }),
+            sub,
+          ),
+        ),
+      );
+    };
+    const add = (glyph: string, title: string, sub: string, domain: string) =>
+      html`<button class="item nav" @click=${() => ctx.openHa(addIntegration(domain))}>
+        <ha-icon icon=${glyph}></ha-icon>
+        <div class="grow">${title}<div class="dim small">${sub}</div></div>
+        <span class="value">${t("daylight.add")}</span>${icon("open")}
+      </button>`;
     return html`<p class="lead">${t("daylight.sources_hint")}</p>
       <div class="rows">
-        <div class="item wrap"><ha-icon icon="mdi:weather-partly-rainy"></ha-icon>
-          <div class="grow">${t("daylight.source_weather")}<div class="dim small">${weather.length ? t("daylight.source_weather_sub") : t("daylight.weather_add")}</div></div>
-          ${weather.length ? picker("weather", weather, found("weather")) : add("met")}
-        </div>
-        <div class="item wrap"><ha-icon icon="mdi:leaf"></ha-icon>
-          <div class="grow">${t("daylight.source_season")}<div class="dim small">${seasons.length ? t("daylight.source_season_sub") : t("daylight.season_add")}</div></div>
-          ${seasons.length ? picker("season", seasons, found("season")) : add("season")}
-        </div>
-        <div class="item wrap"><ha-icon icon="mdi:brightness-5"></ha-icon>
-          <div class="grow">${t("daylight.source_light_sensor")}<div class="dim small">${t("daylight.source_light_sensor_sub")}</div></div>
-          ${picker("light_sensor", lux, t("auto.none"))}
-        </div>
+        ${weather.length
+          ? row("weather", "mdi:weather-partly-rainy", weather, found("weather"), t("daylight.source_weather_sub"))
+          : add("mdi:weather-partly-rainy", t("daylight.source_weather"), t("daylight.weather_add"), "met")}
+        ${seasons.length
+          ? row("season", "mdi:leaf", seasons, found("season"), t("daylight.source_season_sub"))
+          : add("mdi:leaf", t("daylight.source_season"), t("daylight.season_add"), "season")}
+        ${row("light_sensor", "mdi:brightness-5", lux, t("auto.none"), t("daylight.source_light_sensor_sub"))}
       </div>`;
   }
 
@@ -154,18 +194,12 @@ export class DaylightSettingsView extends StudioView {
     const view: PoolView = this.view || (day.now.mood ? { mood: day.now.mood } : { phase: day.now.pool_phase, season: day.now.season });
     const counts = viewCounts(day.tags);
     const scenes = scenesOf(view, day.tags, order);
-    const go = (next: PoolView) => {
-      haptic("selection");
-      this.view = next;
-    };
-    const chip = (on: boolean, label: string, pick: () => void, glyph = "") =>
-      html`<button class=${classMap({ chip: true, on })} @click=${pick}>${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}${label}</button>`;
     const isPhase = "phase" in view;
+    const out = "out" in view;
     const flipDefaults = () => {
       haptic("selection");
       void ctx.setDaylight({ defaults: !day.settings.defaults });
     };
-    const out = "out" in view;
     const pickScenes = () => {
       const before = new Set(scenes);
       this.picker = {
@@ -181,6 +215,24 @@ export class DaylightSettingsView extends StudioView {
         },
       };
     };
+    // What is shown: a phase, a mood, or the scenes left out; and for a phase, a season.
+    const key = isPhase ? `phase:${view.phase}` : "mood" in view ? `mood:${view.mood}` : "out";
+    const viewLabel = isPhase ? t(`auto.phase_${view.phase}` as StringKey) : "mood" in view ? t(`auto.mood_${view.mood}` as StringKey) : t("daylight.out");
+    const count = (n: number | undefined) => t("daylight.pool_count", { count: n || 0 });
+    const views = [
+      ...PHASES.map((phase) => ({ value: `phase:${phase}`, label: t(`auto.phase_${phase}` as StringKey), sub: count(counts[phase]), icon: PHASE_ICONS[phase] })),
+      ...MOODS.map((mood) => ({ value: `mood:${mood}`, label: t(`auto.mood_${mood}` as StringKey), sub: count(counts[mood]), icon: MOOD_ICONS[mood] })),
+      { value: "out", label: t("daylight.out"), icon: "mdi:eye-off-outline" },
+    ];
+    const go = (value: string) => {
+      const [kind, name] = value.split(":");
+      this.view = kind === "phase" ? { phase: name as Phase, season: isPhase ? view.season : null } : kind === "mood" ? { mood: name as Mood } : { out: true };
+    };
+    const seasonLabel = (s: string | null) => (s ? t(`auto.season_${s}` as StringKey) : t("auto.season_all"));
+    const chip = (label: string, open: () => void, on = true) =>
+      html`<button class=${classMap({ chip: true, "filter-chip": true, on })} aria-haspopup="dialog" @click=${open}>
+        <span>${label}</span><ha-icon icon="mdi:chevron-down"></ha-icon>
+      </button>`;
     return html`<p class="lead">${t("daylight.pool_hint")}</p>
       <div class="rows">
         <div class="item">
@@ -189,24 +241,25 @@ export class DaylightSettingsView extends StudioView {
           ${toggle(day.settings.defaults, t("daylight.defaults"), flipDefaults)}
         </div>
       </div>
-      <div class="chips wrap pool-views">
-        ${PHASES.map((phase) =>
-          chip(isPhase && view.phase === phase, `${t(`auto.phase_${phase}` as StringKey)} · ${counts[phase] || 0}`, () => go({ phase, season: isPhase ? view.season : null }), PHASE_ICONS[phase]),
-        )}
+      <div class="section-head filter-head">
+        <h2 class="label">${t("daylight.pool_view")}</h2>
+        <span class="count">${scenes.length}</span>
       </div>
-      <div class="chips wrap pool-views">
-        ${MOODS.map((mood) =>
-          chip("mood" in view && view.mood === mood, `${t(`auto.mood_${mood}` as StringKey)} · ${counts[mood] || 0}`, () => go({ mood }), MOOD_ICONS[mood]),
-        )}
-        ${chip(out, t("daylight.out"), () => go({ out: true }), "mdi:eye-off-outline")}
+      <div class="chips filters">
+        ${chip(viewLabel, () => this.choose(single(t("daylight.pool_view"), views, key, go)))}
+        ${isPhase
+          ? chip(seasonLabel(view.season), () =>
+              this.choose(
+                single(
+                  t("daylight.tag_seasons"),
+                  [null, ...SEASONS].map((s) => ({ value: s || "", label: seasonLabel(s) })),
+                  view.season || "",
+                  (s) => (this.view = { phase: view.phase, season: (s || null) as typeof view.season }),
+                ),
+              ), !!view.season)
+          : nothing}
       </div>
-      ${isPhase
-        ? html`<div class="chips wrap pool-views">
-            ${chip(!view.season, t("auto.season_all"), () => go({ phase: view.phase, season: null }))}
-            ${SEASONS.map((season) => chip(view.season === season, t(`auto.season_${season}` as StringKey), () => go({ phase: view.phase, season })))}
-          </div>`
-        : nothing}
-      <p class="lead small">${t(out ? "daylight.out_hint" : "mood" in view ? "daylight.mood_view_hint" : "daylight.phase_view_hint")}</p>
+      <p class="hint">${t(out ? "daylight.out_hint" : "mood" in view ? "daylight.mood_view_hint" : "daylight.phase_view_hint")}</p>
       <div class="scene-tiles">
         ${scenes.map(
           (id) => html`<div class=${classMap({ tile: true, dimmed: out })} style="background-image: url(${thumbUrl(id)})">

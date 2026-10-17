@@ -11,6 +11,7 @@ import { friendlyName, lightIcon } from "../model.ts";
 import type { EntertainmentArea, EntertainmentMessage } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { bridgeRow, navRow, single } from "./choice.ts";
 
 const TYPES: EntertainmentArea["type"][] = ["screen", "monitor", "music", "3dspace", "other"];
 const TYPE_ICONS: Record<EntertainmentArea["type"], string> = {
@@ -58,7 +59,7 @@ export class EntertainmentView extends StudioView {
     return null;
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     if (!this.data) return this.screen(this.subHead(t("settings.entertainment"), () => ctx.go("/settings")), html`<p class="empty">${t("rooms.loading")}</p>`);
@@ -120,15 +121,12 @@ export class EntertainmentView extends StudioView {
     const { t } = this.ctx;
     const bridges = Object.entries(this.data || {});
     if (bridges.length < 2) return nothing;
-    if (draft.id) return html`<p class="lead small">${t("ent.on_bridge", { bridge: this.data?.[draft.bridge ?? ""]?.name ?? "" })}</p>`;
-    return html`<h2 class="label">${t("add_device.bridge")}</h2>
-      <div class="chips wrap">
-        ${bridges.map(
-          ([id, b]) => html`<button class=${classMap({ chip: true, on: id === draft.bridge })} @click=${() => id !== draft.bridge && set({ bridge: id, lights: [] })}>
-            <ha-icon icon="mdi:router-wireless"></ha-icon>${b.name}
-          </button>`,
-        )}
+    if (draft.id)
+      return html`<div class="item">
+        <ha-icon icon="mdi:router-wireless"></ha-icon><div class="grow">${t("add_device.bridge")}</div>
+        <span class="value">${this.data?.[draft.bridge ?? ""]?.name ?? ""}</span>
       </div>`;
+    return bridgeRow(t("add_device.bridge"), bridges.map(([id, b]) => [id, b.name]), draft.bridge, (c) => this.choose(c), (id) => id !== draft.bridge && set({ bridge: id, lights: [] }));
   }
 
   private editor(draft: Draft, area: EntertainmentArea | null) {
@@ -174,13 +172,10 @@ export class EntertainmentView extends StudioView {
               ?disabled=${streaming} @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })} />
           </div>
         </div>
-        ${this.bridgePick(draft, set)}
-        <h2 class="label">${t("ent.type")}</h2>
-        <div class="chips wrap">
-          ${TYPES.map(
-            (type) => html`<button class=${classMap({ chip: true, on: draft.type === type })} ?disabled=${streaming} @click=${() => set({ type })}>
-              <ha-icon icon=${TYPE_ICONS[type]}></ha-icon>${t(`ent.type_${type}` as StringKey)}
-            </button>`,
+        <div class="rows">
+          ${this.bridgePick(draft, set)}
+          ${navRow({ icon: TYPE_ICONS[draft.type], title: t("ent.type"), value: t(`ent.type_${draft.type}` as StringKey), disabled: streaming }, () =>
+            this.choose(single(t("ent.type"), TYPES.map((type) => ({ value: type, label: t(`ent.type_${type}` as StringKey), icon: TYPE_ICONS[type] })), draft.type, (type) => set({ type: type as Draft["type"] }))),
           )}
         </div>
         <h2 class="label">${t("ent.lights")}</h2>
@@ -201,8 +196,8 @@ export class EntertainmentView extends StudioView {
                   <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
                 </button>
               </div>
-              <div class="center stack">
-                <button class=${classMap({ pill: true, danger: true, confirm: this.confirmDelete })} ?disabled=${streaming} @click=${remove}>
+              <div class="delete-area">
+                <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${streaming} @click=${remove}>
                   ${this.confirmDelete ? t("ent.delete_confirm") : t("ent.delete")}
                 </button>
               </div>`

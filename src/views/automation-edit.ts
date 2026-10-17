@@ -26,12 +26,12 @@ import {
   offsetDuration,
   placesOf,
   offsetMinutes,
+  splitPlaces,
   type StartKind,
   toConfig,
   TYPE_ICONS,
   WEEKDAYS,
   type Weekday,
-  withPlace,
 } from "../automations.ts";
 import { whiteArt } from "../color.ts";
 import {
@@ -57,11 +57,25 @@ import { findGroup, friendlyName } from "../model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine, stepper } from "./day-parts.ts";
+import { navRow, several, single, timeRow } from "./choice.ts";
+import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine } from "./day-parts.ts";
 
 const FADES = [0, 1, 5, 10, 15, 20, 30, 45, 60, 90];
 const OFF_AFTER = [0, 1, 2, 5, 10, 15, 20, 30, 45, 60, 120, 240];
 const BRIGHTNESS_LEVELS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
+/** Minutes before (−) or after sunrise or sunset. */
+const OFFSETS = [-120, -90, -60, -45, -30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30, 45, 60, 90, 120];
+const LUX = [5, 10, 20, 30, 50, 75, 100, 150, 200, 300, 500, 1000];
+/** Common whites, from candlelight to daylight. */
+const WHITES = [2000, 2200, 2500, 2700, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500].filter((k) => k >= KELVIN_RANGE[0] && k <= KELVIN_RANGE[1]);
+/** A phase's brightness, brighter or dimmer. */
+const OFFSET_STEPS = [-60, -50, -40, -30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30, 40, 50, 60];
+const LIGHT_ICONS: Record<LightKind, string> = {
+  scene: "mdi:palette-outline",
+  white: "mdi:lightbulb-outline",
+  natural: "mdi:white-balance-sunny",
+  auto: "mdi:image-filter-hdr",
+};
 type Legacy = Record<string, { natural: boolean; config: DayConfig }>;
 
 @customElement("hue-studio-automation-edit-view")
@@ -86,6 +100,7 @@ export class AutomationEditView extends StudioView {
   @state() private accessor preview: DayPreview | null = null;
   @state() private accessor legacy: Legacy | null = null;
   @state() private accessor picker: Picker | null = null;
+  @state() private accessor editingName = false;
   private previewKey = "";
   private legacyAsked = false;
 
@@ -151,7 +166,7 @@ export class AutomationEditView extends StudioView {
     }
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const d = this.draft;
@@ -172,36 +187,62 @@ export class AutomationEditView extends StudioView {
     }
     if (this.page === "day") {
       const natural = d.input.light === "natural";
-      return html`${this.screen(this.subHead(t(natural ? "automations.light_natural" : "automations.light_auto"), back), this.dayPage(natural), "auto-page")}
+      return html`${this.screen(this.subHead(t(natural ? "automations.light_natural" : "automations.light_auto"), back), this.dayPage(natural), "settings-page auto-page")}
         ${this.picker ? pickerSheet(ctx, this.picker, (picker) => (this.picker = picker)) : nothing}`;
     }
-    const title = this.isNew ? t("automations.new") : d.alias || t(`automations.type_${d.type}` as StringKey);
+    const typeName = t(`automations.type_${d.type}` as StringKey);
     const lacking = missing(d);
     return this.screen(
-      this.subHead(title, back),
-      html`<div class="automation-type">
-          <ha-icon icon=${TYPE_ICONS[d.type]}></ha-icon>
-          <span>${t(`automations.type_${d.type}` as StringKey)}</span>
-        </div>
-        <input class="field" placeholder=${t("automations.name")} aria-label=${t("automations.name")} .value=${d.alias}
-          @input=${(e: InputEvent) => (this.draft = { ...d, alias: (e.target as HTMLInputElement).value })} />
+      this.subHead(this.isNew ? t("automations.new") : typeName, back),
+      html`${this.hero(d, typeName)}
         <h2 class="label">${t("automations.when")}</h2>
         ${this.when(d)}
         <h2 class="label">${t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms")}</h2>
-        ${this.rooms(d)}
+        <div class="rows">${this.rooms(d)}</div>
         ${LIGHT_KINDS[d.type].length ? html`<h2 class="label">${t("automations.light")}</h2>${this.light(d)}` : nothing}
-        <div class="center stack">
+        <div class="save-area">
           <button class="pill apply" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>${t(this.isNew ? "automations.create" : "zone.save")}</button>
-          ${lacking ? html`<p class="lead small">${t(`automations.missing_${lacking}` as StringKey)}</p>` : nothing}
-          ${this.isNew
-            ? nothing
-            : html`<button class="pill reset" @click=${() => ctx.openHa(`/config/automation/edit/${encodeURIComponent(d.id)}`)}>${t("automations.open_ha")}</button>
-                <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmDelete })} @click=${() => this.deleteIt()}>
+          ${lacking ? html`<p class="lead small warn">${t(`automations.missing_${lacking}` as StringKey)}</p>` : nothing}
+        </div>
+        ${this.isNew
+          ? nothing
+          : html`<div class="rows">
+                <button class="item nav" @click=${() => ctx.openHa(`/config/automation/edit/${encodeURIComponent(d.id)}`)}>
+                  <ha-icon icon="mdi:home-assistant"></ha-icon><div class="grow">${t("automations.open_ha")}</div>${icon("open")}
+                </button>
+              </div>
+              <div class="delete-area">
+                <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} @click=${() => this.deleteIt()}>
                   ${t(this.confirmDelete ? "automations.delete_confirm" : "automations.delete")}
-                </button>`}
-        </div>`,
+                </button>
+              </div>`}`,
       "settings-page automation-page",
     );
+  }
+
+  /** Its picture and name (renamed in place), and its type when the name is another. */
+  private hero(d: AutomationDraft, typeName: string) {
+    const { t } = this.ctx;
+    const done = (e: Event) => {
+      this.editingName = false;
+      const alias = (e.target as HTMLInputElement).value.trim();
+      if (alias !== d.alias) this.draft = { ...d, alias };
+    };
+    return html`<div class="sensor-hero">
+      <ha-icon class="pic" icon=${TYPE_ICONS[d.type]}></ha-icon>
+      <div class="name-row">
+        ${this.editingName || !d.alias
+          ? html`<input class="name-input" .value=${d.alias} placeholder=${t("automations.name")} aria-label=${t("automations.name")}
+              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} @blur=${done}
+              @input=${(e: InputEvent) => (this.draft = { ...d, alias: (e.target as HTMLInputElement).value })} />`
+          : html`<h1 class="big">${d.alias}</h1>`}
+        <button class="round rename" aria-label=${t("automations.rename")} @click=${() => {
+          this.editingName = true;
+          void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
+        }}>${icon("pencil")}</button>
+      </div>
+      ${d.alias && d.alias !== typeName ? html`<div class="kind">${typeName}</div>` : nothing}
+    </div>`;
   }
 
   // ---- saving ----
@@ -236,49 +277,36 @@ export class AutomationEditView extends StudioView {
     else this.ctx.go("/automations");
   }
 
-  // ---- controls ----
+  // ---- rows ----
 
-  private seg<T extends string>(values: readonly T[], current: T, label: (v: T) => string, pick: (v: T) => void, extra = "") {
-    const cls = values.length === 2 ? "two" : values.length === 3 ? "three" : "";
-    return html`<div class="seg ${cls} ${extra}" role="radiogroup">
-      ${values.map(
-        (v) => html`<button role="radio" aria-checked=${v === current} class=${classMap({ on: v === current })} @click=${() => {
-          if (v === current) return;
-          haptic("selection");
-          pick(v);
-        }}>${label(v)}</button>`,
-      )}
-    </div>`;
-  }
-
-  private timeRow(glyph: string, label: string, value: string | undefined, change: (v: string) => void) {
-    return html`<div class="item">
-      <ha-icon icon=${glyph}></ha-icon><div class="grow">${label}</div>
-      <input class="select time" type="time" aria-label=${label} .value=${hhmm(value)} @change=${(e: Event) => {
-        const v = (e.target as HTMLInputElement).value;
-        if (/^\d\d:\d\d$/.test(v)) change(`${v}:00`);
-      }} />
-    </div>`;
-  }
-
-  private minutesRow(glyph: string, label: string, sub: string, value: number | undefined, options: number[], zero: StringKey, change: (v: number) => void) {
+  /** "30 min", or `zero` for 0. */
+  private minutes(v: number, zero: StringKey): string {
     const { t } = this.ctx;
-    const values = options.includes(value ?? 0) ? options : [...options, value ?? 0].sort((a, b) => a - b);
-    return html`<div class="item wrap">
-      <ha-icon icon=${glyph}></ha-icon>
-      <div class="grow">${label}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
-      <select class="select" aria-label=${label} @change=${(e: Event) => change(Number((e.target as HTMLSelectElement).value))}>
-        ${values.map((v) => html`<option value=${v} ?selected=${v === (value ?? 0)}>${v ? `${v} ${t("automations.min")}` : t(zero)}</option>`)}
-      </select>
-    </div>`;
+    return v ? `${v} ${t("automations.min")}` : t(zero);
+  }
+
+  /** A row choosing minutes out of `options` (the current value joins them when it is another). */
+  private minutesRow(glyph: string, title: string, sub: string, value: number | undefined, options: number[], zero: StringKey, change: (v: number) => void) {
+    const current = value ?? 0;
+    const values = options.includes(current) ? options : [...options, current].sort((a, b) => a - b);
+    return navRow({ icon: glyph, title, sub, value: this.minutes(current, zero) }, () =>
+      this.choose(single(title, values.map((v) => ({ value: String(v), label: this.minutes(v, zero) })), String(current), (v) => change(Number(v)))),
+    );
   }
 
   private toggleRow(glyph: string, label: string, sub: string, on: boolean, change: (v: boolean) => void) {
     return html`<div class="item">
       <ha-icon icon=${glyph}></ha-icon>
       <div class="grow">${label}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
-      ${toggle(on, label, () => change(!on))}
+      ${toggle(on, label, () => {
+        haptic("selection");
+        change(!on);
+      })}
     </div>`;
+  }
+
+  private time(glyph: string, title: string, value: string | undefined, change: (v: string) => void, sub = "") {
+    return timeRow({ icon: glyph, title, sub }, hhmm(value), (v) => change(`${v}:00`));
   }
 
   private days(d: AutomationDraft) {
@@ -290,17 +318,36 @@ export class AutomationEditView extends StudioView {
       haptic("selection");
       this.set({ days: WEEKDAYS.filter((x) => next.includes(x)) });
     };
-    return html`<div class="chips days">
-      ${WEEKDAYS.map(
-        (day) => html`<button class=${classMap({ chip: true, on: days.includes(day) })} aria-pressed=${days.includes(day)} @click=${() => flip(day)}>
-          ${t(`automations.day_${day}` as StringKey)}
-        </button>`,
-      )}
+    const summary =
+      days.length === 7
+        ? t("automations.every_day")
+        : days.length === 5 && !days.includes("sat") && !days.includes("sun")
+          ? t("automations.weekdays")
+          : days.length === 2 && days.includes("sat") && days.includes("sun")
+            ? t("automations.weekend")
+            : "";
+    return html`<div class="item days-item">
+      <div class="line"><span>${t("automations.repeat")}</span><span class="dim">${summary}</span></div>
+      <div class="days-row">
+        ${WEEKDAYS.map(
+          (day) => html`<button class=${classMap({ on: days.includes(day) })} aria-pressed=${days.includes(day)} @click=${() => flip(day)}>
+            ${t(`automations.day_${day}` as StringKey)}
+          </button>`,
+        )}
+      </div>
     </div>`;
   }
 
-  /** A start or an end: at a time, or at sunrise/sunset with an offset. */
+  /** "15 min before", "Exactly then", "30 min after". */
+  private offsetLabel(minutes: number): string {
+    const { t } = this.ctx;
+    if (!minutes) return t("automations.offset_exact");
+    return t(minutes < 0 ? "automations.offset_before" : "automations.offset_after", { n: Math.abs(minutes) });
+  }
+
+  /** A start or an end: its kind (a time, sunrise or sunset), then the time or the offset. */
   private moment<K extends string>(
+    title: string,
     kinds: readonly K[],
     kind: K,
     time: string | undefined,
@@ -309,19 +356,19 @@ export class AutomationEditView extends StudioView {
   ) {
     const { t } = this.ctx;
     const sun = kind === "sunrise" || kind === "sunset";
-    const label = (k: K) => t((k === "sunrise" || k === "sunset" ? `automations.seg_${k}` : `automations.${k}`) as StringKey);
-    return html`${this.seg(kinds, kind, label, (k) => set({ kind: k }))}
-      ${kind === "none"
-        ? nothing
-        : html`<div class="rows">
-            ${sun
-              ? html`<div class="item wrap">
-                  <ha-icon icon=${kind === "sunrise" ? "mdi:weather-sunset-up" : "mdi:weather-sunset-down"}></ha-icon>
-                  <div class="grow">${t("automations.offset")}<div class="dim small">${t("automations.offset_sub")}</div></div>
-                  ${stepper(offsetMinutes(offset), -180, 180, 5, t("automations.min"), (v) => set({ offset: offsetDuration(v) }), true)}
-                </div>`
-              : this.timeRow("mdi:clock-outline", t("automations.time"), time, (v) => set({ time: v }))}
-          </div>`}`;
+    const label = (k: K) => t((k === "none" ? "automations.none" : `automations.kind_${k}`) as StringKey);
+    const glyph = (k: K) => (k === "sunrise" ? "mdi:weather-sunset-up" : k === "sunset" ? "mdi:weather-sunset-down" : k === "none" ? "mdi:minus-circle-outline" : "mdi:clock-outline");
+    const kindRow = navRow({ icon: glyph(kind), title, value: label(kind) }, () =>
+      this.choose(single(title, kinds.map((k) => ({ value: k, label: label(k), icon: glyph(k) })), kind, (k) => set({ kind: k as K }))),
+    );
+    if (kind === "none") return kindRow;
+    if (!sun) return html`${kindRow}${this.time("mdi:clock-time-four-outline", t("automations.time"), time, (v) => set({ time: v }))}`;
+    const minutes = offsetMinutes(offset);
+    const values = OFFSETS.includes(minutes) ? OFFSETS : [...OFFSETS, minutes].sort((a, b) => a - b);
+    return html`${kindRow}
+      ${navRow({ icon: "mdi:timer-outline", title: t("automations.offset"), value: this.offsetLabel(minutes) }, () =>
+        this.choose(single(t("automations.offset"), values.map((v) => ({ value: String(v), label: this.offsetLabel(v) })), String(minutes), (v) => set({ offset: offsetDuration(Number(v)) }))),
+      )}`;
   }
 
   private zones(d: AutomationDraft) {
@@ -329,12 +376,12 @@ export class AutomationEditView extends StudioView {
     const { t } = ctx;
     const zones = Object.keys(ctx.hass.states).filter((id) => id.startsWith("zone."));
     if (zones.length < 2) return nothing;
-    return html`<div class="item wrap">
-      <ha-icon icon="mdi:map-marker-radius-outline"></ha-icon><div class="grow">${t("automations.zone")}</div>
-      <select class="select" aria-label=${t("automations.zone")} @change=${(e: Event) => this.set({ zone: (e.target as HTMLSelectElement).value })}>
-        ${zones.map((id) => html`<option value=${id} ?selected=${id === (d.input.zone || "zone.home")}>${friendlyName(ctx.hass, id)}</option>`)}
-      </select>
-    </div>`;
+    const current = d.input.zone || "zone.home";
+    return navRow({ icon: "mdi:map-marker-radius-outline", title: t("automations.zone"), value: friendlyName(ctx.hass, current) }, () =>
+      this.choose(
+        single(t("automations.zone"), zones.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), icon: "mdi:map-marker-radius-outline" })), current, (zone) => this.set({ zone })),
+      ),
+    );
   }
 
   // ---- when ----
@@ -343,20 +390,22 @@ export class AutomationEditView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const i = d.input;
+    const start = (p: { kind?: StartKind; time?: string; offset?: Duration }) =>
+      this.set({ ...(p.kind ? { start_kind: p.kind } : {}), ...(p.time ? { start_time: p.time } : {}), ...(p.offset ? { start_offset: p.offset } : {}) });
     switch (d.type) {
       case "wake_up":
         return html`<div class="rows">
-            ${this.timeRow("mdi:alarm", t("automations.wake_time"), i.time, (time) => this.set({ time }))}
-            ${this.minutesRow("mdi:transition", t("automations.fade_in"), t("automations.fade_in_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
-            ${this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
-          </div>
-          ${this.days(d)}`;
+          ${this.time("mdi:alarm", t("automations.wake_time"), i.time, (time) => this.set({ time }))}
+          ${this.days(d)}
+          ${this.minutesRow("mdi:transition", t("automations.fade_in"), t("automations.fade_in_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
+          ${this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
+        </div>`;
       case "go_to_sleep":
         return html`<div class="rows">
-            ${this.timeRow("mdi:bed-clock", t("automations.time"), i.time, (time) => this.set({ time }))}
-            ${this.minutesRow("mdi:transition", t("automations.fade_out"), t("automations.fade_out_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
-          </div>
-          ${this.days(d)}`;
+          ${this.time("mdi:bed-clock", t("automations.time"), i.time, (time) => this.set({ time }))}
+          ${this.days(d)}
+          ${this.minutesRow("mdi:transition", t("automations.fade_out"), t("automations.fade_out_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
+        </div>`;
       case "coming_home":
         return html`<p class="lead">${t("automations.coming_home_hint")}</p>
           <div class="rows">
@@ -367,27 +416,23 @@ export class AutomationEditView extends StudioView {
         return html`<p class="lead">${t("automations.leaving_home_hint")}</p>${this.zones(d) === nothing ? nothing : html`<div class="rows">${this.zones(d)}</div>`}`;
       case "mimic_presence":
         return html`<p class="lead">${t("automations.mimic_hint")}</p>
-          <h3 class="sublabel">${t("automations.start")}</h3>
-          ${this.moment(["time", "sunset"] as const, i.start_kind === "sunset" ? "sunset" : "time", i.start_time, i.start_offset, (p) =>
-            this.set({ ...(p.kind ? { start_kind: p.kind } : {}), ...(p.time ? { start_time: p.time } : {}), ...(p.offset ? { start_offset: p.offset } : {}) }))}
-          <h3 class="sublabel">${t("automations.end")}</h3>
-          <div class="rows">${this.timeRow("mdi:clock-end", t("automations.end"), i.end_time, (end_time) => this.set({ end_time }))}</div>
+          <div class="rows">
+            ${this.moment(t("automations.start"), ["time", "sunset"] as const, i.start_kind === "sunset" ? "sunset" : "time", i.start_time, i.start_offset, start)}
+            ${this.time("mdi:clock-end", t("automations.end"), i.end_time, (end_time) => this.set({ end_time }))}
+            ${this.days(d)}
+          </div>
           <div class="rows">
             ${this.zones(d)}
             ${this.toggleRow("mdi:home-off-outline", t("automations.only_away"), t("automations.only_away_sub"), i.only_away !== false, (v) => this.set({ only_away: v }))}
-          </div>
-          ${this.days(d)}`;
+          </div>`;
       case "schedule":
-        return html`<h3 class="sublabel">${t("automations.start")}</h3>
-          ${this.moment(["time", "sunrise", "sunset"] as const, (i.start_kind || "time") as StartKind, i.start_time, i.start_offset, (p) =>
-            this.set({ ...(p.kind ? { start_kind: p.kind } : {}), ...(p.time ? { start_time: p.time } : {}), ...(p.offset ? { start_offset: p.offset } : {}) }))}
-          <h3 class="sublabel">${t("automations.end")}</h3>
-          ${this.moment(["none", "time", "sunrise", "sunset"] as const, (i.end_kind || "none") as EndKind, i.end_time, i.end_offset, (p) =>
+        return html`<div class="rows">
+          ${this.moment(t("automations.start"), ["time", "sunrise", "sunset"] as const, (i.start_kind || "time") as StartKind, i.start_time, i.start_offset, start)}
+          ${this.moment(t("automations.end"), ["none", "time", "sunrise", "sunset"] as const, (i.end_kind || "none") as EndKind, i.end_time, i.end_offset, (p) =>
             this.set({ ...(p.kind ? { end_kind: p.kind } : {}), ...(p.time ? { end_time: p.time } : {}), ...(p.offset ? { end_offset: p.offset } : {}) }))}
-          <div class="rows">
-            ${this.minutesRow("mdi:transition", t("automations.fade"), t("automations.fade_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
-          </div>
-          ${this.days(d)}`;
+          ${this.days(d)}
+          ${this.minutesRow("mdi:transition", t("automations.fade"), t("automations.fade_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
+        </div>`;
       case "motion":
         return this.motion(d);
     }
@@ -410,39 +455,55 @@ export class AutomationEditView extends StudioView {
     const lux = Object.keys(states)
       .filter((id) => id.startsWith("sensor.") && states[id].attributes.device_class === "illuminance")
       .sort(byName);
-    const chosen = i.motion || [];
-    const flip = (id: string) => {
-      haptic("selection");
-      this.set({ motion: chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id] });
+    const chosen = (i.motion || []).filter((id) => states[id]);
+    const area = (id: string) => {
+      const entry = ctx.hass.entities?.[id];
+      const areaId = entry?.area_id || (entry?.device_id ? ctx.hass.devices?.[entry.device_id]?.area_id : null);
+      return (areaId && ctx.hass.areas?.[areaId]?.name) || "";
     };
-    return html`<p class="lead">${t("automations.motion_hint")}</p>
-      <div class="rows pick">
-        ${sensors.length
-          ? sensors.map(
-              (id) => html`<button class=${classMap({ item: true, on: chosen.includes(id) })} role="checkbox" aria-checked=${chosen.includes(id)} @click=${() => flip(id)}>
-                <ha-icon icon="mdi:motion-sensor"></ha-icon><div class="grow">${friendlyName(ctx.hass, id)}</div>
-                <span class="check">${icon("check")}</span>
-              </button>`,
-            )
-          : html`<div class="item dim">${t("automations.no_motion_sensors")}</div>`}
-      </div>
-      <div class="rows">
-        <div class="item wrap">
-          <ha-icon icon="mdi:brightness-5"></ha-icon>
-          <div class="grow">${t("automations.lux_sensor")}<div class="dim small">${t("automations.lux_sensor_sub")}</div></div>
-          <select class="select" aria-label=${t("automations.lux_sensor")} @change=${(e: Event) => this.set({ lux_sensor: (e.target as HTMLSelectElement).value })}>
-            <option value="" ?selected=${!i.lux_sensor}>${t("auto.none")}</option>
-            ${lux.map((id) => html`<option value=${id} ?selected=${id === i.lux_sensor}>${friendlyName(ctx.hass, id)}</option>`)}
-          </select>
-        </div>
-        ${i.lux_sensor
-          ? html`<div class="item wrap">
-              <ha-icon icon="mdi:weather-night"></ha-icon><div class="grow">${t("automations.lux_below")}</div>
-              ${stepper(i.lux_below || 0, 0, 1000, 10, "lx", (v) => this.set({ lux_below: v }))}
-            </div>`
-          : nothing}
-        ${this.minutesRow("mdi:timer-off-outline", t("automations.off_after"), t("automations.off_after_motion"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
-      </div>`;
+    const pickSensors = () =>
+      this.choose(
+        several(
+          t("automations.motion_sensors"),
+          sensors.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), sub: area(id), icon: "mdi:motion-sensor" })),
+          chosen,
+          (motion) => this.set({ motion }),
+          { hint: sensors.length ? t("automations.motion_hint") : t("automations.no_motion_sensors") },
+        ),
+      );
+    const below = i.lux_below || 0;
+    const luxValues = LUX.includes(below) ? LUX : [...LUX, below].sort((a, b) => a - b);
+    return html`<div class="rows">
+      ${navRow(
+        {
+          icon: "mdi:motion-sensor",
+          title: t("automations.motion_sensors"),
+          sub: chosen.length ? chosen.map((id) => friendlyName(ctx.hass, id)).join(", ") : t("automations.motion_none"),
+          warn: !chosen.length,
+        },
+        pickSensors,
+      )}
+      ${this.minutesRow("mdi:timer-off-outline", t("automations.off_after"), t("automations.off_after_motion"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
+    </div>
+    <div class="rows">
+      ${navRow(
+        { icon: "mdi:brightness-5", title: t("automations.lux_sensor"), sub: t("automations.lux_sensor_sub"), value: i.lux_sensor ? friendlyName(ctx.hass, i.lux_sensor) : t("auto.none") },
+        () =>
+          this.choose(
+            single(
+              t("automations.lux_sensor"),
+              [{ value: "", label: t("auto.none") }, ...lux.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), sub: area(id), icon: "mdi:brightness-5" }))],
+              i.lux_sensor || "",
+              (lux_sensor) => this.set({ lux_sensor }),
+            ),
+          ),
+      )}
+      ${i.lux_sensor
+        ? navRow({ icon: "mdi:weather-night", title: t("automations.lux_below"), value: `${below} lx` }, () =>
+            this.choose(single(t("automations.lux_below"), luxValues.map((v) => ({ value: String(v), label: `${v} lx` })), String(below), (v) => this.set({ lux_below: Number(v) }))),
+          )
+        : nothing}
+    </div>`;
   }
 
   // ---- rooms and light ----
@@ -450,19 +511,29 @@ export class AutomationEditView extends StudioView {
   /** Rooms (HA areas) and zones (Hue rooms/zones no area holds), as on the home screen. */
   private rooms(d: AutomationDraft) {
     const { ctx } = this;
+    const { t } = ctx;
     const places = placesOf(d.input);
-    const flip = (key: string) => {
-      haptic("selection");
-      this.set(withPlace(d.input, key));
-    };
-    return html`<div class="chips wrap rooms-pick">
-      ${[...ctx.home.rooms, ...ctx.home.zones].map((g) => {
-        const on = places.includes(g.key);
-        return html`<button class=${classMap({ chip: true, on })} aria-pressed=${on} @click=${() => flip(g.key)}>
-          <ha-icon icon=${g.icon}></ha-icon>${g.name}
-        </button>`;
-      })}
-    </div>`;
+    const groups = [...ctx.home.rooms, ...ctx.home.zones];
+    const chosen = groups.filter((g) => places.includes(g.key));
+    const title = t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms");
+    const options = groups.map((g) => ({
+      value: g.key,
+      label: g.name,
+      icon: g.icon,
+      sub: ctx.home.zones.includes(g) ? t("automations.zone_kind") : undefined,
+    }));
+    // Places no longer on the home screen stay chosen until unticked (they are listed last).
+    const gone = places.filter((k) => !groups.some((g) => g.key === k));
+    const goneOptions = gone.map((k) => ({ value: k, label: t("automations.place_gone"), sub: k.slice(k.indexOf(".") + 1), icon: "mdi:help-circle-outline" }));
+    return navRow(
+      {
+        icon: chosen[0]?.icon || "mdi:sofa-outline",
+        title: chosen.length ? chosen.map((g) => g.name).join(", ") : t("automations.rooms_none"),
+        warn: !chosen.length || !!gone.length,
+        sub: !chosen.length ? t("automations.missing_rooms") : gone.length ? t("automations.place_gone") : undefined,
+      },
+      () => this.choose(several(title, [...options, ...goneOptions], places, (keys) => this.set(splitPlaces(keys)))),
+    );
   }
 
   private light(d: AutomationDraft) {
@@ -470,82 +541,97 @@ export class AutomationEditView extends StudioView {
     const { t } = ctx;
     const kinds = LIGHT_KINDS[d.type];
     const kind = (d.input.light && kinds.includes(d.input.light) ? d.input.light : kinds[0]) as LightKind;
-    return html`${this.seg(kinds, kind, (k) => t(`automations.light_${k}` as StringKey), (light) => this.set({ light }), "kinds")}
-      ${kind === "scene" ? this.sceneLight(d) : kind === "white" ? this.whiteLight(d) : this.dayLight(d, kind)}`;
+    const options = kinds.map((k) => ({ value: k, label: t(`automations.light_${k}` as StringKey), sub: t(`automations.light_${k}_sub` as StringKey), icon: LIGHT_ICONS[k] }));
+    return html`<div class="rows">
+      ${navRow({ icon: LIGHT_ICONS[kind], title: t("automations.light_kind"), value: t(`automations.light_${kind}` as StringKey) }, () =>
+        this.choose(single(t("automations.light_kind"), options, kind, (light) => this.set({ light: light as LightKind }))),
+      )}
+      ${kind === "scene" ? this.sceneLight(d) : kind === "white" ? this.whiteLight(d) : this.dayLight(d, kind)}
+    </div>`;
+  }
+
+  private brightnessRow(value: number | null, change: (v: number | null) => void, own?: StringKey) {
+    const { t } = this.ctx;
+    const label = (v: number | null) => (v === null ? t(own!) : `${v} %`);
+    const options = [...(own ? [null] : []), ...[...BRIGHTNESS_LEVELS].reverse()].map((v) => ({ value: v === null ? "" : String(v), label: label(v) }));
+    return navRow({ icon: "mdi:brightness-6", title: t("common.brightness"), value: label(value) }, () =>
+      this.choose(single(t("common.brightness"), options, value === null ? "" : String(value), (v) => change(v ? Number(v) : null))),
+    );
   }
 
   private sceneLight(d: AutomationDraft) {
     const { ctx } = this;
     const { t } = ctx;
     const scenes = d.input.scenes || [];
-    const brightness = d.input.brightness ?? null;
-    return html`<div class="rows">
-      ${placesOf(d.input).map((key) => {
+    return html`${placesOf(d.input).map((key) => {
         const group = findGroup(ctx.home, key);
-        const area = group?.name || key;
+        // A place with no Hue lights left is not on the home screen: its HA name, or that it is gone.
+        const id = key.slice(key.indexOf(".") + 1);
+        const known = group?.name || (key.startsWith("area.") ? ctx.hass.areas?.[id]?.name : ctx.hass.states[id] ? friendlyName(ctx.hass, id) : "");
+        const name = known || t("automations.place_gone");
         const own = group?.scenes || [];
-        const current = own.find((s) => scenes.includes(s.entity_id))?.entity_id || "";
+        const current = own.find((s) => scenes.includes(s.entity_id));
         const pick = (value: string) => {
           const rest = scenes.filter((s) => !own.some((o) => o.entity_id === s));
           this.set({ scenes: value ? [...rest, value] : rest });
         };
-        return html`<div class="item wrap">
-          <ha-icon icon=${group?.icon || "mdi:sofa-outline"}></ha-icon>
-          <div class="grow">${group?.name || area}</div>
-          ${own.length
-            ? html`<select class="select" aria-label=${group?.name || area} @change=${(e: Event) => pick((e.target as HTMLSelectElement).value)}>
-                <option value="" ?selected=${!current}>${t("automations.no_scene")}</option>
-                ${own.map((s) => html`<option value=${s.entity_id} ?selected=${s.entity_id === current}>${s.name}</option>`)}
-              </select>`
-            : html`<span class="dim small">${t("automations.room_no_scenes")}</span>`}
-        </div>`;
+        if (!own.length)
+          return html`<div class="item">
+            <ha-icon icon=${group?.icon || (known ? "mdi:sofa-outline" : "mdi:help-circle-outline")}></ha-icon>
+            <div class="grow">${name}<div class=${classMap({ "dim small": true, warn: !known })}>${known ? t("automations.room_no_scenes") : t("automations.place_gone_sub", { id })}</div></div>
+          </div>`;
+        return navRow({ icon: group?.icon || "mdi:sofa-outline", title: name, value: current?.name || t("automations.no_scene") }, () =>
+          this.choose(
+            single(
+              name,
+              [{ value: "", label: t("automations.no_scene") }, ...own.map((s) => ({ value: s.entity_id, label: s.name, icon: "mdi:palette-outline" }))],
+              current?.entity_id || "",
+              pick,
+            ),
+          ),
+        );
       })}
-      <div class="item wrap">
-        <ha-icon icon="mdi:brightness-6"></ha-icon><div class="grow">${t("common.brightness")}</div>
-        <select class="select" aria-label=${t("common.brightness")} @change=${(e: Event) => {
-          const v = (e.target as HTMLSelectElement).value;
-          this.set({ brightness: v ? Number(v) : null });
-        }}>
-          <option value="" ?selected=${brightness === null}>${t("automations.scene_brightness")}</option>
-          ${BRIGHTNESS_LEVELS.map((v) => html`<option value=${v} ?selected=${brightness === v}>${v} %</option>`)}
-        </select>
-      </div>
-    </div>`;
+      ${this.brightnessRow(d.input.brightness ?? null, (brightness) => this.set({ brightness }), "automations.scene_brightness")}`;
+  }
+
+  /** A row choosing a white out of the common ones (the current one joins them). */
+  private whiteRow(title: string, kelvin: number, change: (v: number) => void, glyph?: string) {
+    const values = WHITES.includes(kelvin) ? WHITES : [...WHITES, kelvin].sort((a, b) => a - b);
+    return navRow({ ...(glyph ? { icon: glyph } : { art: whiteArt(kelvin) }), title, value: `${kelvin} K` }, () =>
+      this.choose(
+        single(
+          title,
+          values.map((v) => ({ value: String(v), label: `${v} K`, art: whiteArt(v) })),
+          String(kelvin),
+          (v) => change(Number(v)),
+          this.ctx.t("auto.kelvin_hint"),
+        ),
+      ),
+    );
   }
 
   private whiteLight(d: AutomationDraft) {
     const { t } = this.ctx;
-    const kelvin = d.input.kelvin || 2700;
-    return html`<div class="rows">
-      <div class="item wrap">
-        <span class="swatch-dot" style="background:${whiteArt(kelvin)}"></span>
-        <div class="grow">${t("automations.white")}</div>
-        ${stepper(kelvin, KELVIN_RANGE[0], KELVIN_RANGE[1], 100, "K", (v) => this.set({ kelvin: v }))}
-      </div>
-      <div class="item wrap">
-        <ha-icon icon="mdi:brightness-6"></ha-icon><div class="grow">${t("common.brightness")}</div>
-        ${stepper(d.input.brightness || 100, 5, 100, 5, "%", (v) => this.set({ brightness: v }))}
-      </div>
-    </div>`;
+    return html`${this.whiteRow(t("automations.white"), d.input.kelvin || 2700, (kelvin) => this.set({ kelvin }))}
+      ${this.brightnessRow(d.input.brightness || 100, (v) => this.set({ brightness: v ?? 100 }))}`;
   }
 
   /** Natural light or the scene of the day: what it shows now, and its settings page. */
   private dayLight(d: AutomationDraft, kind: "natural" | "auto") {
-    const { ctx } = this;
-    const { t } = ctx;
+    const { t } = this.ctx;
     const p = this.preview;
     const art = p?.kelvin ? whiteArt(p.kelvin) : p?.scene ? `url("${thumbUrl(p.scene)}") center / cover` : "";
     const what = p?.kelvin ? `${p.kelvin} K` : p?.scene_name || (kind === "auto" ? t("auto.no_scene") : "");
-    return html`<p class="lead small">${t(kind === "natural" ? "automations.natural_hint" : "automations.auto_hint")}</p>
-      <div class="rows">
-        <button class="item" @click=${() => (this.page = "day")}>
-          ${art ? html`<span class="thumb" style="background:${art}"></span>` : html`<ha-icon icon="mdi:palette-swatch-variant"></ha-icon>`}
-          <div class="grow">${t(kind === "natural" ? "automations.natural_settings" : "automations.auto_settings")}
-            <div class="dim small">${[what, stateLine(t, p)].filter(Boolean).join(" · ")}</div>
-          </div>
-          <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-        </button>
-      </div>`;
+    return html`<button class="item nav" @click=${() => {
+        this.pushPage();
+        this.page = "day";
+      }}>
+        ${art ? html`<span class="thumb" style="background:${art}"></span>` : html`<ha-icon icon="mdi:palette-swatch-variant"></ha-icon>`}
+        <div class="grow">${t(kind === "natural" ? "automations.natural_settings" : "automations.auto_settings")}
+          <div class="dim small">${[what, stateLine(t, p)].filter(Boolean).join(" · ")}</div>
+        </div>
+        <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+      </button>`;
   }
 
   // ---- natural light and the scene of the day ----
@@ -560,6 +646,7 @@ export class AutomationEditView extends StudioView {
 
   private leaveDay(): void {
     this.page = "main";
+    this.popPage();
   }
 
   private dayPage(natural: boolean) {
@@ -573,7 +660,7 @@ export class AutomationEditView extends StudioView {
       <h2 class="label">${t("auto.brightness")}</h2>
       ${this.brightness(config)}
       ${natural ? nothing : html`<h2 class="label">${t("auto.more")}</h2>${this.gradient(config.settings)}`}
-      <div class="center"><button class="pill apply" @click=${() => this.leaveDay()}>${t("color.done")}</button></div>`;
+      <div class="save-area"><button class="pill apply" @click=${() => this.leaveDay()}>${t("color.done")}</button></div>`;
   }
 
   /** The old auto light's settings of one of the rooms, while these are still empty. */
@@ -710,7 +797,7 @@ export class AutomationEditView extends StudioView {
           ${toggle(own, t("auto.own_phases"), flip)}
         </div>
       </div>
-      ${own ? phaseRows(t, phaseTimes(config.settings, global), (patch) => this.settings(patch), this.preview?.phase) : nothing}`;
+      ${own ? phaseRows(t, phaseTimes(config.settings, global), (patch) => this.settings(patch), (c) => this.choose(c), this.preview?.phase) : nothing}`;
   }
 
   /** Natural light: the white of each phase. */
@@ -723,52 +810,65 @@ export class AutomationEditView extends StudioView {
       this.settings({ kelvin: Object.keys(next).length ? next : null });
     };
     return html`<p class="lead">${t("auto.kelvin_hint")}</p>
-      <div class="rows">
-        ${PHASES.map(
-          (phase) => html`<div class="item">
-            <span class="swatch-dot" style="background:${whiteArt(values[phase])}"></span>
-            <div class="grow">${t(`auto.phase_${phase}` as StringKey)}</div>
-            ${stepper(values[phase], KELVIN_RANGE[0], KELVIN_RANGE[1], 100, "K", (v) => set(phase, v))}
-          </div>`,
-        )}
-      </div>`;
+      <div class="rows">${PHASES.map((phase) => this.whiteRow(t(`auto.phase_${phase}` as StringKey), values[phase], (v) => set(phase, v)))}</div>`;
   }
 
+  /** Each phase's brightness: automatic or fixed, then brighter or dimmer by some percent. */
   private brightness(config: DayConfig) {
     const { t } = this.ctx;
     const fixed = config.settings.brightness || {};
-    const setFixed = (phase: Phase, value: string) => {
+    const setFixed = (phase: Phase, value: number | null) => {
       const next = { ...fixed } as Record<string, number>;
-      if (value) next[phase] = Number(value);
+      if (value !== null) next[phase] = value;
       else delete next[phase];
       this.settings({ brightness: Object.keys(next).length ? next : null });
     };
+    const signed = (v: number) => (v > 0 ? `+${v} %` : v < 0 ? `−${-v} %` : t("auto.offset_none"));
+    const level = (v: number | undefined) => (v === undefined ? t("auto.brightness_curve") : `${v} %`);
+    const open = (phase: Phase) => {
+      const offset = config.offsets[phase] || 0;
+      const offsets = OFFSET_STEPS.includes(offset) ? OFFSET_STEPS : [...OFFSET_STEPS, offset].sort((a, b) => a - b);
+      this.choose({
+        title: t(`auto.phase_${phase}` as StringKey),
+        lists: [
+          {
+            label: t("auto.brightness"),
+            options: [{ value: "", label: t("auto.brightness_curve"), sub: t("auto.brightness_curve_sub") }, ...[...BRIGHTNESS_LEVELS].reverse().map((v) => ({ value: String(v), label: `${v} %` }))],
+            selected: [fixed[phase] === undefined ? "" : String(fixed[phase])],
+            pick: ([v]) => setFixed(phase, v ? Number(v) : null),
+          },
+          {
+            label: t("auto.offset_label"),
+            hint: t("auto.offset_hint"),
+            options: offsets.map((v) => ({ value: String(v), label: signed(v) })),
+            selected: [String(offset)],
+            pick: ([v]) => this.setDay(withOffset(this.day, phase, Number(v))),
+          },
+        ],
+      });
+    };
     return html`<p class="lead">${t("auto.brightness_hint")}</p>
       <div class="rows">
-        ${PHASES.map(
-          (phase) => html`<div class="item wrap">
-            <ha-icon icon=${PHASE_ICONS[phase]}></ha-icon>
-            <div class="grow">${t(`auto.phase_${phase}` as StringKey)}</div>
-            <select class="select" aria-label=${t("auto.brightness")} @change=${(e: Event) => setFixed(phase, (e.target as HTMLSelectElement).value)}>
-              <option value="" ?selected=${fixed[phase] === undefined}>${t("auto.brightness_curve")}</option>
-              ${BRIGHTNESS_LEVELS.map((v) => html`<option value=${v} ?selected=${fixed[phase] === v}>${v} %</option>`)}
-            </select>
-            ${stepper(config.offsets[phase] || 0, -60, 60, 5, "%", (v) => this.setDay(withOffset(this.day, phase, v)), true)}
-          </div>`,
-        )}
+        ${PHASES.map((phase) => {
+          const offset = config.offsets[phase] || 0;
+          return navRow(
+            { icon: PHASE_ICONS[phase], title: t(`auto.phase_${phase}` as StringKey), value: [level(fixed[phase]), offset ? signed(offset) : ""].filter(Boolean).join(" · ") },
+            () => open(phase),
+          );
+        })}
       </div>`;
   }
 
   private gradient(settings: DaySettings) {
     const { t } = this.ctx;
+    const label = (m: string) => (m ? t(`auto.gradient_${m}` as StringKey) : t("auto.gradient_default"));
+    const current = settings.gradient_mode || "";
     return html`<div class="rows">
-      <div class="item wrap"><ha-icon icon="mdi:gradient-horizontal"></ha-icon>
-        <div class="grow">${t("auto.gradient_mode")}<div class="dim small">${t("auto.gradient_mode_sub")}</div></div>
-        <select class="select" aria-label=${t("auto.gradient_mode")} @change=${(e: Event) => this.settings({ gradient_mode: (e.target as HTMLSelectElement).value || null })}>
-          <option value="" ?selected=${!settings.gradient_mode}>${t("auto.gradient_default")}</option>
-          ${GRADIENT_MODES.map((m) => html`<option value=${m} ?selected=${settings.gradient_mode === m}>${t(`auto.gradient_${m}` as StringKey)}</option>`)}
-        </select>
-      </div>
+      ${navRow({ icon: "mdi:gradient-horizontal", title: t("auto.gradient_mode"), sub: t("auto.gradient_mode_sub"), value: label(current) }, () =>
+        this.choose(
+          single(t("auto.gradient_mode"), ["", ...GRADIENT_MODES].map((m) => ({ value: m, label: label(m) })), current, (m) => this.settings({ gradient_mode: m || null })),
+        ),
+      )}
     </div>`;
   }
 

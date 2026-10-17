@@ -21,6 +21,7 @@ import { hasFeature, statusKey } from "../sync.ts";
 import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { navRow, single } from "./choice.ts";
 
 const NAME_MAX = 32;
 const LEDS = ["off", "dimmed", "normal"] as const;
@@ -63,7 +64,7 @@ export class BridgesView extends StudioView {
     this.cancelBoxLink();
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     if (this.mode === "motion") {
@@ -299,17 +300,9 @@ export class BridgesView extends StudioView {
         ${settings
           ? html`<h2 class="label">${t("bridges.box_settings")}</h2>
               <div class="rows">
-                <div class="item col">
-                  <div class="line"><span>${t("bridges.led")}</span></div>
-                  <div class="seg three" role="radiogroup" aria-label=${t("bridges.led")}>
-                    ${LEDS.map(
-                      (led) => html`<button role="radio" aria-checked=${device.led === led} class=${classMap({ on: device.led === led })} @click=${() => {
-                        haptic("selection");
-                        void configure({ led });
-                      }}>${t(`bridges.led_${led}` as StringKey)}</button>`,
-                    )}
-                  </div>
-                </div>
+                ${navRow({ icon: "mdi:led-on", title: t("bridges.led"), value: device.led ? t(`bridges.led_${device.led}` as StringKey) : "" }, () =>
+                  this.choose(single(t("bridges.led"), LEDS.map((led) => ({ value: led, label: t(`bridges.led_${led}` as StringKey) })), device.led ?? "", (led) => void configure({ led }))),
+                )}
                 ${device.tv_power != null
                   ? html`<div class="item">
                       <ha-icon icon="mdi:television"></ha-icon>
@@ -450,10 +443,14 @@ export class BridgesView extends StudioView {
           </div>`
         : html`<p class="hint">${t("bridges.box_bridge_text", { bridge: this.bridgeLabel(box.bridge) })}</p>
             ${others.length
-              ? html`<div class="chips wrap">
+              ? html`<div class="rows choice-list" role="radiogroup">
                     ${others.map(
-                      ([bid, b]) => html`<button class=${classMap({ chip: true, on: bid === target })} @click=${() => (this.boxTarget = bid)}>
-                        <ha-icon icon="mdi:router-wireless"></ha-icon>${b.name}
+                      ([bid, b]) => html`<button class=${classMap({ item: true, on: bid === target })} role="radio" aria-checked=${bid === target} @click=${() => {
+                        haptic("selection");
+                        this.boxTarget = bid;
+                      }}>
+                        <ha-icon icon="mdi:router-wireless"></ha-icon><div class="grow">${b.name}</div>
+                        ${bid === target ? html`<span class="tick">${icon("check")}</span>` : nothing}
                       </button>`,
                     )}
                   </div>

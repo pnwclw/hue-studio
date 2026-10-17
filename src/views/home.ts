@@ -16,7 +16,7 @@ import { noRoomRows } from "./rooms.ts";
 
 @customElement("hue-studio-home-view")
 export class HomeView extends StudioView {
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t, home } = ctx;
     const groups = allGroups(home);
@@ -24,7 +24,7 @@ export class HomeView extends StudioView {
     const section = (title: string, list: Group[]) =>
       list.length ? html`<h2 class="label">${title}</h2><div class="cards">${list.map((g) => this.card(g))}</div>` : nothing;
 
-    const loose = noRoomRows(ctx);
+    const loose = noRoomRows(ctx, (c) => this.choose(c));
     return this.tabScreen(
       ctx.hass.config?.location_name || t("home.title"),
       html`${this.syncBanners()}
