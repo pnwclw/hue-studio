@@ -29,7 +29,6 @@ import {
   splitPlaces,
   type StartKind,
   toConfig,
-  TYPE_ICONS,
   WEEKDAYS,
   type Weekday,
 } from "../automations.ts";
@@ -192,21 +191,25 @@ export class AutomationEditView extends StudioView {
     }
     const typeName = t(`automations.type_${d.type}` as StringKey);
     const lacking = missing(d);
+    // Like the Hue app's editor: what it is in the header with "Save", the name once below.
+    const save = html`<button class="pill save" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>
+      ${t(this.isNew ? "automations.create" : "zone.save")}
+    </button>`;
     return this.screen(
-      this.subHead(this.isNew ? t("automations.new") : typeName, back),
+      this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save),
       html`${this.hero(d, typeName)}
         <h2 class="label">${t("automations.when")}</h2>
         ${this.when(d)}
         <h2 class="label">${t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms")}</h2>
         <div class="rows">${this.rooms(d)}</div>
         ${LIGHT_KINDS[d.type].length ? html`<h2 class="label">${t("automations.light")}</h2>${this.light(d)}` : nothing}
-        <div class="save-area">
-          <button class="pill apply" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>${t(this.isNew ? "automations.create" : "zone.save")}</button>
-          ${lacking ? html`<p class="lead small warn">${t(`automations.missing_${lacking}` as StringKey)}</p>` : nothing}
-        </div>
+        ${lacking && lacking !== "rooms" /* the rooms row says so itself */
+          ? html`<p class="hint warn">${t(`automations.missing_${lacking}` as StringKey)}</p>`
+          : nothing}
         ${this.isNew
           ? nothing
-          : html`<div class="rows">
+          : html`<h2 class="label">${t("automations.more")}</h2>
+              <div class="rows">
                 <button class="item nav" @click=${() => ctx.openHa(`/config/automation/edit/${encodeURIComponent(d.id)}`)}>
                   <ha-icon icon="mdi:home-assistant"></ha-icon><div class="grow">${t("automations.open_ha")}</div>${icon("open")}
                 </button>
@@ -229,7 +232,6 @@ export class AutomationEditView extends StudioView {
       if (alias !== d.alias) this.draft = { ...d, alias };
     };
     return html`<div class="sensor-hero">
-      <ha-icon class="pic" icon=${TYPE_ICONS[d.type]}></ha-icon>
       <div class="name-row">
         ${this.editingName || !d.alias
           ? html`<input class="name-input" .value=${d.alias} placeholder=${t("automations.name")} aria-label=${t("automations.name")}

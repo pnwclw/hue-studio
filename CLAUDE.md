@@ -139,8 +139,14 @@ touching anything outside this repository.
 - **Code style follows Home Assistant core:** `async`, full type hints,
   `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: add Hue Studio
   once — it uses every `hue` bridge — or a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
-- **Every screen works on phone and desktop.** Verified with screenshots at widths 430 and
-  1440 (how: see `CLAUDE.local.md`). A UI change is not done without screenshots.
+- **Every screen works on phone and desktop.** Verified with screenshots at the widths of
+  iPhone 17 Pro (402×874) and 17 Pro Max (440×956), and 1440 (how: see `CLAUDE.local.md`).
+  A UI change is not done without screenshots.
+- **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
+  Home, room and zone screens: names 15px, tiles 14px; other screens: rows 15px with 13px
+  subtitles and 24px icons, text from ~64px, rows ≥60px. Switches 52×32 and round header
+  buttons 32px (the same height); action buttons are the regular 34px `.pill`, an editor's
+  "Save" sits in its header, "Delete" is the red outlined pill at the bottom.
 - **The on-screen keyboard.** Text fields are at least 16px (smaller ones make iOS zoom in).
   While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
   what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
@@ -349,11 +355,13 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
 - Frontend: `npm run typecheck` and `npm test` (model, color math, optimistic state, locale
   parity).
 - UI, fast loop: `npm run watch`, then `dev/panel.html` (Claude: `preview_start` with `panel-harness` from
-  `.claude/launch.json`, then `/dev/panel.html?lang=en|pl&path=/room/area.office`) at 430
-  and 1440; `&moreinfo=light.desk_lamp` opens the dialog. The browser pane freezes CSS
+  `.claude/launch.json`, then `/dev/panel.html?lang=en|pl&path=/room/area.office`) at 402,
+  440 and 1440; `&moreinfo=light.desk_lamp` opens the dialog. The browser pane freezes CSS
   transitions while hidden and crops at 1440, so take final shots with headless Chrome
   (`--headless=new --window-size=1440,900 --virtual-time-budget=6000 --screenshot=…`,
-  a fresh `--user-data-dir` per run; for 430 use a 520px window plus `&w=430` and crop).
+  a fresh `--user-data-dir` per run; for 402/440 use a 520px window plus `&w=402` or
+  `&w=440` (and `&inset=59,34` for the safe areas) and crop; a black shot is a headless
+  quirk: retake it with a shorter `--virtual-time-budget`).
 - Custom panels get no height from HA: the panel sizes itself to the viewport
   (`fitToViewport`), otherwise the page doesn't scroll and the tab bar ends up below the
   content. The panel is registered with `handle_safe_area`: it pads the status bar and home

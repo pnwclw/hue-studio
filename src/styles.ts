@@ -34,6 +34,8 @@ export const CSS = `
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* An editor's "Save" in its header (the Hue app's): blue once there is something to save. */
+  .bar.sub .pill.save:not(:disabled) { background: var(--accent); color: #fff; }
   /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
      title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
@@ -70,7 +72,7 @@ export const CSS = `
   /* Desktop header of a top-level screen: title and actions in one row, no bar. */
   .head { display: flex; align-items: center; gap: 12px; padding: max(28px, var(--safe-top)) 0 4px; }
   .head h1.big { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .round { position: relative; width: 34px; height: 34px; border: none; border-radius: 50%; padding: 0; flex: none; cursor: pointer;
+  .round { position: relative; width: 32px; height: 32px; border: none; border-radius: 50%; padding: 0; flex: none; cursor: pointer;
            display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, 0.28);
            transition: background 0.2s, transform 0.15s var(--ease); }
   .round::after { content: ""; position: absolute; inset: -5px; }
@@ -101,15 +103,15 @@ export const CSS = `
   .dark-text { color: #1c1c1e; }
 
   /* toggle (iOS proportions, a bit smaller) */
-  .toggle { position: relative; width: 46px; height: 28px; flex: none; border: none; border-radius: 14px; padding: 0; cursor: pointer;
+  .toggle { position: relative; width: 52px; height: 32px; flex: none; border: none; border-radius: 16px; padding: 0; cursor: pointer;
             background: rgba(120, 120, 128, 0.36); transition: background 0.25s var(--ease); }
   .toggle::after { content: ""; position: absolute; inset: -8px -4px; }
-  .toggle span { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff;
+  .toggle span { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%; background: #fff;
                  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); transition: transform 0.3s var(--spring), width 0.15s var(--ease); }
-  .toggle:active span { width: 28px; }
+  .toggle:active span { width: 32px; }
   .toggle.on { background: var(--accent); }
-  .toggle.on span { transform: translateX(18px); }
-  .toggle.on:active span { transform: translateX(14px); }
+  .toggle.on span { transform: translateX(20px); }
+  .toggle.on:active span { transform: translateX(16px); }
   .lit .toggle.on { background: rgba(0, 0, 0, 0.22); }
 
   /* brightness slider: a thin track and a small knob (the Hue app's, measured at 430pt) */
@@ -130,14 +132,18 @@ export const CSS = `
   .dark-text .slider .fill { background: linear-gradient(90deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.16)); }
 
   /* home: room cards */
-  .cards { display: grid; gap: 10px; }
-  .card { padding: 14px 14px 12px; border-radius: var(--radius); cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+  .cards { display: grid; gap: 12px; }
+  /* The Hue app's room card: its icon in a column of its own, the name well clear of it. */
+  .card > .row { gap: 18px; }
+  .card > .row > ha-icon { width: 28px; justify-content: center; --mdc-icon-size: 26px; }
+  .card > .slider { margin-top: 20px; }
+  .card { padding: 18px 18px 14px; border-radius: 16px; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
           transition: transform 0.15s var(--ease), color 0.3s var(--ease); }
   .card:active { transform: scale(0.985); }
   .card.unavailable { opacity: 0.45; }
   .row { display: flex; align-items: center; gap: 12px; }
   .row .text { flex: 1; min-width: 0; }
-  .row .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.7; min-height: 0; }
   .meta:empty { display: none; }
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
@@ -173,7 +179,7 @@ export const CSS = `
   /* Its bar row sits where every other screen's is (the 44px row of .bar), the gap below kept. */
   .hero .topbar { min-height: 44px; padding-bottom: 8px; }
   main.wide .hero .topbar { padding-bottom: 0; }
-  .hero .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hero .title { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Dragging the brightness: the bar shows just the percentage (the Hue app's). */
   .hero .topbar > :not(.title) { transition: opacity 0.2s var(--ease); }
   .hero .topbar.adjusting > :not(.title) { opacity: 0; pointer-events: none; }
@@ -213,10 +219,10 @@ export const CSS = `
   .tile-card > .text { flex: none; box-sizing: border-box; width: 100%; height: var(--text-h); margin-top: var(--gap); display: flex;
                        flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;
-                     overflow-wrap: anywhere; font-size: 15px; font-weight: 600; line-height: 1.2; }
+                     overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.2; }
   /* Two lines under the name: the name keeps one. */
   .tile-card .subs-2 .name { -webkit-line-clamp: 1; }
-  .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: 13px; line-height: 1.2; opacity: 0.75; white-space: nowrap;
+  .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: 12px; line-height: 1.2; opacity: 0.75; white-space: nowrap;
                     overflow: hidden; text-overflow: ellipsis; }
   .tile-card > .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: var(--zone); display: flex; align-items: center;
                               justify-content: center; border-radius: 0 0 16px 16px; background: rgba(0, 0, 0, 0.16);
@@ -242,8 +248,8 @@ export const CSS = `
   .control-card .top { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: auto; }
   .control-card .top ha-icon { --mdc-icon-size: 28px; }
   .control-card .top .inert { pointer-events: none; opacity: 0.35; }
-  .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; line-height: 1.25; }
-  .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 1.3; color: var(--text-2); }
+  .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; line-height: 1.25; }
+  .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
   .control-card.off .top ha-icon { opacity: 0.5; }
   /* A row of cards that scrolls sideways (lights, sensors), like the Hue app's. */
   .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto;
@@ -782,12 +788,12 @@ export const CSS = `
   .sensor-hero .name-input { font-size: 22px; }
   .sensor-edit .rows { margin-top: 16px; }
   .sensor-edit h2.label + .rows { margin-top: 0; }
-  .sensor-edit .rows .item { min-height: 52px; gap: 14px; font-size: 15px; }
+  .sensor-edit .rows .item { min-height: 60px; gap: 20px; padding-left: 20px; font-size: 15px; }
   .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 24px; color: var(--text); }
   .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
   .sensor-edit h2.label { margin-top: 28px; }
-  .round.plus-blue { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--accent); color: #fff; }
+  .round.plus-blue { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--accent); color: #fff; }
   .sensor-sheet .rows { border-radius: 12px; background: #333336; }
   .sensor-sheet .form-body { padding-bottom: 16px; }
   .sensor-sheet .hint { margin: 0 2px 12px; font-size: 15px; }
@@ -841,16 +847,16 @@ export const CSS = `
   /* Settings → Devices, like the Hue app's: kinds with their counts, then a kind's devices by
      room under a search field and filters; big pictures, "Unreachable" in orange, separators
      from the text on, full-width rows on phones. */
-  .bar.sub .round.plus-blue.add-devices { width: 36px; height: 36px; }
+  .bar.sub .round.plus-blue.add-devices { width: 32px; height: 32px; }
   .round.plus-blue.add-devices svg { width: 24px; height: 24px; }
   .add-devices .dot-badge { position: absolute; top: -1px; right: -1px; border: 2px solid var(--bg); }
   .devices-page .notice .dot-badge { margin: 0 4px; }
   .devices-page .notice .go { --mdc-icon-size: 20px; }
   .devices-page .rows.kinds { margin-top: 16px; }
   .devices-page h2.label + .rows { margin-top: 0; }
-  .rows.device-list .item { min-height: 56px; gap: 14px; font-size: 15px; }
+  .rows.device-list .item { min-height: 64px; gap: 18px; padding-left: 18px; font-size: 15px; }
   .rows.device-list .item + .item { position: relative; border-top: none; }
-  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 60px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 66px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
   .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 30px; --mdc-icon-size: 28px; color: var(--text); }
   .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rows.device-list .item .small { margin-top: 2px; font-size: 13px; }
@@ -882,8 +888,8 @@ export const CSS = `
   .info-box.warn { border-color: rgba(255, 179, 64, 0.6); background: rgba(255, 179, 64, 0.1); }
   .info-box.warn .info-head { color: #ffb340; }
   .delete-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 36px; }
-  .delete-btn { min-width: 180px; height: 34px; padding: 0 16px; border: 1.5px solid #e5484d; border-radius: 17px; cursor: pointer;
-                background: rgba(229, 72, 77, 0.14); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase;
+  .delete-btn { min-width: 96px; height: 36px; padding: 0 22px; border: 2px solid #e5484d; border-radius: 18px; cursor: pointer;
+                background: rgba(229, 72, 77, 0.14); color: var(--text); font: inherit; font-size: 15px; font-weight: 500;
                 transition: transform 0.15s var(--ease), background 0.2s; }
   .delete-btn:active { transform: scale(0.96); }
   .delete-btn.confirm { border-color: #c0392b; background: #c0392b; }
@@ -1048,17 +1054,18 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  .settings-page .rows:not(.device-list) .item { min-height: 52px; gap: 14px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item { min-height: 60px; gap: 20px; padding-left: 20px; font-size: 15px; }
   .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 24px; color: var(--text); }
   .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .settings-page .rows:not(.device-list) .item + .item { position: relative; border-top: none; }
   .settings-page .rows:not(.device-list) .item + .item::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
-  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 54px; }
+  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 64px; }
   .settings-page h2.label { margin-top: 28px; }
   .settings-page .section-head h2.label { margin: 0 2px; }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
   .settings-page .lead { font-size: 14px; }
   .settings-page .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+  .settings-page .hint.warn { color: #ffb340; }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
@@ -1072,7 +1079,7 @@ export const CSS = `
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
   .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
-  .choice-sheet .rows .item { min-height: 48px; font-size: 15px; }
+  .choice-sheet .rows .item { min-height: 56px; gap: 18px; font-size: 15px; }
   .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 22px; }
   .choice-sheet .rows + h2.label { margin-top: 20px; }
   .choice-page .rows.choice-list { margin-top: 12px; }
