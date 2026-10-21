@@ -6,6 +6,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from aiohue.v2.models.room import RoomArchetype
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
@@ -82,6 +83,27 @@ async def test_scenes_organized(hass: HomeAssistant, living_room: str) -> None:
         assert entry.area_id == living_room
     (category,) = cr.async_get(hass).async_list_categories(scope="scene")
     assert category.icon == "mdi:sofa-outline"
+
+
+async def test_smart_scene(
+    hass: HomeAssistant,
+    hue_entry: MockConfigEntry,
+    living_room: str,
+    hue_lights: MagicMock,
+) -> None:
+    """A smart scene (natural light of the Hue app) is organized like the others."""
+    smart = SimpleNamespace(
+        group=ResourceIdentifier(rid="res-room", rtype=ResourceTypes.ROOM)
+    )
+    hue_lights.scenes.smart_scene.get.side_effect = {"res-smart": smart}.get
+    entities = er.async_get(hass)
+    entry = entities.async_get_or_create(
+        "scene", HUE_DOMAIN, "res-smart", config_entry=hue_entry
+    )
+    await _organize(hass)
+    entry = entities.async_get(entry.entity_id)
+    assert entry.labels
+    assert _scene_category(hass, entry.categories.get("scene")) == "Living room"
 
 
 async def test_user_choices_stay(

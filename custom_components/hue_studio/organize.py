@@ -1,11 +1,11 @@
 """Our scenes and automations in Home Assistant's own lists (roadmap G2).
 
-Every bridge scene (a `scene` of the native `hue`, recognized by its platform and bridge
-scene id, so one made in the Hue app counts too) gets the "Hue Studio" label, a category
-named after its Hue room or zone with the icon of its archetype (HA's scene list grouped
-by room, like the Hue app) and the area of its room; our automations get the label, the
-"Hue Studio" category and the area of their one room (automations.py). Everything goes
-through HA's registries.
+Every bridge scene (a `scene` of the native `hue`, smart scenes too, recognized by its
+platform and bridge scene id, so one made in the Hue app counts too) gets the "Hue
+Studio" label, a category named after its Hue room or zone with the icon of its
+archetype (HA's scene list grouped by room, like the Hue app) and the area of its room;
+our automations get the label, the "Hue Studio" category and the area of their one room
+(automations.py). Everything goes through HA's registries.
 
 The user's choice wins: we fill only what is empty or still ours, and never touch a
 label, category or area the user set. What is ours is remembered
@@ -19,11 +19,14 @@ everything as it is.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 import logging
 from typing import Any
 
+from aiohue import HueBridgeV2
 from aiohue.v2.models.resource import ResourceTypes
+from aiohue.v2.models.scene import Scene
+from aiohue.v2.models.smart_scene import SmartScene
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import (
     category_registry as cr,
@@ -37,9 +40,10 @@ from homeassistant.helpers.storage import Store
 
 from .alignment import archetype_icon
 from .const import CONF_ORGANIZE, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
+from .lights import async_bridges
 from .options import async_group_areas, async_options
 from .rooms import async_track_rooms
-from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes
+from .scenes import SCENE_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,10 +72,32 @@ def async_label(hass: HomeAssistant) -> lr.LabelEntry:
     )
 
 
-def _scene_group(scene: HueScene) -> tuple[str, str | None, str] | None:
+@callback
+def _async_bridge_scenes(
+    hass: HomeAssistant,
+) -> Iterator[tuple[er.RegistryEntry, HueBridgeV2, Scene | SmartScene]]:
+    """Every Hue scene entity, smart scenes too, with its bridge and resource."""
+    bridges = async_bridges(hass)
+    for entry in list(er.async_get(hass).entities.values()):
+        if (
+            entry.domain != SCENE_DOMAIN
+            or entry.platform != HUE_DOMAIN
+            or (bridge := bridges.get(entry.config_entry_id or "")) is None
+        ):
+            continue
+        resource = bridge.scenes.scene.get(
+            entry.unique_id
+        ) or bridge.scenes.smart_scene.get(entry.unique_id)
+        if resource is not None:
+            yield entry, bridge, resource
+
+
+def _scene_group(
+    bridge: HueBridgeV2, resource: Scene | SmartScene
+) -> tuple[str, str | None, str] | None:
     """The scene's Hue room or zone: name, grouped light id, icon (its archetype's)."""
-    ref = scene.resource.group
-    groups = scene.bridge.groups
+    ref = resource.group
+    groups = bridge.groups
     if ref.rtype == ResourceTypes.ROOM:
         group, zone = groups.room.get(ref.rid), False
     elif ref.rtype == ResourceTypes.ZONE:
@@ -151,12 +177,9 @@ class Organizer:
 
         group_areas = async_group_areas(hass)
         label: lr.LabelEntry | None = None
-        for scene in async_all_scenes(hass):
-            entry = entities.async_get(scene.entity_id)
-            if entry is None:
-                continue
+        for entry, bridge, resource in _async_bridge_scenes(hass):
             known = self.scenes.get(entry.unique_id)
-            group = _scene_group(scene)
+            group = _scene_group(bridge, resource)
             changes: dict[str, Any] = {}
 
             if known is None:
@@ -191,7 +214,7 @@ class Organizer:
 
             self.scenes[entry.unique_id] = {"area": area}
             if changes:
-                entities.async_update_entity(scene.entity_id, **changes)
+                entities.async_update_entity(entry.entity_id, **changes)
 
         # Scenes gone from HA are forgotten (a bridge that is away keeps its own).
         for unique_id in list(self.scenes):

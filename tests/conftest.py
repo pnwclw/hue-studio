@@ -287,6 +287,7 @@ def mock_bridge() -> Generator[MagicMock]:
         bridge.scenes.scene.update = AsyncMock()
         bridge.scenes.scene.recall = AsyncMock()
         bridge.scenes.scene.subscribe.return_value = MagicMock()
+        bridge.scenes.smart_scene.get.return_value = None
         bridge.groups = MagicMock()
         bridge.groups.room.get.side_effect = ROOMS.get
         bridge.groups.zone.get.return_value = None

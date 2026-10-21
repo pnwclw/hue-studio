@@ -191,7 +191,9 @@ export class HueStudioSceneSheet extends LitElement {
                 ${icon("shuffle")}${t("scene.shuffle_colors")}
               </button>`
             : nothing}
-          ${room ? html`<button class="pill" @click=${() => this.edit(room)}>${t("scene.edit")}</button>` : nothing}
+          ${room && info
+            ? html`<button class="pill" @click=${() => this.edit(room)}>${t("scene.edit")}</button>`
+            : nothing /* a smart scene (natural light) has no palette to edit here */}
         </div>
         <button class="as-details" @click=${() => this.details()}>${t("more.settings")}</button>
       </div>
