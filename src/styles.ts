@@ -1093,7 +1093,8 @@ export const CSS = `
   /* The automation editor's rows have no icons, like the Hue app's; its type's icon sits by the name. */
   .automation-page .rows .item > ha-icon:first-child { display: none; }
   .automation-page .rows:not(.device-list) .item { gap: 16px; padding-left: 16px; }
-  .automation-page .rows:not(.device-list) .item + .item::before { left: 16px; }
+  .automation-page .rows:not(.device-list) .item + .item::before,
+  .automation-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 16px; }
   .automation-page .sensor-hero h1.big { font-size: 24px; }
   .automation-page .name-row .type-icon { --mdc-icon-size: 28px; color: var(--text); }
   .settings-page .rows + .rows { margin-top: 16px; }
