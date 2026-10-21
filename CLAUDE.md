@@ -149,7 +149,7 @@ touching anything outside this repository.
   with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
   the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
   10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
-  "Save" sits in its header, "Delete" is the red outlined pill at the bottom. The
+  "Save" sits in its header (a plain grey pill, never the accent), "Delete" is the red outlined pill at the bottom. The
   automation editor's rows have no icons (its type's icon sits by its name).
 - **Times are chosen on wheels**, never the system's time picker: a time screen
   (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
@@ -159,6 +159,7 @@ touching anything outside this repository.
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
   own (`syncBanner`).
+- **Headers: everything is 32px tall** — round buttons, switches, pills, the search field.
 - **Icons fill their room:** a bigger icon takes its space from the gap next to it, so the
   text never moves (rows, room cards, automation cards); in fixed frames (tiles, round
   buttons, the tab bar) only the icon grows.

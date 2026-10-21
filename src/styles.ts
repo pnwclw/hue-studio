@@ -34,8 +34,8 @@ export const CSS = `
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  /* An editor's "Save" in its header (the Hue app's): blue once there is something to save. */
-  .bar.sub .pill.save:not(:disabled) { background: var(--accent); color: #fff; }
+  /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
+  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head) .pill { height: 32px; border-radius: 16px; }
   /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
      title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
@@ -295,8 +295,7 @@ export const CSS = `
   .cv-bar.scrolled .bar-title { opacity: 1; transform: none; }
   .colorview .screen-head:has(.cv-bar.scrolled) { background: rgba(22, 22, 24, 0.82); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
   .fx-title { margin: 8px 0 18px; font-size: 36px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; }
-  .cv-bar .round.more { width: 34px; height: 34px; }
-  .cv-bar .pill { height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;
+  .cv-bar .pill { padding: 0 14px; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;
                   background: rgba(120, 120, 128, 0.28); color: var(--text); }
   .menu-scrim { position: fixed; inset: 0; z-index: 9; }
   .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: 14px;
@@ -542,14 +541,14 @@ export const CSS = `
 
   /* gallery */
   /* In a bar instead of its title (phones), or before the actions (desktop Explore tab). */
-  .search-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 34px; margin: 0; padding: 0 10px; box-sizing: border-box;
+  .search-field { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 32px; margin: 0; padding: 0 10px; box-sizing: border-box;
                   border-radius: 10px; background: rgba(120, 120, 128, 0.24); color: var(--text-2); cursor: text; animation: field-in 0.25s var(--ease); }
   @keyframes field-in { from { opacity: 0; transform: scaleX(0.96); } }
   .search-field svg { width: 18px; height: 18px; flex: none; }
   .search-field .q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: none; background: none; outline: none;
                      font: inherit; font-size: 16px; color: var(--text); }
   .search-field .q::placeholder { color: var(--text-2); }
-  .tab-head.wide .search-field { flex: 0 1 260px; height: 34px; margin: 0; }
+  .tab-head.wide .search-field { flex: 0 1 260px; margin: 0; }
   .tiles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 2), auto); gap: 10px;
            grid-auto-columns: calc((100% - 20px) / 2.4); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
            margin: 0 -16px; padding: 0 16px 2px; scroll-padding: 0 16px; overscroll-behavior-x: contain; }
