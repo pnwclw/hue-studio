@@ -8,7 +8,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
+import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
 import { openStockMoreInfo } from "../ha-internals.ts";
 import {
   type AdaptiveSwitch,
@@ -288,19 +288,19 @@ export class RoomView extends StudioView {
     if (g.kind !== "area" || !plan?.split_areas?.[g.key.slice("area.".length)]) return nothing;
     const [main, ...others] = lightsByBridge(plan, g.lights);
     if (!main || !others.length) return nothing;
-    return html`<div class="mismatch">
-      ${others.map(
+    return banner({
+      title: t("room.split_title"),
+      warn: true,
+      text: html`${others.map(
         ([bridge, lights]) =>
           html`<p>${t("room.split_note", {
             lights: lights.map((l) => friendlyName(ctx.hass, l)).join(", "),
             bridge: bridgeName(plan, bridge) ?? "",
             main: bridgeName(plan, main[0]) ?? "",
           })}</p>`,
-      )}
-      <div class="buttons">
-        <button class="pill" @click=${() => ctx.go("/rooms")}>${t("rooms.title")}</button>
-      </div>
-    </div>`;
+      )}`,
+      open: { label: t("rooms.title"), run: () => ctx.go("/rooms") },
+    });
   }
 
   /**
@@ -313,13 +313,13 @@ export class RoomView extends StudioView {
     const area = ctx.hass.areas?.[m.hueArea]?.name || m.hueArea;
     const accept = () => ctx.setArea(m.light, m.hueArea);
     const restore = () => ctx.call("hue_studio", "align_rooms", { entity_id: m.light }, { optimistic: false });
-    return html`<div class="mismatch">
-      <p>${t("mismatch.note", { light: friendlyName(ctx.hass, m.light), room: m.hueRoom })}</p>
-      <div class="buttons">
-        <button class="pill" @click=${accept}>${t("mismatch.accept", { area })}</button>
-        <button class="pill" @click=${restore}>${t("mismatch.restore")}</button>
-      </div>
-    </div>`;
+    return banner({
+      title: t("mismatch.title"),
+      warn: true,
+      text: t("mismatch.note", { light: friendlyName(ctx.hass, m.light), room: m.hueRoom }),
+      buttons: html`<button class="pill" @click=${accept}>${t("mismatch.accept", { area })}</button>
+        <button class="pill" @click=${restore}>${t("mismatch.restore")}</button>`,
+    });
   }
 
   /**

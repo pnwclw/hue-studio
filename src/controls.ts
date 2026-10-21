@@ -124,6 +124,38 @@ export function sceneDot(gallery: Gallery | null, name: string, info: SceneInfo 
   return match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
 }
 
+/**
+ * A banner, like the Hue app's: a round icon and a spaced capital title in blue (amber for a
+ * warning), the text under it, buttons of its own, and a round button on the right that
+ * goes on (the whole banner does). A Sync Box's banner is a different one (syncBanner).
+ */
+export function banner(o: {
+  title: string;
+  text: TemplateResult | string;
+  warn?: boolean;
+  /** A pulsing dot instead of the icon: something is going on (a search). */
+  live?: boolean;
+  buttons?: TemplateResult;
+  open?: { label: string; run: () => void };
+}): TemplateResult {
+  const mark = o.live
+    ? html`<span class="dot-badge live" aria-hidden="true"></span>`
+    : html`<span class="banner-mark" aria-hidden="true"><ha-icon icon=${o.warn ? "mdi:exclamation-thick" : "mdi:information-variant"}></ha-icon></span>`;
+  return html`<div class=${classMap({ banner: true, warn: !!o.warn, link: !!o.open })} role="note" @click=${() => o.open?.run()}>
+    <div class="grow">
+      <div class="banner-head">${mark}<span>${o.title}</span></div>
+      <div class="banner-text">${o.text}</div>
+      ${o.buttons ? html`<div class="buttons" @click=${(e: Event) => e.stopPropagation()}>${o.buttons}</div>` : nothing}
+    </div>
+    ${o.open
+      ? html`<button class="round banner-go" aria-label=${o.open.label} @click=${(e: Event) => {
+          e.stopPropagation();
+          o.open!.run();
+        }}><ha-icon icon="mdi:chevron-right"></ha-icon></button>`
+      : nothing}
+  </div>`;
+}
+
 /** Temperature and motion of a group, or nothing. */
 export function metaOf(state: GroupState): TemplateResult | typeof nothing {
   if (state.temperature === null && !state.motion) return nothing;

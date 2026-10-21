@@ -7,7 +7,7 @@ import { customElement } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { groupSlider, groupToggle, metaOf, shownState, surfaceOf, syncBanner } from "../controls.ts";
+import { banner, groupSlider, groupToggle, metaOf, shownState, surfaceOf, syncBanner } from "../controls.ts";
 import { allGroups, type Group } from "../model.ts";
 import { planHasNews } from "../rooms.ts";
 import { icon, toggle } from "../ui.ts";
@@ -29,9 +29,7 @@ export class HomeView extends StudioView {
       ctx.hass.config?.location_name || t("home.title"),
       html`${this.syncBanners()}
       ${planHasNews(ctx.rooms)
-        ? html`<button class="notice" @click=${() => ctx.go("/rooms")}>
-            ${icon("rooms")}<span class="grow">${t("home.rooms_differ")}</span><span class="go">${t("home.review")}</span>
-          </button>`
+        ? banner({ title: t("home.rooms_differ_title"), text: t("home.rooms_differ"), open: { label: t("home.review"), run: () => ctx.go("/rooms") } })
         : nothing}
       ${section(t("home.rooms"), home.rooms)} ${section(t("home.zones"), home.zones)}
       ${loose === nothing ? nothing : html`<h2 class="label">${t("home.no_room")}</h2>${loose}`}

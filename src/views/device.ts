@@ -9,6 +9,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import { allDevices, deviceIcon, type FoundDevice, groupOf, LIGHT_FUNCTIONS, POWER_ON } from "../devices.ts";
+import { banner } from "../controls.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { groupBridge } from "../rooms.ts";
@@ -146,10 +147,11 @@ export class DeviceView extends StudioView {
         : nothing}
 
       ${unreachable || light
-        ? html`<div class=${classMap({ "info-box": true, warn: unreachable })} role="note">
-            <div class="info-head"><ha-icon icon=${unreachable ? "mdi:alert-circle" : "mdi:information"}></ha-icon>${t(unreachable ? "devices.unreachable" : "devices.info")}</div>
-            <p>${t(unreachable ? "devices.info_unreachable" : "devices.info_light")}</p>
-          </div>`
+        ? banner({
+            title: t(unreachable ? "devices.unreachable" : "devices.info"),
+            text: t(unreachable ? "devices.info_unreachable" : "devices.info_light"),
+            warn: unreachable,
+          })
         : nothing}
 
       <h2 class="label">${t("sensor.support")}</h2>

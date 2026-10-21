@@ -22,6 +22,7 @@ import {
   groupOf,
   NO_AREA,
 } from "../devices.ts";
+import { banner } from "../controls.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { hueSensor } from "../model.ts";
@@ -118,9 +119,12 @@ export class DevicesView extends StudioView {
               <button class="text-link" @click=${() => ctx.go("/settings/devices")}>${t("devices.all_bridges")}</button></p>`
           : nothing}
         ${searching
-          ? html`<button class="notice" @click=${() => ctx.go("/settings/devices/add")}>
-              <span class="dot-badge live" aria-hidden="true"></span><span class="grow">${t("devices.searching")}</span><ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
-            </button>`
+          ? banner({
+              title: t("devices.searching_title"),
+              text: t("devices.searching"),
+              live: true,
+              open: { label: t("devices.searching_title"), run: () => ctx.go("/settings/devices/add") },
+            })
           : nothing}
         ${fresh.length
           ? html`<h2 class="label">${t("devices.new")}</h2>

@@ -1039,6 +1039,26 @@ export const CSS = `
   .link-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; }
   .link-actions .pill { min-width: 180px; }
   
+  /* banner (controls.ts banner()): the Hue app's, measured on its screenshot */
+  .banner { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; padding: 12px 14px 14px 16px; border-radius: 16px;
+            border: 1.5px solid rgba(64, 104, 224, 0.5); background: #24252d; }
+  .banner.link { cursor: pointer; }
+  .banner.link:active { transform: scale(0.99); }
+  .banner.warn { border-color: rgba(255, 179, 64, 0.45); background: #2a2721; }
+  .banner .grow { flex: 1; min-width: 0; }
+  .banner-head { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 500; letter-spacing: 2px;
+                 text-transform: uppercase; color: #4f84ff; }
+  .banner.warn .banner-head { color: #ffb340; }
+  .banner-mark { flex: none; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                 background: #3478f6; color: #fff; --mdc-icon-size: 14px; }
+  .banner.warn .banner-mark { background: #ffb340; color: #1c1c1e; }
+  .banner-head .dot-badge { margin: 0 4px; }
+  .banner-text { margin-top: 6px; font-size: 15px; line-height: 1.4; color: var(--text-2); }
+  .banner-text p { margin: 0; }
+  .banner-text p + p { margin-top: 6px; }
+  .banner .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .banner .round.banner-go { color: var(--text); --mdc-icon-size: 22px; }
+  .page > .banner:first-child, .rows + .banner { margin-top: 14px; }
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
   .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
   .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

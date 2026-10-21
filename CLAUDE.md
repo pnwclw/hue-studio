@@ -150,6 +150,10 @@ touching anything outside this repository.
   the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
   10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
   "Save" sits in its header, "Delete" is the red outlined pill at the bottom.
+- **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
+  warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
+  buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
+  own (`syncBanner`).
 - **Font weights: 400, 500 and 700 only.** HA loads Roboto as separate files (100, 300,
   400, 500, 700, 900), so 600 renders as 700 and 800 as 900 there. Keep the font as it is
   (`--ha-font-family-body`, falling back to the system font in the harness).
