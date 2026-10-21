@@ -102,16 +102,22 @@ export const CSS = `
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
   .dark-text { color: #1c1c1e; }
 
-  /* toggle (iOS proportions, a bit smaller) */
-  .toggle { position: relative; width: 52px; height: 32px; flex: none; border: none; border-radius: 16px; padding: 0; cursor: pointer;
+  /* toggle: a small knob well inside the track (the Hue app's look); the master switches in a
+     header (home, a room or zone, a light) are the full size, every other one a step smaller. */
+  .toggle { position: relative; width: 46px; height: 28px; flex: none; border: none; border-radius: 14px; padding: 0; cursor: pointer;
             background: rgba(120, 120, 128, 0.36); transition: background 0.25s var(--ease); }
   .toggle::after { content: ""; position: absolute; inset: -8px -4px; }
-  .toggle span { position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%; background: #fff;
-                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25); transition: transform 0.3s var(--spring), width 0.15s var(--ease); }
-  .toggle:active span { width: 32px; }
+  .toggle span { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.3s var(--spring), width 0.15s var(--ease); }
+  .toggle:active span { width: 24px; }
   .toggle.on { background: var(--accent); }
-  .toggle.on span { transform: translateX(20px); }
-  .toggle.on:active span { transform: translateX(16px); }
+  .toggle.on span { transform: translateX(18px); }
+  .toggle.on:active span { transform: translateX(14px); }
+  :is(.bar, .topbar, .cv-bar) .toggle { width: 52px; height: 32px; border-radius: 16px; }
+  :is(.bar, .topbar, .cv-bar) .toggle span { width: 24px; height: 24px; }
+  :is(.bar, .topbar, .cv-bar) .toggle:active span { width: 28px; }
+  :is(.bar, .topbar, .cv-bar) .toggle.on span { transform: translateX(20px); }
+  :is(.bar, .topbar, .cv-bar) .toggle.on:active span { transform: translateX(16px); }
   .lit .toggle.on { background: rgba(0, 0, 0, 0.22); }
 
   /* brightness slider: a thin track and a small knob (the Hue app's, measured at 430pt) */
@@ -143,7 +149,7 @@ export const CSS = `
   .card.unavailable { opacity: 0.45; }
   .row { display: flex; align-items: center; gap: 12px; }
   .row .text { flex: 1; min-width: 0; }
-  .row .name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.7; min-height: 0; }
   .meta:empty { display: none; }
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
