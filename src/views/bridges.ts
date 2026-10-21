@@ -105,15 +105,7 @@ export class BridgesView extends StudioView {
         <div class="grow">${title}<div class=${classMap({ "dim small": true, warn })}>${sub}</div></div>
         <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
       </button>`;
-    const move = this.move;
-    return html`${move
-        ? html`<button class="notice" @click=${() => ctx.go("/settings/bridges/move")}>
-            ${move.running ? html`<span class="dot-badge live" aria-hidden="true"></span>` : html`<ha-icon icon="mdi:alert-outline"></ha-icon>`}
-            <span class="grow">${t(move.step === "done" ? "move.notice_done" : move.running ? "move.notice" : "move.notice_waiting", { bridge: move.target_name })}</span>
-            <ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
-          </button>`
-        : nothing}
-      <h2 class="label">${t("settings.bridges")}</h2>
+    return html`<h2 class="label">${t("settings.bridges")}</h2>
       <div class="rows">
         ${Object.entries(bridges).map(([id, b]) =>
           row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : this.summary(b), b.connected === false),
@@ -266,7 +258,6 @@ export class BridgesView extends StudioView {
                     ctx.go(`/settings/motionaware?bridge=${encodeURIComponent(id)}`),
                   )
                 : nothing}
-              ${this.moveAllLink(id, b)}
             </div>`
           : html`<p class="lead">${t("bridges.offline_hint")}</p>`}
         ${online ? this.rooms(id) : nothing}
@@ -325,12 +316,12 @@ export class BridgesView extends StudioView {
           </div>
           ${!this.direct(box) ? this.link("mdi:link-plus", t("bridges.box_pair"), t("bridges.box_pair_sub"), () => ctx.openSettings(), true) : nothing}
           ${settings
-            ? html`${this.link(
-                "mdi:router-wireless",
-                t("bridges.box_bridge", { bridge: this.bridgeLabel(box.bridge) }),
-                t("bridges.box_bridge_sub"),
-                () => this.openBoxSheet("bridge", box),
-              )}
+            ? html`<div class="item">
+                <ha-icon icon="mdi:router-wireless"></ha-icon>
+                <div class="grow">${t("bridges.box_bridge", { bridge: this.bridgeLabel(box.bridge) })}
+                  <div class="dim small">${t("bridges.box_bridge_sub")}</div>
+                </div>
+              </div>
               ${this.link(
                 "mdi:wifi",
                 t("bridges.box_wifi", { network: device.wifi_name || t("bridges.wifi_none") }),

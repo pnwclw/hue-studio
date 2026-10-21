@@ -535,6 +535,18 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
   let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
+  // The icons of the Hue rooms' and zones' archetypes, as the backend sends them with the config.
+  const ARCHETYPE_ICONS: Record<string, string> = {
+    office: "mdi:desk",
+    balcony: "mdi:balcony",
+    downstairs: "mdi:stairs-down",
+    tv_area: "mdi:television",
+    tree: "mdi:flower-outline",
+  };
+  const configMessage = (): StudioConfig => ({
+    ...config,
+    icons: Object.fromEntries(Object.keys(GROUPS).filter((id) => ARCHETYPE_ICONS[id]).map((id) => [`light.${id}`, ARCHETYPE_ICONS[id]])),
+  });
   // ?bridges=two: a second bridge with the balcony's lights; &split=1 puts the candle there too
   // (its living room then has lights on two bridges).
   const params = new URLSearchParams(location.search);
@@ -1342,7 +1354,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "hue_studio/config/set") {
         const { type: _type, ...change } = msg;
         config = { ...config, ...(change as Partial<StudioConfig>) };
-        setTimeout(() => configListeners.forEach((cb) => cb(config)), 80);
+        setTimeout(() => configListeners.forEach((cb) => cb(configMessage())), 80);
         return null as T;
       }
       if (msg.type !== "hue_studio/lights/set_area") throw new Error("unknown command");
@@ -1384,7 +1396,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         }
         if (msg.type === "hue_studio/config/subscribe") {
           configListeners.add(send);
-          setTimeout(() => send(config), 30);
+          setTimeout(() => send(configMessage()), 30);
           return () => {
             configListeners.delete(send);
           };

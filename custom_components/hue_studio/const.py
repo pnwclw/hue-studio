@@ -27,6 +27,9 @@ GROUP_AUTO: Final = "auto"
 GROUP_ZONE: Final = "zone"
 # Options: align the bridge's rooms with the HA areas whenever areas change.
 CONF_AUTO_ALIGN: Final = "auto_align"
+# Options: label, category and area for our scenes and automations in HA (on unless
+# False).
+CONF_ORGANIZE: Final = "organize"
 # Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths).
 CONF_FOOTER: Final = "footer"
 CONF_FOOTER_TABS: Final = "footer_tabs"

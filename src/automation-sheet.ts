@@ -15,7 +15,8 @@ import { keepTouchInside, toggle } from "./ui.ts";
 /** How long the switch shows its new position without HA confirming it (CLAUDE.md: 5 s). */
 const EXPECT_MS = 5000;
 
-const SHEET_CSS = css`
+/** The sheet itself (shared with the scene sheet). */
+export const SHEET_CSS = css`
   /* Phones: a sheet from the bottom; wide screens: a centered card. */
   :host { position: fixed; inset: 0; z-index: 8; height: auto; flex-direction: row; align-items: flex-end; justify-content: center;
           background: rgba(0, 0, 0, 0.5); animation: scrim-in 0.35s ease; transition: background-color 0.3s ease; }
@@ -28,14 +29,14 @@ const SHEET_CSS = css`
   .as-head { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: 12px; }
   .as-icon { width: 40px; height: 40px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface); }
   .as-head .grow { flex: 1; min-width: 0; }
-  .as-title { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .as-rows .item { min-height: 44px; font-size: 15px; }
+  .as-title { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .as-rows .item { min-height: 40px; font-size: 14px; }
   .as-rows .label { flex: none; color: var(--text-2); }
   .as-rows .value { flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere; }
-  .as-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-  .as-actions .pill { width: 100%; height: 44px; border-radius: 22px; font-size: 15px; letter-spacing: 0; text-transform: none; }
+  .as-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .as-actions .pill { width: 100%; }
   .as-actions .pill.primary { background: var(--accent); }
-  .as-details { display: block; margin: 12px auto 0; padding: 8px 12px; border: none; background: none; cursor: pointer; color: var(--text-2); font-size: 14px; }
+  .as-details { display: block; margin: 10px auto 0; padding: 8px 12px; border: none; background: none; cursor: pointer; color: var(--text-2); font-size: 13px; }
   @keyframes scrim-in { from { background-color: rgba(0, 0, 0, 0); } }
   @keyframes sheet-in { from { transform: translateY(100%); } }
   @keyframes pop-in { from { transform: translateY(16px) scale(0.96); opacity: 0; } }

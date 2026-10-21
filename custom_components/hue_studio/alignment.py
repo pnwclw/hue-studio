@@ -423,6 +423,57 @@ _ARCHETYPES: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
+# Hue room/zone archetypes (the icon picked in the Hue app) -> the closest MDI icon.
+ROOM_ICON = "mdi:home-outline"
+ZONE_ICON = "mdi:texture-box"
+ARCHETYPE_ICONS: dict[str, str] = {
+    "living_room": "mdi:sofa-outline",
+    "kitchen": "mdi:stove",
+    "dining": "mdi:table-chair",
+    "bedroom": "mdi:bed-outline",
+    "kids_bedroom": "mdi:teddy-bear",
+    "bathroom": "mdi:shower",
+    "nursery": "mdi:baby-carriage",
+    "recreation": "mdi:gamepad-variant-outline",
+    "office": "mdi:desk",
+    "gym": "mdi:dumbbell",
+    "hallway": "mdi:door",
+    "toilet": "mdi:toilet",
+    "front_door": "mdi:door-closed",
+    "garage": "mdi:garage",
+    "terrace": "mdi:umbrella-outline",
+    "garden": "mdi:flower-outline",
+    "driveway": "mdi:road-variant",
+    "carport": "mdi:car",
+    "home": "mdi:home-outline",
+    "downstairs": "mdi:stairs-down",
+    "upstairs": "mdi:stairs-up",
+    "top_floor": "mdi:home-floor-3",
+    "attic": "mdi:home-roof",
+    "guest_room": "mdi:bed-double-outline",
+    "staircase": "mdi:stairs",
+    "lounge": "mdi:sofa-single-outline",
+    "man_cave": "mdi:glass-mug-variant",
+    "computer": "mdi:monitor",
+    "studio": "mdi:palette-outline",
+    "music": "mdi:music-note",
+    "tv": "mdi:television",
+    "reading": "mdi:book-open-variant",
+    "closet": "mdi:hanger",
+    "storage": "mdi:archive-outline",
+    "laundry_room": "mdi:washing-machine",
+    "balcony": "mdi:balcony",
+    "porch": "mdi:coach-lamp",
+    "barbecue": "mdi:grill-outline",
+    "pool": "mdi:pool",
+}
+
+
+def archetype_icon(archetype: str | None, *, zone: bool = False) -> str:
+    """Icon of a Hue room or zone by its archetype ("other": a room's or a zone's)."""
+    return ARCHETYPE_ICONS.get(archetype or "", ZONE_ICON if zone else ROOM_ICON)
+
+
 def archetype_for(area: Area) -> str:
     """Hue room archetype for an area, guessed from its icon, then its id."""
     for text in (area.icon or "", area.id):

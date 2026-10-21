@@ -346,7 +346,26 @@ updated with the integration without breaking automations that use them.
 What Hue Studio creates ends up in HA: scenes as `scene.*` of the native `hue` (bridge
 scenes), automations as HA automations (G). Each gets markers so that Hue Studio
 recognizes it, and grouping so that HA's own lists stay tidy. Everything is
-written through HA's public registries and config APIs, never into our Store.
+written through HA's public registries and config APIs; our Store only remembers which
+of it is ours.
+
+**Done for scenes (2026-10-21):** every bridge scene (`organize.py`) gets the "Hue Studio"
+label, a scene category named after its Hue room or zone (made by us, with the icon of
+the archetype picked in the Hue app, the same icons the panel shows its rooms without
+an area icon and its zones with) and the area of its room (the panel's room mapping; none of its own when its Hue
+room's device is in that area already). Done on setup and whenever scenes, rooms, areas
+or the room mapping change. The user's choice wins: what is ours is remembered
+(`.storage/hue_studio.organize`: the scenes organized once, our categories, the areas
+we set), so a label or category the user removes stays removed and a category the user
+renames is theirs; a Hue room renamed on the bridge moves its scenes to a category of
+the new name while theirs is still ours, and our categories nobody uses go away.
+"Organize in Home Assistant" (Settings → Integration settings, on by default) turns it
+off for scenes and automations. The more-info override opens our scene sheet
+(`scene-sheet.ts`) for `scene.*` of `hue` outside `/config/...`: the picture in the
+scene's colors and its room, "Activate" (shown at once, Adaptive Lighting told), and
+while it is on dynamic play and "Shuffle colors", "Edit scene" (the panel's editor,
+which returns to the page it was opened from), "Details" (HA's dialog). Not done: names
+in the HA language with Hue-style icons (scenes keep the bridge's names).
 
 1. **Markers. Hue Studio recognizes its scenes and automations by them, not by name.**
    - Scenes: platform `hue` plus the bridge scene id (as today). The bridge stays the
@@ -396,8 +415,7 @@ Scenes come first: markers, grouping and the scene sheet work today, without wai
 for G. The automation parts land together with G.
 
 Open questions:
-- Whether HA's scene list opens more-info for non-editable (bridge) scenes, so our sheet
-  can appear there too. Check on the live HA.
+- ~~Whether HA's scene list opens our sheet~~ — no, by rule: `/config/...` stays HA's.
 - Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
   (read-only, opening in HA), or left out.
 
@@ -485,6 +503,14 @@ Light of the day):
 
 Not done on purpose: a calendar of holidays.
 
+### K. Moving between bridges: hidden (2026-10-21)
+
+Moving a bridge, a room, lights or a Sync Box to another bridge, and lost devices, are
+built (`migration.py`, `identity.py`, views `bridge-move`, `lost`) but hidden from users:
+the panel has no way in (no bridge tag on a room, no "Move everything to …", no move
+from a light's room picker, which offers only areas on the light's own bridge, no lost
+devices notice). The code and the routes stay until it is brought back.
+
 ### H. Later: Hue Secure
 
 Plans, after research:
@@ -505,7 +531,7 @@ Plans, after research:
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (scenes) -> G (with
 G2 for automations) -> I -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
-for later) and F. Next: G2 for scenes; G is done (2026-10-12).
+for later), F, G, J and G2 (scenes 2026-10-21, automations with G). Next: I.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

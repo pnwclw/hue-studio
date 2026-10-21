@@ -7,7 +7,7 @@ import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
 import type { StudioContext } from "../context.ts";
-import { friendlyName, lightIcon } from "../model.ts";
+import { friendlyName, hueGroupIcon, lightIcon } from "../model.ts";
 import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, lightsByBridge, lightsWithoutArea, severalBridges, type Zone } from "../rooms.ts";
 import type { RoomsPlan } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
@@ -218,7 +218,7 @@ export class RoomsView extends StudioView {
       groupBridge(ctx.rooms, { lights: z.lights, group: z.entity_id }),
     );
     return html`<button class="item" @click=${() => this.edit(z)}>
-      <ha-icon icon="mdi:texture-box"></ha-icon>
+      <ha-icon icon=${hueGroupIcon(ctx.hass, ctx.config, z.entity_id)}></ha-icon>
       <div class="grow">${z.name}<div class="dim small">${meta}</div></div>
       <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
     </button>`;

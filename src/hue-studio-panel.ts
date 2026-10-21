@@ -88,7 +88,7 @@ type Route =
   | { name: "home" }
   | { name: "room"; key: string }
   | { name: "color"; key: string; light: string | null; back: string | null; exit: string | null }
-  | { name: "scene"; key: string; scene: string }
+  | { name: "scene"; key: string; scene: string; exit: string | null }
   | { name: "space"; key: string }
   | { name: "sensor"; key: string; device: string }
   | { name: "gallery"; room: string | null }
@@ -131,7 +131,8 @@ function parseRoute(path: string, search: string): Route {
     // `from`: a page outside the panel (the dialog's "Hue Studio" button) that "Done" returns to.
     return { name: "color", key: parts[1], light: params.get("light"), back: back?.startsWith("/room/") ? back : null, exit: outsidePath(params.get("from")) };
   }
-  if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3]) return { name: "scene", key: parts[1], scene: parts[3] };
+  if (parts[0] === "room" && parts[1] && parts[2] === "scene" && parts[3])
+    return { name: "scene", key: parts[1], scene: parts[3], exit: outsidePath(params.get("from")) };
   if (parts[0] === "room" && parts[1] && parts[2] === "space") return { name: "space", key: parts[1] };
   if (parts[0] === "room" && parts[1] && parts[2] === "sensor" && parts[3]) return { name: "sensor", key: parts[1], device: parts[3] };
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
@@ -287,7 +288,7 @@ export class HueStudioPanel extends LitElement {
       case "sensor":
         return html`<hue-studio-sensor-view .ctx=${ctx} .rev=${rev} .key=${route.key} .device=${route.device}></hue-studio-sensor-view>`;
       case "scene":
-        return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene}></hue-studio-scene-view>`;
+        return html`<hue-studio-scene-view .ctx=${ctx} .rev=${rev} .key=${route.key} .scene=${route.scene} .exitPath=${route.exit}></hue-studio-scene-view>`;
       case "sync":
         return html`<hue-studio-sync-view .ctx=${ctx} .rev=${rev} .box=${route.box}></hue-studio-sync-view>`;
       case "automations":

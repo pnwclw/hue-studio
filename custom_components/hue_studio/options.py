@@ -19,6 +19,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 
+from .alignment import archetype_icon
 from .connections import async_studio_entry
 from .const import (
     CONF_AUTO_ALIGN,
@@ -29,6 +30,7 @@ from .const import (
     CONF_GROUPS,
     CONF_ILLUMINANCE,
     CONF_MOTION,
+    CONF_ORGANIZE,
     CONF_ROOMS,
     CONF_TEMPERATURE,
     DOMAIN,
@@ -36,7 +38,7 @@ from .const import (
     GROUP_ZONE,
     HUE_DOMAIN,
 )
-from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN
+from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_bridges
 
 ATTR_HUE_TYPE = "hue_type"
 
@@ -132,6 +134,48 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
 
 
 @callback
+def async_group_areas(hass: HomeAssistant) -> dict[str, str]:
+    """Hue group unique id -> the area it is the room of (zones are left out).
+
+    The stored mapping where there is one, else the automatic match (as the panel).
+    """
+    groups = async_hue_groups(hass)
+    known = {g.unique_id for g in groups}
+    stored = async_options(hass).get(CONF_GROUPS, {})
+    areas = {
+        uid: target
+        for uid, target in stored.items()
+        if uid in known and target not in (GROUP_AUTO, GROUP_ZONE)
+    }
+    taken = set(areas.values())
+    for uid, area in async_auto_areas(hass, groups).items():
+        if uid not in stored and area not in taken:
+            areas[uid] = area
+    return areas
+
+
+@callback
+def async_group_icons(hass: HomeAssistant) -> dict[str, str]:
+    """Hue group entity id -> the icon of its archetype (picked in the Hue app)."""
+    registry = er.async_get(hass)
+    icons: dict[str, str] = {}
+    for bridge in async_bridges(hass).values():
+        for zone, groups in ((False, bridge.groups.room), (True, bridge.groups.zone)):
+            for group in groups:
+                if group.grouped_light is None:
+                    continue
+                entity_id = registry.async_get_entity_id(
+                    LIGHT_DOMAIN, HUE_DOMAIN, group.grouped_light
+                )
+                if entity_id is not None:
+                    archetype = getattr(group.metadata, "archetype", None)
+                    icons[entity_id] = archetype_icon(
+                        getattr(archetype, "value", archetype), zone=zone
+                    )
+    return icons
+
+
+@callback
 def async_options(hass: HomeAssistant) -> dict[str, Any]:
     """The Hue Studio entry's options (empty before it is added)."""
     entry = async_studio_entry(hass)
@@ -169,10 +213,13 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
         CONF_GROUPS: groups,
         CONF_ROOMS: rooms,
         CONF_AUTO_ALIGN: options.get(CONF_AUTO_ALIGN, False),
+        CONF_ORGANIZE: options.get(CONF_ORGANIZE, True),
         CONF_FOOTER: options.get(CONF_FOOTER, False),
         CONF_FOOTER_TABS: options.get(CONF_FOOTER_TABS, []),
         CONF_GALLERY_SEASONAL: options.get(CONF_GALLERY_SEASONAL, False),
         CONF_GALLERY_RULES: options.get(CONF_GALLERY_RULES, {}),
+        # Not an option: what the bridges say, for the panel's room and zone icons.
+        "icons": async_group_icons(hass),
     }
 
 

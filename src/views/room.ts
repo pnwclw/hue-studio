@@ -8,9 +8,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt, paletteColors } from "../color.ts";
-import { groupSlider, groupToggle, lightTile, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
-import { galleryMatch, thumbUrl } from "../gallery-data.ts";
+import { groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
 import { openStockMoreInfo } from "../ha-internals.ts";
 import {
   type AdaptiveSwitch,
@@ -23,15 +21,14 @@ import {
   sensorReadings,
   splitSensors,
 } from "../model.ts";
-import { bridgeName, groupBridge, lightsByBridge, type Mismatch, mismatchesIn, severalBridges } from "../rooms.ts";
+import { bridgeName, lightsByBridge, type Mismatch, mismatchesIn } from "../rooms.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
-import type { RoomSensors, SceneInfo, SyncBoxInfo } from "../types.ts";
+import type { RoomSensors, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
 import "./add-sheet.ts";
 import { roomAutomations } from "./automations.ts";
 import { StudioView } from "./base.ts";
 
-const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 
 @customElement("hue-studio-room-view")
 export class RoomView extends StudioView {
@@ -51,7 +48,6 @@ export class RoomView extends StudioView {
     }
     const state = shownState(ctx, g);
     const surface = surfaceOf(state);
-    const room = encodeURIComponent(g.key);
     const syncing = syncingIn(ctx.boxes, g);
     const sensors = splitSensors(ctx.hass, g.sensors);
 
@@ -82,13 +78,7 @@ export class RoomView extends StudioView {
         ? html`<h2 class="label">${t("room.scenes")}</h2>
             <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>${g.scenes.map((s) => this.scene(g, s))}</div>`
         : nothing}
-      <div class="section-head">
-        <h2 class="label">${t("room.lights")}</h2>
-        ${this.bridgeTag(g)}
-        ${g.kind === "area" && g.lights.length > 1
-          ? html`<button class="pill shuffle" @click=${() => ctx.go(`/room/${room}/space`)}>${icon("rooms")}${t("space.arrange")}</button>`
-          : nothing}
-      </div>
+      <h2 class="label">${t("room.lights")}</h2>
       ${this.splitNote(g)}
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
@@ -238,8 +228,7 @@ export class RoomView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const info = ctx.sceneInfo[s.entity_id];
-    const match = galleryMatch(ctx.gallery, s.name, info?.image);
-    const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
+    const dot = sceneDot(ctx.gallery, s.name, info);
     const active = !!info && info.active !== "inactive";
     const playing = info?.active === "dynamic_palette";
     const colors = info ? sceneColors(info) : [];
@@ -287,20 +276,6 @@ export class RoomView extends StudioView {
     });
   }
 
-  /** With several bridges: the bridge the room is on; an admin moves the room from there. */
-  private bridgeTag(g: Group) {
-    const { ctx } = this;
-    const plan = ctx.rooms;
-    const name = severalBridges(plan) ? bridgeName(plan, groupBridge(plan, g)) : null;
-    if (!name) return nothing;
-    const content = html`<ha-icon icon="mdi:router-wireless"></ha-icon>${name}`;
-    if (g.kind !== "area" || !ctx.hass.user?.is_admin) return html`<span class="bridge-tag">${content}</span>`;
-    const area = g.key.slice("area.".length);
-    return html`<button class="bridge-tag" aria-label=${ctx.t("move.title")} @click=${() => ctx.go(`/settings/bridges/move?area=${encodeURIComponent(area)}`)}>
-      ${content}<ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-    </button>`;
-  }
-
   /**
    * A room whose lights are on several bridges. An area belongs to one bridge (each bridge
    * is its own Hue system: rooms, scenes and entertainment areas never span two), so the
@@ -323,12 +298,6 @@ export class RoomView extends StudioView {
           })}</p>`,
       )}
       <div class="buttons">
-        ${ctx.hass.user?.is_admin
-          ? others.map(([, lights]) => {
-              const query = `lights=${lights.map(encodeURIComponent).join(",")}&to_area=${encodeURIComponent(g.key.slice("area.".length))}&to=${encodeURIComponent(main[0])}`;
-              return html`<button class="pill" @click=${() => ctx.go(`/settings/bridges/move?${query}`)}>${t("move.to_bridge", { bridge: bridgeName(plan, main[0]) ?? "" })}</button>`;
-            })
-          : nothing}
         <button class="pill" @click=${() => ctx.go("/rooms")}>${t("rooms.title")}</button>
       </div>
     </div>`;
@@ -376,23 +345,6 @@ export function since(iso: string, lang: string, now = Date.now()): string {
   if (Math.abs(minutes) < 60) return format.format(minutes, "minute");
   const hours = Math.round(minutes / 60);
   return Math.abs(hours) < 24 ? format.format(hours, "hour") : format.format(Math.round(hours / 24), "day");
-}
-
-const FALLBACK_COLORS = ["rgb(255,231,184)", "rgb(242,166,90)"];
-
-/** Soft palette colors of a scene (or a warm fallback). */
-export function sceneColors(info: SceneInfo | undefined): string[] {
-  if (!info) return FALLBACK_COLORS;
-  if (info.palette.length) return paletteColors({ kind: "gradient", points: info.palette });
-  if (info.mirek.length) return info.mirek.flatMap((mirek) => paletteColors({ kind: "white", mirek }));
-  return FALLBACK_COLORS;
-}
-
-/** Background of a scene's round picture without a gallery match. */
-export function sceneArt(info: SceneInfo | undefined): string {
-  if (info?.palette.length) return paletteArt({ kind: "gradient", points: info.palette });
-  if (info?.mirek.length) return paletteArt({ kind: "white", mirek: info.mirek[0] });
-  return FALLBACK_DOT;
 }
 
 declare global {

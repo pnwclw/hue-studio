@@ -1,12 +1,13 @@
 // Settings → Integration settings: everything of the integration's options in the panel.
-// Rooms follow areas; which area each Hue room or zone belongs to; the sensors of each
-// room. Adding or pairing a Sync Box stays on HA's integration page (a link); bridges come
-// from the Philips Hue integration by themselves.
+// Rooms follow areas; our scenes and automations organized in HA's lists; which area each
+// Hue room or zone belongs to; the sensors of each room. Adding or pairing a Sync Box stays
+// on HA's integration page (a link); bridges come from the Philips Hue integration by
+// themselves.
 
 import { html } from "lit";
 import { customElement } from "lit/decorators.js";
 
-import { allGroups, friendlyName, type Group, isHueGroup } from "../model.ts";
+import { allGroups, friendlyName, type Group, hueGroupIcon, isHueGroup } from "../model.ts";
 import type { StringKey } from "../i18n.ts";
 import type { RoomSensors } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
@@ -27,6 +28,7 @@ export class IntegrationView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const autoAlign = !!ctx.config.auto_align;
+    const organize = ctx.config.organize !== false;
     return this.screen(
       this.subHead(t("settings.integration"), () => ctx.go("/settings")),
       html`<div class="rows">
@@ -34,6 +36,11 @@ export class IntegrationView extends StudioView {
             <ha-icon icon="mdi:sync"></ha-icon>
             <div class="grow">${t("settings.auto_align")}<div class="dim small">${t("settings.auto_align_sub")}</div></div>
             ${toggle(autoAlign, t("settings.auto_align"), () => ctx.setConfig({ auto_align: !autoAlign }))}
+          </div>
+          <div class="item">
+            <ha-icon icon="mdi:label-outline"></ha-icon>
+            <div class="grow">${t("settings.organize")}<div class="dim small">${t("settings.organize_sub")}</div></div>
+            ${toggle(organize, t("settings.organize"), () => ctx.setConfig({ organize: !organize }))}
           </div>
         </div>
         <h2 class="label">${t("integ.groups")}</h2>
@@ -78,7 +85,7 @@ export class IntegrationView extends StudioView {
           ...areas.map(([aid, a]) => ({ value: aid, label: a.name, icon: a.icon || "mdi:sofa-outline" })),
           { value: "zone", label: t("integ.own_zone"), icon: "mdi:texture-box" },
         ];
-        return navRow({ icon: isRoom ? "mdi:home-outline" : "mdi:texture-box", title: name, sub: `${t(isRoom ? "integ.hue_room" : "integ.hue_zone")} · ${label(current)}` }, () =>
+        return navRow({ icon: hueGroupIcon(ctx.hass, ctx.config, id), title: name, sub: `${t(isRoom ? "integ.hue_room" : "integ.hue_zone")} · ${label(current)}` }, () =>
           this.choose(single(name, options, current, (v) => set(id, v), t("integ.groups_hint"))),
         );
       })}

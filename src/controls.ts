@@ -6,11 +6,13 @@ import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
+import { paletteArt, paletteColors } from "./color.ts";
 import type { StudioContext } from "./context.ts";
+import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
 import { haptic } from "./ha-internals.ts";
 import { syncingIn } from "./sync.ts";
-import type { SyncBoxInfo } from "./types.ts";
+import type { Gallery, SceneInfo, SyncBoxInfo } from "./types.ts";
 import { icon, LightElement, lockedToggle, refuse, type Throttled, throttle, toggle } from "./ui.ts";
 
 /**
@@ -96,6 +98,30 @@ export function surfaceOf(state: Pick<GroupState, "on" | "colors"> & { available
     },
     style: { "--lit-bg": colorsCss(state.colors, "var(--surface)"), "--dim": dim.toFixed(3) },
   };
+}
+
+const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
+const FALLBACK_COLORS = ["rgb(255,231,184)", "rgb(242,166,90)"];
+
+/** Soft palette colors of a scene (or a warm fallback). */
+export function sceneColors(info: SceneInfo | undefined): string[] {
+  if (!info) return FALLBACK_COLORS;
+  if (info.palette.length) return paletteColors({ kind: "gradient", points: info.palette });
+  if (info.mirek.length) return info.mirek.flatMap((mirek) => paletteColors({ kind: "white", mirek }));
+  return FALLBACK_COLORS;
+}
+
+/** Background of a scene's round picture without a gallery match. */
+export function sceneArt(info: SceneInfo | undefined): string {
+  if (info?.palette.length) return paletteArt({ kind: "gradient", points: info.palette });
+  if (info?.mirek.length) return paletteArt({ kind: "white", mirek: info.mirek[0] });
+  return FALLBACK_DOT;
+}
+
+/** A scene's round picture: its gallery picture (bridge scenes usually come from the gallery), else its palette. */
+export function sceneDot(gallery: Gallery | null, name: string, info: SceneInfo | undefined): string {
+  const match = galleryMatch(gallery, name, info?.image);
+  return match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
 }
 
 /** Temperature and motion of a group, or nothing. */

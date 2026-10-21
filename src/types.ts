@@ -400,6 +400,10 @@ export interface StudioConfig {
   rooms: Record<string, Partial<RoomSensors>>;
   /** Hue rooms follow area changes automatically (an option of the integration). */
   auto_align?: boolean;
+  /** Label, category and area for Hue scenes and our automations in HA (on unless false). */
+  organize?: boolean;
+  /** Not an option: Hue group entity id -> the icon of its archetype (picked in the Hue app). */
+  icons?: Record<string, string>;
   /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */
   footer?: boolean;
   footer_tabs?: string[];

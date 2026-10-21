@@ -33,6 +33,7 @@ from .const import (
     CONF_FOOTER_TABS,
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
+    CONF_ORGANIZE,
     FOOTER_MAX_TABS,
     GALLERY_SEASONS,
     SIGNAL_BRIDGES_UPDATED,
@@ -180,23 +181,37 @@ def ws_subscribe_config(
     connection: websocket_api.ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Send the room mapping and room sensors now and whenever options change.
+    """Send the room mapping and room sensors now and whenever options change, and
+    the rooms' and zones' icons whenever the bridges change them.
 
     Event payload:
         {"groups": {group entity_id: "zone" | area_id},
          "rooms": {"area.<id>" | "hue.<group entity_id>":
-                   {"motion": [entity_id], "temperature": [entity_id]}}}
+                   {"motion": [entity_id], "temperature": [entity_id]}},
+         "icons": {group entity_id: icon}, …}
     """
+    sent: dict[str, Any] = {}
 
     @callback
     def send() -> None:
-        connection.send_message(
-            websocket_api.event_message(msg["id"], async_frontend_config(hass))
-        )
+        payload = async_frontend_config(hass)
+        if payload == sent:
+            return
+        sent.clear()
+        sent.update(payload)
+        connection.send_message(websocket_api.event_message(msg["id"], payload))
 
-    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
-        hass, SIGNAL_CONFIG_UPDATED, send
-    )
+    unsubs = [
+        async_dispatcher_connect(hass, SIGNAL_CONFIG_UPDATED, send),
+        async_track_rooms(hass, send),
+    ]
+
+    @callback
+    def unsubscribe() -> None:
+        for unsub in unsubs:
+            unsub()
+
+    connection.subscriptions[msg["id"]] = unsubscribe
     connection.send_result(msg["id"])
     send()
 
@@ -430,6 +445,7 @@ MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
     {
         vol.Required("type"): "hue_studio/config/set",
         vol.Optional(CONF_AUTO_ALIGN): bool,
+        vol.Optional(CONF_ORGANIZE): bool,
         vol.Optional(CONF_FOOTER): bool,
         vol.Optional(CONF_FOOTER_TABS): vol.All(
             [cv.string], vol.Length(max=FOOTER_MAX_TABS)
@@ -463,6 +479,7 @@ def ws_set_config(
         if k
         in (
             CONF_AUTO_ALIGN,
+            CONF_ORGANIZE,
             CONF_FOOTER,
             CONF_FOOTER_TABS,
             CONF_GALLERY_SEASONAL,

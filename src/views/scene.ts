@@ -9,17 +9,15 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt } from "../color.ts";
 import type { SceneDraft } from "../context.ts";
-import { groupSlider, lightTile, surfaceOf } from "../controls.ts";
+import { groupSlider, lightTile, sceneColors, sceneDot, surfaceOf } from "../controls.ts";
 import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts";
-import { galleryMatch, thumbUrl } from "../gallery-data.ts";
+import { leavePanel } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup, friendlyName, type Group, groupState } from "../model.ts";
 import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { sceneArt, sceneColors } from "./room.ts";
 
 const RESET_CONFIRM_MS = 3500;
 
@@ -29,6 +27,8 @@ export class SceneView extends StudioView {
   @property() accessor key = "";
   /** Scene entity id. */
   @property() accessor scene = "";
+  /** A page outside the panel (the scene sheet's "Edit scene") that closing returns to. */
+  @property() accessor exitPath: string | null = null;
 
   @state() private accessor editingName = false;
   @state() private accessor confirmReset = false;
@@ -80,7 +80,7 @@ export class SceneView extends StudioView {
     const roomPath = `/room/${encodeURIComponent(this.key)}`;
     const close = () => {
       ctx.sceneDraft = null;
-      ctx.go(roomPath);
+      this.leave();
     };
     if (!room || !ctx.hass.states[this.scene]) {
       return this.screen(this.subHead("", close), html`<p class="empty">${t("scene.not_found")}</p>`);
@@ -93,10 +93,9 @@ export class SceneView extends StudioView {
       ? { ...room, key: `scene:${this.scene}`, lights, target: sameSet(lights, room.lights) ? room.target : lights }
       : room;
     const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const match = galleryMatch(ctx.gallery, this.name, info?.image);
-    const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
+    const dot = sceneDot(ctx.gallery, this.name, info);
     const surface = surfaceOf({ on: true, colors: sceneColors(info) });
-    const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}`;
+    const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}${this.exitPath ? `?from=${encodeURIComponent(this.exitPath)}` : ""}`;
     const syncing = syncingIn(ctx.boxes, group);
     const name = draft.name ?? this.name;
     const speed = draft.speed ?? speedToStep(info?.speed ?? 0.5);
@@ -225,7 +224,7 @@ export class SceneView extends StudioView {
     if (await ctx.call("hue_studio", "delete_scene", { entity_id: this.scene }, { optimistic: false })) {
       ctx.sceneDraft = null;
       ctx.toast(ctx.t("scene.deleted", { name }));
-      ctx.go(`/room/${encodeURIComponent(this.key)}`);
+      this.leave();
     }
   }
 
@@ -241,8 +240,14 @@ export class SceneView extends StudioView {
     if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) {
       ctx.sceneDraft = null;
       ctx.toast(ctx.t("scene.saved"));
-      ctx.go(`/room/${encodeURIComponent(this.key)}`);
+      this.leave();
     }
+  }
+
+  /** Back to the room, or to the page outside the panel the editor was opened from. */
+  private leave(): void {
+    if (this.exitPath) leavePanel(this.exitPath);
+    else this.ctx.go(`/room/${encodeURIComponent(this.key)}`);
   }
 }
 

@@ -14,8 +14,8 @@ import { styleMap } from "lit/directives/style-map.js";
 import { cardLines, fromConfig, isType, TYPE_ICONS } from "./automations.ts";
 import { paletteArt } from "./color.ts";
 import { PANEL_PATH, StudioContext } from "./context.ts";
-import { automationCard, groupSlider, groupToggle, shownState, surfaceOf } from "./controls.ts";
-import { galleryMatch, thumbUrl } from "./gallery-data.ts";
+import { automationCard, groupSlider, groupToggle, sceneDot, shownState, surfaceOf } from "./controls.ts";
+import { thumbUrl } from "./gallery-data.ts";
 import { currentHass, navigate } from "./ha-internals.ts";
 import { localize, type StringKey } from "./i18n.ts";
 import { findGroup, friendlyName, type Group, type Scene } from "./model.ts";
@@ -23,7 +23,7 @@ import { gallerySeasons, shownCategories } from "./seasons.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
 import { icon, toggle } from "./ui.ts";
-import { sceneArt, since } from "./views/room.ts";
+import { since } from "./views/room.ts";
 
 // ---------- one context for every card of the page ----------
 
@@ -247,8 +247,7 @@ class HueStudioRoomCard extends StudioCard {
   private sceneDot(g: Group, s: Scene) {
     const ctx = this.ctx!;
     const info = ctx.sceneInfo[s.entity_id];
-    const match = galleryMatch(ctx.gallery, s.name, info?.image);
-    const dot = match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
+    const dot = sceneDot(ctx.gallery, s.name, info);
     const active = !!info && info.active !== "inactive";
     const apply = async () => {
       if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);

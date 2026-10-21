@@ -1,6 +1,6 @@
 // Loaded on every HA page (frontend.add_extra_js_url). Opens a Hue-style dialog instead of
-// HA's more-info for Hue lights and Hue rooms/zones, and a Hue-style sheet for automations
-// made with Hue Studio (automation-sheet.ts).
+// HA's more-info for Hue lights and Hue rooms/zones, and Hue-style sheets for Hue scenes
+// (scene-sheet.ts) and automations made with Hue Studio (automation-sheet.ts).
 //
 // Fallback rules (CLAUDE.md): the event is only stopped after our dialog was built and
 // rendered successfully; anything that is not ours, any error, and the "Details" button go
@@ -10,6 +10,7 @@ import { css, html, LitElement, nothing, unsafeCSS } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 
 import { type HueStudioAutomationSheet, opensAutomationSheet, watchOurAutomations } from "./automation-sheet.ts";
+import { type HueStudioSceneSheet, opensSceneSheet } from "./scene-sheet.ts";
 import { loadSyncMemo, PANEL_PATH, StudioContext } from "./context.ts";
 import { currentHass, navigate, openPanelFrom, watchHass } from "./ha-internals.ts";
 import { allGroups, buildHome, friendlyName, type Group, groupOfEntity, type Home } from "./model.ts";
@@ -231,6 +232,10 @@ function onMoreInfo(ev: Event): void {
     openAutomation(ev, hass, id);
     return;
   }
+  if (id.startsWith("scene.")) {
+    openScene(ev, hass, id);
+    return;
+  }
   if (!isHueLight(hass, id)) return;
   // A light (or a Hue room/zone with a light) a Sync Box drives now, known from an earlier
   // visit: straight to its room, which shows the sync and its lights as busy.
@@ -267,6 +272,22 @@ function openAutomation(ev: Event, hass: Hass, id: string): void {
   try {
     if (!opensAutomationSheet(hass, id)) return;
     sheet = document.createElement("hue-studio-automation-sheet") as HueStudioAutomationSheet;
+    document.body.append(sheet);
+    sheet.open(id);
+  } catch (err) {
+    console.error("hue_studio: falling back to the stock more-info dialog", err);
+    sheet?.remove();
+    return;
+  }
+  ev.stopImmediatePropagation();
+}
+
+/** A Hue scene: our sheet; anything else, or an error: HA's dialog. */
+function openScene(ev: Event, hass: Hass, id: string): void {
+  let sheet: HueStudioSceneSheet | undefined;
+  try {
+    if (!opensSceneSheet(hass, id)) return;
+    sheet = document.createElement("hue-studio-scene-sheet") as HueStudioSceneSheet;
     document.body.append(sheet);
     sheet.open(id);
   } catch (err) {

@@ -63,7 +63,6 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
-    label_registry as lr,
 )
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_track_time_interval
@@ -75,6 +74,7 @@ from . import daylight, pool
 from .const import DOMAIN, SIGNAL_CONFIG_UPDATED
 from .gallery import async_gallery_scenes
 from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
+from .organize import async_enabled as async_organize_enabled, async_label
 from .rooms import light_area
 from .services import BRIGHTNESS, TRANSITION, async_target_lights
 
@@ -92,8 +92,6 @@ TYPES = (
     "motion",
 )
 ID_PREFIX = f"{DOMAIN}_"
-LABEL_NAME = "Hue Studio"
-LABEL_ICON = "mdi:lightbulb-group"
 CATEGORY_NAME = "Hue Studio"
 CATEGORY_ICON = "mdi:lightbulb-group"
 
@@ -582,12 +580,9 @@ def async_organize(
     """Label, category and area for one of our automations; the user's values stay."""
     entities = er.async_get(hass)
     entry = entities.async_get(entity_id)
-    if entry is None:
+    if entry is None or not async_organize_enabled(hass):
         return
-    labels = lr.async_get(hass)
-    label = labels.async_get_label_by_name(LABEL_NAME) or labels.async_create(
-        LABEL_NAME, icon=LABEL_ICON
-    )
+    label = async_label(hass)
     categories = cr.async_get(hass)
     category = next(
         (

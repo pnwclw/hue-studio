@@ -31,6 +31,7 @@ from aiohue.v2.models.feature import (
 )
 from aiohue.v2.models.light import LightMetaData
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
+from aiohue.v2.models.room import RoomArchetype
 from aiohue.v2.models.scene import (
     Action,
     ActionAction,
@@ -213,6 +214,21 @@ SCENES = {
 }
 
 
+# resource id -> the scenes' Hue room (its grouped light `grp-room`).
+ROOMS = {
+    "res-room": SimpleNamespace(
+        id="res-room",
+        grouped_light="grp-room",
+        metadata=SimpleNamespace(
+            name="Living room", archetype=RoomArchetype.LIVING_ROOM
+        ),
+        services=[
+            ResourceIdentifier(rid="grp-room", rtype=ResourceTypes.GROUPED_LIGHT)
+        ],
+    ),
+}
+
+
 def make_entertainment(
     resource_id: str, name: str, lights: list[str], *, active: bool = False
 ) -> SimpleNamespace:
@@ -271,6 +287,9 @@ def mock_bridge() -> Generator[MagicMock]:
         bridge.scenes.scene.update = AsyncMock()
         bridge.scenes.scene.recall = AsyncMock()
         bridge.scenes.scene.subscribe.return_value = MagicMock()
+        bridge.groups = MagicMock()
+        bridge.groups.room.get.side_effect = ROOMS.get
+        bridge.groups.zone.get.return_value = None
         bridge.config = MagicMock()
         configs = bridge.config.entertainment_configuration
         configs.__iter__.side_effect = lambda: iter(ENTERTAINMENT)

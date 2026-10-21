@@ -122,11 +122,6 @@ export class DevicesView extends StudioView {
               <span class="dot-badge live" aria-hidden="true"></span><span class="grow">${t("devices.searching")}</span><ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
             </button>`
           : nothing}
-        ${this.lost.length && !only
-          ? html`<button class="notice warn" @click=${() => ctx.go("/settings/devices/lost")}>
-              <ha-icon icon="mdi:lightbulb-question-outline"></ha-icon><span class="grow">${t("lost.notice", { count: this.lost.length })}</span><ha-icon class="go" icon="mdi:chevron-right"></ha-icon>
-            </button>`
-          : nothing}
         ${fresh.length
           ? html`<h2 class="label">${t("devices.new")}</h2>
               <div class="rows device-list">${fresh.map((d) => this.deviceRow(d, d.product))}</div>`

@@ -45,10 +45,12 @@ async def test_config_pushed_to_panel(
         "groups": {},
         "rooms": {},
         "auto_align": False,
+        "organize": True,
         "footer": False,
         "footer_tabs": [],
         "gallery_seasonal": False,
         "gallery_rules": {},
+        "icons": {},
     }
 
     client = await hass_ws_client(hass)

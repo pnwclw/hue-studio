@@ -599,9 +599,8 @@ export const CSS = `
   .sync-hero .center { margin-top: 18px; }
   .sync-hero .area-line { margin-top: 10px; text-align: center; }
   .sync-hero.off .tv { opacity: 0.5; }
-  .pill.go { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 210px; height: 44px; border-radius: 22px;
-             font-size: 15px; letter-spacing: 0; text-transform: none; background: #fff; color: #1c1c1e; }
-  .pill.go svg { width: 20px; height: 20px; }
+  .pill.go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 180px; background: #fff; color: #1c1c1e; }
+  .pill.go svg { width: 18px; height: 18px; }
   .pill.go.stop { background: rgba(0, 0, 0, 0.35); color: #fff; }
   .sync-body { transition: opacity 0.3s; }
   .rows.bright-row { margin-top: 22px; }
@@ -650,12 +649,12 @@ export const CSS = `
   .settings-page .sensor-hero { padding-bottom: 14px; }
   /* "Add devices": what is added, the steps to get it ready, the search. */
   .kind-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px; }
-  .kind-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 120px; padding: 16px; border: none;
+  .kind-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 100px; padding: 14px; border: none;
                border-radius: var(--radius); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
                transition: transform 0.15s var(--ease); }
   .kind-tile:active { transform: scale(0.97); }
-  .kind-tile ha-icon { --mdc-icon-size: 34px; margin-bottom: 8px; color: var(--text); }
-  .kind-tile .name { font-size: 17px; font-weight: 600; }
+  .kind-tile ha-icon { --mdc-icon-size: 28px; margin-bottom: 6px; color: var(--text); }
+  .kind-tile .name { font-size: 15px; font-weight: 600; }
   @container (max-width: 560px) {
     .kind-tiles { grid-template-columns: 1fr; }
     .kind-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; min-height: 0; align-items: center; }
@@ -670,7 +669,7 @@ export const CSS = `
                           display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: 14px; font-weight: 600; }
   .add-steps.tips li::before { content: "•"; background: none; font-size: 20px; }
   .add-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 6px; }
-  .add-actions .pill:not(.go) { height: 44px; min-width: 180px; border-radius: 22px; font-size: 15px; text-transform: none; letter-spacing: 0; }
+  .add-actions .pill:not(.go) { min-width: 180px; }
   .search-ring { position: relative; width: 180px; height: 180px; margin: 22px auto 10px; }
   .search-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .search-ring circle { fill: none; stroke-width: 6; }
@@ -776,16 +775,16 @@ export const CSS = `
   .rows .item .row-open .dim.small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* A sensor's settings, like the Hue app's: picture and big name, then full-width rows on phones. */
   .sensor-edit { padding-bottom: calc(28px + var(--safe-bottom)); }
-  .sensor-hero { padding: 18px 2px 6px; }
-  .sensor-hero .pic { display: block; --mdc-icon-size: 60px; }
-  .sensor-hero .name-row { margin: 14px 0 12px; }
-  .sensor-hero h1.big { white-space: normal; overflow-wrap: anywhere; font-size: 34px; }
-  .sensor-hero .name-input { font-size: 24px; }
+  .sensor-hero { padding: 14px 2px 4px; }
+  .sensor-hero .pic { display: block; --mdc-icon-size: 44px; }
+  .sensor-hero .name-row { margin: 10px 0 10px; }
+  .sensor-hero h1.big { white-space: normal; overflow-wrap: anywhere; font-size: 28px; }
+  .sensor-hero .name-input { font-size: 22px; }
   .sensor-edit .rows { margin-top: 16px; }
   .sensor-edit h2.label + .rows { margin-top: 0; }
-  .sensor-edit .rows .item { min-height: 64px; gap: 16px; font-size: 17px; }
-  .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 28px; color: var(--text); }
-  .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 15px; }
+  .sensor-edit .rows .item { min-height: 52px; gap: 14px; font-size: 15px; }
+  .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 24px; color: var(--text); }
+  .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
   .sensor-edit h2.label { margin-top: 28px; }
   .round.plus-blue { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--accent); color: #fff; }
@@ -801,9 +800,9 @@ export const CSS = `
   .qr-sheet .hint.ok { color: #6fd38a; }
   .qr-sheet .center { padding: 0 16px 16px; }
   .sensor-sheet .tick { display: flex; color: var(--accent); }
-  .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: 34px; font-weight: 700; }
-  .sensor-sheet .sheet-bar { padding: 14px 16px; font-size: 18px; }
-  .sensor-sheet .sheet-bar .pill.save { height: 40px; padding: 0 18px; border-radius: 20px; font-size: 15px; text-transform: uppercase; }
+  .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: 28px; font-weight: 700; }
+  .sensor-sheet .sheet-bar { padding: 12px 16px; font-size: 16px; }
+  .sensor-sheet .sheet-bar .pill.save { padding: 0 16px; }
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
   .sheet.bottom .box { width: 100%; max-width: none; border-radius: 18px 18px 0 0; animation: rise 0.3s var(--ease); }
@@ -849,14 +848,14 @@ export const CSS = `
   .devices-page .notice .go { --mdc-icon-size: 20px; }
   .devices-page .rows.kinds { margin-top: 16px; }
   .devices-page h2.label + .rows { margin-top: 0; }
-  .rows.device-list .item { min-height: 72px; gap: 18px; font-size: 18px; }
+  .rows.device-list .item { min-height: 56px; gap: 14px; font-size: 15px; }
   .rows.device-list .item + .item { position: relative; border-top: none; }
-  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 70px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
-  .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 36px; --mdc-icon-size: 34px; color: var(--text); }
+  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 60px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 30px; --mdc-icon-size: 28px; color: var(--text); }
   .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rows.device-list .item .small { margin-top: 2px; font-size: 15px; }
+  .rows.device-list .item .small { margin-top: 2px; font-size: 13px; }
   .rows.device-list .item .small.warn { font-weight: 500; }
-  .rows.device-list .item .value { font-size: 17px; color: var(--text-2); }
+  .rows.device-list .item .value { font-size: 14px; color: var(--text-2); }
   .rows.device-list .item .dot-badge.warn { background: #ffb340; }
   .devices-page .device-search { display: flex; height: 38px; margin-top: 12px; padding: 0 14px; border-radius: 19px; }
   :is(.devices-page, .daylight-page) .section-head { margin: 22px 2px 8px; }
@@ -873,7 +872,7 @@ export const CSS = `
     .rows.device-list { margin-left: -16px; margin-right: -16px; border-radius: 0; }
   }
   /* A device's settings ("Light settings"): the sensor page's layout, a note, "Delete". */
-  .sensor-hero > .small.warn { margin-top: -4px; font-size: 15px; font-weight: 500; }
+  .sensor-hero > .small.warn { margin-top: -4px; font-size: 13px; font-weight: 500; }
   .device-edit .rows .item .value { max-width: 50%; text-align: right; }
   .info-box { margin: 22px 0 0; padding: 14px 16px; border: 1.5px solid rgba(10, 98, 255, 0.6); border-radius: 12px; background: rgba(10, 98, 255, 0.1); }
   .info-box .info-head { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; letter-spacing: 1.6px;
@@ -883,8 +882,8 @@ export const CSS = `
   .info-box.warn { border-color: rgba(255, 179, 64, 0.6); background: rgba(255, 179, 64, 0.1); }
   .info-box.warn .info-head { color: #ffb340; }
   .delete-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 36px; }
-  .delete-btn { min-width: 180px; height: 48px; padding: 0 28px; border: 2px solid #e5484d; border-radius: 24px; cursor: pointer;
-                background: rgba(229, 72, 77, 0.14); color: var(--text); font: inherit; font-size: 17px; font-weight: 500;
+  .delete-btn { min-width: 180px; height: 34px; padding: 0 16px; border: 1.5px solid #e5484d; border-radius: 17px; cursor: pointer;
+                background: rgba(229, 72, 77, 0.14); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase;
                 transition: transform 0.15s var(--ease), background 0.2s; }
   .delete-btn:active { transform: scale(0.96); }
   .delete-btn.confirm { border-color: #c0392b; background: #c0392b; }
@@ -902,7 +901,7 @@ export const CSS = `
   .ma-page .ma-art { --mdc-icon-size: 64px; color: var(--accent); }
   .ma-page .ma-art.ok { color: #3ddc84; }
   .ma-page .add-actions.stack { flex-direction: column; align-items: center; }
-  .ma-page .add-actions.stack .pill { min-width: 240px; }
+  .ma-page .add-actions.stack .pill { min-width: 200px; }
   .ma-health { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 13px; color: var(--text-2); }
   .ma-health.ready { color: #3ddc84; }
   .ma-health.problem { color: #ffb340; }
@@ -911,30 +910,30 @@ export const CSS = `
   /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
   .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .auto-list + .rows { margin-top: 10px; }
-  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 0 18px 0 0; box-sizing: border-box;
+  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 0 16px 0 0; box-sizing: border-box;
                border-radius: 16px; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
-  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 18px; padding: 14px 0 14px 18px;
+  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 12px 0 12px 16px;
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 32px; color: var(--text); }
+  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 26px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 500; line-height: 1.25; }
-  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.3; color: var(--text-2); }
+  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; line-height: 1.25; }
+  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
   /* light of the day (natural light, scene of the day) */
-  .rows .item .thumb { width: 40px; height: 40px; flex: none; border-radius: 50%; object-fit: cover; }
+  .rows .item .thumb { width: 32px; height: 32px; flex: none; border-radius: 50%; object-fit: cover; }
   .rows .item.wrap { flex-wrap: wrap; }
   .rows .item.wrap .grow { min-width: 140px; }
   .rows .item .plain { padding: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .lead.pad { padding: 0 16px 16px; }
   .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
-  .swatch-dot { width: 26px; height: 26px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  .swatch-dot { width: 24px; height: 24px; flex: none; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
   .today span.pic { display: block; }
   .seg button:disabled { opacity: 0.4; }
   .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--radius);
            background: var(--surface); }
-  .today .pic { width: 64px; height: 64px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+  .today .pic { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
   .today .text { flex: 1; min-width: 160px; }
-  .today .name { font-size: 18px; font-weight: 600; margin: 2px 0; }
+  .today .name { font-size: 16px; font-weight: 600; margin: 2px 0; }
   .today-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .today-actions .pill { text-transform: none; letter-spacing: 0; font-size: 13px; }
   .empty-today { color: var(--text-2); font-size: 14px; }
@@ -953,7 +952,7 @@ export const CSS = `
              background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
   .sheet .box.tag-editor { width: min(100%, 560px); }
   .tag-editor .sheet-bar { gap: 12px; }
-  .tag-editor .tag-pic { width: 44px; height: 44px; flex: none; border-radius: 50%; object-fit: cover; }
+  .tag-editor .tag-pic { width: 36px; height: 36px; flex: none; border-radius: 50%; object-fit: cover; }
   .tag-editor h3.sublabel { margin: 14px 2px 8px; font-size: 13px; font-weight: 500; color: var(--text-2); }
   .tag-editor h3.sublabel:first-child { margin-top: 4px; }
   .tag-editor .chips { padding: 0; }
@@ -1015,7 +1014,7 @@ export const CSS = `
   .bridge-add .item.col .dim.small { margin-top: 8px; }
   .link-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 28px auto 0; text-align: center; }
   .link-state .lead { margin: 6px 0 0; }
-  .link-title { margin: 18px 0 0; font-size: 20px; font-weight: 600; line-height: 1.25; }
+  .link-title { margin: 18px 0 0; font-size: 18px; font-weight: 600; line-height: 1.25; }
   .link-art { width: 132px; height: 132px; }
   .bridge-art { width: 100%; height: 100%; }
   .bridge-art .body { fill: #e9e9ee; }
@@ -1032,9 +1031,8 @@ export const CSS = `
   .link-icon.fail { background: rgba(255, 107, 94, 0.18); color: #ff6b5e; }
   .link-icon.fail ha-icon { --mdc-icon-size: 34px; }
   .link-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; }
-  .link-actions .pill { min-width: 200px; }
-  .link-actions .pill:not(.go) { height: 40px; border-radius: 20px; text-transform: none; letter-spacing: 0; font-size: 15px; }
-
+  .link-actions .pill { min-width: 180px; }
+  
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 179, 64, 0.14); }
   .mismatch p { margin: 0; font-size: 14px; line-height: 1.4; }
   .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
@@ -1050,21 +1048,21 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  .settings-page .rows:not(.device-list) .item { min-height: 64px; gap: 16px; font-size: 17px; }
-  .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 28px; color: var(--text); }
-  .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item { min-height: 52px; gap: 14px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 24px; color: var(--text); }
+  .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .settings-page .rows:not(.device-list) .item + .item { position: relative; border-top: none; }
   .settings-page .rows:not(.device-list) .item + .item::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
-  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 60px; }
+  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 54px; }
   .settings-page h2.label { margin-top: 28px; }
   .settings-page .section-head h2.label { margin: 0 2px; }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
-  .settings-page .lead { font-size: 15px; }
-  .settings-page .hint { margin: 10px 2px 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }
+  .settings-page .lead { font-size: 14px; }
+  .settings-page .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
-  .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 22px; color: var(--text-2); }
-  .rows .item .row-art { flex: none; width: 28px; height: 28px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
+  .rows .item .row-art { flex: none; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
   .rows .item.time-row { cursor: pointer; }
   .rows .item .time-value { flex: none; padding: 0; border: none; background: none; color: var(--text-2); font: inherit; font-size: inherit;
                             font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
@@ -1074,8 +1072,8 @@ export const CSS = `
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
   .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
-  .choice-sheet .rows .item { min-height: 56px; font-size: 17px; }
-  .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 26px; }
+  .choice-sheet .rows .item { min-height: 48px; font-size: 15px; }
+  .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 22px; }
   .choice-sheet .rows + h2.label { margin-top: 20px; }
   .choice-page .rows.choice-list { margin-top: 12px; }
   .choice-page h2.label + .hint + .rows, .choice-page h2.label + .rows { margin-top: 0; }
@@ -1084,7 +1082,7 @@ export const CSS = `
   .rows .item.date-row input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
   .rule-page .lead { margin-top: 14px; }
   /* A screen's own header picture and name (an automation): the sensor page's hero. */
-  .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 15px; color: var(--text-2); }
+  .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 13px; color: var(--text-2); }
   /* Days of the week: round toggles in a row of their own. */
   .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
   .days-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; max-width: 380px; }
@@ -1094,8 +1092,7 @@ export const CSS = `
   .days-row button:active { transform: scale(0.92); }
   /* Under a screen's rows: its main button, then "Open in Home Assistant" and "Delete". */
   .settings-page .save-area { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 30px; }
-  .settings-page .save-area .pill.apply { min-width: 220px; height: 44px; border-radius: 22px; background: var(--accent); color: #fff; font-size: 15px;
-                                          letter-spacing: 0.4px; text-transform: uppercase; }
+  .settings-page .save-area .pill.apply { min-width: 180px; background: var(--accent); color: #fff; }
   .settings-page .save-area .lead { margin: 4px 0 0; text-align: center; }
   @container (max-width: 599px) {
     .settings-page .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }

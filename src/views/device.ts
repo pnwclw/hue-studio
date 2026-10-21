@@ -11,7 +11,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { allDevices, deviceIcon, type FoundDevice, groupOf, LIGHT_FUNCTIONS, POWER_ON } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { bridgeName, groupBridge, severalBridges } from "../rooms.ts";
+import { groupBridge } from "../rooms.ts";
 import type { DevicesMessage, LightFunction, PowerOn } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -136,7 +136,6 @@ export class DeviceView extends StudioView {
           <span class="value">${area ? ctx.hass.areas?.[area]?.name || area : t("sensor.no_room")}</span>
         </button>
       </div>
-      ${this.moveNote(d, area)}
 
       ${light
         ? html`<h2 class="label">${t("sensor.general")}</h2>
@@ -199,25 +198,6 @@ export class DeviceView extends StudioView {
     this.sheet = sheet;
   }
 
-  /** With several bridges, under a room for a light: the bridge it is on. */
-  private areaSub(d: FoundDevice, area: string): string {
-    if (d.kind !== "light" || !severalBridges(this.ctx.rooms)) return "";
-    return bridgeName(this.ctx.rooms, this.areaBridge(area)) ?? "";
-  }
-
-  /** The room picked is on another bridge: the light moves there. */
-  private moveNote(d: FoundDevice, area: string | null): TemplateResult | typeof nothing {
-    const { ctx } = this;
-    const bridge = this.crossBridge(d, area);
-    if (!bridge || !area) return nothing;
-    const name = bridgeName(ctx.rooms, bridge) ?? "";
-    const query = `lights=${d.lights.map(encodeURIComponent).join(",")}&to_area=${encodeURIComponent(area)}&to=${encodeURIComponent(bridge)}`;
-    return html`<div class="mismatch">
-      <p>${ctx.t("move.light_note", { room: ctx.hass.areas?.[area]?.name || area, bridge: name })}</p>
-      <div class="buttons"><button class="pill" @click=${() => ctx.go(`/settings/bridges/move?${query}`)}>${ctx.t("move.to_bridge", { bridge: name })}</button></div>
-    </div>`;
-  }
-
   private renderSheet(sheet: Sheet, d: FoundDevice, area: string | null, fn: LightFunction | null, power: PowerOn | null): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
@@ -237,7 +217,10 @@ export class DeviceView extends StudioView {
       title = t("sensor.room");
       const areas = Object.entries(ctx.hass.areas || {}).sort(([, a], [, b]) => a.name.localeCompare(b.name));
       content = html`${d.kind === "light" ? html`<p class="hint">${t("devices.room_hint")}</p>` : nothing}
-        <div class="rows" role="radiogroup">${areas.map(([id, a]) => pick(id === area, a.name, this.areaSub(d, id), () => (this.area = id)))}</div>`;
+        <div class="rows" role="radiogroup">${areas
+          // A light stays on its bridge: an area whose Hue room is on another one is not offered.
+          .filter(([id]) => id === area || !this.crossBridge(d, id))
+          .map(([id, a]) => pick(id === area, a.name, "", () => (this.area = id)))}</div>`;
     } else if (sheet === "function") {
       title = t("devices.function");
       content = html`<p class="hint">${t("devices.function_hint")}</p>

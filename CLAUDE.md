@@ -86,8 +86,8 @@ touching anything outside this repository.
        only what HA can't do goes through ours (`hue_studio.set_gradient`,
        `hue_studio.apply_palette`) and `hue_studio/lights/subscribe` (gamut, gradients);
    - **more-info override**: listen to `hass-more-info` before HA does; if the entity is a
-     Hue light (`hass.entities[id].platform === "hue"`), open our own sheet, otherwise let
-     the event through untouched;
+     Hue light or scene (`hass.entities[id].platform === "hue"`) or one of our automations,
+     open our own sheet, otherwise let the event through untouched;
    - **cards** for regular dashboards.
 4. **Hue Play HDMI Sync Box**, two kinds of config entries, keyed by the box id so one box
    is only ever set up one way:
@@ -242,7 +242,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 code, switched off and on while the new one searches, setup button), by Zigbee MAC;
                                 settings and HA entities restored per device; rooms, scenes/zones/entertainment areas after;
                                 a journal of every step; devices let go and not found kept as lost (found again later);
-                                one move at a time, in the background
+                                one move at a time, in the background. Hidden from users for now (no entry points in
+                                the panel: room/light/bridge/Sync Box moves, lost devices); code and routes stay
   identity.py                   every Hue device remembered by Zigbee MAC (its entities' ids and settings, HA device area,
                                 name, labels; bridge name, archetype, light settings), rooms/zones/scenes by name; a device
                                 or room that comes back as new resources (any way: a move, "Add devices", the Hue app,
@@ -271,6 +272,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   options.py                    the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
                                 unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
+  organize.py                   bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
+                                icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
+                                the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option
   panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
   gallery.py                    backend access to the bundled gallery
   frontend/                     build output (git-ignored) + gallery/
@@ -280,6 +284,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   hue-studio-extra.ts           extra JS on every HA page: loads more-info, cards and footer, each on its own
   hue-studio-more-info.ts       more-info override + Hue-style dialog
   automation-sheet.ts           the override's sheet for automations made with Hue Studio
+  scene-sheet.ts                the override's sheet for Hue scenes (activate, play, shuffle, edit in the panel)
   cards.ts                      dashboard cards (room, automations, gallery) sharing one StudioContext
   footer.ts, footer-model.ts    experimental Liquid Glass footer (element; pure: tabs, active tab, visibility)
   context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls

@@ -57,6 +57,7 @@ from .const import (
 from .identity import async_setup_identities
 from .migration import async_setup_moves
 from .motion_areas import async_stop_watching as async_stop_motion_areas
+from .organize import async_track_organize
 from .panel import async_register_panel, async_unregister_panel
 from .pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
 from .positions import async_setup_positions
@@ -187,6 +188,7 @@ async def _async_setup_studio(hass: HomeAssistant, entry: HueStudioConfigEntry) 
     await connections.async_start()
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     entry.async_on_unload(_async_track_auto_align(hass, entry))
+    entry.async_on_unload(await async_track_organize(hass))
     await async_register_panel(hass)
     await hass.config_entries.async_forward_entry_setups(entry, STUDIO_PLATFORMS)
     return True

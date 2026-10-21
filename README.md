@@ -23,8 +23,10 @@ its device in the Philips Hue integration), with a link into the panel.
 > (candle, fireplace, sparkle, … with color, brightness and speed), a scene editor (save,
 > dynamic speed, auto-play, reset, dynamic playback), the scene gallery with
 > "set once", Hue rooms that follow your HA areas (a "Rooms and zones" screen with
-> a zone editor), and the Hue Play HDMI Sync Box (a Sync tab, its own entities and
-> service). See the roadmap below.
+> a zone editor), Hue scenes kept tidy in Home Assistant's lists (a "Hue Studio" label,
+> a category per Hue room or zone, the room's area) with a Hue-style sheet when you open
+> one, and the Hue Play HDMI Sync Box (a Sync tab, its own entities and service). See
+> the roadmap below.
 
 ## Services
 

@@ -171,7 +171,7 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
       key,
       kind: "area",
       name: area.name,
-      icon: area.icon || "mdi:sofa-outline",
+      icon: area.icon || (group && config.icons?.[group]) || "mdi:sofa-outline",
       lights: roomLights,
       group,
       target: group && sameSet(members(group), roomLights) ? [group] : roomLights,
@@ -188,7 +188,7 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
         key,
         kind: "hue",
         name: friendlyName(hass, g),
-        icon: hass.states[g].attributes.hue_type === "room" ? "mdi:home-outline" : "mdi:texture-box",
+        icon: hueGroupIcon(hass, config, g),
         lights: members(g),
         group: g,
         target: [g],
@@ -198,6 +198,11 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
     });
 
   return { rooms, zones };
+}
+
+/** A Hue room's or zone's icon: its archetype's (picked in the Hue app), else a room's or a zone's. */
+export function hueGroupIcon(hass: HassData, config: Partial<StudioConfig>, id: string): string {
+  return config.icons?.[id] || (hass.states[id]?.attributes.hue_type === "room" ? "mdi:home-outline" : "mdi:texture-box");
 }
 
 export const allGroups = (home: Home): Group[] => [...home.rooms, ...home.zones];
