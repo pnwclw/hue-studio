@@ -76,6 +76,7 @@ export const CSS = `
            display: flex; align-items: center; justify-content: center; background: rgba(120, 120, 128, 0.28);
            transition: background 0.2s, transform 0.15s var(--ease); }
   .round::after { content: ""; position: absolute; inset: -5px; }
+  .round > svg { width: 22px; height: 22px; }
   .round:active { transform: scale(0.92); }
   .round[hidden] { display: none; }
   .pill { height: 34px; padding: 0 16px; border: none; border-radius: 17px; cursor: pointer; font-size: 13px; font-weight: 500;
@@ -134,8 +135,8 @@ export const CSS = `
   /* home: room cards */
   .cards { display: grid; gap: 12px; }
   /* The Hue app's room card: its icon in a column of its own, the name well clear of it. */
-  .card > .row { gap: 18px; }
-  .card > .row > ha-icon { width: 28px; justify-content: center; --mdc-icon-size: 26px; }
+  .card > .row { gap: 16px; }
+  .card > .row > ha-icon { width: 30px; justify-content: center; --mdc-icon-size: 28px; }
   .card > .slider { margin-top: 20px; }
   .card { padding: 18px 18px 14px; border-radius: 16px; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
           transition: transform 0.15s var(--ease), color 0.3s var(--ease); }
@@ -157,10 +158,10 @@ export const CSS = `
   :host([keyboard]) { --safe-bottom: 0px; }
   :host([keyboard]) nav.tabs:not(.top) { display: none; }
   :host([keyboard]) .sheet { align-items: flex-start; padding-top: max(16px, calc(var(--safe-top) + 8px)); }
-  nav.tabs button { flex: 0 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; border: none;
+  nav.tabs button { flex: 0 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px; border: none;
                     background: none; cursor: pointer; color: var(--text-2); font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase;
                     transition: color 0.2s; }
-  nav.tabs button svg { width: 24px; height: 24px; }
+  nav.tabs button svg { width: 26px; height: 26px; }
   nav.tabs button.on { color: var(--text); }
   /* tabs on top while the experimental footer sits at the bottom */
   nav.tabs.top { order: -1; gap: 4px;
@@ -212,7 +213,7 @@ export const CSS = `
   .tile-card.switchable { padding-bottom: calc(var(--zone) + 8px); }
   .tile-card:active { transform: scale(0.96); }
   .tile-card > .art { flex: none; width: 100%; height: var(--art); display: flex; align-items: center; justify-content: center; }
-  .tile-card > .art ha-icon { --mdc-icon-size: 30px; }
+  .tile-card > .art ha-icon { --mdc-icon-size: 34px; }
   .tile-card > .art .dot { width: var(--art); height: var(--art); border-radius: 50%; background: #555 center / cover no-repeat;
                            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3); transition: transform 0.25s var(--spring); }
   .tile-card:active > .art .dot { transform: scale(0.9); }
@@ -246,7 +247,7 @@ export const CSS = `
                   scroll-snap-align: start; transition: transform 0.15s var(--ease); }
   .control-card:active { transform: scale(0.96); }
   .control-card .top { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: auto; }
-  .control-card .top ha-icon { --mdc-icon-size: 28px; }
+  .control-card .top ha-icon { --mdc-icon-size: 30px; }
   .control-card .top .inert { pointer-events: none; opacity: 0.35; }
   .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; line-height: 1.25; }
   .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
@@ -262,7 +263,7 @@ export const CSS = `
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
     .tile-card { --top: 10px; --art: 38px; --gap: 4px; --text-h: 48px; --zone: 48px; }
-    .tile-card > .art ha-icon { --mdc-icon-size: 26px; }
+    .tile-card > .art ha-icon { --mdc-icon-size: 30px; }
     .tile-card .name { font-size: 14px; }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
     .controls { margin-bottom: 12px; }
@@ -788,8 +789,8 @@ export const CSS = `
   .sensor-hero .name-input { font-size: 22px; }
   .sensor-edit .rows { margin-top: 16px; }
   .sensor-edit h2.label + .rows { margin-top: 0; }
-  .sensor-edit .rows .item { min-height: 68px; gap: 26px; padding: 12px 16px 12px 22px; font-size: 15px; }
-  .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 24px; color: var(--text); }
+  .sensor-edit .rows .item { min-height: 68px; gap: 24px; padding: 12px 16px 12px 20px; font-size: 15px; }
+  .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 28px; color: var(--text); }
   .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
   .sensor-edit h2.label { margin-top: 28px; }
@@ -854,10 +855,10 @@ export const CSS = `
   .devices-page .notice .go { --mdc-icon-size: 20px; }
   .devices-page .rows.kinds { margin-top: 16px; }
   .devices-page h2.label + .rows { margin-top: 0; }
-  .rows.device-list .item { min-height: 70px; gap: 22px; padding-left: 20px; font-size: 15px; }
+  .rows.device-list .item { min-height: 70px; gap: 20px; padding-left: 20px; font-size: 15px; }
   .rows.device-list .item + .item { position: relative; border-top: none; }
   .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 72px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
-  .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 30px; --mdc-icon-size: 28px; color: var(--text); }
+  .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 32px; --mdc-icon-size: 30px; color: var(--text); }
   .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rows.device-list .item .small { margin-top: 2px; font-size: 13px; }
   .rows.device-list .item .small.warn { font-weight: 500; }
@@ -918,9 +919,9 @@ export const CSS = `
   .auto-list + .rows { margin-top: 10px; }
   .auto-card { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 0 16px 0 0; box-sizing: border-box;
                border-radius: 16px; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
-  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 14px; padding: 12px 0 12px 16px;
+  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; padding: 12px 0 12px 16px;
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 26px; color: var(--text); }
+  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 28px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; line-height: 1.25; }
   .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
@@ -1074,8 +1075,8 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  .settings-page .rows:not(.device-list) .item { min-height: 68px; gap: 26px; padding: 12px 16px 12px 22px; font-size: 15px; }
-  .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 24px; color: var(--text); }
+  .settings-page .rows:not(.device-list) .item { min-height: 68px; gap: 24px; padding: 12px 16px 12px 20px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 28px; color: var(--text); }
   .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   /* Row titles are medium (the Hue app's); what a row says under or beside its title stays regular. */
   :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item { font-weight: 500; }
@@ -1110,12 +1111,12 @@ export const CSS = `
   .moment-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   /* Time screen (momentChoice): the wheels under the chosen kind, one band across them. */
   .moment-list .item.wheels-item { display: block; padding: 6px 8px 10px; min-height: 0; }
-  .wheels { position: relative; display: flex; justify-content: center; gap: 28px; }
+  .wheels { position: relative; display: flex; justify-content: center; gap: 28px; overflow: hidden; touch-action: pan-y; }
   .wheels::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 36px; transform: translateY(-50%);
                     border-radius: 10px; background: rgba(120, 120, 128, 0.24); pointer-events: none; }
   hue-studio-wheel { position: relative; display: block; flex: 1; min-width: 0; }
   .wheels.time hue-studio-wheel { flex: none; width: 48px; }
-  .wheel-scroll { height: 160px; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none;
+  .wheel-scroll { height: 160px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scroll-snap-type: y mandatory; scrollbar-width: none;
                   padding: 64px 0; box-sizing: border-box; perspective: 260px; -webkit-mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent);
                   mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
   .wheel-scroll::-webkit-scrollbar { display: none; }
@@ -1125,8 +1126,8 @@ export const CSS = `
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
   .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
-  .choice-sheet .rows .item { min-height: 60px; gap: 22px; font-size: 15px; }
-  .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 22px; }
+  .choice-sheet .rows .item { min-height: 60px; gap: 20px; font-size: 15px; }
+  .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 24px; }
   .choice-sheet .rows + h2.label { margin-top: 20px; }
   .choice-page .rows.choice-list { margin-top: 12px; }
   .choice-page h2.label + .hint + .rows, .choice-page h2.label + .rows { margin-top: 0; }
@@ -1137,8 +1138,8 @@ export const CSS = `
   /* A screen's own header picture and name (an automation): the sensor page's hero. */
   .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 13px; color: var(--text-2); }
   /* Days of the week: round toggles in a row of their own. */
-  .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
-  .days-item > .line { display: flex; align-items: center; gap: 12px; }
+  .rows .item.days-item, .settings-page .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 4px; padding-top: 0; padding-bottom: 18px; }
+  .days-item > .line { display: flex; align-items: center; gap: 12px; min-height: 68px; }
   /* The days spread evenly over the row, as in the Hue app. */
   .days-row { display: flex; justify-content: space-between; }
   .days-row button { width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer; background: rgba(120, 120, 128, 0.24);

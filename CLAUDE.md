@@ -145,7 +145,7 @@ touching anything outside this repository.
 - **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
   Home: room and zone names 16px, a step above everything else (automation cards and
   rows 15px, the room and zone screens' tiles 14px). List rows (settings, devices, sensors, editors, choice
-  sheets) are the Hue app's: ≥68px tall, 24px icons, text from 72px, titles 15px medium
+  sheets) are the Hue app's: ≥68px tall, 28px icons, text from 72px, titles 15px medium
   with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
   the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
   10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
@@ -159,6 +159,9 @@ touching anything outside this repository.
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
   own (`syncBanner`).
+- **Icons fill their room:** a bigger icon takes its space from the gap next to it, so the
+  text never moves (rows, room cards, automation cards); in fixed frames (tiles, round
+  buttons, the tab bar) only the icon grows.
 - **Font weights: 400, 500 and 700 only.** HA loads Roboto as separate files (100, 300,
   400, 500, 700, 900), so 600 renders as 700 and 800 as 900 there. Keep the font as it is
   (`--ha-font-family-body`, falling back to the system font in the harness).
