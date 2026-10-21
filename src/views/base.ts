@@ -13,9 +13,14 @@ import { classMap } from "lit/directives/class-map.js";
 import type { StudioContext } from "../context.ts";
 import { haptic } from "../ha-internals.ts";
 import { icon, LightElement } from "../ui.ts";
-import { type Choice, choiceRows, isScreen } from "./choice.ts";
+import "../wheel.ts";
+import { type Choice, choiceRows, isScreen, type MomentKind, type MomentValue } from "./choice.ts";
 
 type Slot = TemplateResult | typeof nothing;
+
+const pad = (n: number): string => String(n).padStart(2, "0");
+const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: pad(h), label: pad(h) }));
+const MINUTES = Array.from({ length: 60 }, (_, m) => ({ value: pad(m), label: pad(m) }));
 
 export class StudioView extends LightElement {
   @property({ attribute: false }) accessor ctx!: StudioContext;
@@ -125,6 +130,7 @@ export class StudioView extends LightElement {
   private withChoice(page: TemplateResult): TemplateResult {
     const c = this.choosing;
     if (!c) return page;
+    if (c.moment) return this.momentScreen(c);
     const { t } = this.ctx;
     const flip = (index: number, value: string) => {
       const list = c.lists[index];
@@ -161,6 +167,52 @@ export class StudioView extends LightElement {
           <div class="form-body">${body}</div>
         </div>
       </div>`;
+  }
+
+  /** A time screen (momentChoice): kinds with a tick, the chosen one's wheels under it, "Done" keeps them. */
+  private momentScreen(c: Choice): TemplateResult {
+    const m = c.moment!;
+    const { t } = this.ctx;
+    const set = (patch: Partial<MomentValue>) => {
+      this.choosing = { ...c, moment: { ...m, ...patch } };
+    };
+    const done = html`<button class="pill save" @click=${() => {
+      haptic("success");
+      m.done({ kind: m.kind, time: m.time, offset: m.offset });
+      this.closeChoice();
+    }}>${t("color.done")}</button>`;
+    const wheels = (k: MomentKind) => {
+      if (k.wheel === "time") {
+        const [h = "00", min = "00"] = m.time.split(":");
+        return html`<div class="wheels time">
+          <hue-studio-wheel .options=${HOURS} .value=${h} .change=${(v: string) => set({ time: `${v}:${min}` })}></hue-studio-wheel>
+          <hue-studio-wheel .options=${MINUTES} .value=${min} .change=${(v: string) => set({ time: `${h}:${v}` })}></hue-studio-wheel>
+        </div>`;
+      }
+      if (k.wheel === "sun") {
+        const values = m.offsets.includes(m.offset) ? m.offsets : [...m.offsets, m.offset].sort((a, b) => a - b);
+        const options = values.map((v) => ({ value: String(v), label: m.offsetLabel(k.value, v) }));
+        return html`<div class="wheels"><hue-studio-wheel .options=${options} .value=${String(m.offset)} .change=${(v: string) => set({ offset: Number(v) })}></hue-studio-wheel></div>`;
+      }
+      return nothing;
+    };
+    const rows =
+      m.kinds.length === 1
+        ? html`<div class="item wheels-item">${wheels(m.kinds[0])}</div>`
+        : m.kinds.map((k) => {
+            const on = k.value === m.kind;
+            return html`<button class=${classMap({ item: true, on })} role="radio" aria-checked=${on} @click=${() => {
+                if (on) return;
+                haptic("selection");
+                set({ kind: k.value });
+              }}>
+                <div class="grow">${k.label}</div>
+                ${on ? html`<span class="tick">${icon("check")}</span>` : nothing}
+              </button>
+              ${on && k.wheel !== "none" ? html`<div class="item wheels-item">${wheels(k)}</div>` : nothing}`;
+          });
+    const body = html`${c.hint ? html`<p class="hint">${c.hint}</p>` : nothing}<div class="rows moment-list" role="radiogroup">${rows}</div>`;
+    return this.screen(this.subHead(c.title, () => this.closeChoice(), done), body, "settings-page choice-page moment-page");
   }
 
   /** Before showing a page over the current one: remember the scroll, start the next at the top. */

@@ -143,13 +143,18 @@ touching anything outside this repository.
   iPhone 17 Pro (402×874) and 17 Pro Max (440×956), and 1440 (how: see `CLAUDE.local.md`).
   A UI change is not done without screenshots.
 - **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
-  Home: room and zone names 16px (as automation card titles), a step above the room and
-  zone screens' tiles (14px). List rows (settings, devices, sensors, editors, choice
+  Home: room and zone names 16px, a step above everything else (automation cards and
+  rows 15px, the room and zone screens' tiles 14px). List rows (settings, devices, sensors, editors, choice
   sheets) are the Hue app's: ≥68px tall, 24px icons, text from 72px, titles 15px medium
   with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
   the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
   10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
-  "Save" sits in its header, "Delete" is the red outlined pill at the bottom.
+  "Save" sits in its header, "Delete" is the red outlined pill at the bottom. The
+  automation editor's rows have no icons (its type's icon sits by its name).
+- **Times are chosen on wheels**, never the system's time picker: a time screen
+  (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
+  app's "Start at" — each kind (a time, sunrise, sunset, none) a row with a tick, the
+  chosen one's wheels under it, "Done" in the header.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
@@ -332,6 +337,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
   color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
   types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
+  wheel.ts                      the picker wheel (scroll snapping, a drum look) of the time screens
   ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
   i18n.ts                       UI strings (en is the source; same keys in every locale)
   ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets,

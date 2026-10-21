@@ -922,7 +922,7 @@ export const CSS = `
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 26px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; line-height: 1.25; }
+  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; line-height: 1.25; }
   .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
   /* light of the day (natural light, scene of the day) */
@@ -1090,6 +1090,12 @@ export const CSS = `
   .settings-page .lead { font-size: 14px; }
   .settings-page .hint { margin: 10px 2px 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
   .settings-page .hint.warn { color: #ffb340; }
+  /* The automation editor's rows have no icons, like the Hue app's; its type's icon sits by the name. */
+  .automation-page .rows .item > ha-icon:first-child { display: none; }
+  .automation-page .rows:not(.device-list) .item { gap: 16px; padding-left: 16px; }
+  .automation-page .rows:not(.device-list) .item + .item::before { left: 16px; }
+  .automation-page .sensor-hero h1.big { font-size: 24px; }
+  .automation-page .name-row .type-icon { --mdc-icon-size: 28px; color: var(--text); }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
@@ -1099,7 +1105,22 @@ export const CSS = `
                             font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
   .rows .item .time-value::-webkit-calendar-picker-indicator { margin-left: 6px; opacity: 0.55; cursor: pointer; }
   .rows .item .time-value:focus { outline: none; color: var(--text); }
-  .choice-list .item .tick { display: flex; flex: none; color: var(--accent); }
+  .choice-list .item .tick, .moment-list .item .tick { display: flex; flex: none; color: var(--accent); }
+  .moment-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
+  /* Time screen (momentChoice): the wheels under the chosen kind, one band across them. */
+  .moment-list .item.wheels-item { display: block; padding: 6px 8px 10px; min-height: 0; }
+  .wheels { position: relative; display: flex; justify-content: center; gap: 28px; }
+  .wheels::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 36px; transform: translateY(-50%);
+                    border-radius: 10px; background: rgba(120, 120, 128, 0.24); pointer-events: none; }
+  hue-studio-wheel { position: relative; display: block; flex: 1; min-width: 0; }
+  .wheels.time hue-studio-wheel { flex: none; width: 48px; }
+  .wheel-scroll { height: 160px; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scrollbar-width: none;
+                  padding: 64px 0; box-sizing: border-box; perspective: 260px; -webkit-mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent);
+                  mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
+  .wheel-scroll::-webkit-scrollbar { display: none; }
+  .wheel-opt { height: 32px; display: flex; align-items: center; justify-content: center; scroll-snap-align: center; cursor: pointer;
+               font-size: 16px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .wheel-opt.on { font-size: 18px; font-weight: 500; color: var(--text); }
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
   .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
@@ -1116,8 +1137,10 @@ export const CSS = `
   .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 13px; color: var(--text-2); }
   /* Days of the week: round toggles in a row of their own. */
   .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
-  .days-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; max-width: 380px; }
-  .days-row button { width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; cursor: pointer; background: rgba(120, 120, 128, 0.24);
+  .days-item > .line { display: flex; align-items: center; gap: 12px; }
+  /* The days spread evenly over the row, as in the Hue app. */
+  .days-row { display: flex; justify-content: space-between; }
+  .days-row button { width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; cursor: pointer; background: rgba(120, 120, 128, 0.24);
                      color: var(--text-2); font: inherit; font-size: 13px; font-weight: 500; transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
   .days-row button.on { background: var(--accent); color: #fff; }
   .days-row button:active { transform: scale(0.92); }

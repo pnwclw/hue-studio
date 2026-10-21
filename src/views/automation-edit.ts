@@ -13,6 +13,7 @@ import {
   allDayDraft,
   areaFor,
   type AutomationDraft,
+  daysLine,
   type AutomationInput,
   type Duration,
   type EndKind,
@@ -22,6 +23,7 @@ import {
   LIGHT_KINDS,
   type LightKind,
   missing,
+  momentLine,
   newDraft,
   offsetDuration,
   placesOf,
@@ -29,6 +31,7 @@ import {
   splitPlaces,
   type StartKind,
   toConfig,
+  TYPE_ICONS,
   WEEKDAYS,
   type Weekday,
 } from "../automations.ts";
@@ -56,7 +59,7 @@ import { findGroup, friendlyName } from "../model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { navRow, several, single, timeRow } from "./choice.ts";
+import { type MomentKind, momentChoice, navRow, several, single, timeChoice } from "./choice.ts";
 import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine } from "./day-parts.ts";
 
 const FADES = [0, 1, 5, 10, 15, 20, 30, 45, 60, 90];
@@ -100,6 +103,8 @@ export class AutomationEditView extends StudioView {
   @state() private accessor legacy: Legacy | null = null;
   @state() private accessor picker: Picker | null = null;
   @state() private accessor editingName = false;
+  /** "On certain days" switched on while every day is still chosen. */
+  @state() private accessor someDays = false;
   private previewKey = "";
   private legacyAsked = false;
 
@@ -233,6 +238,7 @@ export class AutomationEditView extends StudioView {
     };
     return html`<div class="sensor-hero">
       <div class="name-row">
+        <ha-icon class="type-icon" icon=${TYPE_ICONS[d.type]}></ha-icon>
         ${this.editingName || !d.alias
           ? html`<input class="name-input" .value=${d.alias} placeholder=${t("automations.name")} aria-label=${t("automations.name")}
               @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} @blur=${done}
@@ -307,47 +313,54 @@ export class AutomationEditView extends StudioView {
     </div>`;
   }
 
+  /** A time of day as a row; it opens the time screen (wheels). */
   private time(glyph: string, title: string, value: string | undefined, change: (v: string) => void, sub = "") {
-    return timeRow({ icon: glyph, title, sub }, hhmm(value), (v) => change(`${v}:00`));
+    const current = hhmm(value);
+    return navRow({ icon: glyph, title, sub, value: current }, () => this.choose(timeChoice(title, current, (v) => change(`${v}:00`))));
   }
 
+  /** "On certain days": off is every day, on opens the days of the week (the Hue app's "Repeat"). */
   private days(d: AutomationDraft) {
     const { t } = this.ctx;
     const days = d.input.days?.length ? d.input.days : [...WEEKDAYS];
+    const open = this.someDays || days.length < 7;
     const flip = (day: Weekday) => {
       const next = days.includes(day) ? days.filter((x) => x !== day) : [...days, day];
       if (!next.length) return;
       haptic("selection");
       this.set({ days: WEEKDAYS.filter((x) => next.includes(x)) });
     };
-    const summary =
-      days.length === 7
-        ? t("automations.every_day")
-        : days.length === 5 && !days.includes("sat") && !days.includes("sun")
-          ? t("automations.weekdays")
-          : days.length === 2 && days.includes("sat") && days.includes("sun")
-            ? t("automations.weekend")
-            : "";
+    const flipAll = () => {
+      haptic("selection");
+      this.someDays = !open;
+      if (open) this.set({ days: [...WEEKDAYS] });
+    };
     return html`<div class="item days-item">
-      <div class="line"><span>${t("automations.repeat")}</span><span class="dim">${summary}</span></div>
-      <div class="days-row">
-        ${WEEKDAYS.map(
-          (day) => html`<button class=${classMap({ on: days.includes(day) })} aria-pressed=${days.includes(day)} @click=${() => flip(day)}>
-            ${t(`automations.day_${day}` as StringKey)}
-          </button>`,
-        )}
+      <div class="line">
+        <div class="grow">${t("automations.some_days")}<div class="dim small">${daysLine(days, t)}</div></div>
+        ${toggle(open, t("automations.some_days"), flipAll)}
       </div>
+      ${open
+        ? html`<div class="days-row">
+            ${WEEKDAYS.map(
+              (day) => html`<button class=${classMap({ on: days.includes(day) })} aria-pressed=${days.includes(day)} @click=${() => flip(day)}>
+                ${t(`automations.day_${day}` as StringKey)}
+              </button>`,
+            )}
+          </div>`
+        : nothing}
     </div>`;
   }
 
-  /** "15 min before", "Exactly then", "30 min after". */
-  private offsetLabel(minutes: number): string {
+  /** "Sunrise", "30 min before sunset", "15 min after sunrise". */
+  private offsetLabel(kind: string, minutes: number): string {
     const { t } = this.ctx;
-    if (!minutes) return t("automations.offset_exact");
-    return t(minutes < 0 ? "automations.offset_before" : "automations.offset_after", { n: Math.abs(minutes) });
+    const sun = kind === "sunrise" ? "sunrise" : "sunset";
+    if (!minutes) return t(`automations.wheel_${sun}` as StringKey);
+    return t(`automations.${minutes < 0 ? "before" : "after"}_${sun}` as StringKey, { n: Math.abs(minutes) });
   }
 
-  /** A start or an end: its kind (a time, sunrise or sunset), then the time or the offset. */
+  /** A start or an end as one row ("Sunrise", "07:00", "30 min before sunset"); it opens the time screen. */
   private moment<K extends string>(
     title: string,
     kinds: readonly K[],
@@ -357,20 +370,24 @@ export class AutomationEditView extends StudioView {
     set: (patch: { kind?: K; time?: string; offset?: Duration }) => void,
   ) {
     const { t } = this.ctx;
-    const sun = kind === "sunrise" || kind === "sunset";
-    const label = (k: K) => t((k === "none" ? "automations.none" : `automations.kind_${k}`) as StringKey);
-    const glyph = (k: K) => (k === "sunrise" ? "mdi:weather-sunset-up" : k === "sunset" ? "mdi:weather-sunset-down" : k === "none" ? "mdi:minus-circle-outline" : "mdi:clock-outline");
-    const kindRow = navRow({ icon: glyph(kind), title, value: label(kind) }, () =>
-      this.choose(single(title, kinds.map((k) => ({ value: k, label: label(k), icon: glyph(k) })), kind, (k) => set({ kind: k as K }))),
-    );
-    if (kind === "none") return kindRow;
-    if (!sun) return html`${kindRow}${this.time("mdi:clock-time-four-outline", t("automations.time"), time, (v) => set({ time: v }))}`;
     const minutes = offsetMinutes(offset);
-    const values = OFFSETS.includes(minutes) ? OFFSETS : [...OFFSETS, minutes].sort((a, b) => a - b);
-    return html`${kindRow}
-      ${navRow({ icon: "mdi:timer-outline", title: t("automations.offset"), value: this.offsetLabel(minutes) }, () =>
-        this.choose(single(t("automations.offset"), values.map((v) => ({ value: String(v), label: this.offsetLabel(v) })), String(minutes), (v) => set({ offset: offsetDuration(Number(v)) }))),
-      )}`;
+    const sun = (k: string) => k === "sunrise" || k === "sunset";
+    const label = (k: string) => t((k === "none" ? "automations.none" : `automations.kind_${k}`) as StringKey);
+    const value = kind === "none" ? label(kind) : momentLine(kind as StartKind | EndKind, time, offset, t);
+    const options: MomentKind[] = kinds.map((k) => ({ value: k, label: label(k), wheel: k === "none" ? "none" : sun(k) ? "sun" : "time" }));
+    return navRow({ title, value }, () =>
+      this.choose(
+        momentChoice(title, {
+          kinds: options,
+          kind,
+          time: hhmm(time),
+          offset: minutes,
+          offsets: OFFSETS,
+          offsetLabel: (k, m) => this.offsetLabel(k, m),
+          done: (v) => set({ kind: v.kind as K, time: `${v.time}:00`, offset: offsetDuration(v.offset) }),
+        }),
+      ),
+    );
   }
 
   private zones(d: AutomationDraft) {

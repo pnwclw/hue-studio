@@ -1,7 +1,8 @@
 // Choices like the Hue app's: a row says what is chosen ("Fade in · 30 min ›") and opens the
 // list to choose from — a sheet for one value (from the bottom on phones), a screen of its
-// own for several values or several lists. Sections never hold a <select>, a segmented
-// control or chips: the row tells, the list chooses.
+// own for several values or several lists, and times on a screen of wheels (momentChoice).
+// Sections never hold a <select>, a segmented control or chips: the row tells, the list
+// chooses.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
@@ -38,6 +39,8 @@ export interface Choice {
   screen?: boolean;
   /** A button under the lists (a screen of its own), e.g. back to the defaults. */
   action?: { label: string; run: () => void };
+  /** A time screen instead of lists (momentChoice). */
+  moment?: Moment;
 }
 
 /** One value out of `options`: a sheet that closes once picked. */
@@ -86,26 +89,53 @@ export function navRow(row: Row, open: () => void): TemplateResult {
   </button>`;
 }
 
-/** A time ("06:45") as a row's value: the whole row opens the system's time picker. */
-export function timeRow(row: Row, value: string, change: (hhmm: string) => void): TemplateResult {
-  const open = (e: Event) => {
-    const input = (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>("input");
-    if (input && e.target !== input) {
-      try {
-        input.showPicker();
-      } catch {
-        input.focus();
-      }
-    }
-  };
-  return html`<div class="item time-row" @click=${open}>
-    ${lead(row.icon, row.art)}
-    <div class="grow">${row.title}${row.sub ? html`<div class="dim small">${row.sub}</div>` : nothing}</div>
-    <input class="time-value" type="time" aria-label=${row.title} .value=${value} @change=${(e: Event) => {
-      const v = (e.target as HTMLInputElement).value;
-      if (/^\d\d:\d\d$/.test(v)) change(v);
-    }} />
-  </div>`;
+/** A kind of moment on a time screen: a time of day, or an offset from sunrise/sunset ("sun"); "none" shows no wheel. */
+export interface MomentKind {
+  value: string;
+  label: string;
+  wheel: "time" | "sun" | "none";
+}
+
+export interface MomentValue {
+  kind: string;
+  /** "HH:MM". */
+  time: string;
+  /** Minutes from sunrise/sunset (negative: before). */
+  offset: number;
+}
+
+/**
+ * A time screen like the Hue app's "Start at": each kind a row with a tick, the chosen one
+ * opening its wheels under it (hours and minutes, or minutes before/after the sun). "Done"
+ * in the header keeps what the wheels show, the close button leaves it as it was.
+ */
+export interface Moment extends MomentValue {
+  kinds: MomentKind[];
+  offsets: number[];
+  offsetLabel: (kind: string, minutes: number) => string;
+  done: (value: MomentValue) => void;
+}
+
+/** A time screen (a choice of its own). */
+export function momentChoice(title: string, moment: Moment, hint?: string): Choice {
+  return { title, hint, lists: [], screen: true, moment };
+}
+
+/** Just a time of day ("06:45") on a time screen. */
+export function timeChoice(title: string, value: string, change: (hhmm: string) => void, hint?: string): Choice {
+  return momentChoice(
+    title,
+    {
+      kinds: [{ value: "time", label: title, wheel: "time" }],
+      kind: "time",
+      time: value,
+      offset: 0,
+      offsets: [],
+      offsetLabel: () => "",
+      done: (v) => change(v.time),
+    },
+    hint,
+  );
 }
 
 /** One list of a choice: its options with a tick (one value) or a check (several). */

@@ -12,7 +12,7 @@ import { haptic } from "../ha-internals.ts";
 import type { StringKey, Translate } from "../i18n.ts";
 import type { DayPreview, Phase } from "../types.ts";
 import { icon, normalize } from "../ui.ts";
-import { type Choice, single, timeRow } from "./choice.ts";
+import { type Choice, navRow, single, timeChoice } from "./choice.ts";
 
 export const PHASE_ICONS: Record<Phase, string> = {
   morning: "mdi:weather-sunset-up",
@@ -56,7 +56,9 @@ export function phaseRows(
         <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
       </button>`;
     })}
-    ${timeRow({ icon: PHASE_ICONS.night, title: t("auto.phase_night"), sub: t("auto.night_from") }, times.night_from, (night_from) => change({ night_from }))}
+    ${navRow({ icon: PHASE_ICONS.night, title: t("auto.phase_night"), sub: t("auto.night_from"), value: times.night_from }, () =>
+      choose(timeChoice(t("auto.phase_night"), times.night_from, (night_from) => change({ night_from }), t("auto.night_from"))),
+    )}
   </div>`;
 }
 
