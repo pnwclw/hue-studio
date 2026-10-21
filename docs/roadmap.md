@@ -350,10 +350,10 @@ written through HA's public registries and config APIs; our Store only remembers
 of it is ours.
 
 **Done for scenes (2026-10-21):** every bridge scene (`organize.py`) gets the "Hue Studio"
-label, a scene category named after its Hue room or zone (made by us, with the icon of
+label (smart scenes too), a scene category named after its Hue room or zone (made by us, with the icon of
 the archetype picked in the Hue app, the same icons the panel shows its rooms without
-an area icon and its zones with) and the area of its room (the panel's room mapping; none of its own when its Hue
-room's device is in that area already). Done on setup and whenever scenes, rooms, areas
+an area icon and its zones with) and the area of its room (the panel's room mapping, set on the scene itself: HA's
+scene list shows only an entity's own area). Done on setup and whenever scenes, rooms, areas
 or the room mapping change. The user's choice wins: what is ours is remembered
 (`.storage/hue_studio.organize`: the scenes organized once, our categories, the areas
 we set), so a label or category the user removes stays removed and a category the user

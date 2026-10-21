@@ -30,7 +30,6 @@ from aiohue.v2.models.smart_scene import SmartScene
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers import (
     category_registry as cr,
-    device_registry as dr,
     entity_registry as er,
     label_registry as lr,
 )
@@ -160,7 +159,6 @@ class Organizer:
             return
         hass = self.hass
         entities = er.async_get(hass)
-        devices = dr.async_get(hass)
         categories = cr.async_get(hass)
         before = {
             "scenes": {k: dict(v) for k, v in self.scenes.items()},
@@ -199,12 +197,9 @@ class Organizer:
                 if wanted != category_id:
                     changes["categories"] = {**entry.categories, SCENE_DOMAIN: wanted}
 
-            # The room's area; the scene's device (its Hue room or zone) may already
-            # be in it, then the entity needs none of its own.
-            device = devices.async_get(entry.device_id) if entry.device_id else None
-            device_area = device.area_id if device else None
-            room_area = group_areas.get(group[1]) if group and group[1] else None
-            wanted_area = room_area if room_area != device_area else None
+            # The room's area on the entity itself: HA's scene list shows only that,
+            # not the area of the scene's device (its Hue room or zone).
+            wanted_area = group_areas.get(group[1]) if group and group[1] else None
             area = known["area"] if known else None
             ours = entry.area_id == area
             if ours and entry.area_id != wanted_area:
