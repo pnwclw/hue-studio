@@ -1138,7 +1138,8 @@ export const CSS = `
   /* A screen's own header picture and name (an automation): the sensor page's hero. */
   .settings-page .sensor-hero .kind { margin-top: -6px; font-size: 13px; color: var(--text-2); }
   /* Days of the week: round toggles in a row of their own. */
-  .rows .item.days-item, .settings-page .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 4px; padding-top: 0; padding-bottom: 18px; }
+  .rows .item.days-item, .settings-page .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 4px; padding-top: 0; padding-bottom: 0; }
+  .rows .item.days-item:has(> .days-row) { padding-bottom: 18px; }
   .days-item > .line { display: flex; align-items: center; gap: 12px; min-height: 68px; }
   /* The days spread evenly over the row, as in the Hue app. */
   .days-row { display: flex; justify-content: space-between; }
