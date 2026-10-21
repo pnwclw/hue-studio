@@ -149,7 +149,7 @@ export const CSS = `
   .card.unavailable { opacity: 0.45; }
   .row { display: flex; align-items: center; gap: 12px; }
   .row .text { flex: 1; min-width: 0; }
-  .row .name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.7; min-height: 0; }
   .meta:empty { display: none; }
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
