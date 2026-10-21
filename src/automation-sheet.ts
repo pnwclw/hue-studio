@@ -29,7 +29,7 @@ export const SHEET_CSS = css`
   .as-head { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: 12px; }
   .as-icon { width: 40px; height: 40px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface); }
   .as-head .grow { flex: 1; min-width: 0; }
-  .as-title { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .as-title { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .as-rows .item { min-height: 40px; font-size: 14px; }
   .as-rows .label { flex: none; color: var(--text-2); }
   .as-rows .value { flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere; }

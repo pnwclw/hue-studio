@@ -33,7 +33,7 @@ export const CSS = `
   .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-  .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar.sub .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* An editor's "Save" in its header (the Hue app's): blue once there is something to save. */
   .bar.sub .pill.save:not(:disabled) { background: var(--accent); color: #fff; }
   /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
@@ -78,7 +78,7 @@ export const CSS = `
   .round::after { content: ""; position: absolute; inset: -5px; }
   .round:active { transform: scale(0.92); }
   .round[hidden] { display: none; }
-  .pill { height: 34px; padding: 0 16px; border: none; border-radius: 17px; cursor: pointer; font-size: 13px; font-weight: 600;
+  .pill { height: 34px; padding: 0 16px; border: none; border-radius: 17px; cursor: pointer; font-size: 13px; font-weight: 500;
           letter-spacing: 0.3px; text-transform: uppercase; background: rgba(120, 120, 128, 0.28); transition: transform 0.15s var(--ease); }
   .pill:active { transform: scale(0.96); }
   .pill:disabled { opacity: 0.4; }
@@ -102,22 +102,16 @@ export const CSS = `
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
   .dark-text { color: #1c1c1e; }
 
-  /* toggle: a small knob well inside the track (the Hue app's look); the master switches in a
-     header (home, a room or zone, a light) are the full size, every other one a step smaller. */
-  .toggle { position: relative; width: 46px; height: 28px; flex: none; border: none; border-radius: 14px; padding: 0; cursor: pointer;
+  /* toggle: one size everywhere (the master switch's), a small knob well inside the track (the Hue app's look) */
+  .toggle { position: relative; width: 52px; height: 32px; flex: none; border: none; border-radius: 16px; padding: 0; cursor: pointer;
             background: rgba(120, 120, 128, 0.36); transition: background 0.25s var(--ease); }
   .toggle::after { content: ""; position: absolute; inset: -8px -4px; }
-  .toggle span { position: absolute; top: 4px; left: 4px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  .toggle span { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff;
                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.3s var(--spring), width 0.15s var(--ease); }
-  .toggle:active span { width: 24px; }
+  .toggle:active span { width: 28px; }
   .toggle.on { background: var(--accent); }
-  .toggle.on span { transform: translateX(18px); }
-  .toggle.on:active span { transform: translateX(14px); }
-  :is(.bar, .topbar, .cv-bar) .toggle { width: 52px; height: 32px; border-radius: 16px; }
-  :is(.bar, .topbar, .cv-bar) .toggle span { width: 24px; height: 24px; }
-  :is(.bar, .topbar, .cv-bar) .toggle:active span { width: 28px; }
-  :is(.bar, .topbar, .cv-bar) .toggle.on span { transform: translateX(20px); }
-  :is(.bar, .topbar, .cv-bar) .toggle.on:active span { transform: translateX(16px); }
+  .toggle.on span { transform: translateX(20px); }
+  .toggle.on:active span { transform: translateX(16px); }
   .lit .toggle.on { background: rgba(0, 0, 0, 0.22); }
 
   /* brightness slider: a thin track and a small knob (the Hue app's, measured at 430pt) */
@@ -149,7 +143,7 @@ export const CSS = `
   .card.unavailable { opacity: 0.45; }
   .row { display: flex; align-items: center; gap: 12px; }
   .row .text { flex: 1; min-width: 0; }
-  .row .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.7; min-height: 0; }
   .meta:empty { display: none; }
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 6px #3ddc84; }
@@ -202,7 +196,7 @@ export const CSS = `
   .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .badges:empty { display: none; }
   .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: 14px; cursor: pointer;
-           font-size: 12px; font-weight: 600; background: rgba(0, 0, 0, 0.22); transition: background 0.2s, transform 0.15s var(--ease); }
+           font-size: 12px; font-weight: 500; background: rgba(0, 0, 0, 0.22); transition: background 0.2s, transform 0.15s var(--ease); }
   .badge:active { transform: scale(0.96); }
   .badge svg { width: 16px; height: 16px; }
   .badge.on { background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
@@ -210,7 +204,7 @@ export const CSS = `
   /* Cards (scenes, lights, sensors; tileCard): the picture at a fixed distance from the top, a text
      block of fixed height with the name (and lines under it) centered in it, and an optional
      switch zone of its own at the bottom (the Hue app's). Every card is as tall as any other. */
-  .tile-card { --top: 14px; --art: 44px; --gap: 6px; --text-h: 52px; --zone: 48px; --icon-y: calc(var(--top) + var(--art) / 2);
+  .tile-card { --top: 14px; --art: 44px; --gap: 6px; --text-h: 52px; --zone: 52px; --icon-y: calc(var(--top) + var(--art) / 2);
                position: relative; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
                min-width: 0; padding: var(--top) 6px 8px; border: none; border-radius: 16px; cursor: pointer; text-align: center;
                background: var(--surface); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
@@ -225,7 +219,7 @@ export const CSS = `
   .tile-card > .text { flex: none; box-sizing: border-box; width: 100%; height: var(--text-h); margin-top: var(--gap); display: flex;
                        flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;
-                     overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.2; }
+                     overflow-wrap: anywhere; font-size: 14px; font-weight: 500; line-height: 1.2; }
   /* Two lines under the name: the name keeps one. */
   .tile-card .subs-2 .name { -webkit-line-clamp: 1; }
   .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: 12px; line-height: 1.2; opacity: 0.75; white-space: nowrap;
@@ -267,7 +261,7 @@ export const CSS = `
   .light.busy .switch-zone.inert .toggle { opacity: 1; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
-    .tile-card { --top: 10px; --art: 38px; --gap: 4px; --text-h: 48px; --zone: 44px; }
+    .tile-card { --top: 10px; --art: 38px; --gap: 4px; --text-h: 48px; --zone: 48px; }
     .tile-card > .art ha-icon { --mdc-icon-size: 26px; }
     .tile-card .name { font-size: 14px; }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
@@ -295,13 +289,13 @@ export const CSS = `
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .cv-bar { position: relative; display: flex; align-items: center; gap: 8px; min-height: 46px; }
   .cv-bar .grow { flex: 1; min-width: 0; }
-  .cv-bar .bar-title { text-align: center; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .cv-bar .bar-title { text-align: center; font-size: 17px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                        opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .cv-bar.scrolled .bar-title { opacity: 1; transform: none; }
   .colorview .screen-head:has(.cv-bar.scrolled) { background: rgba(22, 22, 24, 0.82); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
-  .fx-title { margin: 8px 0 18px; font-size: 36px; font-weight: 800; letter-spacing: -0.6px; line-height: 1.1; }
+  .fx-title { margin: 8px 0 18px; font-size: 36px; font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; }
   .cv-bar .round.more { width: 34px; height: 34px; }
-  .cv-bar .pill { height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+  .cv-bar .pill { height: 34px; padding: 0 14px; border-radius: 17px; font-size: 14px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px;
                   background: rgba(120, 120, 128, 0.28); color: var(--text); }
   .menu-scrim { position: fixed; inset: 0; z-index: 9; }
   .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: 14px;
@@ -337,7 +331,7 @@ export const CSS = `
   .bri-track svg { position: relative; width: 28px; height: 28px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
   .bri-track:focus-visible { box-shadow: 0 0 0 2px #fff, 0 16px 40px rgba(0, 0, 0, 0.5); }
   .bri-chip { position: fixed; transform: translateX(-50%); padding: 5px 10px; border-radius: 10px; background: rgba(44, 44, 46, 0.95);
-              font-size: 13px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; animation: fade 0.2s ease; }
+              font-size: 13px; font-weight: 500; letter-spacing: 1px; font-variant-numeric: tabular-nums; animation: fade 0.2s ease; }
   @keyframes bri-grow { from { transform: scaleY(0.22); opacity: 0.5; } }
   .controls:has(.bri) { align-items: flex-end; }
   /* Lights a Sync Box drives: why they are locked, and a way to stop it. */
@@ -388,7 +382,7 @@ export const CSS = `
   .pin.dragging { cursor: grabbing; transform: scale(1.22); transition: transform 0.2s var(--spring); }
   /* Pins with one color: one pin with their count; a tap spreads them around a disc (the Hue app's). */
   .pin.stack .count { position: relative; display: flex; height: 100%; align-items: center; justify-content: center; font-size: 20px;
-                      font-weight: 600; color: #fff; pointer-events: none; }
+                      font-weight: 500; color: #fff; pointer-events: none; }
   .spread-layer { position: absolute; inset: 0; z-index: 3; border-radius: 50%; }
   .spread-disc { position: absolute; inset: 25%; border-radius: 50%; background: rgba(96, 96, 102, 0.78); box-shadow: 0 0 0 2px #fff;
                  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: spread-in 0.3s var(--spring); }
@@ -411,7 +405,7 @@ export const CSS = `
   .style-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
   .style-modes button { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border: none;
                         border-radius: 14px; background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 12px;
-                        font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+                        font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
                         transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
   .style-modes button:active { transform: scale(0.97); }
   .style-modes button.on { background: #fff; color: #1c1c1e; }
@@ -459,12 +453,12 @@ export const CSS = `
   .fx:active { transform: scale(0.96); }
   .fx.on { border-color: #fff; }
   .fx .art { width: 54px; height: 54px; margin-bottom: 6px; border-radius: 50%; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
-  .fx .name { font-size: 14px; font-weight: 600; line-height: 1.2; }
+  .fx .name { font-size: 14px; font-weight: 500; line-height: 1.2; }
   .fx .sub { font-size: 12px; color: var(--text-2); }
   .fx.create { background: transparent; border: 2px solid var(--surface-2); }
   .fx.create .art.plus { display: flex; align-items: center; justify-content: center; background: var(--surface-2); box-shadow: none; }
   .fx-sheet { max-width: 440px; }
-  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #333336; font-size: 16px; font-weight: 600; }
+  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #333336; font-size: 16px; font-weight: 500; }
   .sheet-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fx-head { padding: 16px 16px 4px; }
   .fx-head .art { display: block; width: 56px; height: 56px; border-radius: 50%; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
@@ -493,7 +487,7 @@ export const CSS = `
   /* scene editor */
   .scene-edit { padding-bottom: calc(28px + var(--safe-bottom)); }
   .scene-edit > .topbar.surface { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .scene-edit > .topbar .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; }
+  .scene-edit > .topbar .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; }
   .scene-edit .hero { position: relative; z-index: 0; padding-bottom: 18px; border-radius: 0 0 22px 22px; }
   .scene-edit .hero .inner { padding-top: 8px; }
   .scene-edit .dot.big { width: 60px; height: 60px; border-radius: 50%; background: #555 center / cover no-repeat;
@@ -564,7 +558,7 @@ export const CSS = `
   .tile:active { transform: scale(0.97); }
   .tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .tile::after { content: ""; position: absolute; inset: 40% 0 0; background: linear-gradient(transparent, rgba(0, 0, 0, 0.42)); }
-  .tile span { position: absolute; left: 10px; right: 8px; bottom: 7px; z-index: 1; color: #fff; font-size: 13px; font-weight: 600;
+  .tile span { position: absolute; left: 10px; right: 8px; bottom: 7px; z-index: 1; color: #fff; font-size: 13px; font-weight: 500;
                text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .searching { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
   .searching section:not([hidden]), .searching .tiles { display: contents; }
@@ -606,7 +600,7 @@ export const CSS = `
   .sync .chips.boxes { margin-top: 12px; }
   .sync-hero { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: 18px 18px 16px; border-radius: 22px;
                background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
-  .sync-hero .name { font-size: 18px; font-weight: 600; }
+  .sync-hero .name { font-size: 18px; font-weight: 500; }
   .sync-hero .status { margin-top: 2px; font-size: 14px; }
   .sync-hero .center { margin-top: 18px; }
   .sync-hero .area-line { margin-top: 10px; text-align: center; }
@@ -620,7 +614,7 @@ export const CSS = `
   .sync-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .mode-tile { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 8px;
                padding: 16px 6px 14px; border: 2px solid transparent; border-radius: var(--radius); cursor: pointer; background: var(--surface);
-               font-size: 14px; font-weight: 600; transition: border-color 0.2s, transform 0.15s var(--ease); }
+               font-size: 14px; font-weight: 500; transition: border-color 0.2s, transform 0.15s var(--ease); }
   .mode-tile::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 0.4s var(--ease);
                        background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3)); }
   .mode-tile:nth-child(1) { --g1: #3a5bff; --g2: #b03cff; --g3: #ff3d8b; }
@@ -635,7 +629,7 @@ export const CSS = `
          background: rgba(118, 118, 128, 0.24); }
   .seg button { height: 34px; border: none; border-radius: 9px; cursor: pointer; background: transparent; font-size: 13px; font-weight: 500;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; transition: background 0.2s var(--ease); }
-  .seg button.on { background: #636366; font-weight: 600; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); }
+  .seg button.on { background: #636366; font-weight: 500; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12); }
   .grid.inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .palette { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: var(--radius); border: 1.5px solid transparent;
@@ -666,7 +660,7 @@ export const CSS = `
                transition: transform 0.15s var(--ease); }
   .kind-tile:active { transform: scale(0.97); }
   .kind-tile ha-icon { --mdc-icon-size: 28px; margin-bottom: 6px; color: var(--text); }
-  .kind-tile .name { font-size: 15px; font-weight: 600; }
+  .kind-tile .name { font-size: 15px; font-weight: 500; }
   @container (max-width: 560px) {
     .kind-tiles { grid-template-columns: 1fr; }
     .kind-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; min-height: 0; align-items: center; }
@@ -678,7 +672,7 @@ export const CSS = `
   .add-steps { margin: 6px 0 16px; padding: 0; list-style: none; counter-reset: step; }
   .add-steps li { position: relative; padding: 10px 4px 10px 44px; font-size: 15px; line-height: 1.45; counter-increment: step; }
   .add-steps li::before { content: counter(step); position: absolute; left: 4px; top: 8px; width: 28px; height: 28px; border-radius: 50%;
-                          display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: 14px; font-weight: 600; }
+                          display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: 14px; font-weight: 500; }
   .add-steps.tips li::before { content: "•"; background: none; font-size: 20px; }
   .add-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 6px; }
   .add-actions .pill:not(.go) { min-width: 180px; }
@@ -688,7 +682,7 @@ export const CSS = `
   .search-ring .track { stroke: var(--surface-2); }
   .search-ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; }
   .search-ring .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-                            font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+                            font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
   .search-ring .ring-text ha-icon { --mdc-icon-size: 40px; animation: breathe 2s ease-in-out infinite; }
   @keyframes breathe { 50% { opacity: 0.45; } }
   .rows .item.fresh { animation: pop 0.35s var(--ease); }
@@ -699,7 +693,7 @@ export const CSS = `
                 transition: transform 0.15s var(--ease), box-shadow 0.2s; }
   .input-tile:active { transform: scale(0.97); }
   .input-tile ha-icon { --mdc-icon-size: 26px; margin-bottom: 6px; }
-  .input-tile .name { font-size: 15px; font-weight: 600; }
+  .input-tile .name { font-size: 15px; font-weight: 500; }
   .input-tile .dim { display: flex; align-items: center; gap: 6px; }
   .input-tile.on { box-shadow: 0 0 0 2px #fff, 0 3px 10px rgba(0, 0, 0, 0.18); }
   .input-tile.unplugged { opacity: 0.5; }
@@ -715,7 +709,7 @@ export const CSS = `
   .sync-card { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; gap: 12px; padding: 12px 14px;
                border-radius: var(--radius); cursor: pointer; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
   .sync-card .text { flex: 1; min-width: 0; }
-  .sync-card .name { font-size: 15px; font-weight: 600; }
+  .sync-card .name { font-size: 15px; font-weight: 500; }
   .sync-card .status { font-size: 13px; opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sync-card .tv { width: 38px; height: 38px; }
   .sync-card .tv svg { width: 20px; height: 20px; }
@@ -741,7 +735,7 @@ export const CSS = `
             background: rgba(10, 98, 255, 0.16); }
   .notice svg { flex: none; color: #6c9dff; }
   .notice .grow { flex: 1; min-width: 0; }
-  .notice .go { flex: none; font-weight: 600; color: #6c9dff; }
+  .notice .go { flex: none; font-weight: 500; color: #6c9dff; }
   .notice:active { transform: scale(0.99); }
   /* A Sync Box drives lights: the Hue app's "Hue Sync is active" bar with its Stop button. */
   .sync-banner { display: flex; align-items: center; gap: 14px; margin: 14px 0 0; padding: 10px 10px 10px 18px; border-radius: 28px;
@@ -755,7 +749,7 @@ export const CSS = `
   .sync-banner .pill { height: 30px; padding: 0 12px; border-radius: 15px; font-size: 13px; background: rgba(255, 255, 255, 0.14); }
   /* Settings → Scene gallery: a category's rule opens under its row; whether it shows now. */
   .rule-row .chevron { flex: none; opacity: 0.5; }
-  .season-state { flex: none; font-size: 12px; font-weight: 600; color: var(--text-2); }
+  .season-state { flex: none; font-size: 12px; font-weight: 500; color: var(--text-2); }
   .season-state.on { color: #3ddc84; }
   .lead { margin: 0 2px 10px; font-size: 14px; line-height: 1.45; color: var(--text-2); }
   .lead.small { margin-top: 12px; font-size: 13px; }
@@ -794,7 +788,7 @@ export const CSS = `
   .sensor-hero .name-input { font-size: 22px; }
   .sensor-edit .rows { margin-top: 16px; }
   .sensor-edit h2.label + .rows { margin-top: 0; }
-  .sensor-edit .rows .item { min-height: 60px; gap: 20px; padding-left: 20px; font-size: 15px; }
+  .sensor-edit .rows .item { min-height: 68px; gap: 26px; padding: 12px 16px 12px 22px; font-size: 15px; }
   .sensor-edit .rows .item > ha-icon:first-child { --mdc-icon-size: 24px; color: var(--text); }
   .sensor-edit .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
@@ -823,7 +817,7 @@ export const CSS = `
   /* Motion sensitivity: the level, a stepped slider with the names under its stops, trying it out. */
   .sens-level { margin: 34px 0 18px; text-align: center; }
   .sens-level .label { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); }
-  .sens-level .value { margin-top: 4px; font-size: 20px; font-weight: 600; }
+  .sens-level .value { margin-top: 4px; font-size: 20px; font-weight: 500; }
   .sens-slider { --r: 13px; position: relative; padding: 0 8px; }
   .sens-slider input { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 30px; margin: 0; background: none; cursor: pointer; }
   .sens-slider input::-webkit-slider-runnable-track { height: 8px; border-radius: 4px;
@@ -860,9 +854,9 @@ export const CSS = `
   .devices-page .notice .go { --mdc-icon-size: 20px; }
   .devices-page .rows.kinds { margin-top: 16px; }
   .devices-page h2.label + .rows { margin-top: 0; }
-  .rows.device-list .item { min-height: 64px; gap: 18px; padding-left: 18px; font-size: 15px; }
+  .rows.device-list .item { min-height: 70px; gap: 22px; padding-left: 20px; font-size: 15px; }
   .rows.device-list .item + .item { position: relative; border-top: none; }
-  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 66px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+  .rows.device-list .item + .item::before { content: ""; position: absolute; top: 0; left: 72px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
   .rows.device-list .item > ha-icon:first-child { flex: none; display: flex; justify-content: center; width: 30px; --mdc-icon-size: 28px; color: var(--text); }
   .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rows.device-list .item .small { margin-top: 2px; font-size: 13px; }
@@ -876,7 +870,7 @@ export const CSS = `
   .daylight-page .scene-tiles { margin-top: 12px; }
   .chips.filters { gap: 8px; padding-top: 2px; }
   .chip.filter-chip { height: 30px; gap: 2px; padding: 0 6px 0 12px; border-radius: 15px; border: none; background: rgba(120, 120, 128, 0.28);
-                      font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+                      font-size: 12px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
   .chip.filter-chip span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip.filter-chip ha-icon { --mdc-icon-size: 18px; }
   .chip.filter-chip.on { background: var(--accent); }
@@ -887,7 +881,7 @@ export const CSS = `
   .sensor-hero > .small.warn { margin-top: -4px; font-size: 13px; font-weight: 500; }
   .device-edit .rows .item .value { max-width: 50%; text-align: right; }
   .info-box { margin: 22px 0 0; padding: 14px 16px; border: 1.5px solid rgba(10, 98, 255, 0.6); border-radius: 12px; background: rgba(10, 98, 255, 0.1); }
-  .info-box .info-head { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; letter-spacing: 1.6px;
+  .info-box .info-head { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; letter-spacing: 1.6px;
                          text-transform: uppercase; color: #6c9dff; }
   .info-box .info-head ha-icon { --mdc-icon-size: 22px; color: inherit; }
   .info-box p { margin: 8px 0 0; font-size: 15px; line-height: 1.45; }
@@ -907,7 +901,7 @@ export const CSS = `
                             font: inherit; color: inherit; text-align: left; cursor: pointer; }
   .ma-steps { display: flex; gap: 6px; margin-left: auto; }
   .ma-steps span { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
-                   background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 600; color: var(--text-2); }
+                   background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 500; color: var(--text-2); }
   .ma-steps span.on { background: var(--accent); color: #fff; }
   .ma-page h1.ma-title { margin: 6px 2px 8px; }
   .ma-page .ma-art { --mdc-icon-size: 64px; color: var(--accent); }
@@ -945,7 +939,7 @@ export const CSS = `
            background: var(--surface); }
   .today .pic { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
   .today .text { flex: 1; min-width: 160px; }
-  .today .name { font-size: 16px; font-weight: 600; margin: 2px 0; }
+  .today .name { font-size: 16px; font-weight: 500; margin: 2px 0; }
   .today-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .today-actions .pill { text-transform: none; letter-spacing: 0; font-size: 13px; }
   .empty-today { color: var(--text-2); font-size: 14px; }
@@ -960,7 +954,7 @@ export const CSS = `
   .scene-tiles .tile .tile-open { position: absolute; inset: 0; z-index: 1; padding: 0; border: none; background: none; cursor: pointer; }
   .scene-tiles .tile .tile-open ~ span { pointer-events: none; }
   /* Settings → Light of the day */
-  .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 8px; vertical-align: 1px; font-size: 11px; font-weight: 600;
+  .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 8px; vertical-align: 1px; font-size: 11px; font-weight: 500;
              background: rgba(255, 214, 102, 0.9); color: #1c1c1e; }
   .sheet .box.tag-editor { width: min(100%, 560px); }
   .tag-editor .sheet-bar { gap: 12px; }
@@ -1016,7 +1010,7 @@ export const CSS = `
   .steps-list { margin: 10px 0 0; padding: 0; list-style: none; }
   .steps-list .item { align-items: flex-start; font-size: 15px; line-height: 1.4; }
   .step-no { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 50%;
-             background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 600; }
+             background: rgba(120, 120, 128, 0.32); font-size: 12px; font-weight: 500; }
   .scan-state { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; font-size: 12px; color: var(--text-2); }
   .spinner { width: 12px; height: 12px; flex: none; box-sizing: border-box; border: 2px solid rgba(235, 235, 245, 0.25); border-top-color: var(--text-2);
              border-radius: 50%; animation: spin 0.9s linear infinite; }
@@ -1026,7 +1020,7 @@ export const CSS = `
   .bridge-add .item.col .dim.small { margin-top: 8px; }
   .link-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 28px auto 0; text-align: center; }
   .link-state .lead { margin: 6px 0 0; }
-  .link-title { margin: 18px 0 0; font-size: 18px; font-weight: 600; line-height: 1.25; }
+  .link-title { margin: 18px 0 0; font-size: 18px; font-weight: 500; line-height: 1.25; }
   .link-art { width: 132px; height: 132px; }
   .bridge-art { width: 100%; height: 100%; }
   .bridge-art .body { fill: #e9e9ee; }
@@ -1060,12 +1054,16 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  .settings-page .rows:not(.device-list) .item { min-height: 60px; gap: 20px; padding-left: 20px; font-size: 15px; }
+  .settings-page .rows:not(.device-list) .item { min-height: 68px; gap: 26px; padding: 12px 16px 12px 22px; font-size: 15px; }
   .settings-page .rows:not(.device-list) .item > ha-icon:first-child { flex: none; --mdc-icon-size: 24px; color: var(--text); }
   .settings-page .rows .item .dim.small { margin-top: 2px; font-size: 13px; }
+  /* Row titles are medium (the Hue app's); what a row says under or beside its title stays regular. */
+  :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item { font-weight: 500; }
+  :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item :is(.dim, .small, .value, .value-text, input),
+  .rows.device-list .item :is(.dim, .small, .value) { font-weight: 400; }
   .settings-page .rows:not(.device-list) .item + .item { position: relative; border-top: none; }
   .settings-page .rows:not(.device-list) .item + .item::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
-  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 64px; }
+  .settings-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 72px; }
   .settings-page h2.label { margin-top: 28px; }
   .settings-page .section-head h2.label { margin: 0 2px; }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
@@ -1085,7 +1083,7 @@ export const CSS = `
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
   .choice-sheet .form-body { max-height: min(70vh, 640px); overflow: auto; overscroll-behavior: contain; }
-  .choice-sheet .rows .item { min-height: 56px; gap: 18px; font-size: 15px; }
+  .choice-sheet .rows .item { min-height: 60px; gap: 22px; font-size: 15px; }
   .choice-sheet .rows .item > ha-icon:first-child { --mdc-icon-size: 22px; }
   .choice-sheet .rows + h2.label { margin-top: 20px; }
   .choice-page .rows.choice-list { margin-top: 12px; }
@@ -1100,7 +1098,7 @@ export const CSS = `
   .rows .item.days-item { flex-direction: column; align-items: stretch; gap: 12px; padding-top: 14px; padding-bottom: 16px; }
   .days-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; max-width: 380px; }
   .days-row button { width: 40px; height: 40px; padding: 0; border: none; border-radius: 50%; cursor: pointer; background: rgba(120, 120, 128, 0.24);
-                     color: var(--text-2); font: inherit; font-size: 13px; font-weight: 600; transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
+                     color: var(--text-2); font: inherit; font-size: 13px; font-weight: 500; transition: background 0.2s, color 0.2s, transform 0.15s var(--ease); }
   .days-row button.on { background: var(--accent); color: #fff; }
   .days-row button:active { transform: scale(0.92); }
   /* Under a screen's rows: its main button, then "Open in Home Assistant" and "Delete". */

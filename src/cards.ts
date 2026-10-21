@@ -72,7 +72,7 @@ const CARD_CSS = css`
   .body { padding: 14px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .grow { flex: 1; min-width: 0; }
-  .name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .link { display: block; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: inherit; }
   .card-head.surface { margin: -14px -14px 0; padding: 14px; border-radius: 0; }
@@ -107,7 +107,7 @@ const CARD_CSS = css`
   .gtiles::-webkit-scrollbar { display: none; }
   .gtile { position: relative; height: 84px; border-radius: 12px; border: none; padding: 0; cursor: pointer; overflow: hidden;
            background-size: cover; background-position: center; }
-  .gtile span { position: absolute; left: 8px; right: 8px; bottom: 6px; font-size: 12px; font-weight: 600; color: #fff; text-align: left;
+  .gtile span { position: absolute; left: 8px; right: 8px; bottom: 6px; font-size: 12px; font-weight: 500; color: #fff; text-align: left;
                 text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gtile.done::after { content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
                        font-size: 28px; color: #fff; background: rgba(0, 0, 0, 0.35); }

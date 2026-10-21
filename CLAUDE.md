@@ -144,11 +144,15 @@ touching anything outside this repository.
   A UI change is not done without screenshots.
 - **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
   Home: room and zone names 16px (as automation card titles), a step above the room and
-  zone screens' tiles (14px); other screens: rows 15px with 13px
-  subtitles and 24px icons, text from ~64px, rows ≥60px. Switches have a small knob well
-  inside the track: the master switch in a header 52×32 (knob 24, as tall as the 32px
-  round header buttons), every other one 46×28 (knob 20); action buttons are the regular 34px `.pill`, an editor's
+  zone screens' tiles (14px). List rows (settings, devices, sensors, editors, choice
+  sheets) are the Hue app's: ≥68px tall, 24px icons, text from 72px, titles 15px medium
+  with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
+  the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
+  10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
   "Save" sits in its header, "Delete" is the red outlined pill at the bottom.
+- **Font weights: 400, 500 and 700 only.** HA loads Roboto as separate files (100, 300,
+  400, 500, 700, 900), so 600 renders as 700 and 800 as 900 there. Keep the font as it is
+  (`--ha-font-family-body`, falling back to the system font in the harness).
 - **The on-screen keyboard.** Text fields are at least 16px (smaller ones make iOS zoom in).
   While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
   what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
