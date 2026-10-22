@@ -31,18 +31,24 @@ Without a path the upstream repository is shallow-cloned into a temporary direct
 `--images` only refreshes `public_image` and `picture` in the existing gallery.json.
 `--pictures <file>` rewrites `hue_scene_pictures.json` from the Hue app's gallery
 (its `CdpStorageScenes` file), then refreshes them.
+`--app-defaults <apk>` puts the Hue app's pictures of the defaults (Read, Relax, …),
+which it keeps inside the app, into `local/` for this install only: they are Signify's
+and the folder is not in the repository (pictures.py serves it first). The Android app's
+APK, or its XAPK.
 """
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
-from typing import Any
+from typing import IO, Any
 import unicodedata
+import zipfile
 
 from PIL import Image
 
@@ -57,6 +63,10 @@ OUT = (
 # The upstream author's own presets, not part of the Hue app gallery.
 SKIP_CATEGORIES = {"Misc Additions"}
 THUMB_SIZE = (480, 270)
+# The size pictures.py asks the Hue app's pictures in.
+PICTURE_SIZE = (960, 540)
+APP_PACKAGE = "com.philips.lighting.hue2.apk"
+APP_DEFAULTS = "assets/flutter_assets/packages/preset_scenes/assets/scenes/3x/recipes_"
 PUBLIC_IMAGES = Path(__file__).resolve().parent / "hue_public_images.json"
 PICTURES = Path(__file__).resolve().parent / "hue_scene_pictures.json"
 # Scenes the Hue app has renamed since upstream recorded them (same colors), by our id;
@@ -89,15 +99,39 @@ def white_mirek(x: float, y: float) -> int | None:
     return None
 
 
-def thumbnail(src: Path, dst: Path) -> None:
+def thumbnail(
+    src: Path | IO[bytes], dst: Path, size: tuple[int, int] = THUMB_SIZE
+) -> None:
     """Center-crop to 16:9 and save a JPEG tile."""
     im = Image.open(src).convert("RGB")
     w, h = im.size
     tw, th = (w, round(w * 9 / 16)) if w * 9 / 16 <= h else (round(h * 16 / 9), h)
     box = ((w - tw) // 2, (h - th) // 2, (w + tw) // 2, (h + th) // 2)
-    im.crop(box).resize(THUMB_SIZE, Image.Resampling.LANCZOS).save(
+    im.crop(box).resize(size, Image.Resampling.LANCZOS).save(
         dst, quality=78, optimize=True, progressive=True
     )
+
+
+def import_app_defaults(src: Path) -> list[str]:
+    """Write the Hue app's pictures of the defaults to `local/`; return their ids."""
+    gallery = json.loads((OUT / "gallery.json").read_text())
+    ids = {s["id"] for s in gallery["scenes"] if s["category"] == "defaults"}
+    with zipfile.ZipFile(src) as outer:
+        apk = (
+            zipfile.ZipFile(io.BytesIO(outer.read(APP_PACKAGE)))
+            if APP_PACKAGE in outer.namelist()
+            else outer
+        )
+        local = OUT / "local"
+        local.mkdir(exist_ok=True)
+        done = []
+        for scene_id in sorted(ids):
+            name = f"{APP_DEFAULTS}{scene_id}.webp"
+            if name in apk.namelist():
+                picture = io.BytesIO(apk.read(name))
+                thumbnail(picture, local / f"{scene_id}.jpg", PICTURE_SIZE)
+                done.append(scene_id)
+    return done
 
 
 def add_public_images(scenes: list[dict[str, Any]]) -> tuple[int, int]:
@@ -215,6 +249,10 @@ def build(src: Path) -> None:
 
 def main() -> None:
     """Entry point."""
+    if sys.argv[1:2] == ["--app-defaults"] and len(sys.argv) == 3:
+        done = import_app_defaults(Path(sys.argv[2]))
+        print(f"{len(done)} defaults from the Hue app -> {OUT / 'local'}: {done}")
+        return
     if sys.argv[1:2] == ["--pictures"] and len(sys.argv) == 3:
         print(f"{import_pictures(Path(sys.argv[2]))} Hue app pictures -> {PICTURES}")
     if sys.argv[1:2] in (["--images"], ["--pictures"]):

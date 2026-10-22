@@ -228,7 +228,9 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
   gallery), which HA downloads on first use into its cache and serves at
   `/api/hue_studio/gallery/<id>.jpg` (`pictures.py`), the bundled tile standing in until
   then. The Hue app's pictures never go into the repository. The defaults (Read, Relax, …)
-  have none: the Hue app ships those inside the app.
+  have none: the Hue app ships those inside the app. A picture in the git-ignored
+  `frontend/gallery/local/<id>.jpg` comes first (`build_gallery.py --app-defaults <apk>`
+  puts the Hue app's defaults there for one install).
 - Light icons are the Hue app's, from [elax46/custom-brand-icons](https://github.com/elax46/custom-brand-icons)
   (MIT, attribution in `NOTICE`): a light's CLIP v2 archetype (the shape picked in the Hue app),
   refined by its product name, picks the icon; an icon set in HA's entity settings wins.

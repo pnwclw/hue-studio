@@ -5,6 +5,10 @@ with a `picture` (the address of its picture in the Hue app's gallery) is served
 that picture instead: downloaded on first use into `.cache/hue_studio/gallery/` and from
 there on served locally. Until it is there, when it can't be downloaded and for scenes
 without one, the bundled tile is served.
+
+A picture in `frontend/gallery/local/<scene id>.jpg` comes before all of them: pictures
+an install has of its own and may not share (the Hue app's defaults, which it keeps
+inside the app: `build_gallery.py --app-defaults`). The folder is not in the repository.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PICTURE_URL = f"/api/{DOMAIN}/gallery/{{scene_id}}.jpg"
 THUMB_DIR = Path(__file__).parent / "frontend" / "gallery" / "thumb"
+LOCAL_DIR = Path(__file__).parent / "frontend" / "gallery" / "local"
 # Twice the 480x270 tile (sharp on phones), cropped to fill, as JPEG.
 PICTURE_QUERY = {"w": "960", "h": "540", "fit": "fill", "fm": "jpg", "q": "80"}
 MAX_BYTES = 2_000_000
@@ -58,6 +63,9 @@ class GalleryPictureView(HomeAssistantView):
         scene = (await async_gallery_scenes(self.hass)).get(scene_id)
         if scene is None:
             return web.Response(status=HTTPStatus.NOT_FOUND)
+        local = LOCAL_DIR / f"{scene_id}.jpg"
+        if await self.hass.async_add_executor_job(local.is_file):
+            return web.FileResponse(local, headers={"Cache-Control": CACHED})
         if (url := scene.get("picture")) and (path := await self._picture(url)):
             return web.FileResponse(path, headers={"Cache-Control": CACHED})
         # The browser asks again next time, when the picture may be there.

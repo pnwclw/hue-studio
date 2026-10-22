@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from homeassistant.components.frontend import DATA_PANELS
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
@@ -58,9 +59,13 @@ async def test_gallery_picture(
     studio_entry: MockConfigEntry,
     mock_bridge: MagicMock,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A gallery picture is the Hue app's, downloaded once; the tile stands in."""
     hass.config.config_dir = str(tmp_path)
+    local = tmp_path / "local"
+    local.mkdir()
+    monkeypatch.setattr(f"{PICTURES}.LOCAL_DIR", local)
     assert await hass.config_entries.async_setup(studio_entry.entry_id)
     await hass.async_block_till_done()
     scenes = await async_gallery_scenes(hass)
@@ -99,3 +104,9 @@ async def test_gallery_picture(
     assert await resp.read() == (THUMB_DIR / f"{plain['id']}.jpg").read_bytes()
     resp = await client.get("/api/hue_studio/gallery/not_a_scene.jpg")
     assert resp.status == 404
+
+    # A picture of its own (not in the repository) comes first.
+    for own in (scene, plain):
+        (local / f"{own['id']}.jpg").write_bytes(b"own")
+        resp = await client.get(f"/api/hue_studio/gallery/{own['id']}.jpg")
+        assert await resp.read() == b"own"
