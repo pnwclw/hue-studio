@@ -63,7 +63,9 @@ touching anything outside this repository.
      `hue_studio.apply_light` shows them and keeps them up with the day — and with the
      mood and the global settings — while nobody changes the lights (memory only). Our automations have ids `hue_studio_<type>_…` and
      get the "Hue Studio" label and category and the area of their one room. Their places
-     are areas (`rooms`) and Hue rooms/zones no area holds (`zones`, group lights); the
+     are areas (`rooms`), and Hue rooms/zones no area holds or single Hue lights (some of a
+     room's, the Hue app's light picker) in `zones` (an entity selector of Hue lights); a
+     scene on some of a room's lights shows on those only (each light's action); the
      panel lists them by room/zone from what HA reports they control (public
      `automations_with_area`/`_entity`) and reads their inputs through HA's automation
      config API (`automation/config` gives a blueprint automation expanded);
@@ -154,7 +156,9 @@ touching anything outside this repository.
 - **Times are chosen on wheels**, never the system's time picker: a time screen
   (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
   app's "Start at" — each kind (a time, sunrise, sunset, none) a row with a tick, the
-  chosen one's wheels under it, "Done" in the header.
+  chosen one's wheels under it, "Done" in the header. An automation's own time of day
+  (wake up, go to sleep) sits on its wheels in place (`timeWheels`), its fade on a sheet
+  with a slider and the time it leads to.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
@@ -325,7 +329,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                automations (the tab, "+" and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
+                                automations (the tab, "+" with a picture card per type and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
@@ -337,7 +341,9 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 choice.ts: a row with its value opens the list to pick from (a sheet for one value, a screen
                                 for several) — no <select>, segments or chips inside a section
   space.ts                      pure: placed lights, top-view coordinate mapping
-  automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows
+  automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows,
+                                the light picker (whole rooms/zones or single lights)
+  automation-art.ts             pictures of the automation types ("+" cards), drawn here
   daylight.ts                   pure: scene tags and pool views, an automation's own settings (extra/skipped, own phases, offsets),
                                 splitting settings from before 0.10
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`

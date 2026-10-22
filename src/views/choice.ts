@@ -1,6 +1,7 @@
 // Choices like the Hue app's: a row says what is chosen ("Fade in · 30 min ›") and opens the
 // list to choose from — a sheet for one value (from the bottom on phones), a screen of its
-// own for several values or several lists, and times on a screen of wheels (momentChoice).
+// own for several values or several lists, and times on a screen of wheels (momentChoice)
+// or, a plain time of day, on wheels in place (timeWheels).
 // Sections never hold a <select>, a segmented control or chips: the row tells, the list
 // chooses.
 
@@ -136,6 +137,19 @@ export function timeChoice(title: string, value: string, change: (hhmm: string) 
     },
     hint,
   );
+}
+
+const pad = (n: number): string => String(n).padStart(2, "0");
+const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: pad(h), label: pad(h) }));
+const MINUTES = Array.from({ length: 60 }, (_, m) => ({ value: pad(m), label: pad(m) }));
+
+/** Hours and minutes on two wheels side by side, one band across them ("HH:MM" in and out). */
+export function timeWheels(value: string, change: (hhmm: string) => void): TemplateResult {
+  const [h = "00", min = "00"] = value.split(":");
+  return html`<div class="wheels time">
+    <hue-studio-wheel .options=${HOURS} .value=${h} .change=${(v: string) => change(`${v}:${min}`)}></hue-studio-wheel>
+    <hue-studio-wheel .options=${MINUTES} .value=${min} .change=${(v: string) => change(`${h}:${v}`)}></hue-studio-wheel>
+  </div>`;
 }
 
 /** One list of a choice: its options with a tick (one value) or a check (several). */

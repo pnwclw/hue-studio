@@ -159,6 +159,40 @@ export function splitPlaces(places: string[]): { rooms: string[]; zones: string[
   };
 }
 
+/** A room or zone as the light picker sees it: its group key and its Hue lights. */
+export interface PlaceGroup {
+  key: string;
+  lights: string[];
+}
+
+/**
+ * What an automation has of a room or zone, like the Hue app's light picker: "all" (the
+ * room or zone itself), or which of its lights (single lights live among the zones, an
+ * entity selector of Hue lights). Zones are only ever whole.
+ */
+export function pickedOf(input: Pick<AutomationInput, "rooms" | "zones">, g: PlaceGroup): "all" | string[] {
+  if (placesOf(input).includes(g.key)) return "all";
+  if (!g.key.startsWith(AREA)) return [];
+  const zones = input.zones || [];
+  return g.lights.filter((l) => zones.includes(l));
+}
+
+/** The whole room or zone in or out (its single lights go either way). */
+export function withGroup(input: AutomationInput, g: PlaceGroup): Pick<AutomationInput, "rooms" | "zones"> {
+  const all = pickedOf(input, g) === "all";
+  const places = placesOf(input).filter((k) => k !== g.key && !(k.startsWith(HUE) && g.lights.includes(k.slice(HUE.length))));
+  return splitPlaces(all ? places : [...places, g.key]);
+}
+
+/** One light of a room in or out; all of its lights chosen are the room itself. */
+export function withLight(input: AutomationInput, g: PlaceGroup, light: string): Pick<AutomationInput, "rooms" | "zones"> {
+  const picked = pickedOf(input, g);
+  const now = picked === "all" ? g.lights.filter((l) => l !== light) : picked.includes(light) ? picked.filter((l) => l !== light) : [...picked, light];
+  const others = placesOf(input).filter((k) => k !== g.key && !(k.startsWith(HUE) && g.lights.includes(k.slice(HUE.length))));
+  const mine = now.length && g.lights.every((l) => now.includes(l)) ? [g.key] : now.map((l) => HUE + l);
+  return splitPlaces([...others, ...mine]);
+}
+
 /** Add or remove a room/zone (a group key). */
 export function withPlace(input: AutomationInput, key: string): Pick<AutomationInput, "rooms" | "zones"> {
   const places = placesOf(input);
@@ -283,12 +317,19 @@ export function cardLines(draft: AutomationDraft, name: string, t: Translate): {
   }
 }
 
-/** Names of the rooms (areas) and zones an automation uses. */
+/** Names of the rooms (areas) and zones an automation uses; single lights by their room. */
 export function roomsLine(hass: HassData, input: Pick<AutomationInput, "rooms" | "zones">): string {
-  return [
+  const roomOf = (id: string): string | null => {
+    if (hass.states[id]?.attributes.is_hue_group) return null;
+    const entry = hass.entities?.[id];
+    const area = entry?.area_id || (entry?.device_id ? hass.devices?.[entry.device_id]?.area_id : null);
+    return area ? hass.areas?.[area]?.name || area : null;
+  };
+  const names = [
     ...input.rooms.map((id) => hass.areas?.[id]?.name || id),
-    ...(input.zones || []).map((id) => hass.states[id]?.attributes.friendly_name || id),
-  ].join(", ");
+    ...(input.zones || []).map((id) => roomOf(id) || hass.states[id]?.attributes.friendly_name || id),
+  ];
+  return [...new Set(names)].join(", ");
 }
 
 /** The area an automation gets in HA: that of its one room (and no zone), else none. */
@@ -299,14 +340,19 @@ export const areaFor = (draft: AutomationDraft): string | null =>
 export interface Controls {
   areas?: string[];
   groups?: string[];
+  /** Single Hue lights (some of a room's). */
+  lights?: string[];
 }
 
 /**
- * Whether an automation belongs on the screen of a room or zone (a group key and its Hue
- * group entity): it controls that area or that Hue room/zone.
+ * Whether an automation belongs on the screen of a room or zone (a group key, its Hue
+ * group entity and its lights): it controls that area, that Hue room/zone, or some of the
+ * lights of that room.
  */
-export const controlsGroup = (c: Controls, key: string, group: string | null): boolean =>
-  (key.startsWith(AREA) && !!c.areas?.includes(key.slice(AREA.length))) || (!!group && !!c.groups?.includes(group));
+export const controlsGroup = (c: Controls, key: string, group: string | null, lights: string[] = []): boolean =>
+  (key.startsWith(AREA) && !!c.areas?.includes(key.slice(AREA.length))) ||
+  (!!group && !!c.groups?.includes(group)) ||
+  (key.startsWith(AREA) && !!c.lights?.some((l) => lights.includes(l)));
 
 /**
  * Whether an entity is an automation made with Hue Studio, for the more-info override: its

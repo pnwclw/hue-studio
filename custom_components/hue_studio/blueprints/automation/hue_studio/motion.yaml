@@ -62,10 +62,10 @@ blueprint:
                 - integration: hue
                   domain: light
         zones:
-          name: Zones
+          name: Zones and lights
           description: >-
             Hue rooms and zones (their group lights) that no area above holds, such
-            as a zone across several rooms.
+            as a zone across several rooms, and single Hue lights (some of a room's).
           default: []
           selector:
             entity:

@@ -28,7 +28,10 @@ import {
   offsetDuration,
   placesOf,
   offsetMinutes,
-  splitPlaces,
+  type PlaceGroup,
+  pickedOf,
+  withGroup,
+  withLight,
   type StartKind,
   toConfig,
   TYPE_ICONS,
@@ -55,14 +58,16 @@ import {
 import { thumbUrl } from "../gallery-data.ts";
 import { haptic, leavePanel } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { findGroup, friendlyName } from "../model.ts";
+import { allGroups, findGroup, friendlyName, type Group, lightIcon } from "../model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../types.ts";
+import { tileCard } from "../controls.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { type MomentKind, momentChoice, navRow, several, single, timeChoice } from "./choice.ts";
+import { type MomentKind, momentChoice, navRow, several, single, timeWheels } from "./choice.ts";
 import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine } from "./day-parts.ts";
 
-const FADES = [0, 1, 5, 10, 15, 20, 30, 45, 60, 90];
+/** The fade sheet's scale (minutes), like the Hue app's; a longer fade stretches it. */
+const FADE_MAX = 60;
 const OFF_AFTER = [0, 1, 2, 5, 10, 15, 20, 30, 45, 60, 120, 240];
 const BRIGHTNESS_LEVELS = Array.from({ length: 20 }, (_, i) => (i + 1) * 5);
 /** Minutes before (−) or after sunrise or sunset. */
@@ -103,6 +108,10 @@ export class AutomationEditView extends StudioView {
   @state() private accessor legacy: Legacy | null = null;
   @state() private accessor picker: Picker | null = null;
   @state() private accessor editingName = false;
+  /** The fade sheet: its minutes until "Done". */
+  @state() private accessor fadeSheet: { value: number } | null = null;
+  /** The light picker sheet: what it has chosen until "Done", the rooms opened in it. */
+  @state() private accessor lightsSheet: { places: Pick<AutomationInput, "rooms" | "zones">; open: string[] } | null = null;
   /** "On certain days" switched on while every day is still chosen. */
   @state() private accessor someDays = false;
   private previewKey = "";
@@ -200,13 +209,12 @@ export class AutomationEditView extends StudioView {
     const save = html`<button class="pill save" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>
       ${t(this.isNew ? "automations.create" : "zone.save")}
     </button>`;
-    return this.screen(
+    return html`${this.screen(
       this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save),
       html`${this.hero(d, typeName)}
         <h2 class="label">${t("automations.when")}</h2>
         ${this.when(d)}
-        <h2 class="label">${t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms")}</h2>
-        <div class="rows">${this.rooms(d)}</div>
+        ${this.selectedLights(d)}
         ${LIGHT_KINDS[d.type].length ? html`<h2 class="label">${t("automations.light")}</h2>${this.light(d)}` : nothing}
         ${lacking && lacking !== "rooms" /* the rooms row says so itself */
           ? html`<p class="hint warn">${t(`automations.missing_${lacking}` as StringKey)}</p>`
@@ -225,7 +233,9 @@ export class AutomationEditView extends StudioView {
                 </button>
               </div>`}`,
       "settings-page automation-page",
-    );
+    )}
+    ${this.fadeSheet ? this.fadeSheetView(d) : nothing}
+    ${this.lightsSheet ? this.lightsSheetView() : nothing}`;
   }
 
   /** Its picture and name (renamed in place), and its type when the name is another. */
@@ -313,10 +323,80 @@ export class AutomationEditView extends StudioView {
     </div>`;
   }
 
-  /** A time of day as a row; it opens the time screen (wheels). */
-  private time(glyph: string, title: string, value: string | undefined, change: (v: string) => void, sub = "") {
-    const current = hhmm(value);
-    return navRow({ icon: glyph, title, sub, value: current }, () => this.choose(timeChoice(title, current, (v) => change(`${v}:00`))));
+  /** A time of day on its wheels in place, like the Hue app's editor. */
+  private time(title: string, value: string | undefined, change: (v: string) => void) {
+    return html`<div class="item time-item">
+      <div class="grow">${title}</div>
+      ${timeWheels(hhmm(value) || "00:00", (v) => change(`${v}:00`))}
+    </div>`;
+  }
+
+  /** The fade as a row ("30 min"); it opens the fade sheet. */
+  private fadeRow(title: string, value: number | undefined) {
+    return navRow({ title, value: this.minutes(value ?? 0, "automations.instantly") }, () => {
+      haptic("selection");
+      this.fadeSheet = { value: value ?? 0 };
+    });
+  }
+
+  /** "06:30": a time of day some minutes from another ("HH:MM[:SS]"). */
+  private static shifted(time: string | undefined, minutes: number): string {
+    const [h = 0, m = 0] = hhmm(time).split(":").map(Number);
+    const total = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  }
+
+  /** What the fade means in time: when waking up starts, when going to sleep ends (null: no clock). */
+  private fadeMoment(d: AutomationDraft, fade: number): { label: string; time: string } | null {
+    const { t } = this.ctx;
+    if (d.type === "wake_up") return { label: t("automations.fade_starts"), time: AutomationEditView.shifted(d.input.time, -fade) };
+    if (d.type === "go_to_sleep") return { label: t("automations.fade_ends"), time: AutomationEditView.shifted(d.input.time, fade) };
+    return null;
+  }
+
+  /** The line under waking up and going to sleep: when the lights start or end. */
+  private fadeHint(d: AutomationDraft) {
+    const { t } = this.ctx;
+    const fade = d.input.fade ?? 0;
+    const moment = this.fadeMoment(d, fade);
+    if (!moment) return nothing;
+    const key = d.type === "wake_up" ? (fade ? "automations.wake_hint" : "automations.wake_hint_now") : "automations.sleep_hint";
+    return html`<p class="hint">${t(key, { time: moment.time, n: fade })}</p>`;
+  }
+
+  /** The fade sheet: minutes on a slider, the time they lead to beside them, "Done" keeps them. */
+  private fadeSheetView(d: AutomationDraft) {
+    const { t } = this.ctx;
+    const sheet = this.fadeSheet!;
+    const title = t(d.type === "wake_up" ? "automations.fade_in" : d.type === "go_to_sleep" ? "automations.fade_out" : "automations.fade");
+    const max = Math.max(FADE_MAX, Math.ceil(sheet.value / 10) * 10);
+    const moment = this.fadeMoment(d, sheet.value);
+    const close = () => (this.fadeSheet = null);
+    const done = () => {
+      haptic("success");
+      this.set({ fade: sheet.value });
+      close();
+    };
+    const ticks = Array.from({ length: max / 10 + 1 }, (_, i) => i * 10);
+    return html`<div class=${classMap({ sheet: true, bottom: this.ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form sensor-sheet fade-sheet" role="dialog" aria-label=${title}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+          <div class="grow">${title}</div>
+          <button class="pill save" @click=${done}>${t("color.done")}</button>
+        </div>
+        <div class="fade-body">
+          <div class="fade-values">
+            <div><div class="caps">${t("automations.fade_for")}</div><div class="big-value">${this.minutes(sheet.value, "automations.instantly")}</div></div>
+            ${moment ? html`<div><div class="caps">${moment.label}</div><div class="big-value">${moment.time}</div></div>` : nothing}
+          </div>
+          <hue-studio-slider class="fade-slider" .min=${0} .max=${max} .value=${sheet.value} .label=${title}
+            @value-input=${(e: CustomEvent<number>) => (this.fadeSheet = { value: Math.round(e.detail) })}
+            @value-change=${(e: CustomEvent<number>) => (this.fadeSheet = { value: Math.round(e.detail) })}></hue-studio-slider>
+          <div class="fade-ticks">${ticks.map((v) => html`<span>${v}</span>`)}</div>
+        </div>
+      </div>
+    </div>`;
   }
 
   /** "On certain days": off is every day, on opens the days of the week (the Hue app's "Repeat"). */
@@ -414,17 +494,21 @@ export class AutomationEditView extends StudioView {
     switch (d.type) {
       case "wake_up":
         return html`<div class="rows">
-          ${this.time("mdi:alarm", t("automations.wake_time"), i.time, (time) => this.set({ time }))}
-          ${this.days(d)}
-          ${this.minutesRow("mdi:transition", t("automations.fade_in"), t("automations.fade_in_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
-          ${this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
-        </div>`;
+            ${this.time(t("automations.wake_time"), i.time, (time) => this.set({ time }))}
+            ${this.fadeRow(t("automations.fade_in"), i.fade)}
+          </div>
+          ${this.fadeHint(d)}
+          <div class="rows">
+            ${this.days(d)}
+            ${this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
+          </div>`;
       case "go_to_sleep":
         return html`<div class="rows">
-          ${this.time("mdi:bed-clock", t("automations.time"), i.time, (time) => this.set({ time }))}
-          ${this.days(d)}
-          ${this.minutesRow("mdi:transition", t("automations.fade_out"), t("automations.fade_out_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
-        </div>`;
+            ${this.time(t("automations.time"), i.time, (time) => this.set({ time }))}
+            ${this.fadeRow(t("automations.fade_out"), i.fade)}
+          </div>
+          ${this.fadeHint(d)}
+          <div class="rows">${this.days(d)}</div>`;
       case "coming_home":
         return html`<p class="lead">${t("automations.coming_home_hint")}</p>
           <div class="rows">
@@ -437,7 +521,7 @@ export class AutomationEditView extends StudioView {
         return html`<p class="lead">${t("automations.mimic_hint")}</p>
           <div class="rows">
             ${this.moment(t("automations.start"), ["time", "sunset"] as const, i.start_kind === "sunset" ? "sunset" : "time", i.start_time, i.start_offset, start)}
-            ${this.time("mdi:clock-end", t("automations.end"), i.end_time, (end_time) => this.set({ end_time }))}
+            ${this.time(t("automations.end"), i.end_time, (end_time) => this.set({ end_time }))}
             ${this.days(d)}
           </div>
           <div class="rows">
@@ -450,7 +534,7 @@ export class AutomationEditView extends StudioView {
           ${this.moment(t("automations.end"), ["none", "time", "sunrise", "sunset"] as const, (i.end_kind || "none") as EndKind, i.end_time, i.end_offset, (p) =>
             this.set({ ...(p.kind ? { end_kind: p.kind } : {}), ...(p.time ? { end_time: p.time } : {}), ...(p.offset ? { end_offset: p.offset } : {}) }))}
           ${this.days(d)}
-          ${this.minutesRow("mdi:transition", t("automations.fade"), t("automations.fade_sub"), i.fade, FADES, "automations.instantly", (fade) => this.set({ fade }))}
+          ${this.fadeRow(t("automations.fade"), i.fade)}
         </div>`;
       case "motion":
         return this.motion(d);
@@ -527,32 +611,141 @@ export class AutomationEditView extends StudioView {
 
   // ---- rooms and light ----
 
-  /** Rooms (HA areas) and zones (Hue rooms/zones no area holds), as on the home screen. */
-  private rooms(d: AutomationDraft) {
+  /**
+   * Where the automation's lights are, like the Hue app's: each room or zone it has as a
+   * tile (the whole of it, or how many of its lights), places no longer known with them.
+   */
+  private places(input: Pick<AutomationInput, "rooms" | "zones">): { group: Group | null; key: string; picked: "all" | string[] }[] {
+    const { ctx } = this;
+    const found = allGroups(ctx.home)
+      .map((group) => ({ group, key: group.key, picked: pickedOf(input, group) }))
+      .filter((p) => p.picked === "all" || p.picked.length);
+    // Rooms and zones gone from the home screen, and single lights of no room shown here.
+    const known = new Set([...found.map((p) => p.key), ...ctx.home.rooms.flatMap((g) => g.lights.map((l) => `hue.${l}`))]);
+    const gone = placesOf(input)
+      .filter((k) => !known.has(k))
+      .map((key) => ({ group: null, key, picked: "all" as const }));
+    return [...found, ...gone];
+  }
+
+  private selectedLights(d: AutomationDraft) {
     const { ctx } = this;
     const { t } = ctx;
-    const places = placesOf(d.input);
-    const groups = [...ctx.home.rooms, ...ctx.home.zones];
-    const chosen = groups.filter((g) => places.includes(g.key));
-    const title = t(ctx.home.zones.length ? "automations.rooms_zones" : "automations.rooms");
-    const options = groups.map((g) => ({
-      value: g.key,
-      label: g.name,
-      icon: g.icon,
-      sub: ctx.home.zones.includes(g) ? t("automations.zone_kind") : undefined,
-    }));
-    // Places no longer on the home screen stay chosen until unticked (they are listed last).
-    const gone = places.filter((k) => !groups.some((g) => g.key === k));
-    const goneOptions = gone.map((k) => ({ value: k, label: t("automations.place_gone"), sub: k.slice(k.indexOf(".") + 1), icon: "mdi:help-circle-outline" }));
-    return navRow(
-      {
-        icon: chosen[0]?.icon || "mdi:sofa-outline",
-        title: chosen.length ? chosen.map((g) => g.name).join(", ") : t("automations.rooms_none"),
-        warn: !chosen.length || !!gone.length,
-        sub: !chosen.length ? t("automations.missing_rooms") : gone.length ? t("automations.place_gone") : undefined,
-      },
-      () => this.choose(several(title, [...options, ...goneOptions], places, (keys) => this.set(splitPlaces(keys)))),
-    );
+    const places = this.places(d.input);
+    const edit = () => {
+      haptic("selection");
+      const open = places.filter((p) => p.picked !== "all" && p.group).map((p) => p.key);
+      this.lightsSheet = { places: { rooms: d.input.rooms, zones: d.input.zones || [] }, open };
+    };
+    return html`<div class="rows lights-card">
+      <div class="item lights-head">
+        <div class="grow">${t("automations.selected_lights")}</div>
+        <button class="round" aria-label=${t("automations.edit_lights")} @click=${edit}>${icon("pencil")}</button>
+      </div>
+      ${places.length
+        ? html`<div class="place-tiles">
+            ${places.map(({ group, key, picked }) => {
+              const id = key.slice(key.indexOf(".") + 1);
+              const zone = !!group && ctx.home.zones.includes(group);
+              const sub = !group
+                ? t("automations.place_gone")
+                : picked === "all"
+                  ? t(zone ? "automations.entire_zone" : "automations.entire_room")
+                  : t(picked.length === 1 ? "automations.one_light" : "automations.n_lights", { count: picked.length });
+              return html`<button class=${classMap({ "place-tile": true, gone: !group })} @click=${edit}>
+                <ha-icon icon=${group?.icon || "mdi:help-circle-outline"}></ha-icon>
+                <span class="name">${group?.name || id}</span>
+                <span class="sub">${sub}</span>
+              </button>`;
+            })}
+          </div>`
+        : html`<button class="item nav lights-empty" @click=${edit}>
+            <div class="grow dim warn">${t("automations.missing_rooms")}</div>
+            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+          </button>`}
+    </div>`;
+  }
+
+  /** The light picker, like the Hue app's "Edit lights": rooms with their lights, zones whole. */
+  private lightsSheetView() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const sheet = this.lightsSheet!;
+    const input = { ...this.draft!.input, ...sheet.places };
+    const set = (places: Pick<AutomationInput, "rooms" | "zones">) => {
+      haptic("selection");
+      this.lightsSheet = { ...sheet, places };
+    };
+    const close = () => (this.lightsSheet = null);
+    const done = () => {
+      haptic("success");
+      this.set(sheet.places);
+      close();
+    };
+    const check = (state: "all" | "some" | "none") =>
+      html`<span class=${classMap({ "pick-check": true, [state]: true })}>${state === "all" ? icon("check") : state === "some" ? html`<i></i>` : nothing}</span>`;
+    const room = (g: Group, zone: boolean) => {
+      const picked = pickedOf(input, g);
+      const state = picked === "all" ? "all" : picked.length ? "some" : "none";
+      const open = !zone && sheet.open.includes(g.key);
+      const sub =
+        state === "all"
+          ? t(zone ? "automations.entire_zone_selected" : "automations.entire_room_selected")
+          : state === "some"
+            ? t("automations.some_selected", { count: (picked as string[]).length, total: g.lights.length })
+            : "";
+      const flip = () => {
+        set(withGroup(input, g as PlaceGroup));
+      };
+      const expand = () => {
+        haptic("selection");
+        this.lightsSheet = { ...sheet, open: open ? sheet.open.filter((k) => k !== g.key) : [...sheet.open, g.key] };
+      };
+      return html`<div class="pick-room">
+        <div class="item">
+          <button class="pick-toggle" role="checkbox" aria-checked=${state === "all" ? "true" : state === "some" ? "mixed" : "false"} aria-label=${g.name} @click=${flip}>${check(state)}</button>
+          <button class="pick-name" @click=${zone ? flip : expand}>
+            <span class="grow">${g.name}${sub ? html`<span class="dim small">${sub}</span>` : nothing}</span>
+          </button>
+          ${zone
+            ? nothing
+            : html`<button class=${classMap({ round: true, expand: true, open })} aria-expanded=${open} aria-label=${g.name} @click=${expand}>
+                <ha-icon icon="mdi:chevron-down"></ha-icon>
+              </button>`}
+        </div>
+        ${open
+          ? html`<div class="pick-lights">
+              ${g.lights.map((id) => {
+                const on = picked === "all" || picked.includes(id);
+                return tileCard({
+                  art: html`<ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>`,
+                  name: friendlyName(ctx.hass, id),
+                  toggle: check(on ? "all" : "none"),
+                  classes: { "pick-light": true, on },
+                  click: () => set(withLight(input, g as PlaceGroup, id)),
+                });
+              })}
+            </div>`
+          : nothing}
+      </div>`;
+    };
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form sensor-sheet lights-sheet" role="dialog" aria-label=${t("automations.edit_lights")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+          <div class="grow">${t("automations.edit_lights")}</div>
+          <button class="pill save" @click=${done}>${t("color.done")}</button>
+        </div>
+        <div class="lights-body">
+          <h2 class="label">${t("automations.rooms")}</h2>
+          <div class="rows pick-rows">${ctx.home.rooms.map((g) => room(g, false))}</div>
+          ${ctx.home.zones.length
+            ? html`<h2 class="label">${t("automations.zones")}</h2>
+                <div class="rows pick-rows">${ctx.home.zones.map((g) => room(g, true))}</div>`
+            : nothing}
+        </div>
+      </div>
+    </div>`;
   }
 
   private light(d: AutomationDraft) {
@@ -582,7 +775,7 @@ export class AutomationEditView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const scenes = d.input.scenes || [];
-    return html`${placesOf(d.input).map((key) => {
+    return html`${this.places(d.input).map(({ key }) => {
         const group = findGroup(ctx.home, key);
         // A place with no Hue lights left is not on the home screen: its HA name, or that it is gone.
         const id = key.slice(key.indexOf(".") + 1);

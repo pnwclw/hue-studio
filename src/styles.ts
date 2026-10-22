@@ -1101,6 +1101,73 @@ export const CSS = `
   .automation-page .rows:not(.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .swatch-dot, .tag-pic):first-child)::before { left: 16px; }
   .automation-page .sensor-hero h1.big { font-size: 24px; }
   .automation-page .name-row .type-icon { --mdc-icon-size: 28px; color: var(--text); }
+  /* "+": a picture card for each automation type, like the Hue app's. */
+  h1.big.new-question { margin: 8px 2px 18px; font-size: 26px; }
+  .type-cards { display: grid; gap: 12px; }
+  main.wide .type-cards { grid-template-columns: 1fr 1fr; }
+  .type-card { position: relative; display: block; width: 100%; height: 172px; padding: 0; border: none; border-radius: 14px; overflow: hidden;
+               background: #222; color: #fff; font: inherit; text-align: left; cursor: pointer; transition: transform 0.15s var(--ease); }
+  .type-card:active { transform: scale(0.98); }
+  .type-card svg.art { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .type-card::after { content: ""; position: absolute; inset: 30% 0 0; background: linear-gradient(transparent, rgba(0, 0, 0, 0.66)); }
+  .type-card .text { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; display: flex; flex-direction: column; gap: 3px; }
+  .type-card .title { font-size: 19px; font-weight: 500; }
+  .type-card .sub { font-size: 15px; line-height: 1.3; color: rgba(255, 255, 255, 0.82); }
+  .type-cards + .rows { margin-top: 16px; }
+  /* A time of day on its wheels in place (wake up, go to sleep): the title over them. */
+  .automation-page .rows .item.time-item { display: block; padding: 12px 8px 6px 16px; }
+  .automation-page .rows .item.time-item .wheels { margin: 4px 0 0 -8px; }
+  .automation-page .rows .item.time-item .wheels::before { border-radius: 10px; }
+  .automation-page .hint + .rows { margin-top: 16px; }
+  /* Selected lights, like the Hue app's: a card with its pencil, a tile for each room or zone. */
+  .lights-card .item.lights-head { min-height: 60px; }
+  .lights-card .lights-head .round { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+  .lights-card .lights-head .round svg { width: 18px; height: 18px; }
+  .place-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 2px 12px 14px; }
+  .place-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: none;
+                border-radius: 12px; background: #3a3a3c; color: var(--text); font: inherit; text-align: left; cursor: pointer;
+                transition: transform 0.15s var(--ease); }
+  .place-tile:active { transform: scale(0.96); }
+  .place-tile ha-icon { --mdc-icon-size: 28px; margin-bottom: 14px; }
+  .place-tile .name { max-width: 100%; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .place-tile .sub { max-width: 100%; font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .place-tile.gone .sub { color: #ffb340; }
+  .lights-card .lights-empty .warn { font-weight: 400; font-size: 15px; }
+  /* The fade sheet: minutes and the time they lead to, a slider with its scale under it. */
+  .fade-sheet .fade-body { padding: 22px 20px calc(22px + var(--safe-bottom)); }
+  .fade-values { display: flex; justify-content: space-around; text-align: center; }
+  .fade-values .caps { font-size: 12px; font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
+  .fade-values .big-value { margin-top: 4px; font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .fade-sheet .fade-slider { height: 8px; margin: 30px 8px 0; border-radius: 4px; background: rgba(255, 255, 255, 0.16); }
+  .fade-sheet .fade-slider .fill { border-radius: 4px; background: linear-gradient(90deg, #0a3fb8, var(--accent)); }
+  .fade-sheet .fade-slider .knob { width: 18px; height: 18px; }
+  .fade-ticks { display: flex; justify-content: space-between; margin: 14px 0 0; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .fade-ticks span { width: 16px; text-align: center; }
+  /* The light picker ("Edit lights"): a room's check (whole, some, none), its lights in a strip. */
+  .sheet .box.lights-sheet { display: flex; flex-direction: column; width: min(100%, 520px); max-height: min(100%, 760px); }
+  .sheet.bottom .box.lights-sheet { width: 100%; max-height: calc(100% - var(--safe-top) - 24px); }
+  .lights-sheet .lights-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 calc(18px + var(--safe-bottom)); }
+  .lights-sheet h2.label { margin: 18px 16px 8px; }
+  .lights-sheet .rows.pick-rows { border-radius: 0; background: #333336; }
+  .pick-room + .pick-room { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+  .pick-room > .item { display: flex; align-items: center; gap: 4px; min-height: 68px; padding: 0 14px 0 4px; }
+  .pick-toggle, .pick-name { border: none; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
+  .pick-toggle { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; flex: none; }
+  .pick-name { flex: 1; min-width: 0; height: 68px; display: flex; align-items: center; text-align: left; font-size: 15px; font-weight: 500; }
+  .pick-name .grow { display: flex; flex-direction: column; min-width: 0; }
+  .pick-name .dim.small { font-size: 13px; font-weight: 400; }
+  .pick-check { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; box-sizing: border-box; border-radius: 50%;
+                border: 1.5px solid rgba(255, 255, 255, 0.4); color: #fff; }
+  .pick-check.all, .pick-check.some { border-color: var(--accent); background: var(--accent); }
+  .pick-check svg { width: 16px; height: 16px; }
+  .pick-check i { width: 10px; height: 2px; border-radius: 1px; background: #fff; }
+  .pick-room .round.expand { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+  .pick-room .round.expand ha-icon { --mdc-icon-size: 22px; justify-content: center; transition: transform 0.2s var(--ease); }
+  .pick-room .round.expand.open ha-icon { transform: rotate(180deg); }
+  .pick-lights { display: flex; gap: 10px; padding: 2px 16px 16px 56px; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; }
+  .pick-lights::-webkit-scrollbar { display: none; }
+  .pick-lights .tile-card { flex: none; width: 104px; --zone: 44px; background: #3a3a3c; box-shadow: none; }
+  .pick-lights .tile-card > .switch-zone { background: rgba(0, 0, 0, 0.12); }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
@@ -1118,7 +1185,9 @@ export const CSS = `
   .wheels::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 36px; transform: translateY(-50%);
                     border-radius: 10px; background: rgba(120, 120, 128, 0.24); pointer-events: none; }
   hue-studio-wheel { position: relative; display: block; flex: 1; min-width: 0; }
-  .wheels.time hue-studio-wheel { flex: none; width: 48px; }
+  /* Hours and minutes close together, like the Hue app's. */
+  .wheels.time { gap: 6px; }
+  .wheels.time hue-studio-wheel { flex: none; width: 40px; }
   .wheel-scroll { height: 160px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; scroll-snap-type: y mandatory; scrollbar-width: none;
                   padding: 64px 0; box-sizing: border-box; perspective: 260px; -webkit-mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent);
                   mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }

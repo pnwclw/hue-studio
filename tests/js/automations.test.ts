@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allDayDraft, areaFor, cardLines, controlsGroup, daysLine, fromConfig, isOurAutomation, lightLine, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, summaryRows, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
+import { allDayDraft, areaFor, cardLines, controlsGroup, pickedOf, withGroup, withLight, daysLine, fromConfig, isOurAutomation, lightLine, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, summaryRows, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
 import { localize } from "../../src/i18n.ts";
 
 const t = localize(null);
@@ -94,6 +94,43 @@ test("rooms and zones of an automation", () => {
   assert.equal(controlsGroup(controls, "hue.light.tv_area", "light.tv_area"), true);
   assert.equal(controlsGroup(controls, "area.balcony", "light.balcony"), false);
   assert.equal(controlsGroup({}, "area.office", null), false);
+  // Some lights of a room: listed under that room.
+  assert.equal(controlsGroup({ lights: ["light.desk"] }, "area.office", null, ["light.desk", "light.lamp"]), true);
+  assert.equal(controlsGroup({ lights: ["light.desk"] }, "area.balcony", null, ["light.garland"]), false);
+});
+
+test("lights of a room are picked like in the Hue app's picker", () => {
+  const office = { key: "area.office", lights: ["light.desk", "light.lamp", "light.strip"] };
+  const zone = { key: "hue.light.tv_area", lights: ["light.desk"] };
+  let input = newDraft("go_to_sleep", "Sleep", ["area.office"]).input;
+  assert.equal(pickedOf(input, office), "all");
+  // One light out of the whole room: the others stay as single lights.
+  input = { ...input, ...withLight(input, office, "light.lamp") };
+  assert.deepEqual(input.rooms, []);
+  assert.deepEqual(input.zones, ["light.desk", "light.strip"]);
+  assert.deepEqual(pickedOf(input, office), ["light.desk", "light.strip"]);
+  assert.deepEqual(pickedOf(input, zone), []);
+  // Back in: every light chosen is the room again.
+  input = { ...input, ...withLight(input, office, "light.lamp") };
+  assert.deepEqual(input.rooms, ["office"]);
+  assert.deepEqual(input.zones, []);
+  // The room's check: out (with its lights), then whole again.
+  input = { ...input, ...withLight(input, office, "light.lamp") };
+  input = { ...input, ...withGroup(input, office) };
+  assert.deepEqual([input.rooms, input.zones], [["office"], []]);
+  input = { ...input, ...withGroup(input, office) };
+  assert.deepEqual([input.rooms, input.zones], [[], []]);
+  // A zone is whole or not at all; a room's single light stays a light.
+  input = { ...input, ...withGroup(input, zone) };
+  input = { ...input, ...withLight(input, office, "light.strip") };
+  assert.deepEqual(input.zones, ["light.tv_area", "light.strip"]);
+  // Single lights are named by their room.
+  const hass = {
+    areas: { office: { area_id: "office", name: "Office" } },
+    entities: { "light.strip": { entity_id: "light.strip", area_id: "office" } },
+    states: { "light.tv_area": { entity_id: "light.tv_area", state: "on", attributes: { friendly_name: "TV area", is_hue_group: true } } },
+  };
+  assert.equal(roomsLine(hass as never, input), "TV area, Office");
 });
 
 test("the more-info sheet opens only for automations made with Hue Studio", () => {

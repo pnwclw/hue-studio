@@ -7,6 +7,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
+import { automationArt } from "../automation-art.ts";
 import { type AutomationDraft, cardLines, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES } from "../automations.ts";
 import type { StudioContext } from "../context.ts";
 import type { StringKey } from "../i18n.ts";
@@ -30,7 +31,7 @@ function ours(ctx: StudioContext): Listed[] {
   return Object.entries(ctx.automations?.automations || {})
     .map(([entityId, a]) => {
       const config = ctx.automationConfigs[entityId];
-      return { entityId, draft: config ? fromConfig(config) : null, custom: a.custom, type: a.type, controls: { areas: a.areas, groups: a.groups } };
+      return { entityId, draft: config ? fromConfig(config) : null, custom: a.custom, type: a.type, controls: { areas: a.areas, groups: a.groups, lights: a.lights } };
     })
     .sort((a, b) => name(a).localeCompare(name(b)));
 }
@@ -42,7 +43,7 @@ const haEditor = (ctx: StudioContext, entityId: string | null): void => {
 };
 
 /** The automations of one room or zone. */
-const ofGroup = (list: Listed[], g: Group): Listed[] => list.filter((l) => controlsGroup(l.controls, g.key, g.group));
+const ofGroup = (list: Listed[], g: Group): Listed[] => list.filter((l) => controlsGroup(l.controls, g.key, g.group, g.lights));
 
 /** One of ours; `inGroup`: listed under its room, so other rooms are named only if it has any. */
 function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null = null): TemplateResult {
@@ -80,7 +81,7 @@ function byGroup(ctx: StudioContext, list: Listed[]): TemplateResult[] {
       ({ g, items }) => html`<h2 class="label">${g.name}</h2>
         <div class="auto-list">${items.map((l) => row(ctx, l, true))}</div>`,
     );
-  const rest = list.filter((l) => !groups.some((g) => controlsGroup(l.controls, g.key, g.group)));
+  const rest = list.filter((l) => !groups.some((g) => controlsGroup(l.controls, g.key, g.group, g.lights)));
   if (rest.length)
     sections.push(html`<h2 class="label">${ctx.t("automations.no_room")}</h2>
       <div class="auto-list">${rest.map((l) => row(ctx, l))}</div>`);
@@ -128,7 +129,7 @@ export class AutomationsView extends StudioView {
   }
 }
 
-/** "+": the Hue app's automation types, then a custom one in HA's editor. */
+/** "+": the Hue app's automation types as picture cards, then a custom one in HA's editor. */
 @customElement("hue-studio-automation-new-view")
 export class AutomationNewView extends StudioView {
   /** The room the new automation starts with (an area id), from its screen. */
@@ -138,14 +139,18 @@ export class AutomationNewView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const room = this.room ? `?room=${encodeURIComponent(this.room)}` : "";
+    // Like the Hue app's: a picture card for each type, then a custom one in HA's editor.
     return this.screen(
       this.subHead(t("automations.new"), () => history.back()),
-      html`<div class="rows">
+      html`<h1 class="big new-question">${t("automations.new_question")}</h1>
+        <div class="type-cards">
           ${TYPES.map(
-            (type) => html`<button class="item" @click=${() => ctx.go(`/automations/new/${type}${room}`)}>
-              <ha-icon icon=${TYPE_ICONS[type]}></ha-icon>
-              <div class="grow">${t(`automations.type_${type}` as StringKey)}<div class="dim small">${t(`automations.type_${type}_sub` as StringKey)}</div></div>
-              <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+            (type) => html`<button class="type-card" @click=${() => ctx.go(`/automations/new/${type}${room}`)}>
+              ${automationArt(type)}
+              <span class="text">
+                <span class="title">${t(`automations.type_${type}` as StringKey)}</span>
+                <span class="sub">${t(`automations.type_${type}_sub` as StringKey)}</span>
+              </span>
             </button>`,
           )}
         </div>

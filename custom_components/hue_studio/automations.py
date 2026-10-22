@@ -72,11 +72,18 @@ from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
 from . import daylight, pool
+from .adaptive import async_mark_manual
 from .const import DOMAIN, SIGNAL_CONFIG_UPDATED
 from .gallery import async_gallery_scenes
 from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
 from .organize import async_enabled as async_organize_enabled, async_label
 from .rooms import light_area
+from .scenes import (
+    async_resolve_scenes,
+    async_show_on_lights,
+    light_entity_ids,
+    scene_lights,
+)
 from .services import BRIGHTNESS, TRANSITION, async_target_lights
 
 _LOGGER = logging.getLogger(__name__)
@@ -440,8 +447,22 @@ async def _async_apply_light(hass: HomeAssistant, call: ServiceCall) -> None:
                 blocking=True,
                 context=call.context,
             )
-        recall: dict[str, Any] = {"entity_id": scenes}
-        if (brightness := data.get("brightness")) is not None:
+        # A scene whose lights are all chosen plays as it is set up; one of a room some
+        # of whose lights are chosen shows on those only (the Hue app's way).
+        brightness = data.get("brightness")
+        whole: list[str] = []
+        for scene in async_resolve_scenes(hass, scenes):
+            if set(light_entity_ids(hass, scene_lights(scene))) <= set(lights):
+                whole.append(scene.entity_id)
+                continue
+            shown = await async_show_on_lights(
+                hass, scene, lights, brightness, transition
+            )
+            await async_mark_manual(hass, shown)
+        if not whole:
+            return
+        recall: dict[str, Any] = {"entity_id": whole}
+        if brightness is not None:
             recall["brightness"] = brightness
         if transition is not None:
             recall["transition"] = transition
@@ -520,12 +541,13 @@ def blueprint_path(kind: str) -> str:
 
 
 def our_automations(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
-    """Automations made with Hue Studio: entity id -> id, type, custom, areas, groups.
+    """Our automations: entity id -> id, type, custom, areas, groups, lights.
 
     Those using one of our blueprints, and those whose id says they were made by Hue
-    Studio and were taken over in HA's editor since ("custom"). `areas` and `groups`
-    are the areas and Hue rooms/zones (group light entities) they control, as HA sees
-    their targets, so the panel can list them by room without reading their configs.
+    Studio and were taken over in HA's editor since ("custom"). `areas`, `groups` and
+    `lights` are the areas, Hue rooms/zones (group light entities) and single Hue lights
+    they control, as HA sees their targets, so the panel can list them by room without
+    reading their configs.
     """
     found: dict[str, dict[str, Any]] = {}
     for kind in TYPES:
@@ -543,6 +565,7 @@ def our_automations(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
     for info in found.values():
         info["areas"] = []
         info["groups"] = []
+        info["lights"] = []
     for area in ar.async_get(hass).async_list_areas():
         for entity_id in automations_with_area(hass, area.id):
             if entity_id in found:
@@ -552,6 +575,10 @@ def our_automations(hass: HomeAssistant) -> dict[str, dict[str, Any]]:
             for entity_id in automations_with_entity(hass, state.entity_id):
                 if entity_id in found:
                     found[entity_id]["groups"].append(state.entity_id)
+    for light in async_all_lights(hass):
+        for entity_id in automations_with_entity(hass, light.entity_id):
+            if entity_id in found:
+                found[entity_id]["lights"].append(light.entity_id)
     return found
 
 

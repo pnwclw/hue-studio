@@ -4,7 +4,7 @@ import asyncio
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.automation import automations_with_blueprint
 from homeassistant.core import HomeAssistant
@@ -219,7 +219,7 @@ async def test_apply_light_scene(hass: HomeAssistant, hue_lights: MagicMock) -> 
         DOMAIN,
         "apply_light",
         {
-            "entity_id": "light.bulb",
+            "entity_id": ["light.bulb", "light.strip"],
             "light": "scene",
             "scenes": ["scene.sunset"],
             "transition": 30,
@@ -232,6 +232,35 @@ async def test_apply_light_scene(hass: HomeAssistant, hue_lights: MagicMock) -> 
     assert put.recall.action.value == "active"
     assert put.recall.duration == 30_000
     assert put.recall.dimming is None
+
+
+async def test_apply_light_scene_on_some_lights(
+    hass: HomeAssistant, hue_lights: MagicMock
+) -> None:
+    """Some of a scene's lights chosen: it shows on those only, light by light."""
+    hue_lights.request = AsyncMock()
+    await hass.services.async_call(
+        DOMAIN,
+        "apply_light",
+        {
+            "entity_id": "light.bulb",
+            "light": "scene",
+            "scenes": ["scene.sunset"],
+            "transition": 30,
+            "brightness": 40,
+        },
+        blocking=True,
+    )
+    hue_lights.scenes.scene.update.assert_not_called()
+    hue_lights.request.assert_awaited_once_with(
+        "put",
+        "clip/v2/resource/light/res-bulb",
+        json={
+            "on": {"on": True},
+            "dimming": {"brightness": 40},
+            "dynamics": {"duration": 30_000},
+        },
+    )
 
 
 async def test_apply_light_off_only_if_off_and_toggle(
@@ -384,7 +413,7 @@ async def test_subscribe_and_organize(
                     "actions": [
                         {
                             "action": "hue_studio.apply_light",
-                            "target": {"area_id": area.id},
+                            "target": {"area_id": area.id, "entity_id": "light.bulb"},
                             "data": {"light": "off"},
                         }
                     ],
@@ -458,6 +487,7 @@ async def test_subscribe_and_organize(
             "id": "hue_studio_leaving_home_a",
             "areas": [area.id],
             "groups": ["light.example_zone"],
+            "lights": [],
         },
         "automation.taken": {
             "id": "hue_studio_schedule_taken",
@@ -465,6 +495,7 @@ async def test_subscribe_and_organize(
             "custom": True,
             "areas": [area.id],
             "groups": [],
+            "lights": ["light.bulb"],
         },
     }
     # The leak automation names the area only to switch a plug off: not about light.

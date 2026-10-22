@@ -425,7 +425,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       // HA reports what an automation controls from its targets (here: straight from the inputs).
       const input = (config.use_blueprint?.input || {}) as { rooms?: string[]; zones?: string[] };
       if (type || config.id?.startsWith("hue_studio_"))
-        ours[entityId] = { id: config.id || null, type, custom: !type, areas: [...(input.rooms || [])], groups: [...(input.zones || [])] };
+        ours[entityId] = {
+          id: config.id || null,
+          type,
+          custom: !type,
+          areas: [...(input.rooms || [])],
+          groups: (input.zones || []).filter((id) => states[id]?.attributes.is_hue_group),
+          lights: (input.zones || []).filter((id) => !states[id]?.attributes.is_hue_group),
+        };
     }
     const related = Object.keys(automationConfigs).filter((id) => !ours[id]);
     return { automations: ours, related, types: ["wake_up", "go_to_sleep", "coming_home", "leaving_home", "mimic_presence", "schedule", "motion"], reloads: automationReloads };

@@ -14,13 +14,9 @@ import type { StudioContext } from "../context.ts";
 import { haptic } from "../ha-internals.ts";
 import { icon, LightElement } from "../ui.ts";
 import "../wheel.ts";
-import { type Choice, choiceRows, isScreen, type MomentKind, type MomentValue } from "./choice.ts";
+import { type Choice, choiceRows, isScreen, type MomentKind, type MomentValue, timeWheels } from "./choice.ts";
 
 type Slot = TemplateResult | typeof nothing;
-
-const pad = (n: number): string => String(n).padStart(2, "0");
-const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: pad(h), label: pad(h) }));
-const MINUTES = Array.from({ length: 60 }, (_, m) => ({ value: pad(m), label: pad(m) }));
 
 export class StudioView extends LightElement {
   @property({ attribute: false }) accessor ctx!: StudioContext;
@@ -182,13 +178,7 @@ export class StudioView extends LightElement {
       this.closeChoice();
     }}>${t("color.done")}</button>`;
     const wheels = (k: MomentKind) => {
-      if (k.wheel === "time") {
-        const [h = "00", min = "00"] = m.time.split(":");
-        return html`<div class="wheels time">
-          <hue-studio-wheel .options=${HOURS} .value=${h} .change=${(v: string) => set({ time: `${v}:${min}` })}></hue-studio-wheel>
-          <hue-studio-wheel .options=${MINUTES} .value=${min} .change=${(v: string) => set({ time: `${h}:${v}` })}></hue-studio-wheel>
-        </div>`;
-      }
+      if (k.wheel === "time") return timeWheels(m.time, (time) => set({ time }));
       if (k.wheel === "sun") {
         const values = m.offsets.includes(m.offset) ? m.offsets : [...m.offsets, m.offset].sort((a, b) => a - b);
         const options = values.map((v) => ({ value: String(v), label: m.offsetLabel(k.value, v) }));

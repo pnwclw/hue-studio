@@ -9,12 +9,14 @@ Scenes live on the bridge only, so the Hue app sees every change.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 import random
 from typing import Any
 
+from aiohttp import ClientError
 from aiohue import HueBridgeV2
+from aiohue.errors import AiohueException
 from aiohue.util import dataclass_to_dict
 from aiohue.v2.models.feature import (
     ColorFeatureBase,
@@ -41,7 +43,7 @@ from aiohue.v2.models.scene import (
     ScenePost,
 )
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, HUE_DOMAIN
@@ -103,6 +105,48 @@ def scene_lights(scene: HueScene) -> list[Light]:
         if action.target.rtype == ResourceTypes.LIGHT
     )
     return [light for light in lights if light is not None]
+
+
+async def async_show_on_lights(
+    hass: HomeAssistant,
+    scene: HueScene,
+    entity_ids: Collection[str],
+    brightness: float | None = None,
+    transition: float | None = None,
+) -> list[str]:
+    """Show a scene on some of its lights only (the Hue app's scene on chosen lights).
+
+    Each light gets its own action as the scene has it (one command per light: they are
+    few, a room's chosen lights); a recall would turn on every light of the scene.
+    Returns the entity ids of the lights shown.
+    """
+    registry = er.async_get(hass)
+    shown: list[str] = []
+    for action in scene.resource.actions:
+        if action.target.rtype != ResourceTypes.LIGHT:
+            continue
+        rid = action.target.rid
+        entity_id = registry.async_get_entity_id(LIGHT_DOMAIN, HUE_DOMAIN, rid)
+        if entity_id not in entity_ids:
+            continue
+        body = dataclass_to_dict(action.action, skip_none=True)
+        body["on"] = {"on": True}
+        if brightness is not None:
+            body["dimming"] = {"brightness": brightness}
+        if transition is not None:
+            body["dynamics"] = {"duration": round(transition * 1000)}
+        try:
+            await scene.bridge.request(
+                "put", f"clip/v2/resource/light/{rid}", json=body
+            )
+        except (AiohueException, ClientError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"entity_id": entity_id},
+            ) from err
+        shown.append(entity_id)
+    return shown
 
 
 @callback
