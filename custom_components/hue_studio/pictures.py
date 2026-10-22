@@ -91,10 +91,16 @@ class GalleryPictureView(HomeAssistantView):
             resp.raise_for_status()
             if not resp.content_type.startswith("image/"):
                 raise ValueError(f"not a picture: {resp.content_type}")
-            data = await resp.content.read(MAX_BYTES + 1)
-        if not data or len(data) > MAX_BYTES:
-            raise ValueError(f"unexpected size: {len(data)} bytes")
-        return data
+            data = bytearray()
+            async for chunk in resp.content.iter_chunked(65536):
+                data += chunk
+                if len(data) > MAX_BYTES:
+                    raise ValueError(f"over {MAX_BYTES} bytes")
+            if (size := resp.headers.get("Content-Length")) and len(data) != int(size):
+                raise ValueError(f"{len(data)} of {size} bytes")
+        if not data:
+            raise ValueError("empty")
+        return bytes(data)
 
 
 def _write(path: Path, data: bytes) -> None:

@@ -81,14 +81,15 @@ async def test_gallery_picture(
 
     # Later it downloads (at the tile's size, as JPEG) and is then kept.
     aioclient_mock.clear_requests()
+    original = bytes(range(256)) * 1000  # several chunks
     aioclient_mock.get(
-        scene["picture"], content=b"original", headers={"Content-Type": "image/jpeg"}
+        scene["picture"], content=original, headers={"Content-Type": "image/jpeg"}
     )
     with patch(f"{PICTURES}.time.monotonic", return_value=1e9):
         resp = await client.get(f"/api/hue_studio/gallery/{scene['id']}.jpg")
-        assert await resp.read() == b"original"
+        assert await resp.read() == original
         resp = await client.get(f"/api/hue_studio/gallery/{scene['id']}.jpg")
-        assert await resp.read() == b"original"
+        assert await resp.read() == original
     assert aioclient_mock.call_count == 1
     assert aioclient_mock.mock_calls[0][1].query["w"] == "960"
     assert "max-age" in resp.headers["Cache-Control"]
