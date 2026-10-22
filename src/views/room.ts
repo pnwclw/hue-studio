@@ -259,6 +259,17 @@ export class RoomView extends StudioView {
         row.push({ key: `side-${s.entity_id}`, tpl: this.sceneButtons(g, s) });
     });
     const suggestion = this.suggestion(g);
+    const shuffle = html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`;
+    // No scenes yet, like the Hue app's: what scenes are, a suggestion and the gallery.
+    if (!g.scenes.length)
+      return html`<div class="first-scene">
+        <h3>${ctx.t("room.first_scene")}</h3>
+        <p>${ctx.t("room.first_scene_text")}</p>
+        <div class="first-scene-cards">
+          ${suggestion ? html`${this.suggestedCard(g, suggestion)}${shuffle}` : nothing}
+          ${this.galleryCard(g)}
+        </div>
+      </div>`;
     // Keyed cells: a card keeps its element when others come in, so it can slide.
     const line = (cells: { key: string; tpl: unknown }[]) =>
       repeat(cells, (c) => c.key, (c) => html`<div class="scene-cell" data-k=${c.key}>${c.tpl}</div>`);
@@ -272,10 +283,7 @@ export class RoomView extends StudioView {
           suggestion
             ? [
                 { key: `suggested-${suggestion.id}`, tpl: this.suggestedCard(g, suggestion) },
-                {
-                  key: "shuffle",
-                  tpl: html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
-                },
+                { key: "shuffle", tpl: shuffle },
               ]
             : [],
         )}

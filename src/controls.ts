@@ -169,14 +169,27 @@ export function metaOf(state: GroupState): TemplateResult | typeof nothing {
 
 /**
  * An automation's card, like the Hue app's: its picture, "07:00 • Wake up" over "Weekdays"
- * (or what starts it), and its switch.
+ * (or what starts it), "start" (going to sleep: play) and its switch.
  */
-export function automationCard(glyph: string, title: string, sub: string, open: () => void, toggle: TemplateResult | typeof nothing = nothing): TemplateResult {
+export function automationCard(
+  glyph: string,
+  title: string,
+  sub: string,
+  open: () => void,
+  toggle: TemplateResult | typeof nothing = nothing,
+  start: { label: string; run: () => void } | null = null,
+): TemplateResult {
   return html`<div class="auto-card">
     <button class="row-open" @click=${open}>
       <ha-icon icon=${glyph}></ha-icon>
       <span class="text"><span class="title">${title}</span>${sub ? html`<span class="sub">${sub}</span>` : nothing}</span>
     </button>
+    ${start
+      ? html`<button class="round start" aria-label=${start.label} @click=${() => {
+          haptic("success");
+          start.run();
+        }}>${icon("play")}</button>`
+      : nothing}
     ${toggle}
   </div>`;
 }

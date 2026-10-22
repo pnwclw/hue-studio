@@ -109,6 +109,7 @@ test("waking up with sunrise, going to sleep by a button", () => {
   sleep.input = { ...sleep.input, use_time: false };
   assert.equal(missing(sleep), "trigger");
   assert.equal(whenLine(sleep, t), "With a button");
+  assert.deepEqual(cardLines(sleep, "Sleep", t), { title: "30 min • Sleep", sub: "" });
   sleep.input = { ...sleep.input, buttons: ["event.example_button"] };
   assert.equal(missing(sleep), null);
   assert.deepEqual(fromConfig(toConfig(sleep, ""))?.input.buttons, ["event.example_button"]);

@@ -745,6 +745,13 @@ export const CSS = `
   .scene-cols { overflow-x: auto; margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none;
                 scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .scene-cols::-webkit-scrollbar { display: none; }
+  /* A room without scenes, the Hue app's: what scenes are, then a suggestion and the gallery, centered. */
+  .first-scene { padding: 18px 8px 4px; text-align: center; }
+  .first-scene h3 { margin: 0; font-size: 22px; font-weight: 500; }
+  .first-scene p { margin: 12px auto 22px; max-width: 420px; font-size: 15px; line-height: 1.45; color: var(--text-2); }
+  .first-scene-cards { display: flex; align-items: stretch; justify-content: center; gap: 12px; }
+  .first-scene-cards .tile-card { width: 104px; }
+  .first-scene-cards .scene-side { align-self: center; height: auto; }
   .scene-grid { display: grid; grid-template-columns: max-content max-content; gap: 12px 10px; width: max-content; }
   .scene-line { display: flex; gap: 10px; }
   .scene-cols .tile-card { width: 104px; }
@@ -990,16 +997,19 @@ export const CSS = `
   .ma-page .steps-list { margin-top: 18px; }
   .sensor-sheet .rows .item.on[aria-disabled] { cursor: default; }
   /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
-  .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .auto-list + .rows { margin-top: 10px; }
-  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 0 16px 0 0; box-sizing: border-box;
+  /* An automation's card, the Hue app's: 86px tall, a 32px icon, the text from 72px, 17px over 15px. */
+  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 0 16px 0 0; box-sizing: border-box;
                border-radius: 16px; background: var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
-  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; padding: 12px 0 12px 16px;
+  .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 24px; padding: 14px 0 14px 16px;
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 28px; color: var(--text); }
+  .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 32px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500; line-height: 1.25; }
-  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
+  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 500; line-height: 1.25; }
+  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 1.3; color: var(--text-2); }
+  .auto-card .start { flex: none; width: 40px; height: 40px; background: rgba(255, 255, 255, 0.12); color: var(--text); }
+  .auto-card .start svg { width: 18px; height: 18px; }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
   /* light of the day (natural light, scene of the day) */
   .rows .item .thumb { width: 32px; height: 32px; flex: none; border-radius: 50%; object-fit: cover; }

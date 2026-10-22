@@ -60,7 +60,9 @@ function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null 
   const open = () => (l.custom || !id ? haEditor(ctx, l.entityId) : ctx.go(`/automations/${encodeURIComponent(id)}${room}`));
   const glyph = l.type && l.type in TYPE_ICONS ? TYPE_ICONS[l.type as keyof typeof TYPE_ICONS] : "mdi:lightning-bolt";
   const sub = [lines.sub, rooms].filter(Boolean).join(" · ");
-  return automationCard(glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })));
+  // Going to sleep starts right here too, like the Hue app's play (its conditions skipped).
+  const start = draft?.type === "go_to_sleep" && !l.custom ? { label: t("automations.start_now"), run: () => void ctx.call("automation", "trigger", { entity_id: l.entityId, skip_condition: true }) } : null;
+  return automationCard(glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })), start);
 }
 
 /** The automations of a room or zone, for its screen (nothing without any: its "+" adds them). */

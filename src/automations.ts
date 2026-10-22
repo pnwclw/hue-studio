@@ -321,7 +321,8 @@ export function cardLines(draft: AutomationDraft, name: string, t: Translate): {
     case "wake_up":
       return timed(wakeMoment(i, t));
     case "go_to_sleep":
-      return i.use_time === false ? { title: name, sub: t("automations.when_button") } : timed(hhmm(i.time));
+      // Without a time, the Hue app's "15 min • Go to sleep": how long it dims.
+      return i.use_time === false ? { title: `${i.fade ?? 0} ${t("automations.min")} • ${name}`, sub: "" } : timed(hhmm(i.time));
     case "mimic_presence":
       return timed(`${momentLine(i.start_kind, i.start_time, i.start_offset, t)} – ${hhmm(i.end_time)}`);
     case "schedule": {

@@ -145,8 +145,9 @@ touching anything outside this repository.
   iPhone 17 Pro (402×874) and 17 Pro Max (440×956), and 1440 (how: see `CLAUDE.local.md`).
   A UI change is not done without screenshots.
 - **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
-  Home: room and zone names 16px, a step above everything else (automation cards and
-  rows 15px, the room and zone screens' tiles 14px). List rows (settings, devices, sensors, editors, choice
+  Home: room and zone names 16px, a step above everything else (rows 15px, the room and
+  zone screens' tiles 14px). Automation cards are the Hue app's: 86px tall, a 32px icon,
+  the text from 72px, 17px medium titles over 15px subtitles. List rows (settings, devices, sensors, editors, choice
   sheets) are the Hue app's: ≥68px tall, 28px icons, text from 72px, titles 15px medium
   with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
   the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
