@@ -499,6 +499,8 @@ export interface GalleryScene extends Palette {
   category: string;
   /** Id of the scene's picture in the Hue app, when known. */
   public_image?: string;
+  /** Where the Hue app's picture is (Home Assistant serves it through `thumbUrl`). */
+  picture?: string;
 }
 
 export interface Gallery {

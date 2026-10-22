@@ -9,18 +9,28 @@ gallery.json:
   categories: [{"id": "dreamy", "name": "Dreamy"}]
   scenes: [{"id": "ocean_dawn", "name": "Ocean dawn", "category": "dreamy",
             "brightness": 84, "kind": "gradient", "points": [[x, y], ...],
-            "public_image": "<uuid>"}
+            "public_image": "<uuid>", "picture": "<url>"}
            | {..., "kind": "white", "mirek": 370}]
 
 `public_image` is the id of the scene's picture in the Hue app (CLIP v2
 `scene.metadata.image`, a `public_image` resource; the same on every bridge). Upstream
 does not have it: it comes from `hue_public_images.json` (Hue app scene name -> id),
-read off real bridges. Scenes created from the gallery carry it, so the Hue app shows
-their picture, and bridge scenes are matched to gallery pictures by it.
+read off real bridges, and from `hue_scene_pictures.json`. Scenes created from the
+gallery carry it, so the Hue app shows their picture, and bridge scenes are matched to
+gallery pictures by it.
+
+Upstream pictures are clean-room stand-ins, not the Hue app's. The Hue app loads its
+gallery pictures from Signify's content service; `hue_scene_pictures.json` (picture
+id -> Hue app scene name and the picture's address there) is read off the Hue app's own
+copy of its gallery (`--pictures`). `picture` is that address: Home Assistant downloads
+it once and keeps it in its cache (`pictures.py`); the bundled tile stands in until
+then and for scenes without one. The pictures themselves are never in this repository.
 
 Usage: uv run python scripts/build_gallery.py [path to a clone]
 Without a path the upstream repository is shallow-cloned into a temporary directory.
-`--images` only refreshes `public_image` in the existing gallery.json.
+`--images` only refreshes `public_image` and `picture` in the existing gallery.json.
+`--pictures <file>` rewrites `hue_scene_pictures.json` from the Hue app's gallery
+(its `CdpStorageScenes` file), then refreshes them.
 """
 
 from __future__ import annotations
@@ -48,6 +58,10 @@ OUT = (
 SKIP_CATEGORIES = {"Misc Additions"}
 THUMB_SIZE = (480, 270)
 PUBLIC_IMAGES = Path(__file__).resolve().parent / "hue_public_images.json"
+PICTURES = Path(__file__).resolve().parent / "hue_scene_pictures.json"
+# Scenes the Hue app has renamed since upstream recorded them (same colors), by our id;
+# the id stays, so references to it keep working.
+HUE_NAMES = {"miami": "Malibu pink"}
 
 
 def slug(name: str, taken: set[str]) -> str:
@@ -86,19 +100,50 @@ def thumbnail(src: Path, dst: Path) -> None:
     )
 
 
-def add_public_images(scenes: list[dict[str, Any]]) -> int:
-    """Set `public_image` on scenes whose Hue app picture id is known; return count."""
+def add_public_images(scenes: list[dict[str, Any]]) -> tuple[int, int]:
+    """Set `public_image` and `picture` where the Hue app's are known.
+
+    Return how many scenes got a picture id and how many a picture.
+    """
+    pictures: dict[str, dict[str, str]] = json.loads(PICTURES.read_text())
     known = {
         name.casefold(): rid
         for name, rid in json.loads(PUBLIC_IMAGES.read_text()).items()
     }
-    count = 0
+    known |= {p["name"].casefold(): rid for rid, p in pictures.items()}
+    ids = urls = 0
     for scene in scenes:
         scene.pop("public_image", None)
-        if (rid := known.get(scene["name"].casefold())) is not None:
-            scene["public_image"] = rid
-            count += 1
-    return count
+        scene.pop("picture", None)
+        scene["name"] = HUE_NAMES.get(scene["id"], scene["name"])
+        if (rid := known.get(scene["name"].casefold())) is None:
+            continue
+        scene["public_image"] = rid
+        ids += 1
+        if (picture := pictures.get(rid)) is not None:
+            scene["picture"] = picture["picture"]
+            urls += 1
+    return ids, urls
+
+
+def import_pictures(src: Path) -> int:
+    """Rewrite `hue_scene_pictures.json` from the Hue app's gallery; return count.
+
+    `src` is the app's `CdpStorageScenes`: {"jsonData": "<json>"} whose `scenes` map a
+    picture id to the scene (`name`, `sceneImage.image.url`).
+    """
+    scenes = json.loads(json.loads(src.read_text())["jsonData"])["scenes"]
+    pictures = {}
+    for rid, scene in scenes.items():
+        url = ((scene.get("sceneImage") or {}).get("image") or {}).get("url")
+        if url:
+            # Without the app's size query: pictures.py asks for its own.
+            name = scene["name"].strip()
+            pictures[rid] = {"name": name, "picture": url.split("?")[0]}
+    PICTURES.write_text(
+        json.dumps(dict(sorted(pictures.items())), indent=1, ensure_ascii=False) + "\n"
+    )
+    return len(pictures)
 
 
 def write(gallery: dict[str, Any]) -> None:
@@ -154,7 +199,7 @@ def build(src: Path) -> None:
         thumbnail(base / "assets" / preset["img"], thumbs / f"{scene_id}.jpg")
         scenes.append(scene)
 
-    images = add_public_images(scenes)
+    ids, urls = add_public_images(scenes)
     write(
         {
             "source": {"repo": REPO, "commit": commit},
@@ -164,17 +209,19 @@ def build(src: Path) -> None:
     )
     print(
         f"{len(scenes)} scenes in {len(categories)} categories "
-        f"({images} with a Hue app picture id) -> {OUT}"
+        f"({ids} with a Hue app picture id, {urls} with its picture) -> {OUT}"
     )
 
 
 def main() -> None:
     """Entry point."""
-    if sys.argv[1:] == ["--images"]:
+    if sys.argv[1:2] == ["--pictures"] and len(sys.argv) == 3:
+        print(f"{import_pictures(Path(sys.argv[2]))} Hue app pictures -> {PICTURES}")
+    if sys.argv[1:2] in (["--images"], ["--pictures"]):
         gallery = json.loads((OUT / "gallery.json").read_text())
-        images = add_public_images(gallery["scenes"])
+        ids, urls = add_public_images(gallery["scenes"])
         write(gallery)
-        print(f"{images} scenes with a Hue app picture id")
+        print(f"{ids} scenes with a Hue app picture id, {urls} with its picture")
         return
     if len(sys.argv) > 1:
         build(Path(sys.argv[1]))

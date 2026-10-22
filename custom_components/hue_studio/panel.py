@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
+from .pictures import GalleryPictureView
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 STATIC_URL = f"/{DOMAIN}_static"
@@ -33,6 +34,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(STATIC_URL, str(FRONTEND_DIR), cache_headers=False)]
         )
+        hass.http.register_view(GalleryPictureView(hass))
         hass.data[_STATIC_REGISTERED] = True
 
     if PANEL_URL_PATH in hass.data.get(frontend.DATA_PANELS, {}):

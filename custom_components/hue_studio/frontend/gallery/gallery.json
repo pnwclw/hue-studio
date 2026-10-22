@@ -211,7 +211,8 @@
      0.2761
     ]
    ],
-   "public_image": "a8897dcb-5c90-4459-8e4a-02b984bd32b5"
+   "public_image": "a8897dcb-5c90-4459-8e4a-02b984bd32b5",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/EcVgJo5jqhDiLNg3SVzus/753373fba815aba600227eb9f58090ba/CherryBlossom.webp"
   },
   {
    "id": "crocus",
@@ -240,7 +241,9 @@
      0.4212,
      0.38
     ]
-   ]
+   ],
+   "public_image": "07591cf1-2594-4d6e-ae07-a032bc101ccc",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4BJNz5BzAlrpxxmFDuShdX/34a44ad5bd6c03b3940e885947c23032/Crocus.webp"
   },
   {
    "id": "precious",
@@ -269,7 +272,9 @@
      0.4384,
      0.3976
     ]
-   ]
+   ],
+   "public_image": "7f9638b1-1efc-4acc-8440-6bd70b0cf3f4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/8DyNLAYLtUvZ2jkf8X0By/1aa2a1999b99f75c6f514d1cc5566449/PinkyPop.webp"
   },
   {
    "id": "narcissa",
@@ -298,7 +303,9 @@
      0.4759,
      0.4481
     ]
-   ]
+   ],
+   "public_image": "c550452e-efe8-4151-b57a-0cb77296b823",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/Q5mGY7TRX4hDPcBQ3l7Mw/4807b60f277d23a1a6b846b553a37570/Narcissa.webp"
   },
   {
    "id": "rolling_hills",
@@ -327,7 +334,9 @@
      0.5015,
      0.401
     ]
-   ]
+   ],
+   "public_image": "ed21c67b-6059-4721-8995-6cb4d7bae19d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/27pfPE7JDTeaLExGxTGFiw/2b86625ce32d45b5707dbdd963d2bfd0/RollingHills.webp"
   },
   {
    "id": "warm_embrace",
@@ -356,7 +365,9 @@
      0.5258,
      0.3976
     ]
-   ]
+   ],
+   "public_image": "d098da1e-9311-4270-8f94-7072317d465d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2ZVmNyfKnaLjIr4z6Zdm2K/0cbf5148c09c65808814eadf3e25bfc1/WarmEmbrace.webp"
   },
   {
    "id": "dreamy_dusk",
@@ -386,7 +397,8 @@
      0.3308
     ]
    ],
-   "public_image": "2bbb750a-95c6-4159-a654-a620ec7c101a"
+   "public_image": "2bbb750a-95c6-4159-a654-a620ec7c101a",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/53OHRKuCPBPkho6Enz6W7T/cb2d7aeb2e97b7544a6d0e7ce511bbca/DreamyDusk.webp"
   },
   {
    "id": "honolulu",
@@ -415,7 +427,9 @@
      0.5727,
      0.3587
     ]
-   ]
+   ],
+   "public_image": "d271d202-6856-4633-95ae-953ba73aee64",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/ubEuYjjrlW9y2DRisHHZ/f290fc570210c6986da77c0957e56920/honolulu.webp"
   },
   {
    "id": "savanna_sunset",
@@ -444,7 +458,9 @@
      0.4801,
      0.4309
     ]
-   ]
+   ],
+   "public_image": "4f2ed241-5aea-4c9d-8028-55d2b111e06f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/iBMGFHkyvnCY0TPLFEJi/5fd2fe6e3047bacb7bf56daddac03614/savannaSunset.webp"
   },
   {
    "id": "golden_pond",
@@ -473,7 +489,9 @@
      0.496,
      0.4424
     ]
-   ]
+   ],
+   "public_image": "93984a4f-2d1b-4554-b972-b60fa8e476c5",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/XmNJgPRBxCs6KrkyVGVR/03ca14ce653593833026951e5a957aa5/goldenPond.webp"
   },
   {
    "id": "ruby_glow",
@@ -502,7 +520,9 @@
      0.4903,
      0.2839
     ]
-   ]
+   ],
+   "public_image": "edd77f6a-0198-44ac-b7c0-465dbd3d8707",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/yAZQ50veOQ2yPkg2ETdo/fbaf45093449de8a7c91f4bf5fcaaf49/rubyGlow.webp"
   },
   {
    "id": "tropical_twilight",
@@ -531,11 +551,13 @@
      0.3044,
      0.1803
     ]
-   ]
+   ],
+   "public_image": "a6a03e6a-fe6e-45bc-b686-878137f3ba91",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/K4FA5eYgomoCFLqk0S8q/64a08025e65c0dd51c10f09798d512ae/tropicalTwilight.webp"
   },
   {
    "id": "miami",
-   "name": "Miami",
+   "name": "Malibu pink",
    "category": "party_vibes",
    "brightness": 80,
    "kind": "gradient",
@@ -560,7 +582,9 @@
      0.4548,
      0.2433
     ]
-   ]
+   ],
+   "public_image": "b037f15f-f7e4-46ab-b624-45ba2886c127",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6hpZVCvzpbucxLRiTGPqQV/793e9e8519dc07feac9333b996e992a9/Miami.webp"
   },
   {
    "id": "cancun",
@@ -589,7 +613,9 @@
      0.6153,
      0.3655
     ]
-   ]
+   ],
+   "public_image": "dba71ef7-789b-41b0-b6dd-c86fcbd56c04",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1gxyfRFvsClHjrpYNovfj7/57e2ec11141c011a41d9bcde7e246932/Cancun.webp"
   },
   {
    "id": "rio",
@@ -618,7 +644,9 @@
      0.5473,
      0.3735
     ]
-   ]
+   ],
+   "public_image": "b17c7762-2619-4435-b931-313f17cc20e0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3IadaGi4NYZjO2JngFDn2M/b8b06b2066083f332523d776d3082b1a/Rio.webp"
   },
   {
    "id": "chinatown",
@@ -647,7 +675,9 @@
      0.6362,
      0.2999
     ]
-   ]
+   ],
+   "public_image": "63d50cd6-5909-4f7b-8810-137d08f57c54",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/H0xFP7wLEnrNQrF8C4Xh/e6efa7032eb6af9c8fea8baf1afefb7e/chinatown.webp"
   },
   {
    "id": "ibiza",
@@ -676,7 +706,9 @@
      0.4787,
      0.4495
     ]
-   ]
+   ],
+   "public_image": "01e1d138-fc77-44e1-8012-c04fbae878e4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/OrxEokBsIjeRmALkAHuh/8f10733d63f560ac98c5fe38875628f1/ibiza.webp"
   },
   {
    "id": "osaka",
@@ -705,7 +737,9 @@
      0.4519,
      0.2677
     ]
-   ]
+   ],
+   "public_image": "87cb1e51-f823-42b1-86e5-697fc0c3d2ae",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/I3TWTlmgK8ZPoOcWwff1/63e1f7b2628ac3389035d0603c0e7b2c/osaka.webp"
   },
   {
    "id": "tokyo",
@@ -735,7 +769,8 @@
      0.103
     ]
    ],
-   "public_image": "60f088f5-4224-4f01-bcb1-81ef46099f63"
+   "public_image": "60f088f5-4224-4f01-bcb1-81ef46099f63",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/VwEdIuCwL6qbt8K1wQZy/3746740eef719de7776f4462d1340bcd/tokyo.webp"
   },
   {
    "id": "motown",
@@ -764,7 +799,9 @@
      0.1561,
      0.1586
     ]
-   ]
+   ],
+   "public_image": "60de81e9-ffa6-485a-b7d1-e50c47912f18",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/VvFKx37DNYUKeoox8eYO/67993da95fb074b94d59336aba8c3f7a/motown.webp"
   },
   {
    "id": "fairfax",
@@ -793,7 +830,9 @@
      0.4818,
      0.321
     ]
-   ]
+   ],
+   "public_image": "cc716363-44c2-4d64-88be-152d74072ea0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/GU3S0MO2LL2RfgIaUJHH/a9f7236805f44bafad1005eb32b06399/fairfax.webp"
   },
   {
    "id": "galaxy",
@@ -822,7 +861,9 @@
      0.5351,
      0.3287
     ]
-   ]
+   ],
+   "public_image": "9e1d16f5-f391-4306-a6d3-d15bca61eb56",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/ixWfGjf4yjJvpNWU7mXR/e08ae71a8de1fa8bd5e32d7cf4950330/galaxy.webp"
   },
   {
    "id": "starlight",
@@ -851,7 +892,9 @@
      0.4228,
      0.3349
     ]
-   ]
+   ],
+   "public_image": "d41d4a88-2019-48c6-84eb-a1080f2f7bd0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/XaUofXiy3jSa95u05lON/f0f445113a5f88e2a48c446abcce7d4f/starlight.webp"
   },
   {
    "id": "blood_moon",
@@ -880,7 +923,9 @@
      0.4651,
      0.3463
     ]
-   ]
+   ],
+   "public_image": "324509da-25d2-4d22-abab-e9091c0efb37",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/tGSU0GXsdB1wOP17X8Pi/1c9ca90b218839401dccd85f9fb5ec2b/bloodmoon.webp"
   },
   {
    "id": "arctic_aurora",
@@ -909,7 +954,9 @@
      0.2359,
      0.3855
     ]
-   ]
+   ],
+   "public_image": "1e42b2e8-d02e-40d2-9c8d-b1fd8216c686",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5ze2lvgIQIRS5mHh4ddd/38e09e6604d2e2c6c78f66892125b040/arcticAurora.webp"
   },
   {
    "id": "moonlight",
@@ -938,7 +985,9 @@
      0.1547,
      0.1074
     ]
-   ]
+   ],
+   "public_image": "ce78a7c5-3507-447e-a872-e367963817f0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/jGFPgnQCT1DZrD79vqq8/1e3b5c1eeba4decd24da54b00c2c826c/moonlight.webp"
   },
   {
    "id": "nebula",
@@ -968,7 +1017,8 @@
      0.2727
     ]
    ],
-   "public_image": "e6b53fe0-6b37-40bf-8c4e-f32afe95420f"
+   "public_image": "e6b53fe0-6b37-40bf-8c4e-f32afe95420f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/0vXW2fGmhZUXdzgP2MVy/79915523b3e038ee866769bdd4c44130/nebula.webp"
   },
   {
    "id": "still_waters",
@@ -997,7 +1047,9 @@
      0.3984,
      0.3182
     ]
-   ]
+   ],
+   "public_image": "95471c58-6222-4a1f-99ae-0d473103937d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6hXgzTVY5FwtlWhDG2IMTO/4da5188113f9b2238da13b30e35959bf/StillWaters.webp"
   },
   {
    "id": "adrift",
@@ -1026,7 +1078,9 @@
      0.2789,
      0.2025
     ]
-   ]
+   ],
+   "public_image": "9694fc40-922b-44a6-a646-4ab4780aa51d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/38CIL9MNVPgEt4MLqidjr5/2202ddfb118ebfbbf1834919c591539e/Adrift.webp"
   },
   {
    "id": "pensive",
@@ -1056,7 +1110,8 @@
      0.3272
     ]
    ],
-   "public_image": "ff5dc7b4-0e7c-4990-86ac-8cd3dccec97d"
+   "public_image": "ff5dc7b4-0e7c-4990-86ac-8cd3dccec97d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6WhQusrz09jkca1wFRc4RJ/be5a37ea1f3c9f4e70c339bf24d50d68/Pensive.webp"
   },
   {
    "id": "majestic_morning",
@@ -1085,7 +1140,9 @@
      0.1879,
      0.0644
     ]
-   ]
+   ],
+   "public_image": "30162fd5-4b29-46fc-86ba-2c3649d4d127",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2w6wDl7mHEJFnvMjUYcrhL/d23154bad446ec398a29fb0eb22554ae/MajesticMorning.webp"
   },
   {
    "id": "sundown",
@@ -1114,7 +1171,9 @@
      0.4848,
      0.3887
     ]
-   ]
+   ],
+   "public_image": "a9038608-5e3e-4fde-8b31-2c03543445e3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2zTQFU5SI0HtvWc0UJ8i/470f4d672f75c5d2af96e26f043242c6/sundown.webp"
   },
   {
    "id": "blue_lagoon",
@@ -1143,7 +1202,9 @@
      0.3962,
      0.4341
     ]
-   ]
+   ],
+   "public_image": "68d526e2-6139-4855-bdb2-dd77acfdeba4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/T6VQ6yl9ZzcN3AdoyXiG/021fa1584f98cd14abecf84bbcfd1357/blueLagoon.webp"
   },
   {
    "id": "palm_beach",
@@ -1172,7 +1233,9 @@
      0.2007,
      0.3418
     ]
-   ]
+   ],
+   "public_image": "f44b43b1-b6d1-46e1-8c15-00d2b551b6fa",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/XJOhFhAaM5V5UCtofnRl/91e1fe6a714522d0e477c06438341e32/palmBeach.webp"
   },
   {
    "id": "lake_placid",
@@ -1201,7 +1264,9 @@
      0.194,
      0.1927
     ]
-   ]
+   ],
+   "public_image": "b9b51b88-1570-4083-b8e4-bb02a981d2d2",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/EJ3jA1tobZT4awAp4oif/3456764375e14b1b727c5fb05888f730/lakePlacid.webp"
   },
   {
    "id": "mountain_breeze",
@@ -1230,7 +1295,9 @@
      0.3836,
      0.3413
     ]
-   ]
+   ],
+   "public_image": "53742ab5-a15d-457d-84c4-0303acd25c81",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/jL1EU6aZSY86W7l6MeGO/8288d96d41093d99265f607f7a0e9fb0/mountainBreeze.webp"
   },
   {
    "id": "lake_mist",
@@ -1259,7 +1326,9 @@
      0.2263,
      0.2095
     ]
-   ]
+   ],
+   "public_image": "b9deeedc-1f30-4152-90ba-e9c356f77871",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/Xh79sLMuNk6TbX3WqKnD/fc019eea8f73ccd2234f9b8714bfc66a/lakeMist.webp"
   },
   {
    "id": "ocean_dawn",
@@ -1288,7 +1357,9 @@
      0.4416,
      0.3743
     ]
-   ]
+   ],
+   "public_image": "747e2db1-d458-4c82-9b5c-c15f8273b90f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/G2W4aZoCOjzALG8kLYMS/d27d983a8f2332b4bad4c2b3ca6c70db/oceanDawn.webp"
   },
   {
    "id": "frosty_dawn",
@@ -1317,7 +1388,9 @@
      0.4013,
      0.4172
     ]
-   ]
+   ],
+   "public_image": "034d4ac9-a461-4b95-b59c-e2be9942ec28",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/fWoF524DPnDyJ3ahahue/dc59e5f36847e3ad9512a4e9390aface/frostydawn.webp"
   },
   {
    "id": "sunday_morning",
@@ -1346,7 +1419,9 @@
      0.403,
      0.382
     ]
-   ]
+   ],
+   "public_image": "3bc285d2-cb38-4d51-98dc-8da84a82f034",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/SgZGomLHIrHyYYm4U096/5c6f2a73b1fd632538b9474d6314fa6c/sundayMorning.webp"
   },
   {
    "id": "emerald_isle",
@@ -1375,7 +1450,9 @@
      0.3134,
      0.4131
     ]
-   ]
+   ],
+   "public_image": "23a4eec3-f67e-4c82-8837-5ef31cf93838",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/FjQ24eGRk25bkFrVteye/627926333029ccc7bc9becdd8c65ea45/emeraldIsle.webp"
   },
   {
    "id": "spring_blossom",
@@ -1404,7 +1481,9 @@
      0.4435,
      0.2537
     ]
-   ]
+   ],
+   "public_image": "adfa9c3e-e9aa-4b65-b9d3-c5b2c0576715",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7kwpNy1H1EhLMdmQZfTK/64ffab6bb55e22a3aba6200cdfdbdd5f/springBlossom.webp"
   },
   {
    "id": "beginnings",
@@ -1433,7 +1512,9 @@
      0.2726,
      0.2045
     ]
-   ]
+   ],
+   "public_image": "860350c2-f2dc-4c1c-8e1f-1ddb65001e1d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1wta721rOJxVtBxhZZ0Sux/d2cd72ec9f5823adba3945b93596ffb9/Sunrise10.webp"
   },
   {
    "id": "first_light",
@@ -1462,7 +1543,9 @@
      0.4134,
      0.2962
     ]
-   ]
+   ],
+   "public_image": "ec790a2f-e63e-46cf-8a0f-1dd525e70f66",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1J2t7IyFPdBAk2g1uX4TEN/56f9b2074003cfe33e75580f41f17b37/Sunrise14.webp"
   },
   {
    "id": "horizon",
@@ -1491,7 +1574,9 @@
      0.5247,
      0.3877
     ]
-   ]
+   ],
+   "public_image": "8150ea42-9e7e-447d-a668-1e3d26a6fafb",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1MVLYYibwOiDTN2Ao4YkhR/e236f7221cab398baf2858d35534e2ee/Sunrise16.webp"
   },
   {
    "id": "valley_dawn",
@@ -1520,7 +1605,9 @@
      0.4996,
      0.4026
     ]
-   ]
+   ],
+   "public_image": "e15e34e3-6c93-4914-a274-7e73ac0ad2a0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6UKXsczEHiwoV4Ksf5jbbH/ab11d3c21167973e3c91b5de2597dd89/Sunrise18.webp"
   },
   {
    "id": "sunflare",
@@ -1549,7 +1636,9 @@
      0.4967,
      0.414
     ]
-   ]
+   ],
+   "public_image": "51657196-e17c-47f6-8ed5-596237b152c8",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/12cXgUhwUNPLaIDUUeTNCt/5773195a9388fd7a7d26913ae876ca24/Sunrise20.webp"
   },
   {
    "id": "emerald_flutter",
@@ -1578,7 +1667,9 @@
      0.1569,
      0.1897
     ]
-   ]
+   ],
+   "public_image": "e3fb3dfd-f746-442d-8e17-43afcb542bfc",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/13AZSYWBU2adktAHLpjbBo/a698ab06cc98fa16b4a0088f63e7c677/EmeraldFlutter.webp"
   },
   {
    "id": "memento",
@@ -1607,7 +1698,9 @@
      0.1671,
      0.0853
     ]
-   ]
+   ],
+   "public_image": "9b4a6882-b2e5-4ce2-9235-75f93a3a70e2",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/xrDS3sGEUfNY0eHf6HJ0h/b24e52c9cd1a55fdfa65271f33a00ded/Memento.webp"
   },
   {
    "id": "resplendent",
@@ -1636,7 +1729,9 @@
      0.3223,
      0.1916
     ]
-   ]
+   ],
+   "public_image": "19ba4ece-0dfd-4ea6-9cd8-ba267e1dac98",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/26e24wr7Mr1MCHoJWxF605/cbfb853e60eb0fbdb2f772091c6534c5/Resplendent.webp"
   },
   {
    "id": "scarlet_dream",
@@ -1665,7 +1760,9 @@
      0.4585,
      0.2636
     ]
-   ]
+   ],
+   "public_image": "548374ca-d7bc-4183-9383-faaff262160c",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6hRblv4CvREugrjNWSMfSl/2dd51e2ed52c201e8bd1bc8fefd159bf/ScarletDream.webp"
   },
   {
    "id": "amethyst_valley",
@@ -1694,7 +1791,9 @@
      0.2883,
      0.2235
     ]
-   ]
+   ],
+   "public_image": "b9c991c0-24b0-4267-ac02-84cc95074176",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2TJldpiJu1wV9rxFWa5w9/96c7f8d199a1813ba50958a901d92683/AmethystValley.webp"
   },
   {
    "id": "misty_ridge",
@@ -1723,7 +1822,9 @@
      0.3955,
      0.3272
     ]
-   ]
+   ],
+   "public_image": "c6eab11b-10ea-42c0-936d-fb5692b897af",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/66ExrmF0GlAOclKuyzQ4tu/05bcf0d5c7014021060680acab09b4ae/MistyRidge.webp"
   },
   {
    "id": "hazy_days",
@@ -1752,7 +1853,9 @@
      0.4625,
      0.4217
     ]
-   ]
+   ],
+   "public_image": "16282090-fe57-4f97-95a9-1420155f4d4f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2yTFpshVWPTqUVXolwPBK5/67ef633747cf9fdc156e849859abe1f9/HazyDays.webp"
   },
   {
    "id": "midsummer_sun",
@@ -1781,7 +1884,9 @@
      0.4849,
      0.4339
     ]
-   ]
+   ],
+   "public_image": "a23f4a96-2c68-4655-acda-c29661f8b6ac",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/fiP0ZOZV28gach0tuLSX/d23d569cc5eb334af23ee5f9b30edf5f/midsummerSun.webp"
   },
   {
    "id": "autumn_gold",
@@ -1810,7 +1915,9 @@
      0.4427,
      0.4017
     ]
-   ]
+   ],
+   "public_image": "6799326d-e9cd-4b2a-9166-287509f841f3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/ZG7OVtYqcS3LtCS0W8bm/c5376f23fa6ea3988f6d058202772dc2/autumnGold.webp"
   },
   {
    "id": "spring_lake",
@@ -1839,7 +1946,9 @@
      0.3414,
      0.3868
     ]
-   ]
+   ],
+   "public_image": "f23b133f-7d9e-4edd-bf22-c2c4ba47b39d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/rdJNiB3E3pptWntEmLaJ/4f9e3b13b0448bc64844eeb2b051ac1c/springLake.webp"
   },
   {
    "id": "winter_mountain",
@@ -1868,7 +1977,9 @@
      0.2376,
      0.3042
     ]
-   ]
+   ],
+   "public_image": "ecbce974-7b1f-46da-a632-c57af04056f0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/axg2o141wQOUqnkFnOko/3a652666ebdf874a2948e761b72ced07/winterMountain.webp"
   },
   {
    "id": "midwinter",
@@ -1897,7 +2008,9 @@
      0.2091,
      0.1898
     ]
-   ]
+   ],
+   "public_image": "284a13b9-af1e-4274-a099-0ce7ec00dfef",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/DmyZa6xosXq87NrEDiZD/44b779d68da58fbca339871261021782/midwinter.webp"
   },
   {
    "id": "amber_bloom",
@@ -1927,7 +2040,8 @@
      0.3811
     ]
    ],
-   "public_image": "10306e69-57ea-47a0-bd27-0efd001d0527"
+   "public_image": "10306e69-57ea-47a0-bd27-0efd001d0527",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/SlcL4Yk5JN3LQzeN1mRY/93a9307af04fec53ca8009d7293a13fd/amberBloom.webp"
   },
   {
    "id": "lily",
@@ -1956,7 +2070,9 @@
      0.5407,
      0.4008
     ]
-   ]
+   ],
+   "public_image": "94f0895c-b38f-400f-873e-a93ed16fae4d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/WAVIJPrMM482EF1LXC23/96ee9903e68c5ae469327e8526e7f56f/lily.webp"
   },
   {
    "id": "painted_sky",
@@ -1986,7 +2102,8 @@
      0.1839
     ]
    ],
-   "public_image": "001d8ffa-3ca9-4662-8658-5ed0af976d23"
+   "public_image": "001d8ffa-3ca9-4662-8658-5ed0af976d23",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/hAUHxekKZCXh8hTujU0b/ed2a4c89f6fb660f5e68765161bd928c/paintedSky.webp"
   },
   {
    "id": "winter_beauty",
@@ -2015,7 +2132,9 @@
      0.5353,
      0.4074
     ]
-   ]
+   ],
+   "public_image": "6e9492d8-035b-4f7c-b2b9-65973e7b3328",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/YmCkiVRmLSFKvtjo63r9/14f74626e480504e06afdaabfdabfcd7/winterBeauty.webp"
   },
   {
    "id": "orange_fields",
@@ -2044,7 +2163,9 @@
      0.5013,
      0.4511
     ]
-   ]
+   ],
+   "public_image": "cb67acc8-7fbe-4458-949e-f1dd6d21fae4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/ttaLi9NS7Ye8PMEIPYhL/53d3155d446a3953887041e360e06447/orangeFields.webp"
   },
   {
    "id": "forest_adventure",
@@ -2073,7 +2194,9 @@
      0.3095,
      0.5913
     ]
-   ]
+   ],
+   "public_image": "3fd1c2af-25a6-4dda-8931-56864e501db0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2f2UavlWIPAOTRP4WBwV/ac9ac565b23455b3f7995fbfcdf4c8e9/forestAdventure.webp"
   },
   {
    "id": "blue_planet",
@@ -2102,7 +2225,9 @@
      0.3314,
      0.5391
     ]
-   ]
+   ],
+   "public_image": "db4ded6b-b552-4e0d-a1ea-2f23d8880c8c",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/C6594TKPhL75Y7JAv2vV/86ea6218e5aeea1fc27dfef34534931c/bluePlanet.webp"
   },
   {
    "id": "meriete",
@@ -2131,7 +2256,9 @@
      0.2092,
      0.1108
     ]
-   ]
+   ],
+   "public_image": "1e6ad4d1-d636-4afa-8a6d-1a68d35a7c8c",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3hyRmrdl0pBTC8ZSXJHzpK/9e1d1121d46e70d498e415575293cd68/Meriete.webp"
   },
   {
    "id": "soho",
@@ -2160,7 +2287,9 @@
      0.2219,
      0.0825
     ]
-   ]
+   ],
+   "public_image": "e4ee61c3-ecdd-4005-b483-58207e693258",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/302hFn7siMt09xal66eI/aa85273a18f124cbeb6dfe887fc93215/soho.webp"
   },
   {
    "id": "vapor_wave",
@@ -2189,7 +2318,9 @@
      0.5403,
      0.4219
     ]
-   ]
+   ],
+   "public_image": "d8d1a014-5551-4ada-8da1-5a527d7bc09b",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/c0QW2ZhbVzgdLVT0vV3u/89ac98e7ff99527dd1307ed4cd68641e/vaporWave.webp"
   },
   {
    "id": "magneto",
@@ -2218,7 +2349,9 @@
      0.171,
      0.3389
     ]
-   ]
+   ],
+   "public_image": "05b493ae-d0ed-4b3c-8fea-3c1003e0aeb6",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/aAt6uGs0Xa1vBJCfLHEc/ed6a029f8430eae0382f0e238b45a0d4/magneto.webp"
   },
   {
    "id": "tyrell",
@@ -2247,7 +2380,9 @@
      0.257,
      0.1754
     ]
-   ]
+   ],
+   "public_image": "a8b531f3-2bec-4aa3-abb1-842418276799",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/lmN8Ms9qqLG1Wv2eWjzA/2ae6c83f4d654d75e8cea30fa1d60343/tyrell.webp"
   },
   {
    "id": "disturbia",
@@ -2276,7 +2411,9 @@
      0.1616,
      0.3754
     ]
-   ]
+   ],
+   "public_image": "703662f8-cfdc-4486-bf96-dfba46f22583",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/9kKjkyUyu9hSf5wQKDr5/3ddd70cba77168d5fa28030cb389ea3a/disturbia.webp"
   },
   {
    "id": "hal",
@@ -2305,7 +2442,9 @@
      0.5641,
      0.3328
     ]
-   ]
+   ],
+   "public_image": "10f1768a-5872-4b6f-bb6c-4d2db7bd2eae",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1Le82tMEuEdfwVxrLOO5/e3c076b83be447d0db57e91523742980/hal.webp"
   },
   {
    "id": "trick_or_treat",
@@ -2334,7 +2473,9 @@
      0.3786,
      0.2083
     ]
-   ]
+   ],
+   "public_image": "a93d1cb8-3ed3-444f-b727-e23936ab9e9d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/77DA6xmFNxuEehI7o4LyRo/cb74a4f7bc181d62267c16e05c2bd7db/trick_or_treat_preview.png"
   },
   {
    "id": "glowing_grins",
@@ -2363,7 +2504,9 @@
      0.3134,
      0.5923
     ]
-   ]
+   ],
+   "public_image": "b5f5a765-8f72-4aef-af99-90a116818ad4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5ddsjbUBWEiEEXckZEeXIW/aaac076096a6e0a129dbdeec75c80107/glowing_greens_preview.png"
   },
   {
    "id": "spellbound",
@@ -2392,7 +2535,9 @@
      0.306,
      0.568
     ]
-   ]
+   ],
+   "public_image": "d864a3dc-3925-49e9-b9ea-4415c0836326",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3DEswpckCMdDCHNRFD49OZ/1ce9e2e69d6d36b778e10bad93d0ce5f/Spellbound_preview.png"
   },
   {
    "id": "hocus_pocus",
@@ -2421,7 +2566,9 @@
      0.6915,
      0.3083
     ]
-   ]
+   ],
+   "public_image": "a30e93c1-1cbc-41d6-8425-a8f004d0ad35",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6iC1nUF5qziqubWgnOcSNN/be9047912df2da63dd832134de3f2c38/haunted_house_landscape.jpeg"
   },
   {
    "id": "toil_and_trouble",
@@ -2450,7 +2597,9 @@
      0.2446,
      0.1235
     ]
-   ]
+   ],
+   "public_image": "f2c7785d-e49e-4f9c-a8c1-b443a14bbe9a",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/47rCXWs65vSu1pJgYJEsS5/7249fc7d15a96f063503554f9cab5188/Hue_Spiderweb_fire_landscape.jpeg"
   },
   {
    "id": "witching_hour",
@@ -2479,7 +2628,9 @@
      0.1689,
      0.1281
     ]
-   ]
+   ],
+   "public_image": "75457600-682c-437f-a83c-c411f3ec73e3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/qK7wIHNBm4fe0tVZiNmVQ/355549cd5df21c302a0c3aff22ef00b2/witching_hour_preview.png"
   },
   {
    "id": "pandemonium",
@@ -2508,7 +2659,9 @@
      0.2267,
      0.1354
     ]
-   ]
+   ],
+   "public_image": "a235fd77-25e7-450a-979a-42dbaee82a5d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6AUZlygl6e08XyCcHhqc6e/44f26d6098aa7d3833fd3e4f874dd95b/Pandemonium_PREVIEW.png"
   },
   {
    "id": "phantom",
@@ -2537,7 +2690,9 @@
      0.4281,
      0.3412
     ]
-   ]
+   ],
+   "public_image": "5debd7d7-8506-4617-9a3f-bf78f58b6572",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1JQ2eu6BbSQWWmYqWBN4V8/8bf2281fcf245d6605e73a9311455197/Phantom_PREVIEW.png"
   },
   {
    "id": "snow_sparkle",
@@ -2567,7 +2722,8 @@
      0.3447
     ]
    ],
-   "public_image": "6e6fe016-d9a8-4b87-81d2-696128e2c12d"
+   "public_image": "6e6fe016-d9a8-4b87-81d2-696128e2c12d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7gIl2ifnh37Z6hzHNHx5bd/216d433efb4f61e1a8a70824f91176d2/snow_sparkle_gallery.png"
   },
   {
    "id": "under_the_tree",
@@ -2596,7 +2752,9 @@
      0.523,
      0.3581
     ]
-   ]
+   ],
+   "public_image": "2821554b-b5f7-4deb-8292-a95feb42280f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4MW3FL1KFcwCZwPnX0kL/10b7325cd92276042d1548cb17f83efd/underTheTree.webp"
   },
   {
    "id": "nutcracker",
@@ -2625,7 +2783,9 @@
      0.1995,
      0.4599
     ]
-   ]
+   ],
+   "public_image": "6787a536-1bc5-4eb7-8a4b-8d1553c5a7d2",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4Y4a7CjiVqup6wR4ahWAld/69193b730035b1f2e351b8a9876a2bc3/nutcracker_gallery.png"
   },
   {
    "id": "jolly",
@@ -2654,7 +2814,9 @@
      0.4667,
      0.238
     ]
-   ]
+   ],
+   "public_image": "3cdb01fa-2ba9-4975-b64e-f46c914b8b9b",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/oqE9XMxzmo3cZ5sQ6A6Pn/e941d6792ec1ad07a3022df02b835c2c/jolly_gallery_.png"
   },
   {
    "id": "golden_star",
@@ -2684,7 +2846,8 @@
      0.3222
     ]
    ],
-   "public_image": "93a6021b-955e-4fde-9d94-b77ec158106b"
+   "public_image": "93a6021b-955e-4fde-9d94-b77ec158106b",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/j7kN7HaggVbdtQn7P5fP/38188b0a601ced8f8a5e35401325486a/goldenStar.webp"
   },
   {
    "id": "silent_night",
@@ -2713,7 +2876,9 @@
      0.4658,
      0.3667
     ]
-   ]
+   ],
+   "public_image": "cb0f5370-c6af-414a-a0c1-e23be7136f01",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/UVn9z7uPegxyvshuaa83/8a5f0320c2a54bef79f98b5d0220d1bd/silentNight.webp"
   },
   {
    "id": "color_burst",
@@ -2743,7 +2908,8 @@
      0.4742
     ]
    ],
-   "public_image": "c8647d7d-ca53-4b0f-81f5-03eb6ba233f1"
+   "public_image": "c8647d7d-ca53-4b0f-81f5-03eb6ba233f1",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/qDUVgJfAykCI0nQ1NFOr/a48ebdb5b125ed80cf18094e57defb39/colorBurst.webp"
   },
   {
    "id": "crystalline",
@@ -2772,7 +2938,9 @@
      0.3373,
      0.2571
     ]
-   ]
+   ],
+   "public_image": "40482fc3-1a6d-4d65-8aa9-60a8b6d93a5d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/77ZAoUd9bzwiLtOXrAnh/d255c6cbcb361ce36e54a1f4e4b1d4e0/crystalline.webp"
   },
   {
    "id": "rosy_sparkle",
@@ -2801,7 +2969,9 @@
      0.3613,
      0.2005
     ]
-   ]
+   ],
+   "public_image": "39dccf09-09a1-4447-b6a9-2ce7167ae8a8",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/kdF51s0Q9oTQOTFDD6Eg/9a5347c8e10e8c6c87401d6da212d786/rosySparkle.webp"
   },
   {
    "id": "festive_fun",
@@ -2831,7 +3001,8 @@
      0.3418
     ]
    ],
-   "public_image": "4580a393-f90a-45b6-a92c-b64f19b5e1b3"
+   "public_image": "4580a393-f90a-45b6-a92c-b64f19b5e1b3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/rWq0jPS90dDWgMwR1dRI/0904e5d1bae6b0f9641c1a70c936e5ab/festiveFun.webp"
   },
   {
    "id": "silverstone",
@@ -2860,7 +3031,9 @@
      0.5236,
      0.386
     ]
-   ]
+   ],
+   "public_image": "0b6d2d48-1f78-4fa6-84d4-e37374da84b9",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3sby8kUig8qfxqkQvYSDv6/46467255fb7e3e493728f79608adedba/Silverstone.webp"
   },
   {
    "id": "zandvoort",
@@ -2889,7 +3062,9 @@
      0.5087,
      0.4226
     ]
-   ]
+   ],
+   "public_image": "782299ec-3af0-483a-9f09-6198bfbd56d2",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2v4OHToti0uCcak4h7SUyh/d78b161cd55379b85e7a906f22552a6e/Zandvoort.webp"
   },
   {
    "id": "singapore",
@@ -2918,7 +3093,9 @@
      0.1711,
      0.2357
     ]
-   ]
+   ],
+   "public_image": "eec8faf8-2419-4da1-9c70-bf50bdbb3081",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/79EYyDsD2KYxAu0vjRotQw/d4593cbfc55d2141a7c5e2c9978beb24/Singapore.webp"
   },
   {
    "id": "sao_paulo",
@@ -2947,7 +3124,9 @@
      0.4421,
      0.4811
     ]
-   ]
+   ],
+   "public_image": "163210e3-69a3-4af6-92ea-ca0ae4e0627d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5lPcIlE3XIXqYxua09gGhM/0d63f2b1b55696c8c4df94fe186e0aa3/Sao_Paulo2.webp"
   },
   {
    "id": "miami_2",
@@ -2976,7 +3155,9 @@
      0.5371,
      0.2735
     ]
-   ]
+   ],
+   "public_image": "00e5d2a6-305d-4270-ba63-fa1609a6fb26",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4b4ht76q9vt3KCv32ZVRGS/5c88304da0f38658abd7e7344df47911/Miami.webp"
   },
   {
    "id": "suzuka",
@@ -3005,7 +3186,9 @@
      0.4195,
      0.445
     ]
-   ]
+   ],
+   "public_image": "c3a1f243-c6a3-4f94-ac00-a7afb30fc867",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/ThKJfcNub2TDqvMwjq9wp/40cce0cccaf9296198b1f072ae24ce63/Suzuka2.webp"
   },
   {
    "id": "bahrain",
@@ -3034,7 +3217,9 @@
      0.5896,
      0.3706
     ]
-   ]
+   ],
+   "public_image": "03afc233-4845-4fe8-b2f4-f79873666326",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1fQj5cZxMQAumEawmwjzjB/b47a8f44dda8796ce0302f34f7cce639/Bahrain.webp"
   },
   {
    "id": "nighttime",
@@ -3064,7 +3249,8 @@
      0.404
     ]
    ],
-   "public_image": "afea2234-8d6f-4bb3-a174-8e5bd5f7372d"
+   "public_image": "afea2234-8d6f-4bb3-a174-8e5bd5f7372d",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6WwTR3umzLuVvbCDzgeMMf/86577a7c23c92d20df088ec9981baf28/nighttime_gallery.webp"
   },
   {
    "id": "sleepy",
@@ -3094,7 +3280,8 @@
      0.409
     ]
    ],
-   "public_image": "410b851f-e329-4a4f-b6cc-e51659118db4"
+   "public_image": "410b851f-e329-4a4f-b6cc-e51659118db4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6DFd6uKJNjHyTfiTfcixHo/f9e3a70aba0a174ee1d613fdb464be27/sleepy_gallery.webp"
   },
   {
    "id": "unwind",
@@ -3124,7 +3311,8 @@
      0.4189
     ]
    ],
-   "public_image": "3b0f3c83-26f1-4ece-a206-e764b49a05a6"
+   "public_image": "3b0f3c83-26f1-4ece-a206-e764b49a05a6",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6dZShPS9KNpFSRTmx3suaF/c2f94d01e1db9d98cd8f0bf2fe3fa138/unwind_gallery.webp"
   },
   {
    "id": "storybook",
@@ -3154,7 +3342,8 @@
      0.4086
     ]
    ],
-   "public_image": "7e8adc28-a0ef-4319-afbd-c206fd9e99a3"
+   "public_image": "7e8adc28-a0ef-4319-afbd-c206fd9e99a3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5ehT6hVXQozaqVr0UdvQ1A/872049f7a1a6b06e9f4bf4e529878706/storybook_gallery.webp"
   },
   {
    "id": "shine",
@@ -3184,7 +3373,8 @@
      0.4037
     ]
    ],
-   "public_image": "9bcc7653-5b19-437f-8bf2-332aa89b92d9"
+   "public_image": "9bcc7653-5b19-437f-8bf2-332aa89b92d9",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5BC8SQbl1Wk7A2rILq6o1v/e6a81fb61407b2455d42244f1b8f8d8b/shine_gallery.webp"
   },
   {
    "id": "arise",
@@ -3214,7 +3404,8 @@
      0.348
     ]
    ],
-   "public_image": "39e7d257-45f5-4112-bfc1-de02dd41ce13"
+   "public_image": "39e7d257-45f5-4112-bfc1-de02dd41ce13",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/63J4Ov5c5sDbFLuHh4he8r/061147a70cd36439cb91a159cea693bb/arise_gallery.webp"
   },
   {
    "id": "ruby_romance",
@@ -3243,7 +3434,9 @@
      0.5079,
      0.3289
     ]
-   ]
+   ],
+   "public_image": "499f48bd-53d2-41a4-8278-bf00344f1730",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/qWeqoBNID8n9f1yC5jev/f8861a092322bb4494b3a28da1651f82/rubyRomance.webp"
   },
   {
    "id": "city_of_love",
@@ -3272,7 +3465,9 @@
      0.5311,
      0.4235
     ]
-   ]
+   ],
+   "public_image": "b73872b9-f641-4d85-8e7c-7124b93e90d0",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/8vA2n2g9qMjRvZoQTiVg/e134234c00f9bdd4607c0ab5485889b9/cityOfLove.webp"
   },
   {
    "id": "sunset_allure",
@@ -3301,7 +3496,9 @@
      0.5363,
      0.3986
     ]
-   ]
+   ],
+   "public_image": "c7e5c485-bc72-4ef1-a5ce-08ae6611c9fd",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1GYiuI6SnJ4C4Q5lD2CziG/134537cfea2661f0e48d841419c00392/sunset_allure_web.png"
   },
   {
    "id": "lovebirds",
@@ -3330,7 +3527,9 @@
      0.5202,
      0.4369
     ]
-   ]
+   ],
+   "public_image": "1ed5d588-7a9d-46ce-8e4b-cb08e0a19f9c",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/tmjZlUvGyhjpS7xI31ro/c726a4677c878673126a52dd8ac79d7b/lovebirds.webp"
   },
   {
    "id": "smitten",
@@ -3359,7 +3558,9 @@
      0.5508,
      0.3704
     ]
-   ]
+   ],
+   "public_image": "6c3599b0-3c2b-4019-b5bd-3e7e7764bceb",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/RZTPvCEMkGe7KMUWspf1/2855cfd450aff453c522e1848dacf125/smitten.webp"
   },
   {
    "id": "glitz_and_glam",
@@ -3388,7 +3589,9 @@
      0.5565,
      0.3924
     ]
-   ]
+   ],
+   "public_image": "df93ccf7-8928-41eb-af11-eefdcffbb06a",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7qtqPvUg3Dl6m76J0XOT/50bc340dbd89a0fca6818ec16b8aeb70/glitzAndGlam.webp"
   },
   {
    "id": "promise",
@@ -3417,7 +3620,9 @@
      0.4791,
      0.3551
     ]
-   ]
+   ],
+   "public_image": "f8db4e12-7406-4e05-ad6e-f09469ed7742",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5aJW5FtDLEBfoOyusNV1/a840480276a7ed4ab98202fcdc1b5627/promise.webp"
   },
   {
    "id": "baby_s_breath",
@@ -3447,7 +3652,8 @@
      0.2967
     ]
    ],
-   "public_image": "8c74c49b-3f4c-4b14-86f5-99aa49ee9e5a"
+   "public_image": "8c74c49b-3f4c-4b14-86f5-99aa49ee9e5a",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4zI8W7bza9s9YunsHPqZUs/5e4cc9a65791a1eb51d708d608f3bf3b/Baby-s_breath.webp"
   },
   {
    "id": "sailing_away",
@@ -3476,7 +3682,9 @@
      0.3603,
      0.358
     ]
-   ]
+   ],
+   "public_image": "5228cb16-79de-421b-9ef9-569099ebe894",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7LB5AQABqDcOnSnjsaDOVc/d7146653529a19dcd8d1b108d68867db/Sailboat.webp"
   },
   {
    "id": "juicy_watermelon",
@@ -3505,7 +3713,9 @@
      0.3513,
      0.3616
     ]
-   ]
+   ],
+   "public_image": "8816e302-0d50-45d8-917e-916590fa2240",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/43bk9ARFjRBIJZi8daR1S4/030637638f42e659435259a78fd17987/Watermelon.webp"
   },
   {
    "id": "summer_splash",
@@ -3534,7 +3744,9 @@
      0.4054,
      0.3863
     ]
-   ]
+   ],
+   "public_image": "cc40dfff-2023-489b-a4c6-ea2bc8ae9f8f",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6geb9LRh65zynDnsLZrlsq/9e4e29e78ed4aac7d0f7d1dda5d11f6d/Donut.webp"
   },
   {
    "id": "fruity_popsicle",
@@ -3563,7 +3775,9 @@
      0.3794,
      0.3712
     ]
-   ]
+   ],
+   "public_image": "bbc6f351-4603-4216-8dcd-1e70a9f53501",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3pla6LoKBKrGklm33so2Bw/0e2763c721c1ba5f525b63cdd901d85d/popsickle.webp"
   },
   {
    "id": "rome",
@@ -3592,7 +3806,9 @@
      0.3797,
      0.3653
     ]
-   ]
+   ],
+   "public_image": "e40a4c56-fdf7-4484-b421-e9889523e9d3",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/5RcctsiqtSU7rzxjvAdEFE/a068eb4718d265a1f1eddf792e48f128/Vespa.webp"
   },
   {
    "id": "santorini",
@@ -3621,7 +3837,9 @@
      0.3375,
      0.3508
     ]
-   ]
+   ],
+   "public_image": "134790b1-d2ae-4570-8359-6f6b3566f648",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/37HbOkjD1cmDE2SkfIjrYL/73cb33a096c91cd43a7807f74c56e5c2/Santorini.webp"
   },
   {
    "id": "coastal_nights",
@@ -3651,7 +3869,8 @@
      0.3903
     ]
    ],
-   "public_image": "bfa4375e-e253-400b-b472-62203a10afc8"
+   "public_image": "bfa4375e-e253-400b-b472-62203a10afc8",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/2ip2ql3vAvj6IvbdGfSyli/29875872a21246a808b9845d87ae430c/Campire_.webp"
   },
   {
    "id": "island_warmth",
@@ -3680,7 +3899,9 @@
      0.4374,
      0.3994
     ]
-   ]
+   ],
+   "public_image": "eb917bf0-2d59-4350-b1dd-2d93bfaa455a",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/1dhvP2Xf0XaYNxj26YH40g/7eb8cdb5d53c2ffe5b439472c71cc0bc/Palm_sunset.webp"
   },
   {
    "id": "ocean_escape",
@@ -3709,7 +3930,9 @@
      0.3586,
      0.3677
     ]
-   ]
+   ],
+   "public_image": "b2fbc4f3-5033-4f4a-b1f6-990301bea611",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7DTARIyHwleRRZWruWmnEB/48097dd28bf35214cb1c0ccb9fcdf42c/Summer_resort.webp"
   },
   {
    "id": "downtown_drizzle",
@@ -3738,7 +3961,9 @@
      0.4251,
      0.4111
     ]
-   ]
+   ],
+   "public_image": "90bdf576-64ee-47e9-8900-c71ca4bb905b",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/7Fvqn366bF9AKrrbefcMpI/aa4da6a1db4e1d53aad2a024eaa163d2/DowntownDrizzle.webp"
   },
   {
    "id": "amber_robin",
@@ -3767,7 +3992,9 @@
      0.4288,
      0.3977
     ]
-   ]
+   ],
+   "public_image": "8fd4fcf4-50db-4a9a-994b-adc74a293a9b",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/65hfSzR8pF5vw4tv1kYOyX/f67432230fea3070b09c9d25c4351a1f/AmberRobin.webp"
   },
   {
    "id": "woodland_toadstool",
@@ -3796,7 +4023,9 @@
      0.5503,
      0.3889
     ]
-   ]
+   ],
+   "public_image": "04bbe374-6445-4c56-971b-6e8eae6c54e5",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3gz3f6ogKnXf44eYqzGIkI/3e23360eef9c8bb11513e042c15a9c24/WoodlandToadstool.webp"
   },
   {
    "id": "pumpkin_spice",
@@ -3825,7 +4054,9 @@
      0.3878,
      0.3747
     ]
-   ]
+   ],
+   "public_image": "5ab5b7bf-a543-4859-8e69-447c3183cdfd",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6klVduqK7FJFaRoPSGzIpR/26b8f03441984d2ec8eb56a02b18aa81/PumpkinSpice.webp"
   },
   {
    "id": "fall_harvest",
@@ -3854,7 +4085,9 @@
      0.441,
      0.4098
     ]
-   ]
+   ],
+   "public_image": "e330cd9c-6220-41aa-8c82-8e14c93e8fd6",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/29U4sJ5GLozwdXPV9wLDJj/7236d94898189c189a5572b8797420fa/FallHarvest.webp"
   },
   {
    "id": "pumpkin_patch",
@@ -3883,7 +4116,9 @@
      0.4602,
      0.4061
     ]
-   ]
+   ],
+   "public_image": "f03b098c-bb63-4fae-8b79-0a21ed1de329",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3LBzZHyCGLME1osHknpbYK/fa1fe48b7f4722d50c5338961db4a40b/PumpkinPatch.webp"
   },
   {
    "id": "november_haze",
@@ -3913,7 +4148,8 @@
      0.4031
     ]
    ],
-   "public_image": "bdb900ce-7de1-40fb-a372-de61e18598c4"
+   "public_image": "bdb900ce-7de1-40fb-a372-de61e18598c4",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/yRNGHcgkq60eHN1g5vvVd/04e457d8f0b953eaa74b80aa6bb6b7c2/NovemberHaze.webp"
   },
   {
    "id": "among_the_pines",
@@ -3942,7 +4178,9 @@
      0.1929,
      0.108
     ]
-   ]
+   ],
+   "public_image": "4189ad6c-0be6-4f63-82d6-e4b3845029d6",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/6lf5pkJiNtsHArigj5Mkj2/9f2e3a9a5adf09ad825bf214e9ba23c0/Amongthepines.webp"
   },
   {
    "id": "fuchsia_frost",
@@ -3971,7 +4209,9 @@
      0.5241,
      0.3461
     ]
-   ]
+   ],
+   "public_image": "bb42c7e0-ebaf-485d-b3c0-d879da0d6d89",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/470flqQCEe0pHTjXG2h4d8/9072f0d2cc1c35f97f23c1611e62762c/Fuchsiafrost.webp"
   },
   {
    "id": "icy_glow",
@@ -4000,7 +4240,9 @@
      0.4343,
      0.4121
     ]
-   ]
+   ],
+   "public_image": "fa01890f-2da3-4575-a0d0-b310fda02fb8",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/15ydiBbBGQr4Szdyg1hNsQ/258a584f6ffe36cadfc9a9942cf5654b/Icy_glow.webp"
   },
   {
    "id": "snow_capped",
@@ -4029,7 +4271,9 @@
      0.3396,
      0.2358
     ]
-   ]
+   ],
+   "public_image": "975fd274-434c-4485-bccf-6ba649a39afb",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/4koQTbHLEvSDY92m6bGQ9T/2ef7e547c54b49975d2c527969c65c3a/Snowcapped.webp"
   },
   {
    "id": "stadium",
@@ -4058,7 +4302,9 @@
      0.3826,
      0.5178
     ]
-   ]
+   ],
+   "public_image": "c4c93287-3bc8-4959-97c4-b4dde20f3c49",
+   "picture": "https://images.ctfassets.net/ibk8qx4pr63c/3cjhq8TBrMb2HT4r6aNheN/78c7d33947f3f032f00039952c688106/Stadium.webp"
   }
  ]
 }

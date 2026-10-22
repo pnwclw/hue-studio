@@ -19,7 +19,13 @@ export const loadGallery = (): Promise<Gallery> =>
       throw err;
     }));
 
-export const thumbUrl = (id: string): string => new URL(`./gallery/thumb/${id}.jpg`, import.meta.url).href;
+// Served by Home Assistant (not the dev harness): pictures.py answers with the Hue app's
+// picture of the scene where it has one, else with the bundled tile.
+const IN_HA = new URL(import.meta.url).pathname.startsWith("/hue_studio_static/");
+
+/** A gallery scene's picture. */
+export const thumbUrl = (id: string): string =>
+  IN_HA ? `/api/hue_studio/gallery/${id}.jpg` : new URL(`./gallery/thumb/${id}.jpg`, import.meta.url).href;
 
 /**
  * Gallery scene of a bridge scene: by the Hue app picture id (survives renaming), else
