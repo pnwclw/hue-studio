@@ -59,7 +59,7 @@ export class AddSheet extends StudioView {
               ${row("mdi:palette-outline", "add.current", "add.current_sub", () => next("current"))}
               ${row("mdi:weather-sunset", "add.all_day", "add.all_day_sub", () => go(`/automations/new/schedule?room=${room}&preset=all_day`))}`
             : html`${row("mdi:palette-swatch-outline", "add.scene", "add.scene_sub", () => next("scene"))}
-              ${row("mdi:robot-outline", "add.automation", "add.automation_sub", () => go(`/automations/new?room=${room}`))}
+              ${row("mdi:lightning-bolt", "add.automation", "add.automation_sub", () => go(`/automations/new?room=${room}`))}
               ${row("mdi:lightbulb-on-outline", "add.device", "add.device_sub", () => go(`/settings/devices/add?room=${room}`))}`}
         </div>
       </div>

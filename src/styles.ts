@@ -17,6 +17,10 @@ export const CSS = `
     color: var(--text); font-family: var(--ha-font-family-body, -apple-system, system-ui, Roboto, sans-serif);
     font-size: 15px; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
+  /* Nothing is selected as text (a long press on a tile or a drag over the wheel); only
+     fields keep it, so typing and its caret work. */
+  :host, * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
   button { font: inherit; color: inherit; }
   hue-studio-home-view, hue-studio-room-view, hue-studio-color-view, hue-studio-gallery-view, hue-studio-scene-view, hue-studio-sync-view, hue-studio-rooms-view, hue-studio-settings-view, hue-studio-automations-view, hue-studio-automation-new-view, hue-studio-automation-edit-view, hue-studio-space-view, hue-studio-effects,
   hue-studio-experimental-view, hue-studio-devices-view, hue-studio-slider { display: block; }

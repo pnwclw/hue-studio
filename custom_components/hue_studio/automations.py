@@ -36,6 +36,7 @@ from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.components.automation import (
+    DATA_COMPONENT as AUTOMATION_COMPONENT,
     DOMAIN as AUTOMATION_DOMAIN,
     EVENT_AUTOMATION_RELOADED,
     automations_with_area,
@@ -569,8 +570,48 @@ def related_automations(hass: HomeAssistant, ours: set[str]) -> list[str]:
         if state.attributes.get(ATTR_IS_HUE_GROUP):
             related.update(automations_with_entity(hass, state.entity_id))
     for area in areas:
-        related.update(automations_with_area(hass, area))
+        related.update(
+            entity_id
+            for entity_id in automations_with_area(hass, area)
+            if lights_area_action(hass, entity_id, area)
+        )
     return sorted(related - ours)
+
+
+LIGHT_ACTION_DOMAINS = {LIGHT_DOMAIN, "scene", DOMAIN}
+
+
+def lights_area_action(hass: HomeAssistant, entity_id: str, area: str) -> bool:
+    """Whether an action of the automation sends lights or scenes to the area.
+
+    HA counts an area anywhere in an automation, its triggers and conditions too: a
+    leak sensor's area that switches a plug off is not about light. When the actions
+    can't be read, the area counts as before.
+    """
+    component = hass.data.get(AUTOMATION_COMPONENT)
+    entity = component.get_entity(entity_id) if component else None
+    script = getattr(entity, "action_script", None)
+    if script is None:
+        return True
+    return area in _light_action_areas(script.sequence)
+
+
+def _light_action_areas(config: Any) -> set[str]:
+    """Areas targeted by light, scene and Hue Studio actions anywhere in a config."""
+    found: set[str] = set()
+    if isinstance(config, list):
+        for item in config:
+            found |= _light_action_areas(item)
+    elif isinstance(config, dict):
+        action = config.get("action") or config.get("service")
+        if isinstance(action, str) and action.partition(".")[0] in LIGHT_ACTION_DOMAINS:
+            for data in (config.get("target"), config.get("data")):
+                areas = data.get("area_id") if isinstance(data, dict) else None
+                found.update([areas] if isinstance(areas, str) else areas or [])
+        for value in config.values():
+            if isinstance(value, (dict, list)):
+                found |= _light_action_areas(value)
+    return found
 
 
 @callback

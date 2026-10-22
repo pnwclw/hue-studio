@@ -181,7 +181,7 @@ export class HueStudioAutomationSheet extends LitElement {
     // Taken over in HA's editor (no blueprint of ours any more): HA's editor is the place.
     const custom = config !== undefined && !draft && !!config;
     const type = draft?.type ?? known?.[entityId]?.type ?? null;
-    const glyph = type && type in TYPE_ICONS ? TYPE_ICONS[type as keyof typeof TYPE_ICONS] : "mdi:robot-outline";
+    const glyph = type && type in TYPE_ICONS ? TYPE_ICONS[type as keyof typeof TYPE_ICONS] : "mdi:lightning-bolt";
     const sub = custom ? t("automations.custom_sub") : type ? t(`automations.type_${type}` as StringKey) : "";
 
     const rows = draft

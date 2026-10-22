@@ -365,6 +365,7 @@ async def test_subscribe_and_organize(
 ) -> None:
     """Our automations (blueprint or taken over) and others touching Hue lights."""
     area = ar.async_get(hass).async_create("Living room")
+    er.async_get(hass).async_update_entity("light.bulb", area_id=area.id)
     hass.states.async_set("light.example_zone", "on", {"is_hue_group": True})
     await async_install_blueprints(hass)
     assert await async_setup_component(
@@ -385,6 +386,49 @@ async def test_subscribe_and_organize(
                             "action": "hue_studio.apply_light",
                             "target": {"area_id": area.id},
                             "data": {"light": "off"},
+                        }
+                    ],
+                },
+                {
+                    "id": "leak",
+                    "alias": "leak",
+                    "triggers": [
+                        {
+                            "trigger": "state",
+                            "entity_id": "binary_sensor.leak",
+                            "to": "on",
+                        }
+                    ],
+                    "conditions": [
+                        {
+                            "condition": "state",
+                            "entity_id": "binary_sensor.leak",
+                            "state": "on",
+                        }
+                    ],
+                    "actions": [
+                        {"action": "switch.turn_off", "target": {"area_id": area.id}}
+                    ],
+                },
+                {
+                    "id": "area_light",
+                    "alias": "area_light",
+                    "triggers": [],
+                    "actions": [
+                        {
+                            "if": [
+                                {
+                                    "condition": "state",
+                                    "entity_id": "sun.sun",
+                                    "state": "below_horizon",
+                                }
+                            ],
+                            "then": [
+                                {
+                                    "action": "light.turn_on",
+                                    "target": {"area_id": [area.id]},
+                                }
+                            ],
                         }
                     ],
                 },
@@ -423,7 +467,8 @@ async def test_subscribe_and_organize(
             "groups": [],
         },
     }
-    assert event["related"] == ["automation.other"]
+    # The leak automation names the area only to switch a plug off: not about light.
+    assert event["related"] == ["automation.area_light", "automation.other"]
     assert event["reloads"] == 0
 
     # Created with our id: label and category at once; the area from the panel.

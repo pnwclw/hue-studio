@@ -243,7 +243,7 @@ export class HueStudioPanel extends LitElement {
     lastPaths[tab] = path + location.search;
     const tabs: [string, string, IconName, string][] = [
       ["home", "", "home", ctx.t("nav.home")],
-      ["automations", "/automations", "clock", ctx.t("nav.automations")],
+      ["automations", "/automations", "bolt", ctx.t("nav.automations")],
     ];
     if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);

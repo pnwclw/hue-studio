@@ -16,7 +16,8 @@ import { focusedElement, keepTouchInside, opensKeyboard } from "./ui.ts";
 class HueStudioFooter extends LitElement {
   static override styles = css`
     :host { position: fixed; z-index: 5; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
-            display: block; pointer-events: none; font-family: var(--ha-font-family-body, Roboto, sans-serif); }
+            display: block; pointer-events: none; font-family: var(--ha-font-family-body, Roboto, sans-serif);
+            -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     :host([typing]) { display: none; }
     nav { pointer-events: auto; display: flex; gap: 2px; height: 62px; padding: 5px; box-sizing: border-box; border-radius: 31px;
           max-width: 520px; margin: 0 auto;

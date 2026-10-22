@@ -286,7 +286,7 @@ export class BridgesView extends StudioView {
       this.subHead(t("bridges.box_page"), () => ctx.go("/settings/bridges"), this.saveButton(name, (n) => configure({ name: n }))),
       html`${this.hero("mdi:television-box", name, box.available ? t(statusKey(box)) : t("bridges.box_offline"), settings)}
         <div class="rows">
-          ${this.link("mdi:sync", t("bridges.sync_controls"), t("bridges.sync_controls_sub"), () => ctx.go(`/sync?box=${encodeURIComponent(id)}`))}
+          ${this.link("hue-studio:sync", t("bridges.sync_controls"), t("bridges.sync_controls_sub"), () => ctx.go(`/sync?box=${encodeURIComponent(id)}`))}
         </div>
         ${settings
           ? html`<h2 class="label">${t("bridges.box_settings")}</h2>

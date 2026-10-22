@@ -310,7 +310,7 @@ class HueStudioAutomationsCard extends StudioCard {
           ${list.map(({ entityId, id, type, draft, name }) => {
             const on = ctx.hass.states[entityId]?.state === "on";
             const lines = draft ? cardLines(draft, name, t) : { title: name, sub: "" };
-            const glyph = type && isType(type) ? TYPE_ICONS[type] : "mdi:robot-outline";
+            const glyph = type && isType(type) ? TYPE_ICONS[type] : "mdi:lightning-bolt";
             const open = () => id && this.panel(`/automations/${encodeURIComponent(id)}${room}`);
             const sw = toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: entityId }));
             return automationCard(glyph, lines.title, lines.sub, open, sw);

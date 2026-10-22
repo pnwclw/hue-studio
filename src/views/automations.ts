@@ -57,7 +57,7 @@ function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null 
   const room = from ? `?room=${encodeURIComponent(from.key)}` : "";
   // Ours open here (one whose config can't be read says so there); taken over in HA: HA's editor.
   const open = () => (l.custom || !id ? haEditor(ctx, l.entityId) : ctx.go(`/automations/${encodeURIComponent(id)}${room}`));
-  const glyph = l.type && l.type in TYPE_ICONS ? TYPE_ICONS[l.type as keyof typeof TYPE_ICONS] : "mdi:robot-outline";
+  const glyph = l.type && l.type in TYPE_ICONS ? TYPE_ICONS[l.type as keyof typeof TYPE_ICONS] : "mdi:lightning-bolt";
   const sub = [lines.sub, rooms].filter(Boolean).join(" · ");
   return automationCard(glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })));
 }
@@ -113,7 +113,7 @@ export class AutomationsView extends StudioView {
                 const on = ctx.hass.states[id].state === "on";
                 const name = friendlyName(ctx.hass, id);
                 const sw = toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: id }));
-                return automationCard("mdi:robot-outline", name, "", () => haEditor(ctx, id), sw);
+                return automationCard("mdi:lightning-bolt", name, "", () => haEditor(ctx, id), sw);
               })}
             </div>`
           : nothing}
