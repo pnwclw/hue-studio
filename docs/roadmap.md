@@ -263,6 +263,9 @@ directly. Per HA area with auto light settings:
 
 ### G. Automations like the Hue app, HA-first (2026-10-11)
 
+**Closed (2026-10-22).** The live light automations are moved to our types; the open
+questions below are dropped. Its place in the order goes to S (the Sync Box screen).
+
 **Done (2026-10-12):**
 - seven blueprints: wake up, go to sleep, coming home, leaving home, mimic presence,
   schedule, plus a motion sensor (the Hue app's accessory behaviour). They are put in
@@ -419,65 +422,23 @@ Open questions:
 - Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
   (read-only, opening in HA), or left out.
 
-### I. Interface: Hue Studio's or Home Assistant's own (2026-10-11)
+### I. One style for every dashboard: our cards, and theirs (2026-10-22)
 
-A choice between our Hue-app look and the stock HA interface (Lovelace, HA's dialogs and
-editors). In the stock mode the user's HA theme styles everything, custom themes included.
-The features stay the same; only who draws them changes.
+Replaces the earlier plan of a switch between Hue Studio's look and stock HA (with a
+generated dashboard of stock cards): the goal is one style everywhere, whatever a
+dashboard is built from.
 
-1. **The setting.**
-   - "Interface: Hue Studio / Home Assistant", with a global default in the integration
-     options.
-   - A per-user override (HA's frontend user data, like HA's own profile settings), so
-     one household can mix both.
-   - Switching needs no reinstall and no YAML.
-2. **Hue Studio mode** (today): the `/hue` panel, our more-info sheets (lights, and with
-   G2 scenes and automations), our cards, the experimental footer. Our own design tokens;
-   the HA theme does not apply.
-3. **Home Assistant mode:**
-   - **No interception.** The more-info override is off, so lights, scenes and
-     automations open HA's own dialogs; automations are edited in HA's editor through our
-     blueprints (G). The footer is off.
-   - **A dashboard strategy** (`custom:hue-studio`): it generates a Lovelace dashboard
-     from stock cards and keeps it current with no saved config. Its content:
-     - rooms and zones as sections;
-     - tile cards with features (brightness, color temperature, effects);
-     - room scenes as buttons (`scene.turn_on`);
-     - Sync Box entities;
-     - auto light entities (control, scene, offset, next scene);
-     - automations of G2's category.
-   - **Getting the dashboard:** the strategy is offered in "Add dashboard", plus a button
-     in the settings that creates it. A user can also "take control" and edit the
-     generated dashboard by hand, as with HA's own strategies.
-   - **Section or view strategies** for a single room, for users who build their own
-     dashboards.
-4. **What stock HA cannot draw:**
-   - Some things have no stock card or dialog: the color wheel with light dots and gamut,
-     multi-color gradients, the gallery, palettes, the auto light pools editor, arranging
-     lights in space, entertainment areas.
-   - These stay our elements, but in HA mode they take the HA theme. All their colors,
-     radii and fonts go through one token map. In Hue Studio mode it holds our values; in
-     HA mode it maps to HA's theme variables (`--primary-color`,
-     `--card-background-color`, `--primary-text-color`, `--ha-card-border-radius`,
-     `--ha-card-box-shadow`, …). Then a theme reaches them without knowing Hue Studio.
-   - They are offered as cards (themed, in the generated dashboard) and through the
-     settings. Wherever HA has a native form (options flow, blueprint form, entity
-     settings), that form is the HA-mode path.
-5. **Rule for new UI.** From now on (G, G2, H), every feature has an HA-mode path:
-   - entities and services first;
-   - then a stock card or form;
-   - our themed element only when neither works.
-   A screen that exists only in the Hue-look panel is not done.
+1. **Our own cards** for everything the panel has (rooms and zones, scenes and the
+   gallery, lights, automations, sensors, Sync Box), built on the design system (DS), so
+   a card on a dashboard looks like the same thing in the panel.
+2. **Building them from other cards:** what a dashboard made of Mushroom, Bubble Card or
+   stock Lovelace cards needs to look the same — entities, attributes and services
+   (no card of ours required), and the design tokens published as CSS variables or a
+   theme that those cards can take.
+3. **A separate theme** may take the same tokens later, so HA's own screens match too.
+4. **Rule:** a feature is done when it can be put on a dashboard in that style, not only
+   in the `/hue` panel.
 
-Decided:
-- **The `/hue` panel stays in the sidebar in both modes.** In HA mode it is the same
-  panel; its colors, radii and fonts follow the HA theme through the token map.
-- **HA mode loses nothing.** Whatever HA's own dialogs can't do (gradients, effects beyond
-  the list, the wheel) stays reachable: in the panel, and in the themed cards.
-- **"Add dashboard" lists our strategy through a public hook.** It is registered like
-  custom cards: `window.customStrategies.push({type: "hue-studio", strategyType:
-  "dashboard", name, description})`. HA 2026.10's new dashboard dialog lists those
-  entries. No internals are involved; the settings button is just a shortcut.
 
 ### J. The light of the day: one scene pool for every automation (2026-10-13)
 
@@ -503,17 +464,43 @@ Light of the day):
 
 Not done on purpose: a calendar of holidays.
 
-### K. Moving between bridges: hidden (2026-10-21)
+### K. Moving between bridges: dropped (2026-10-22)
 
-Moving a bridge, a room, lights or a Sync Box to another bridge, and lost devices, are
-built (`migration.py`, `identity.py`, views `bridge-move`, `lost`) but hidden from users:
-the panel has no way in (no bridge tag on a room, no "Move everything to …", no move
-from a light's room picker, which offers only areas on the light's own bridge, no lost
-devices notice). The code and the routes stay until it is brought back.
+Moving a bridge, a room, lights or a Sync Box to another bridge, and lost devices, were
+built (`migration.py`, `identity.py`, views `bridge-move`, `lost`) and are hidden from
+users (no way in from the panel). Dropped: the code and the routes stay as they are, but
+no more work goes into them — no fixes, no features, no bringing it back.
+
+
+### S. The Sync Box screen, reworked (2026-10-22)
+
+The Sync tab and a box's page get the same pass the rooms, scenes and automations got:
+the Hue app's Sync screens as the reference (modes, intensity, inputs, the entertainment
+area, music and background lighting), laid out on the design system (DS). Direct pairing
+and the `huesyncbox` link mode keep one screen.
+
+### DS. One design system (2026-10-22)
+
+So that new features are not built on a vision of their own, everything is put on one
+design system first:
+
+1. **Inventory of the Hue app:** every screen of the real app (home, rooms, scenes and
+   the gallery, the wheel, effects, automations, Sync, settings, devices, sheets and
+   pickers), with sizes in points (1pt ≈ 2.09px on its screenshots).
+2. **Inventory of Hue Studio:** every screen and part of the panel, the dialogs and the
+   cards, against it: what matches, what differs, what is ours only.
+3. **The system:** tokens (colors, type scale, spacing, radii, shadows, motion) and
+   components (headers, section titles, rows, tiles and cards, sheets and action sheets,
+   pills and round buttons, switches, sliders, wheels, banners, pickers), each with where
+   it is used. It lives in the repository, and `CLAUDE.md`'s scale rules point to it.
+4. **Bringing the code in line:** `styles.ts` and the views use the tokens and
+   components only; one-off sizes go away.
+5. **Rule:** a new screen is made of the system's parts; a part that is missing is added
+   to the system first.
 
 ### H. Later: Hue Secure
 
-Plans, after research:
+Only after everything else on this list (S, DS, I) is done. Plans, after research:
 
 1. **What the bridge and the cloud expose** (2026): CLIP v2 resources for contact sensors,
    tamper, camera motion and security areas; whether cameras talk to the bridge at all or
@@ -530,8 +517,12 @@ Plans, after research:
 ## Order
 
 A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (scenes) -> G (with
-G2 for automations) -> I -> H. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
-for later), F, G, J and G2 (scenes 2026-10-21, automations with G). Next: I.
+G2 for automations) -> J. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
+for later), F, G, J and G2 (scenes 2026-10-21, automations with G). K is dropped.
+
+Next (2026-10-22): **DS** (the design system, first: everything after it is built on it)
+-> **S** (the Sync Box screen) -> **I** (one style for every dashboard) -> **H** (Hue Secure,
+last).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

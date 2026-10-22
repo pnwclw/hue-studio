@@ -289,8 +289,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 code, switched off and on while the new one searches, setup button), by Zigbee MAC;
                                 settings and HA entities restored per device; rooms, scenes/zones/entertainment areas after;
                                 a journal of every step; devices let go and not found kept as lost (found again later);
-                                one move at a time, in the background. Hidden from users for now (no entry points in
-                                the panel: room/light/bridge/Sync Box moves, lost devices); code and routes stay
+                                one move at a time, in the background. Dropped (roadmap K): hidden from users (no entry
+                                points in the panel), code and routes stay, no more work goes into it
   identity.py                   every Hue device remembered by Zigbee MAC (its entities' ids and settings, HA device area,
                                 name, labels; bridge name, archetype, light settings), rooms/zones/scenes by name; a device
                                 or room that comes back as new resources (any way: a move, "Add devices", the Hue app,
