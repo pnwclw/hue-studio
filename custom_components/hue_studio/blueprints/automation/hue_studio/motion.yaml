@@ -23,7 +23,9 @@ blueprint:
               multiple: true
         lux_sensor:
           name: Light sensor
-          description: Optional; with it, lights go on only below the light level.
+          description: >-
+            Optional; with it, lights go on only below the light level. Hue Studio takes the
+            motion sensor's own.
           default: ""
           selector:
             entity:
@@ -47,6 +49,23 @@ blueprint:
               min: 0
               max: 120
               unit_of_measurement: min
+        off_after_phases:
+          name: Turn off after, by part of the day
+          description: >-
+            Minutes for some parts of Hue Studio's light of the day ({"night": 2}); the
+            others use the minutes above. Easiest to edit in Hue Studio.
+          default: {}
+          selector:
+            object:
+        phase_sensor:
+          name: Part of the day
+          description: Hue Studio's part of the day (its phase sensor).
+          default: sensor.hue_studio_phase
+          selector:
+            entity:
+              filter:
+                - integration: hue_studio
+                  domain: sensor
     rooms_section:
       name: Rooms
       icon: mdi:sofa-outline
@@ -134,6 +153,10 @@ blueprint:
             object:
 
 mode: restart
+trigger_variables:
+  off_default: !input off_after
+  off_phases: !input off_after_phases
+  phase_sensor: !input phase_sensor
 triggers:
   - trigger: state
     entity_id: !input motion
@@ -142,14 +165,16 @@ triggers:
   - trigger: state
     entity_id: !input motion
     to: "off"
+    # The minutes of the part of the day it is when the motion ends.
     for:
-      minutes: !input off_after
+      minutes: "{{ (off_phases or {}).get(states(phase_sensor), off_default) | int(0) }}"
     id: clear
 variables:
   motion: !input motion
   lux_sensor: !input lux_sensor
   lux_below: !input lux_below
-  off_after: !input off_after
+  off_after: >-
+    {{ (off_phases or {}).get(states(phase_sensor), off_default) | int(0) }}
 actions:
   - if:
       - condition: template

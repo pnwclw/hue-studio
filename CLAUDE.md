@@ -160,7 +160,9 @@ touching anything outside this repository.
   (wake up, go to sleep) sits on its wheels in place (`timeWheels`) under a "Time" switch
   (waking up: off is with sunrise, an offset on one wheel; going to sleep: off is only by
   its Hue buttons, "Controlled by"), its fade on a sheet with a slider and the time it
-  leads to. Coming and leaving home are HA-first: a new one shows only a checklist (home
+  leads to. A motion sensor's "Turn off after" is a slider too, its minutes may differ by
+  part of the light of the day (`off_after_phases`), and its light level comes from the
+  sensor's own light sensor (no choice of one). Coming and leaving home are HA-first: a new one shows only a checklist (home
   zone, people whose phone shares its location "Always"; in the companion app this
   person's own phone, with a button to the app's settings) until HA can know who is home.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
@@ -334,12 +336,13 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
                                 automations (the tab, "+" with a picture card per type and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
-                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, lights, sensitivity),
+                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, its motion automation edited in place, sensitivity),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves and how each device is found, the move
                                 device by device, its journal, a device not found), lost (lost devices: look again, forget), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
-                                gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
+                                automation-parts (what the automation editor and a sensor's settings share: lights, light,
+                                timers on slider sheets, the natural light page), gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
                                 phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
                                 — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers;
                                 choice.ts: a row with its value opens the list to pick from (a sheet for one value, a screen

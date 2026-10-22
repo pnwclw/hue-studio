@@ -1150,6 +1150,14 @@ export const CSS = `
   .fade-sheet .fade-slider .knob { width: 18px; height: 18px; }
   .fade-ticks { display: flex; justify-content: space-between; margin: 14px 0 0; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
   .fade-ticks span { width: 16px; text-align: center; }
+  /* "Turn off after": the slider sets the row with the tick (every part of the day, or one of them). */
+  .off-sheet .fade-body { max-height: min(70dvh, 620px); overflow-y: auto; overscroll-behavior: contain; }
+  .off-sheet .off-phases { margin-top: 10px; border-radius: 12px; background: #333336; }
+  .off-sheet .off-phases .item { min-height: 52px; }
+  .off-sheet .off-phases .value { color: var(--text-2); }
+  .off-sheet .off-phases .value.own { color: var(--text); }
+  .off-sheet .center { margin-top: 12px; }
+  .off-sheet .hint { margin: 22px 2px 0; }
   /* The light picker ("Edit lights"): a room's check (whole, some, none), its lights in a strip. */
   .sheet .box.lights-sheet { display: flex; flex-direction: column; width: min(100%, 520px); max-height: min(100%, 760px); }
   .sheet.bottom .box.lights-sheet { width: 100%; max-height: calc(100% - var(--safe-top) - 24px); }

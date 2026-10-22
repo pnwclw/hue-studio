@@ -1,9 +1,10 @@
 // A Hue sensor's settings, like the Hue app's "Sensor settings": its picture and name
-// (renamed on the bridge, HA follows), its room (the HA device's area), the lights it
-// switches ("Add lights": the motion automations that use it, and a new one), motion
-// sensitivity (on the bridge; HA's `hue` does not expose it), daylight (the light level
-// below which its automations switch the lights on) and support. "Save" stores the name
-// and the room at once. The sensitivity sheet is the Hue app's: a slider whose value goes
+// (renamed on the bridge, HA follows), its room (the HA device's area), what it does —
+// its motion automation edited right here, laid out like the automation editor (the
+// lights it switches, their light, "Turn off after" by part of the day, daylight from its
+// own light sensor) — motion sensitivity (on the bridge; HA's `hue` does not expose it)
+// and support. "Save" stores the name, the room and the automation at once (created
+// once it has lights, deleted when they are all taken away). The sensitivity sheet is the Hue app's: a slider whose value goes
 // to the bridge as soon as it is let go, so the sensor can be tried out (it calibrates for
 // about 15 s, then a dot lights up on motion); its "Save" keeps it, closing goes back.
 // "Delete" at the bottom removes the sensor from its bridge (a second tap confirms).
@@ -12,13 +13,13 @@ import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
-import { type AutomationDraft, fromConfig, roomsLine } from "../automations.ts";
+import { areaFor, type AutomationDraft, fromConfig, missing, newDraft, placesOf, toConfig } from "../automations.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { BATTERY_ICON, defaultSensitivity, findGroup, type HueSensor, hueSensor, sensitivityLevels } from "../model.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
-import { StudioView } from "./base.ts";
+import { AutomationParts } from "./automation-parts.ts";
 
 const NAME_MAX = 32;
 const HELP_URL = "https://www.philips-hue.com/support";
@@ -34,7 +35,7 @@ interface Uses {
 }
 
 @customElement("hue-studio-sensor-view")
-export class SensorView extends StudioView {
+export class SensorView extends AutomationParts {
   /** The room (group key) it was opened from. */
   @property() accessor key = "";
   /** The sensor's HA device id. */
@@ -60,6 +61,10 @@ export class SensorView extends StudioView {
   /** "Delete" was tapped once: the next tap deletes. */
   @state() private accessor confirmDelete = false;
   private stop?: () => void;
+  /** The config id of the motion automation it stands for; null: a new one (once it has lights). */
+  private automationId: string | null = null;
+  /** The draft as it was read, to tell whether it changed. */
+  private original = "";
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -93,12 +98,42 @@ export class SensorView extends StudioView {
     return this.ctx.hass.devices?.[this.device]?.area_id ?? null;
   }
 
-  private get dirty(): boolean {
+  /** The name or the room changed. */
+  private get deviceDirty(): boolean {
     const info = this.info;
     return (
       (this.name !== null && this.name.trim() !== "" && this.name.trim() !== (info?.name ?? "")) ||
       (this.area !== undefined && this.area !== this.currentArea)
     );
+  }
+
+  /** The automation changed (a new one only counts once it has lights). */
+  private get draftDirty(): boolean {
+    const d = this.draft;
+    if (!d || JSON.stringify(d) === this.original) return false;
+    return !!this.automationId || placesOf(d.input).length > 0;
+  }
+
+  private get dirty(): boolean {
+    return this.deviceDirty || this.draftDirty;
+  }
+
+  /** Its motion automation: the first of ours that uses it, else a new one for its motion and light sensors. */
+  protected override willUpdate(): void {
+    const { ctx } = this;
+    if (this.draft || !ctx.automations || ctx.automationConfigsRead !== ctx.automations) return;
+    const sensor = hueSensor(ctx.hass, this.device);
+    const motion = sensor?.sensors.motion[0];
+    if (!sensor || !motion) return;
+    const used = this.uses(sensor)[0];
+    if (used) {
+      this.automationId = used.id;
+      this.draft = used.draft;
+    } else {
+      const draft = newDraft("motion", this.info?.name ?? sensor.name, []);
+      this.draft = { ...draft, input: { ...draft.input, motion: [motion], lux_sensor: this.luxFor([motion]) } };
+    }
+    this.original = JSON.stringify(this.draft);
   }
 
   /** Motion automations of ours that use the sensor. */
@@ -113,33 +148,29 @@ export class SensorView extends StudioView {
       .sort((a, b) => a.draft.alias.localeCompare(b.draft.alias));
   }
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const close = () => ctx.go(this.roomPath);
     const sensor = hueSensor(ctx.hass, this.device);
     if (!sensor) return this.screen(this.subHead("", close), html`<p class="empty">${t("sensor.not_found")}</p>`);
+    if (this.page === "day" && this.draft) return this.dayScreen();
     const info = this.info;
     const name = this.name ?? info?.name ?? sensor.name;
     const area = this.area !== undefined ? this.area : this.currentArea;
-    const uses = this.uses(sensor);
+    const others = this.uses(sensor).filter((u) => u.id !== this.automationId);
     const room = encodeURIComponent(this.key);
-    const motion = sensor.sensors.motion[0];
-    const lux = sensor.sensors.illuminance[0];
-    const add = () => {
-      const params = new URLSearchParams({ room: this.key, ...(motion ? { sensor: motion } : {}), ...(lux ? { lux } : {}) });
-      ctx.go(`/automations/new/motion?${params}`);
-    };
-    const daylight = uses.find((u) => u.draft.input.lux_sensor && u.draft.input.lux_below);
+    const d = this.draft;
+    const lacking = d && placesOf(d.input).length ? missing(d) : null;
     const battery = sensor.battery ? ctx.hass.states[sensor.battery] : undefined;
     const level = battery && Number.isFinite(parseFloat(battery.state)) ? `${Math.round(parseFloat(battery.state))}%` : "";
 
     const head = html`<div class="bar sub">
       <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
       <div class="title">${t("sensor.settings")}</div>
-      <button class="pill save" ?disabled=${!this.dirty || this.saving || !info} @click=${() => this.save(info!)}>${t("scene.save")}</button>
+      <button class="pill save" ?disabled=${!this.dirty || this.saving || !info || !!lacking} @click=${() => this.save(info!)}>${t("scene.save")}</button>
     </div>`;
-    const body = html`<div class="page sensor-edit">
+    const body = html`
       <div class="sensor-hero">
         <ha-icon class="pic" icon=${sensor.icon}></ha-icon>
         <div class="name-row">
@@ -172,37 +203,29 @@ export class SensorView extends StudioView {
         </button>
       </div>
 
-      <div class="rows">
-        ${uses.map(
-          (u) => html`<button class="item" @click=${() => ctx.go(`/automations/${encodeURIComponent(u.id)}?room=${room}`)}>
-            <ha-icon icon="mdi:lightbulb-group-outline"></ha-icon>
-            <div class="grow">${roomsLine(ctx.hass, u.draft.input) || u.draft.alias}<div class="dim small">${u.draft.alias}</div></div>
-          </button>`,
-        )}
-        <button class="item" ?disabled=${!motion} @click=${add}>
-          <div class="grow">${t("sensor.add_lights")}</div>
-          <span class="round plus-blue">${icon("plus")}</span>
-        </button>
-      </div>
+      ${d ? this.selectedLights(d) : nothing}
+      ${d && placesOf(d.input).length
+        ? html`<h2 class="label">${t("automations.general")}</h2>
+            <div class="rows">${this.light(d)}${this.offRow(d, t("automations.off_after_motion"))}${this.daylightRow(d)}</div>`
+        : nothing}
+      ${lacking ? html`<p class="hint warn">${t(`automations.missing_${lacking}` as StringKey)}</p>` : nothing}
 
-      <h2 class="label">${t("sensor.general")}</h2>
-      <div class="rows">
-        ${info?.sensitivity
-          ? this.row("mdi:motion-sensor", t("sensor.sensitivity"), this.level(info.sensitivity.value, info.sensitivity.max), () => this.open("sensitivity"))
-          : nothing}
-        ${motion
-          ? this.row(
-              "mdi:white-balance-sunny",
-              t("sensor.daylight"),
-              daylight ? t("sensor.daylight_below", { lux: daylight.draft.input.lux_below ?? 0 }) : t("sensor.daylight_off"),
-              () => {
-                const u = daylight ?? uses[0];
-                if (u) ctx.go(`/automations/${encodeURIComponent(u.id)}?room=${room}`);
-                else add();
-              },
-            )
-          : nothing}
-      </div>
+      ${info?.sensitivity
+        ? html`<h2 class="label">${t("sensor.motion")}</h2>
+            <div class="rows">${this.row("mdi:motion-sensor", t("sensor.sensitivity"), this.level(info.sensitivity.value, info.sensitivity.max), () => this.open("sensitivity"))}</div>`
+        : nothing}
+
+      ${others.length
+        ? html`<h2 class="label">${t("sensor.other_automations")}</h2>
+            <div class="rows">
+              ${others.map(
+                (u) => html`<button class="item nav" @click=${() => ctx.go(`/automations/${encodeURIComponent(u.id)}?room=${room}`)}>
+                  <div class="grow">${u.draft.alias}</div>
+                  <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+                </button>`,
+              )}
+            </div>`
+        : nothing}
 
       <h2 class="label">${t("sensor.support")}</h2>
       <div class="rows">
@@ -219,12 +242,11 @@ export class SensorView extends StudioView {
             </button>
             ${this.confirmDelete ? html`<p class="hint warn">${t("devices.delete_hint")}</p>` : nothing}
           </div>`
-        : nothing}
-    </div>`;
-    // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
-    return html`<div class="screen-head">${head}</div>
-      <div class="screen-body">${body}</div>
-      ${this.sheet ? this.renderSheet(this.sheet, sensor, info, area, level) : nothing}`;
+        : nothing}`;
+    // The sheets sit outside the scrolling body: a scroller (iOS) would clip them.
+    return html`${this.screen(head, body, "settings-page automation-page sensor-edit")}
+      ${this.sheet ? this.renderSheet(this.sheet, sensor, info, area, level) : nothing}
+      ${d ? this.partSheets(d) : nothing}`;
   }
 
   /** A row like the Hue app's: picture, title and value, no chevron. */
@@ -379,12 +401,23 @@ export class SensorView extends StudioView {
     const { ctx } = this;
     this.saving = true;
     const name = this.name?.trim() || info.name;
-    const ok = await ctx.ws({
-      type: "hue_studio/devices/setup",
-      device: info.id,
-      name,
-      area_id: this.area !== undefined ? this.area : this.currentArea,
-    });
+    let ok = true;
+    if (this.deviceDirty)
+      ok = await ctx.ws({
+        type: "hue_studio/devices/setup",
+        device: info.id,
+        name,
+        area_id: this.area !== undefined ? this.area : this.currentArea,
+      });
+    const d = this.draft;
+    if (ok && d && this.draftDirty) {
+      // Without lights the sensor switches nothing: its automation goes.
+      if (!placesOf(d.input).length) ok = await ctx.deleteAutomation(d.id);
+      else {
+        const draft = { ...d, alias: d.alias.trim() || name };
+        ok = await ctx.saveAutomation(toConfig(draft, ctx.t("automations.description", { url: `/hue/automations/${d.id}` })), areaFor(draft));
+      }
+    }
     this.saving = false;
     if (!ok) return;
     haptic("success");

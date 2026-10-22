@@ -4,7 +4,7 @@
 // what the list shows. Pure functions, no DOM.
 
 import type { StringKey, Translate } from "./i18n.ts";
-import type { AutomationConfig, DayConfig, HassData } from "./types.ts";
+import type { AutomationConfig, DayConfig, HassData, Phase } from "./types.ts";
 
 export const TYPES = ["wake_up", "go_to_sleep", "coming_home", "leaving_home", "mimic_presence", "schedule", "motion"] as const;
 export type AutomationType = (typeof TYPES)[number];
@@ -39,6 +39,10 @@ export interface AutomationInput {
   days?: Weekday[];
   fade?: number;
   off_after?: number;
+  /** Motion: the minutes of some parts of the light of the day (the others: `off_after`). */
+  off_after_phases?: Partial<Record<Phase, number>>;
+  /** Motion: Hue Studio's part of the day (its phase sensor). */
+  phase_sensor?: string;
   light?: LightKind;
   scenes?: string[];
   kelvin?: number;
@@ -77,7 +81,7 @@ export const INPUT_KEYS: Record<AutomationType, readonly (keyof AutomationInput)
   leaving_home: ["rooms", "zones", "zone"],
   mimic_presence: ["rooms", "zones", "start_kind", "start_time", "start_offset", "end_time", "days", "zone", "only_away", ...LIGHT_KEYS],
   schedule: ["rooms", "zones", "start_kind", "start_time", "start_offset", "end_kind", "end_time", "end_offset", "days", "fade", ...LIGHT_KEYS],
-  motion: ["rooms", "zones", "motion", "lux_sensor", "lux_below", "off_after", ...LIGHT_KEYS],
+  motion: ["rooms", "zones", "motion", "lux_sensor", "lux_below", "off_after", "off_after_phases", "phase_sensor", ...LIGHT_KEYS],
 };
 
 /** Which light kinds a type offers (none: it only turns lights off). */

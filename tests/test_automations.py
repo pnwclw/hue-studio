@@ -160,6 +160,51 @@ async def test_go_to_sleep_by_button(hass: HomeAssistant, config_dir: Path) -> N
 
 
 @pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_motion_off_by_part_of_the_day(
+    hass: HomeAssistant, config_dir: Path, freezer: Any
+) -> None:
+    """The lights go off after the minutes of the part of the day the motion ends in."""
+    apply = async_mock_service(hass, DOMAIN, "apply_light")
+    hass.states.async_set("binary_sensor.example_motion", "off")
+    hass.states.async_set("sensor.hue_studio_phase", "night")
+    await async_install_blueprints(hass)
+    inputs = {
+        "rooms": ["living_room"],
+        "motion": ["binary_sensor.example_motion"],
+        "off_after": 10,
+        "off_after_phases": {"night": 1},
+    }
+    assert await async_setup_component(
+        hass, "automation", {"automation": [_automation("motion", inputs)]}
+    )
+    await hass.async_block_till_done()
+
+    async def walk_by() -> None:
+        hass.states.async_set("binary_sensor.example_motion", "on")
+        await hass.async_block_till_done()
+        hass.states.async_set("binary_sensor.example_motion", "off")
+        await hass.async_block_till_done()
+
+    async def wait(minutes: float) -> None:
+        freezer.tick(timedelta(minutes=minutes))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    # At night: one minute.
+    await walk_by()
+    assert [c.data["light"] for c in apply] == ["auto"]
+    await wait(1.1)
+    assert [c.data["light"] for c in apply] == ["auto", "off"]
+    # During the day: the minutes for every other part of the day.
+    hass.states.async_set("sensor.hue_studio_phase", "day")
+    await walk_by()
+    await wait(5)
+    assert [c.data["light"] for c in apply] == ["auto", "off", "auto"]
+    await wait(5.1)
+    assert [c.data["light"] for c in apply] == ["auto", "off", "auto", "off"]
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
 async def test_wake_up_with_sunrise(
     hass: HomeAssistant, config_dir: Path, freezer: Any
 ) -> None:
