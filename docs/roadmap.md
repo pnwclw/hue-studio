@@ -482,9 +482,13 @@ and the `huesyncbox` link mode keep one screen.
 ### DS. One design system (2026-10-22)
 
 So that new features are not built on a vision of their own, everything is put on one
-design system first:
+design system first. **Done (2026-10-22)** except the rest of the Hue app inventory:
+`docs/design-system.md`, tokens in `src/tokens.ts`, `styles.ts` and the cards, sheets and
+dialog on them, kept there by `tests/js/styles.test.ts`.
 
-1. **Inventory of the Hue app:** every screen of the real app (home, rooms, scenes and
+1. **Inventory of the Hue app** (partly: what was measured so far is in the doc; the color
+   screen, effects, gallery, Sync, adding devices, bridges, MotionAware, sheets and pickers
+   still need the app's screenshots side by side): every screen of the real app (home, rooms, scenes and
    the gallery, the wheel, effects, automations, Sync, settings, devices, sheets and
    pickers), with sizes in points (1pt ≈ 2.09px on its screenshots).
 2. **Inventory of Hue Studio:** every screen and part of the panel, the dialogs and the
@@ -520,9 +524,9 @@ A -> B1–B2 -> R -> Settings tab -> D -> D2 -> C -> rest of B -> E -> F -> G2 (
 G2 for automations) -> J. Done so far: A, B, C, D, R, D2, E (except the HACS submission, kept
 for later), F, G, J and G2 (scenes 2026-10-21, automations with G). K is dropped.
 
-Next (2026-10-22): **DS** (the design system, first: everything after it is built on it)
--> **S** (the Sync Box screen) -> **I** (one style for every dashboard) -> **H** (Hue Secure,
-last).
+Next (2026-10-22): **DS** (the design system, first: everything after it is built on it;
+done but for the rest of the Hue app inventory) -> **S** (the Sync Box screen) -> **I** (one
+style for every dashboard) -> **H** (Hue Secure, last).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.

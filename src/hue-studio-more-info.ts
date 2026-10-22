@@ -62,7 +62,7 @@ const DIALOG_CSS = css`
   }
   @media (min-width: 600px) {
     :host { align-items: center; }
-    .dlg { border-radius: 22px; height: min(880px, 92dvh); padding-top: 8px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    .dlg { border-radius: var(--r-3xl); height: min(880px, 92dvh); padding-top: 8px; box-shadow: var(--shadow-overlay);
            animation: pop-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1); }
     :host(.closing) .dlg { transform: translateY(12px) scale(0.97); opacity: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
     .colorbody .dock { padding-bottom: 14px; }

@@ -23,15 +23,15 @@ import { icon, keepTouchInside } from "./ui.ts";
 const EXPECT_MS = 5000;
 
 const SCENE_CSS = css`
-  .ss-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: 14px; }
-  .ss-dot { width: 44px; height: 44px; flex: none; border-radius: 50%; background: #555 center / cover no-repeat;
+  .ss-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--r-l); }
+  .ss-dot { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
             box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
   .ss-card .grow { flex: 1; min-width: 0; }
-  .ss-room { opacity: 0.75; font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ss-room { opacity: 0.75; font-size: var(--fs-footnote); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ss-check { width: 28px; height: 28px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
               background: rgba(255, 255, 255, 0.25); --mdc-icon-size: 18px; }
   .dark-text .ss-check { background: rgba(0, 0, 0, 0.12); }
-  .ss-note { margin: 12px 2px 0; color: var(--text-2); font-size: 14px; }
+  .ss-note { margin: 12px 2px 0; color: var(--text-2); font-size: var(--fs-callout); }
   .as-actions .pill { display: flex; align-items: center; justify-content: center; gap: 6px; }
   .as-actions .pill svg { width: 16px; height: 16px; fill: currentColor; }
 `;

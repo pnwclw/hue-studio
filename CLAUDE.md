@@ -144,6 +144,10 @@ touching anything outside this repository.
 - **Every screen works on phone and desktop.** Verified with screenshots at the widths of
   iPhone 17 Pro (402×874) and 17 Pro Max (440×956), and 1440 (how: see `CLAUDE.local.md`).
   A UI change is not done without screenshots.
+- **Design system** (`docs/design-system.md`): every screen, sheet and card is made of its
+  parts — tokens in `src/tokens.ts` (colors, type scale, radii, shadows, sizes, motion) and
+  the components in `styles.ts` and their helpers. A missing part is added to the system
+  (and the doc) first; no one-off sizes, colors or fonts (`tests/js/styles.test.ts`).
 - **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
   Home: room and zone names 16px, a step above everything else (rows 15px, the room and
   zone screens' tiles 14px). Automation cards are the Hue app's: 86px tall, a 32px icon,
@@ -371,6 +375,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
   wheel.ts                      the picker wheel (scroll snapping, a drum look) of the time screens
   ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
+  tokens.ts                     pure: the design system's tokens (docs/design-system.md), as CSS variables
   i18n.ts                       UI strings (en is the source; same keys in every locale)
   ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets,
                                 the companion app's QR scanner)
@@ -402,7 +407,7 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   no real bridge.
 - Color math (xy ↔ RGB, gamut clipping, mirek) — pure functions with unit tests.
 - Frontend: `npm run typecheck` and `npm test` (model, color math, optimistic state, locale
-  parity).
+  parity, stylesheets on the design system's tokens).
 - UI, fast loop: `npm run watch`, then `dev/panel.html` (Claude: `preview_start` with `panel-harness` from
   `.claude/launch.json`, then `/dev/panel.html?lang=en|pl&path=/room/area.office`) at 402,
   440 and 1440; `&moreinfo=light.desk_lamp` opens the dialog. The browser pane freezes CSS

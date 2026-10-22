@@ -62,57 +62,57 @@ function feed(hass: Hass): void {
 const CARD_CSS = css`
   :host {
     display: block; height: auto; overflow: visible; background: none;
-    --bg: var(--ha-card-background, var(--card-background-color, #1c1c1e));
+    --bg: var(--ha-card-background, var(--card-background-color, var(--text-dark)));
     --surface: color-mix(in srgb, var(--primary-text-color, #fff) 8%, transparent);
     --surface-2: color-mix(in srgb, var(--primary-text-color, #fff) 14%, transparent);
     --text: var(--primary-text-color, #fff); --text-2: var(--secondary-text-color, rgba(235, 235, 245, 0.6));
-    color: var(--text); font-size: 14px;
+    color: var(--text); font-size: var(--fs-callout);
   }
   ha-card { overflow: hidden; }
   .body { padding: 14px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .grow { flex: 1; min-width: 0; }
-  .name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sub { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { font-size: var(--fs-name); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { font-size: var(--fs-caption); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .link { display: block; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: inherit; }
   .card-head.surface { margin: -14px -14px 0; padding: 14px; border-radius: 0; }
   .card-head.surface.lit { background: var(--lit-bg); }
-  .card-head.dark-text { color: #1c1c1e; }
+  .card-head.dark-text { color: var(--text-dark); }
   .card-head.dark-text .sub { color: rgba(28, 28, 30, 0.7); }
   .card-head hue-studio-slider { margin-top: 10px; }
   .dots { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 12px -14px 0; padding: 2px 14px; }
   .dots::-webkit-scrollbar { display: none; }
   .dot-btn { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 5px; border: none; background: none;
-             padding: 0; cursor: pointer; font-size: 11px; color: var(--text); }
+             padding: 0; cursor: pointer; font-size: var(--fs-micro); color: var(--text); }
   .dot-btn .dot { width: 52px; height: 52px; border-radius: 50%; background-size: cover; background-position: center;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); transition: transform 0.2s; }
-  .dot-btn:active .dot { transform: scale(0.92); }
+                  box-shadow: var(--shadow-dot); transition: transform 0.2s; }
+  .dot-btn:active .dot { transform: scale(var(--press-round)); }
   .dot-btn.active .dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
   .dot-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -14px 10px; padding: 0 14px; }
-  .chip { flex: none; height: 30px; padding: 0 12px; border-radius: 15px; border: 1.5px solid transparent; background: var(--surface);
-          cursor: pointer; font-size: 13px; }
+  .chip { flex: none; height: 30px; padding: 0 12px; border-radius: var(--r-full); border: 1.5px solid transparent; background: var(--surface);
+          cursor: pointer; font-size: var(--fs-footnote); }
   .chip.on { border-color: var(--text); }
   .seg { margin-top: 12px; }
   .seg button.on { background: var(--surface-2); }
-  .meta-line { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: 12px; color: var(--text-2); }
+  .meta-line { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: var(--fs-caption); color: var(--text-2); }
   .meta-line span { display: inline-flex; align-items: center; gap: 4px; }
   .meta-line ha-icon { --mdc-icon-size: 15px; }
   .pic { width: 72px; height: 72px; flex: none; border-radius: 50%; background-size: cover; background-position: center;
-         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+         box-shadow: var(--shadow-dot); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .actions .pill { height: 32px; font-size: 13px; }
+  .actions .pill { height: 32px; font-size: var(--fs-footnote); }
   .gtiles { display: grid; grid-auto-flow: column; grid-auto-columns: 132px; gap: 8px; overflow-x: auto; scrollbar-width: none;
            margin: 0 -14px 12px; padding: 0 14px; }
   .gtiles::-webkit-scrollbar { display: none; }
-  .gtile { position: relative; height: 84px; border-radius: 12px; border: none; padding: 0; cursor: pointer; overflow: hidden;
+  .gtile { position: relative; height: 84px; border-radius: var(--r-m); border: none; padding: 0; cursor: pointer; overflow: hidden;
            background-size: cover; background-position: center; }
-  .gtile span { position: absolute; left: 8px; right: 8px; bottom: 6px; font-size: 12px; font-weight: 500; color: #fff; text-align: left;
+  .gtile span { position: absolute; left: 8px; right: 8px; bottom: 6px; font-size: var(--fs-caption); font-weight: 500; color: #fff; text-align: left;
                 text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gtile.done::after { content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-                       font-size: 28px; color: #fff; background: rgba(0, 0, 0, 0.35); }
-  .cat { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
-  .warn { color: var(--text-2); font-size: 13px; }
+                       font-size: var(--fs-title); color: #fff; background: rgba(0, 0, 0, 0.35); }
+  .cat { font-size: var(--fs-micro); letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
+  .warn { color: var(--text-2); font-size: var(--fs-footnote); }
   .auto-card { box-shadow: none; }
 `;
 
