@@ -72,6 +72,17 @@ def _automation(kind: str, inputs: dict[str, Any], suffix: str = "a") -> dict:
 INPUTS: dict[str, dict[str, Any]] = {
     "wake_up": {"rooms": ["living_room"], "time": "06:30:00", "fade": 20},
     "go_to_sleep": {"rooms": ["living_room"], "days": ["mon", "fri"]},
+    # The other ways of each: with sunrise; only by a button.
+    "wake_up_sunrise": {
+        "rooms": ["living_room"],
+        "start_kind": "sunrise",
+        "start_offset": {"hours": 0, "minutes": -15, "seconds": 0},
+    },
+    "go_to_sleep_button": {
+        "rooms": ["living_room"],
+        "use_time": False,
+        "buttons": ["event.example_button"],
+    },
     "coming_home": {"rooms": ["living_room"], "only_dark": True},
     "leaving_home": {"zones": ["light.example_zone"]},
     "mimic_presence": {
@@ -105,16 +116,76 @@ async def test_blueprints_are_valid(
     assert set(await async_install_blueprints(hass)) == set(TYPES)
     assert await async_install_blueprints(hass) == []
     assert (config_dir / "blueprints/automation/hue_studio/schedule.yaml").exists()
+    variants = {"wake_up": "wake_up_sunrise", "go_to_sleep": "go_to_sleep_button"}
     assert await async_setup_component(
         hass,
         "automation",
-        {"automation": [_automation(kind, INPUTS[kind]) for kind in TYPES]},
+        {
+            "automation": [_automation(kind, INPUTS[kind]) for kind in TYPES]
+            + [
+                _automation(kind, INPUTS[variant], "b")
+                for kind, variant in variants.items()
+            ]
+        },
     )
     await hass.async_block_till_done()
     for kind in TYPES:
         found = automations_with_blueprint(hass, blueprint_path(kind))
-        assert len(found) == 1, kind
-        assert hass.states.get(found[0]).state == "on", kind
+        assert len(found) == (2 if kind in variants else 1), kind
+        for entity_id in found:
+            assert hass.states.get(entity_id).state == "on", entity_id
+
+
+async def test_go_to_sleep_by_button(hass: HomeAssistant, config_dir: Path) -> None:
+    """Without a time, a short press of a chosen button starts going to sleep."""
+    apply = async_mock_service(hass, DOMAIN, "apply_light")
+    hass.states.async_set("event.example_button", "2026-10-22T20:00:00+00:00")
+    await async_install_blueprints(hass)
+    assert await async_setup_component(
+        hass,
+        "automation",
+        {"automation": [_automation("go_to_sleep", INPUTS["go_to_sleep_button"])]},
+    )
+    await hass.async_block_till_done()
+    press = {"event_type": "long_release"}
+    hass.states.async_set("event.example_button", "2026-10-22T20:01:00+00:00", press)
+    await hass.async_block_till_done()
+    assert not apply
+    press = {"event_type": "short_release"}
+    hass.states.async_set("event.example_button", "2026-10-22T20:02:00+00:00", press)
+    await hass.async_block_till_done()
+    assert len(apply) == 1
+    assert apply[0].data["light"] == "off"
+    assert apply[0].data["transition"] == 1800
+
+
+@pytest.mark.parametrize("expected_lingering_timers", [True])
+async def test_wake_up_with_sunrise(
+    hass: HomeAssistant, config_dir: Path, freezer: Any
+) -> None:
+    """With sunrise: the fade ends with the lights full at sunrise plus the offset."""
+    await hass.config.async_set_time_zone("UTC")
+    freezer.move_to("2026-10-22 05:00:00+00:00")
+    apply = async_mock_service(hass, DOMAIN, "apply_light")
+    hass.states.async_set(
+        "sun.sun", "below_horizon", {"next_rising": "2026-10-22T05:40:00+00:00"}
+    )
+    await async_install_blueprints(hass)
+    inputs = {**INPUTS["wake_up_sunrise"], "fade": 20}
+    assert await async_setup_component(
+        hass, "automation", {"automation": [_automation("wake_up", inputs)]}
+    )
+    await hass.async_block_till_done()
+    # 05:40 sunrise, 15 min before it, a 20 min fade: from 05:05.
+    freezer.move_to("2026-10-22 05:04:00+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert not apply
+    freezer.move_to("2026-10-22 05:05:00+00:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(apply) == 1
+    assert apply[0].data["transition"] == 1200
 
 
 async def test_changed_blueprint_reloads_automations(

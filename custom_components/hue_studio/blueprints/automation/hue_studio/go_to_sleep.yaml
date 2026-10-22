@@ -1,7 +1,8 @@
 blueprint:
   name: "Hue Studio: Go to sleep"
   description: >-
-    Like the Hue app's go to sleep: from the set time the lights slowly dim to off. Made for Hue Studio: create and edit it in the Hue Studio panel
+    Like the Hue app's go to sleep: from the set time, or a press of a button, the lights slowly dim to off.
+    Made for Hue Studio: create and edit it in the Hue Studio panel
     ([Automations](/hue/automations)); this form edits it too.
   domain: automation
   author: Hue Studio
@@ -13,11 +14,27 @@ blueprint:
       name: When
       icon: mdi:sleep
       input:
+        use_time:
+          name: At a time
+          description: Off, only the buttons below start it.
+          default: true
+          selector:
+            boolean:
         time:
           name: Time
           default: "23:00:00"
           selector:
             time:
+        buttons:
+          name: Buttons
+          description: Hue buttons (their events) that start it with a short press.
+          default: []
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - integration: hue
+                  domain: event
         days:
           name: Days
           default: [mon, tue, wed, thu, fri, sat, sun]
@@ -80,11 +97,25 @@ mode: single
 triggers:
   - trigger: time
     at: !input time
+    enabled: !input use_time
+    id: time
+  - trigger: state
+    entity_id: !input buttons
+    id: button
 variables:
   fade: !input fade
+  days: !input days
 conditions:
-  - condition: time
-    weekday: !input days
+  # A time on its days; a button on a short press (not when it comes back online).
+  - condition: template
+    value_template: >-
+      {% if trigger.id == 'button' %}
+        {{ trigger.from_state is not none
+           and trigger.from_state.state not in ['unavailable', 'unknown']
+           and trigger.to_state.attributes.event_type == 'short_release' }}
+      {% else %}
+        {{ ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][now().weekday()] in days }}
+      {% endif %}
 actions:
   - action: hue_studio.apply_light
     target:

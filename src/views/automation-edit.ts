@@ -212,11 +212,12 @@ export class AutomationEditView extends StudioView {
     return html`${this.screen(
       this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save),
       html`${this.hero(d, typeName)}
-        <h2 class="label">${t("automations.when")}</h2>
+        ${d.type === "wake_up" ? html`<h2 class="label">${t("automations.time")}</h2>` : d.type === "go_to_sleep" ? nothing : html`<h2 class="label">${t("automations.when")}</h2>`}
         ${this.when(d)}
         ${this.selectedLights(d)}
-        ${LIGHT_KINDS[d.type].length ? html`<h2 class="label">${t("automations.light")}</h2>${this.light(d)}` : nothing}
-        ${lacking && lacking !== "rooms" /* the rooms row says so itself */
+        ${this.general(d)}
+        ${d.type === "go_to_sleep" ? this.controlledBy(d) : nothing}
+        ${lacking && lacking !== "rooms" /* the lights card says so itself */
           ? html`<p class="hint warn">${t(`automations.missing_${lacking}` as StringKey)}</p>`
           : nothing}
         ${this.isNew
@@ -246,9 +247,9 @@ export class AutomationEditView extends StudioView {
       const alias = (e.target as HTMLInputElement).value.trim();
       if (alias !== d.alias) this.draft = { ...d, alias };
     };
-    return html`<div class="sensor-hero">
+    return html`<div class="sensor-hero automation-hero">
+      <ha-icon class="type-icon" icon=${TYPE_ICONS[d.type]}></ha-icon>
       <div class="name-row">
-        <ha-icon class="type-icon" icon=${TYPE_ICONS[d.type]}></ha-icon>
         ${this.editingName || !d.alias
           ? html`<input class="name-input" .value=${d.alias} placeholder=${t("automations.name")} aria-label=${t("automations.name")}
               @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} @blur=${done}
@@ -331,8 +332,25 @@ export class AutomationEditView extends StudioView {
     </div>`;
   }
 
+  /** Wheels in place, under the row that says what they choose. */
+  private wheelsItem(wheels: unknown) {
+    return html`<div class="item time-item">${wheels}</div>`;
+  }
+
+  /** Waking up with sunrise: minutes before or after it on one wheel. */
+  private sunriseWheel(d: AutomationDraft) {
+    const minutes = offsetMinutes(d.input.start_offset);
+    const values = OFFSETS.includes(minutes) ? OFFSETS : [...OFFSETS, minutes].sort((a, b) => a - b);
+    const options = values.map((v) => ({ value: String(v), label: this.offsetLabel("sunrise", v) }));
+    return this.wheelsItem(
+      html`<div class="wheels"><hue-studio-wheel .options=${options} .value=${String(minutes)}
+        .change=${(v: string) => this.set({ start_offset: offsetDuration(Number(v)) })}></hue-studio-wheel></div>`,
+    );
+  }
+
   /** The fade as a row ("30 min"); it opens the fade sheet. */
-  private fadeRow(title: string, value: number | undefined) {
+  private fadeRow(value: number | undefined) {
+    const title = this.ctx.t("automations.fade_duration");
     return navRow({ title, value: this.minutes(value ?? 0, "automations.instantly") }, () => {
       haptic("selection");
       this.fadeSheet = { value: value ?? 0 };
@@ -349,8 +367,10 @@ export class AutomationEditView extends StudioView {
   /** What the fade means in time: when waking up starts, when going to sleep ends (null: no clock). */
   private fadeMoment(d: AutomationDraft, fade: number): { label: string; time: string } | null {
     const { t } = this.ctx;
-    if (d.type === "wake_up") return { label: t("automations.fade_starts"), time: AutomationEditView.shifted(d.input.time, -fade) };
-    if (d.type === "go_to_sleep") return { label: t("automations.fade_ends"), time: AutomationEditView.shifted(d.input.time, fade) };
+    if (d.type === "wake_up" && d.input.start_kind !== "sunrise")
+      return { label: t("automations.fade_starts"), time: AutomationEditView.shifted(d.input.time, -fade) };
+    if (d.type === "go_to_sleep" && d.input.use_time !== false)
+      return { label: t("automations.fade_ends"), time: AutomationEditView.shifted(d.input.time, fade) };
     return null;
   }
 
@@ -358,6 +378,11 @@ export class AutomationEditView extends StudioView {
   private fadeHint(d: AutomationDraft) {
     const { t } = this.ctx;
     const fade = d.input.fade ?? 0;
+    if (d.type === "wake_up" && d.input.start_kind === "sunrise") {
+      const minutes = offsetMinutes(d.input.start_offset);
+      const wake = minutes ? this.offsetLabel("sunrise", minutes).toLowerCase() : t("automations.at_sunrise");
+      return html`<p class="hint">${t(fade ? "automations.wake_hint_sun" : "automations.wake_hint_sun_now", { when: wake, n: fade })}</p>`;
+    }
     const moment = this.fadeMoment(d, fade);
     if (!moment) return nothing;
     const key = d.type === "wake_up" ? (fade ? "automations.wake_hint" : "automations.wake_hint_now") : "automations.sleep_hint";
@@ -368,7 +393,7 @@ export class AutomationEditView extends StudioView {
   private fadeSheetView(d: AutomationDraft) {
     const { t } = this.ctx;
     const sheet = this.fadeSheet!;
-    const title = t(d.type === "wake_up" ? "automations.fade_in" : d.type === "go_to_sleep" ? "automations.fade_out" : "automations.fade");
+    const title = t("automations.fade_duration");
     const max = Math.max(FADE_MAX, Math.ceil(sheet.value / 10) * 10);
     const moment = this.fadeMoment(d, sheet.value);
     const close = () => (this.fadeSheet = null);
@@ -423,8 +448,9 @@ export class AutomationEditView extends StudioView {
       ${open
         ? html`<div class="days-row">
             ${WEEKDAYS.map(
-              (day) => html`<button class=${classMap({ on: days.includes(day) })} aria-pressed=${days.includes(day)} @click=${() => flip(day)}>
-                ${t(`automations.day_${day}` as StringKey)}
+              (day) => html`<button class=${classMap({ on: days.includes(day) })} aria-pressed=${days.includes(day)}
+                aria-label=${t(`automations.day_${day}` as StringKey)} @click=${() => flip(day)}>
+                ${t(`automations.letter_${day}` as StringKey)}
               </button>`,
             )}
           </div>`
@@ -492,23 +518,26 @@ export class AutomationEditView extends StudioView {
     const start = (p: { kind?: StartKind; time?: string; offset?: Duration }) =>
       this.set({ ...(p.kind ? { start_kind: p.kind } : {}), ...(p.time ? { start_time: p.time } : {}), ...(p.offset ? { start_offset: p.offset } : {}) });
     switch (d.type) {
-      case "wake_up":
+      case "wake_up": {
+        // A time of day, like the Hue app's, or (switched off) with sunrise.
+        const atTime = i.start_kind !== "sunrise";
         return html`<div class="rows">
-            ${this.time(t("automations.wake_time"), i.time, (time) => this.set({ time }))}
-            ${this.fadeRow(t("automations.fade_in"), i.fade)}
-          </div>
-          ${this.fadeHint(d)}
-          <div class="rows">
-            ${this.days(d)}
-            ${this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
-          </div>`;
-      case "go_to_sleep":
-        return html`<div class="rows">
-            ${this.time(t("automations.time"), i.time, (time) => this.set({ time }))}
-            ${this.fadeRow(t("automations.fade_out"), i.fade)}
+            ${this.toggleRow("", t("automations.at_time"), atTime ? "" : t("automations.with_sunrise"), atTime, (on) => this.set({ start_kind: on ? "time" : "sunrise" }))}
+            ${atTime ? this.wheelsItem(timeWheels(hhmm(i.time) || "07:00", (v) => this.set({ time: `${v}:00` }))) : this.sunriseWheel(d)}
+            ${this.fadeRow(i.fade)}
           </div>
           ${this.fadeHint(d)}
           <div class="rows">${this.days(d)}</div>`;
+      }
+      case "go_to_sleep": {
+        // At a time of day on its days, or (switched off) only by its buttons.
+        const atTime = i.use_time !== false;
+        return html`<div class="rows">
+            ${this.toggleRow("", t("automations.time"), atTime ? "" : t("automations.when_button"), atTime, (on) => this.set({ use_time: on }))}
+            ${atTime ? html`${this.wheelsItem(timeWheels(hhmm(i.time) || "23:00", (v) => this.set({ time: `${v}:00` })))}${this.days(d)}` : nothing}
+          </div>
+          ${atTime ? this.fadeHint(d) : nothing}`;
+      }
       case "coming_home":
         return html`<p class="lead">${t("automations.coming_home_hint")}</p>
           <div class="rows">
@@ -534,7 +563,7 @@ export class AutomationEditView extends StudioView {
           ${this.moment(t("automations.end"), ["none", "time", "sunrise", "sunset"] as const, (i.end_kind || "none") as EndKind, i.end_time, i.end_offset, (p) =>
             this.set({ ...(p.kind ? { end_kind: p.kind } : {}), ...(p.time ? { end_time: p.time } : {}), ...(p.offset ? { end_offset: p.offset } : {}) }))}
           ${this.days(d)}
-          ${this.fadeRow(t("automations.fade"), i.fade)}
+          ${this.fadeRow(i.fade)}
         </div>`;
       case "motion":
         return this.motion(d);
@@ -637,6 +666,14 @@ export class AutomationEditView extends StudioView {
       const open = places.filter((p) => p.picked !== "all" && p.group).map((p) => p.key);
       this.lightsSheet = { places: { rooms: d.input.rooms, zones: d.input.zones || [] }, open };
     };
+    // None yet: just "Add lights", like the Hue app's.
+    if (!places.length)
+      return html`<div class="rows lights-card">
+        <div class="item lights-head">
+          <div class="grow">${t("automations.add_lights")}</div>
+          <button class="round add" aria-label=${t("automations.add_lights")} @click=${edit}>${icon("plus")}</button>
+        </div>
+      </div>`;
     return html`<div class="rows lights-card">
       <div class="item lights-head">
         <div class="grow">${t("automations.selected_lights")}</div>
@@ -748,18 +785,62 @@ export class AutomationEditView extends StudioView {
     </div>`;
   }
 
+  /** "General", like the Hue app's: the light (its kind and settings), then what each type adds. */
+  private general(d: AutomationDraft) {
+    const { t } = this.ctx;
+    const i = d.input;
+    const light = LIGHT_KINDS[d.type].length ? this.light(d) : nothing;
+    const extra =
+      d.type === "wake_up"
+        ? this.minutesRow("mdi:lightbulb-off-outline", t("automations.off_after"), t("automations.off_after_wake"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))
+        : d.type === "go_to_sleep"
+          ? this.fadeRow(i.fade)
+          : nothing;
+    if (light === nothing && extra === nothing) return nothing;
+    return html`<h2 class="label">${t("automations.general")}</h2><div class="rows">${light}${extra}</div>`;
+  }
+
+  /** Going to sleep by a button: Hue buttons (their event entities), like the Hue app's "Controlled by". */
+  private controlledBy(d: AutomationDraft) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const buttons = Object.keys(ctx.hass.states)
+      .filter((id) => id.startsWith("event.") && ctx.hass.entities?.[id]?.platform === "hue")
+      .sort((a, b) => friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)));
+    const chosen = (d.input.buttons || []).filter((id) => ctx.hass.states[id]);
+    const area = (id: string) => {
+      const entry = ctx.hass.entities?.[id];
+      const areaId = entry?.area_id || (entry?.device_id ? ctx.hass.devices?.[entry.device_id]?.area_id : null);
+      return (areaId && ctx.hass.areas?.[areaId]?.name) || "";
+    };
+    const value = chosen.length ? chosen.map((id) => friendlyName(ctx.hass, id)).join(", ") : t("automations.no_devices");
+    return html`<h2 class="label">${t("automations.controlled_by")}</h2>
+      <div class="rows">
+        ${navRow({ title: t("automations.devices"), value }, () =>
+          this.choose(
+            several(
+              t("automations.devices"),
+              buttons.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), sub: area(id), icon: "mdi:gesture-tap-button" })),
+              chosen,
+              (ids) => this.set({ buttons: ids }),
+              { hint: t(buttons.length ? "automations.buttons_hint" : "automations.no_buttons") },
+            ),
+          ),
+        )}
+      </div>`;
+  }
+
+  /** The light: its kind, then that kind's settings. */
   private light(d: AutomationDraft) {
     const { ctx } = this;
     const { t } = ctx;
     const kinds = LIGHT_KINDS[d.type];
     const kind = (d.input.light && kinds.includes(d.input.light) ? d.input.light : kinds[0]) as LightKind;
     const options = kinds.map((k) => ({ value: k, label: t(`automations.light_${k}` as StringKey), sub: t(`automations.light_${k}_sub` as StringKey), icon: LIGHT_ICONS[k] }));
-    return html`<div class="rows">
-      ${navRow({ icon: LIGHT_ICONS[kind], title: t("automations.light_kind"), value: t(`automations.light_${kind}` as StringKey) }, () =>
+    return html`${navRow({ icon: LIGHT_ICONS[kind], title: t("automations.light_kind"), value: t(`automations.light_${kind}` as StringKey) }, () =>
         this.choose(single(t("automations.light_kind"), options, kind, (light) => this.set({ light: light as LightKind }))),
       )}
-      ${kind === "scene" ? this.sceneLight(d) : kind === "white" ? this.whiteLight(d) : this.dayLight(d, kind)}
-    </div>`;
+      ${kind === "scene" ? this.sceneLight(d) : kind === "white" ? this.whiteLight(d) : this.dayLight(d, kind)}`;
   }
 
   private brightnessRow(value: number | null, change: (v: number | null) => void, own?: StringKey) {

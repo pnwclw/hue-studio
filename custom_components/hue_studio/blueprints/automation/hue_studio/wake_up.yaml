@@ -1,7 +1,8 @@
 blueprint:
   name: "Hue Studio: Wake up with light"
   description: >-
-    Like the Hue app's wake-up: the lights fade in and are fully on at the wake-up time. Made for Hue Studio: create and edit it in the Hue Studio panel
+    Like the Hue app's wake-up: the lights fade in and are fully on at the wake-up time, a time of day or one
+    from sunrise. Made for Hue Studio: create and edit it in the Hue Studio panel
     ([Automations](/hue/automations)); this form edits it too.
   domain: automation
   author: Hue Studio
@@ -13,11 +14,31 @@ blueprint:
       name: When
       icon: mdi:alarm
       input:
+        start_kind:
+          name: Wake up
+          default: time
+          selector:
+            select:
+              options:
+                - label: At a time
+                  value: time
+                - label: With sunrise
+                  value: sunrise
         time:
           name: Wake-up time
           default: "07:00:00"
           selector:
             time:
+        start_offset:
+          name: Offset from sunrise
+          description: For "With sunrise"; negative is before it.
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 0
+          selector:
+            duration:
+              allow_negative: true
         days:
           name: Days
           default: [mon, tue, wed, thu, fri, sat, sun]
@@ -147,13 +168,29 @@ blueprint:
 
 mode: single
 trigger_variables:
+  kind: !input start_kind
   wake_time: !input time
+  offset: !input start_offset
   fade_minutes: !input fade
 triggers:
+  # Fade minutes before the wake-up moment: a time of day, or today's sunrise and the
+  # offset (sun.sun names the next sunrise; once today's is past, a day back is close).
   - trigger: template
     value_template: >-
-      {{ now().strftime('%H:%M') == (today_at(wake_time)
-         - timedelta(minutes=fade_minutes | int(0))).strftime('%H:%M') }}
+      {% set target = none %}
+      {% if kind == 'sunrise' %}
+        {% set rise = state_attr('sun.sun', 'next_rising') | as_datetime(none) %}
+        {% if rise is not none %}
+          {% set rise = rise | as_local %}
+          {% if rise.date() > now().date() %}{% set rise = rise - timedelta(days=1) %}{% endif %}
+          {% set target = rise + timedelta(hours=offset.hours | default(0) | int(0),
+             minutes=offset.minutes | default(0) | int(0)) %}
+        {% endif %}
+      {% else %}
+        {% set target = today_at(wake_time) %}
+      {% endif %}
+      {{ target is not none and now().strftime('%H:%M')
+         == (target - timedelta(minutes=fade_minutes | int(0))).strftime('%H:%M') }}
 variables:
   days: !input days
   fade: !input fade

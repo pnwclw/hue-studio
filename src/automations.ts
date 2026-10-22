@@ -32,6 +32,10 @@ export interface AutomationInput {
   /** Hue rooms/zones (group light entities) no area holds, e.g. a zone across rooms. */
   zones?: string[];
   time?: string;
+  /** Going to sleep: at `time` (else only by its buttons). */
+  use_time?: boolean;
+  /** Hue buttons (event entities) that start it with a short press. */
+  buttons?: string[];
   days?: Weekday[];
   fade?: number;
   off_after?: number;
@@ -67,8 +71,8 @@ const LIGHT_KEYS = ["light", "scenes", "kelvin", "brightness", "scene_of_the_day
 
 /** The inputs each blueprint has (anything else is left out of the config). */
 export const INPUT_KEYS: Record<AutomationType, readonly (keyof AutomationInput)[]> = {
-  wake_up: ["rooms", "zones", "time", "days", "fade", "off_after", ...LIGHT_KEYS],
-  go_to_sleep: ["rooms", "zones", "time", "days", "fade"],
+  wake_up: ["rooms", "zones", "start_kind", "time", "start_offset", "days", "fade", "off_after", ...LIGHT_KEYS],
+  go_to_sleep: ["rooms", "zones", "use_time", "time", "buttons", "days", "fade"],
   coming_home: ["rooms", "zones", "zone", "only_dark", ...LIGHT_KEYS],
   leaving_home: ["rooms", "zones", "zone"],
   mimic_presence: ["rooms", "zones", "start_kind", "start_time", "start_offset", "end_time", "days", "zone", "only_away", ...LIGHT_KEYS],
@@ -109,9 +113,9 @@ function typeDefaults(type: AutomationType, rooms: string[]): AutomationInput {
   const light = { light: LIGHT_KINDS[type][0], scenes: [], kelvin: 2700, brightness: null, scene_of_the_day: {} };
   switch (type) {
     case "wake_up":
-      return { rooms, time: "07:00:00", days: EVERY_DAY, fade: 30, off_after: 0, ...light, kelvin: 4000, brightness: 100 };
+      return { rooms, start_kind: "time", time: "07:00:00", start_offset: NO_OFFSET, days: EVERY_DAY, fade: 30, off_after: 0, ...light, kelvin: 4000, brightness: 100 };
     case "go_to_sleep":
-      return { rooms, time: "23:00:00", days: EVERY_DAY, fade: 30 };
+      return { rooms, use_time: true, time: "23:00:00", buttons: [], days: EVERY_DAY, fade: 30 };
     case "coming_home":
       return { rooms, zone: "zone.home", only_dark: false, ...light };
     case "leaving_home":
@@ -213,6 +217,7 @@ export function fromConfig(config: AutomationConfig): AutomationDraft | null {
   input.rooms = toList(input.rooms);
   input.zones = toList(input.zones);
   if (input.motion !== undefined) input.motion = toList(input.motion);
+  if (input.buttons !== undefined) input.buttons = toList(input.buttons);
   if (input.scenes !== undefined) input.scenes = toList(input.scenes);
   return { id: config.id, type, alias: config.alias || "", input };
 }
@@ -235,9 +240,10 @@ export function toConfig(draft: AutomationDraft, description: string): Automatio
 }
 
 /** What a draft still needs before it can be saved, or null. */
-export function missing(draft: AutomationDraft): "name" | "rooms" | "scenes" | "motion" | null {
+export function missing(draft: AutomationDraft): "name" | "rooms" | "scenes" | "motion" | "trigger" | null {
   if (!draft.alias.trim()) return "name";
   if (!placesOf(draft.input).length) return "rooms";
+  if (draft.type === "go_to_sleep" && draft.input.use_time === false && !draft.input.buttons?.length) return "trigger";
   if (draft.type === "motion" && !draft.input.motion?.length) return "motion";
   if (LIGHT_KINDS[draft.type].length && draft.input.light === "scene" && !draft.input.scenes?.length) return "scenes";
   return null;
@@ -273,13 +279,18 @@ export function momentLine(kind: StartKind | EndKind | undefined, time: string |
   return minutes ? `${name} ${minutes > 0 ? "+" : "−"}${Math.abs(minutes)} ${t("automations.min")}` : name;
 }
 
+/** When waking up is full: "07:00", "Sunrise", "Sunrise −15 min". */
+const wakeMoment = (i: AutomationInput, t: Translate): string =>
+  i.start_kind === "sunrise" ? momentLine("sunrise", i.time, i.start_offset, t) : hhmm(i.time);
+
 /** When an automation runs, in a few words (the list's second line). */
 export function whenLine(draft: AutomationDraft, t: Translate): string {
   const i = draft.input;
   switch (draft.type) {
     case "wake_up":
+      return `${wakeMoment(i, t)} · ${daysLine(i.days, t)}`;
     case "go_to_sleep":
-      return `${hhmm(i.time)} · ${daysLine(i.days, t)}`;
+      return i.use_time === false ? t("automations.when_button") : `${hhmm(i.time)} · ${daysLine(i.days, t)}`;
     case "coming_home":
       return t(i.only_dark ? "automations.when_arrive_dark" : "automations.when_arrive");
     case "leaving_home":
@@ -304,8 +315,9 @@ export function cardLines(draft: AutomationDraft, name: string, t: Translate): {
   const timed = (time: string) => ({ title: `${time} • ${name}`, sub: daysLine(i.days, t) });
   switch (draft.type) {
     case "wake_up":
+      return timed(wakeMoment(i, t));
     case "go_to_sleep":
-      return timed(hhmm(i.time));
+      return i.use_time === false ? { title: name, sub: t("automations.when_button") } : timed(hhmm(i.time));
     case "mimic_presence":
       return timed(`${momentLine(i.start_kind, i.start_time, i.start_offset, t)} – ${hhmm(i.end_time)}`);
     case "schedule": {

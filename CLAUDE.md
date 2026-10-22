@@ -157,8 +157,10 @@ touching anything outside this repository.
   (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
   app's "Start at" — each kind (a time, sunrise, sunset, none) a row with a tick, the
   chosen one's wheels under it, "Done" in the header. An automation's own time of day
-  (wake up, go to sleep) sits on its wheels in place (`timeWheels`), its fade on a sheet
-  with a slider and the time it leads to.
+  (wake up, go to sleep) sits on its wheels in place (`timeWheels`) under a "Time" switch
+  (waking up: off is with sunrise, an offset on one wheel; going to sleep: off is only by
+  its Hue buttons, "Controlled by"), its fade on a sheet with a slider and the time it
+  leads to.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its

@@ -160,5 +160,31 @@ const ART: Record<AutomationType, () => TemplateResult> = {
     ),
 };
 
+/** A custom automation (Home Assistant's editor): a flow of steps, when → if → then. */
+export const customArt = (): TemplateResult =>
+  frame(
+    "custom",
+    svg`<defs>
+        <linearGradient id="art-custom-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b2a6b"></stop><stop offset="1" stop-color="#0a62ff"></stop></linearGradient>
+      </defs>
+      <rect width="400" height="170" fill="url(#art-custom-bg)"></rect>
+      <g fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1">
+        ${Array.from({ length: 9 }, (_, i) => svg`<line x1=${i * 50} y1="0" x2=${i * 50} y2="170"></line>`)}
+        ${Array.from({ length: 4 }, (_, i) => svg`<line x1="0" y1=${i * 50 + 10} x2="400" y2=${i * 50 + 10}></line>`)}
+      </g>
+      <g transform="translate(-40 6)">
+      <path d="M196 38 C236 38 236 38 236 58 M196 38 C236 38 250 92 286 92 M310 92 C340 92 340 40 362 40 M310 92 C340 92 340 136 362 136"
+        fill="none" stroke="#bcd3ff" stroke-width="3" stroke-linecap="round" opacity="0.8"></path>
+      <rect x="128" y="20" width="68" height="36" rx="10" fill="#ffffff"></rect>
+      <circle cx="146" cy="38" r="7" fill="#0a62ff"></circle>
+      <rect x="158" y="34" width="28" height="8" rx="4" fill="#9fb8e8"></rect>
+      <path d="M298 72 L318 92 L298 112 L278 92 Z" fill="#ffd27a"></path>
+      <rect x="362" y="24" width="64" height="32" rx="10" fill="#ffffff" opacity="0.92"></rect>
+      <rect x="362" y="120" width="64" height="32" rx="10" fill="#ffffff" opacity="0.92"></rect>
+      <circle cx="378" cy="40" r="6" fill="#ffb35c"></circle>
+      <circle cx="378" cy="136" r="6" fill="#6fd38a"></circle>
+      </g>`,
+  );
+
 /** The picture of an automation type. */
 export const automationArt = (type: AutomationType): TemplateResult => ART[type]();

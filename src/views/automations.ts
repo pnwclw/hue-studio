@@ -7,7 +7,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import { automationArt } from "../automation-art.ts";
+import { automationArt, customArt } from "../automation-art.ts";
 import { type AutomationDraft, cardLines, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES } from "../automations.ts";
 import type { StudioContext } from "../context.ts";
 import type { StringKey } from "../i18n.ts";
@@ -129,7 +129,7 @@ export class AutomationsView extends StudioView {
   }
 }
 
-/** "+": the Hue app's automation types as picture cards, then a custom one in HA's editor. */
+/** "+": the Hue app's automation types as picture cards, then (last, outlined) a custom one in HA's editor. */
 @customElement("hue-studio-automation-new-view")
 export class AutomationNewView extends StudioView {
   /** The room the new automation starts with (an area id), from its screen. */
@@ -139,7 +139,7 @@ export class AutomationNewView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const room = this.room ? `?room=${encodeURIComponent(this.room)}` : "";
-    // Like the Hue app's: a picture card for each type, then a custom one in HA's editor.
+    // Like the Hue app's: a picture card for each type; last and outlined, a custom one in HA's editor.
     return this.screen(
       this.subHead(t("automations.new"), () => history.back()),
       html`<h1 class="big new-question">${t("automations.new_question")}</h1>
@@ -153,12 +153,13 @@ export class AutomationNewView extends StudioView {
               </span>
             </button>`,
           )}
-        </div>
-        <div class="rows">
-          <button class="item" @click=${() => haEditor(ctx, null)}>
-            <ha-icon icon="mdi:home-assistant"></ha-icon>
-            <div class="grow">${t("automations.custom")}<div class="dim small">${t("automations.custom_hint")}</div></div>
-            <ha-icon class="chevron" icon="mdi:open-in-new"></ha-icon>
+          <button class="type-card custom" @click=${() => haEditor(ctx, null)}>
+            ${customArt()}
+            <ha-icon class="open" icon="mdi:open-in-new"></ha-icon>
+            <span class="text">
+              <span class="title">${t("automations.custom")}</span>
+              <span class="sub">${t("automations.custom_hint")}</span>
+            </span>
           </button>
         </div>`,
       "settings-page",

@@ -294,6 +294,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     }
   };
   refreshGroups();
+  // A Hue dimmer switch: its buttons are event entities (going to sleep by a button).
+  for (const n of [1, 4]) {
+    const id = `event.bedroom_dimmer_button_${n}`;
+    states[id] = { entity_id: id, state: "unknown", attributes: { friendly_name: `Bedroom dimmer button ${n}`, event_type: null } };
+    entities[id] = { platform: "hue" };
+  }
 
   const sceneInfo: Record<string, SceneInfo> = {};
   const sceneListeners = new Set<(msg: unknown) => void>();

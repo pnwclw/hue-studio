@@ -13,7 +13,7 @@ test("a draft becomes a blueprint automation and back", () => {
   const config = toConfig(draft, "link");
   assert.equal(config.use_blueprint?.path, "hue_studio/wake_up.yaml");
   assert.deepEqual(Object.keys(config.use_blueprint!.input).sort(), [
-    "brightness", "days", "fade", "kelvin", "light", "off_after", "rooms", "scene_of_the_day", "scenes", "time", "zones",
+    "brightness", "days", "fade", "kelvin", "light", "off_after", "rooms", "scene_of_the_day", "scenes", "start_kind", "start_offset", "time", "zones",
   ]);
   // Inputs of other types are left out.
   const sleep = toConfig({ ...newDraft("go_to_sleep", "Sleep", ["area.bedroom"]), input: { ...draft.input } }, "");
@@ -97,6 +97,21 @@ test("rooms and zones of an automation", () => {
   // Some lights of a room: listed under that room.
   assert.equal(controlsGroup({ lights: ["light.desk"] }, "area.office", null, ["light.desk", "light.lamp"]), true);
   assert.equal(controlsGroup({ lights: ["light.desk"] }, "area.balcony", null, ["light.garland"]), false);
+});
+
+test("waking up with sunrise, going to sleep by a button", () => {
+  const t = localize({ language: "en" } as never);
+  const wake = newDraft("wake_up", "Wake up");
+  wake.input = { ...wake.input, start_kind: "sunrise", start_offset: offsetDuration(-15) };
+  assert.equal(cardLines(wake, "Wake up", t).title, "Sunrise −15 min • Wake up");
+  const sleep = newDraft("go_to_sleep", "Sleep", ["area.office"]);
+  assert.equal(missing(sleep), null);
+  sleep.input = { ...sleep.input, use_time: false };
+  assert.equal(missing(sleep), "trigger");
+  assert.equal(whenLine(sleep, t), "With a button");
+  sleep.input = { ...sleep.input, buttons: ["event.example_button"] };
+  assert.equal(missing(sleep), null);
+  assert.deepEqual(fromConfig(toConfig(sleep, ""))?.input.buttons, ["event.example_button"]);
 });
 
 test("lights of a room are picked like in the Hue app's picker", () => {

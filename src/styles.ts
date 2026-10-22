@@ -1113,7 +1113,14 @@ export const CSS = `
   .type-card .text { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; display: flex; flex-direction: column; gap: 3px; }
   .type-card .title { font-size: 19px; font-weight: 500; }
   .type-card .sub { font-size: 15px; line-height: 1.3; color: rgba(255, 255, 255, 0.82); }
-  .type-cards + .rows { margin-top: 16px; }
+  /* The custom one (Home Assistant's editor) stands out: outlined, an arrow out of the panel. */
+  .type-card.custom::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; pointer-events: none;
+                              border: 1.5px solid rgba(160, 196, 255, 0.95); }
+  .type-card .open { position: absolute; top: 12px; right: 12px; z-index: 1; --mdc-icon-size: 20px; color: rgba(255, 255, 255, 0.9); }
+  /* The editor's head, like the Hue app's: the type's icon over the name. */
+  .automation-page .automation-hero > .type-icon { --mdc-icon-size: 40px; color: var(--text); margin: 4px 0 2px; }
+  .automation-page .automation-hero h1.big { font-size: 30px; }
+  .lights-card .lights-head .round.add { background: var(--accent); color: #fff; }
   /* A time of day on its wheels in place (wake up, go to sleep): the title over them. */
   .automation-page .rows .item.time-item { display: block; padding: 12px 8px 6px 16px; }
   .automation-page .rows .item.time-item .wheels { margin: 4px 0 0 -8px; }
