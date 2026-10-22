@@ -169,6 +169,9 @@ touching anything outside this repository.
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
   own (`syncBanner`).
+- **Section titles** sit 8px over their cards and 22px under the ones before, everywhere:
+  rows that scroll sideways keep the room for their cards' shadows inside (padding) and
+  give it back outside (negative margin).
 - **Headers: everything is 32px tall** — round buttons, switches, pills, the search field.
 - **Icons fill their room:** a bigger icon takes its space from the gap next to it, so the
   text never moves (rows, room cards, automation cards); in fixed frames (tiles, round
@@ -336,7 +339,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
                                 automations (the tab, "+" with a picture card per type and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
-                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, its motion automation edited in place, sensitivity),
+                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, its motion automation edited in place, sensitivity), scene-pick (a scene's sheet: save it to a room or set it once),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
                                 settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
                                 MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), bridge-move (what moves and how each device is found, the move
@@ -415,8 +418,12 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   phone's safe areas, `&pad=59,34` additionally pads the slot like HA would.
 - A room's scenes are the Hue app's: columns of two that scroll sideways; the active one
   shows play/stop (a dynamic one) in place of its picture and gets edit and "⋯" beside it
-  (copy to another room, dynamic speed, shuffle colors, delete), then the scene gallery
-  and a suggested gallery scene with a shuffle. A light playing a dynamic scene says
+  (copy to another room, dynamic speed, shuffle colors, delete), the cards sliding aside
+  and the buttons fading in; then the scene gallery and a suggested scene (a scene of the
+  day now by the ready-made tags alone, tinted with its colors, rising from its stack on
+  shuffle). A scene's sheet (`scene-pick.ts`: the gallery's, and "Copy to…") is the Hue
+  app's: picture, name and pencil, colors and shuffle, room or zone, "Save to my scenes",
+  "Set once". A light playing a dynamic scene says
   "Dynamics" and its card's colors drift at the scene's speed (`dynamics` of the light).
 - Gradient lights always show `points_capable` pins on the wheel (fixed per device, like the
   Hue app). Pins with the same color are drawn as one pin with a count (a uniform gradient,

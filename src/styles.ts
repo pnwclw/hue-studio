@@ -247,7 +247,7 @@ export const CSS = `
   .light.selected { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28); outline: 2px solid var(--ring); outline-offset: 3px; }
   /* The Hue app's "Controls" tiles (sensors): picture and switch on top, name and status below. */
   .control-row { display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: 12px; overflow-x: auto;
-                 margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+                 margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                  overscroll-behavior-x: contain; }
   .control-row::-webkit-scrollbar { display: none; }
   .control-card { box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; height: 106px; padding: 14px 14px 12px;
@@ -261,8 +261,10 @@ export const CSS = `
   .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.3; color: var(--text-2); }
   .control-card.off .top ha-icon { opacity: 0.5; }
   /* A row of cards that scrolls sideways (lights, sensors), like the Hue app's. */
+  /* Rows that scroll sideways keep room for their cards' shadows inside (8px) and give it
+     back outside, so every section's title sits as far from its cards as any other's. */
   .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: 104px; gap: 12px; overflow-x: auto;
-               margin: 0 -16px; padding: 7px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+               margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
   .light-row .tile-card { scroll-snap-align: start; }
@@ -728,27 +730,40 @@ export const CSS = `
   /* A room's scenes, the Hue app's: columns of two that scroll sideways, cards as wide as the
      light cards; narrow columns beside the active scene (edit, "⋯") and the suggestion (shuffle). */
   .scene-cols { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: max-content; gap: 12px 10px;
-                overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none;
+                overflow-x: auto; margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none;
                 scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .scene-cols::-webkit-scrollbar { display: none; }
-  .scene-cols .tile-card { width: 104px; scroll-snap-align: start; }
-  .scene-side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; height: 100%; }
+  .scene-cols .tile-card { width: 104px; }
+  .scene-cell { display: flex; scroll-snap-align: start; }
+  /* The active scene's buttons (and the shuffle) come in softly while the cards slide aside. */
+  .scene-side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; width: 32px;
+                animation: side-in 0.36s var(--ease) both; }
+  @keyframes side-in { from { opacity: 0; transform: scale(0.6); } }
   .scene-side .round { background: rgba(255, 255, 255, 0.12); color: var(--text); }
   .scene-side .round svg { width: 18px; height: 18px; }
   .scene-cols.locked .scene { opacity: 0.45; cursor: default; }
   .scene-cols.locked .scene:active { transform: none; }
   /* A dynamic active scene: play/stop in place of its picture. */
   .scene-play { width: var(--art); height: var(--art); border: none; border-radius: 50%; padding: 0; display: flex; align-items: center;
-                justify-content: center; background: rgba(255, 255, 255, 0.3); color: #fff; cursor: pointer; transition: transform 0.2s var(--spring); }
+                justify-content: center; background: rgba(255, 255, 255, 0.3); color: #fff; cursor: pointer; transition: transform 0.2s var(--spring);
+                box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3); }
   .scene-play:active { transform: scale(0.9); }
   .scene-play svg { width: 22px; height: 22px; }
   .dark-text .scene-play { background: rgba(255, 255, 255, 0.45); color: #1c1c1e; }
   /* The gallery: three of its pictures overlapping; a suggestion: a stack of cards. */
   .dots-three { display: flex; height: var(--art); align-items: center; }
-  .dots-three span { width: 38px; height: 38px; border-radius: 50%; margin-left: -10px; box-shadow: -2px 0 6px rgba(0, 0, 0, 0.35); }
+  .dots-three span { width: 32px; height: 32px; border-radius: 50%; margin-left: -8px; box-shadow: -2px 0 6px rgba(0, 0, 0, 0.35); }
   .dots-three span:first-child { margin-left: 0; box-shadow: none; }
   .tile-card.gallery-card { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.12); background: transparent; }
-  .tile-card.suggested { margin-left: 6px; box-shadow: -3px 0 0 -1px #3a3a3c, -6px 0 0 -2px #2f2f31, 0 6px 18px rgba(0, 0, 0, 0.22); }
+  /* A suggestion: the top of a stack of cards, tinted with its scene's colors; a new one
+     rises from the stack. */
+  .tile-card.suggested { margin-left: 8px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--tint-a, #3a3a3c) 26%, var(--surface)),
+      color-mix(in srgb, var(--tint-b, #3a3a3c) 16%, #232325));
+    box-shadow: -4px 0 0 -1px color-mix(in srgb, var(--tint-a, #3a3a3c) 18%, #303032),
+      -8px 0 0 -2px color-mix(in srgb, var(--tint-b, #3a3a3c) 12%, #29292b), 0 6px 18px rgba(0, 0, 0, 0.22);
+    animation: from-stack 0.42s var(--ease) both; }
+  @keyframes from-stack { from { transform: translate(-8px, 6px) scale(0.92); opacity: 0.3; } }
   .tile-card.suggested .sub { opacity: 0.6; }
   .sync-meta svg { width: 14px; height: 14px; }
 
@@ -835,9 +850,25 @@ export const CSS = `
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
   .sheet.bottom .box { width: 100%; max-width: none; border-radius: 18px 18px 0 0; animation: rise 0.3s var(--ease); }
+  /* A scene's sheet (scene-pick.ts), the Hue app's: picture with name and pencil, colors with
+     shuffle, the room or zone it goes to, "Save to my scenes" and "Set once". */
+  hue-studio-scene-pick { display: contents; }
+  .scene-pick .box { width: min(100%, 440px); padding-bottom: 0; }
+  .scene-pick .pic { aspect-ratio: 16 / 9; }
+  .scene-pick .pic .round.rename { top: auto; bottom: 12px; }
+  .scene-pick .pic .name-input { position: absolute; left: 16px; right: 60px; bottom: 12px; z-index: 1; font-size: 22px; font-weight: 700; }
+  .scene-pick .dots { gap: 0; padding: 16px; background: none; }
+  .scene-pick .dots .shuffle { margin-left: auto; background: rgba(255, 255, 255, 0.12); color: var(--text); }
+  .scene-pick h2.label { margin: 8px 18px 8px; }
+  .scene-pick .target-row { display: flex; align-items: center; gap: 24px; width: calc(100% - 32px); margin: 0 16px 18px; min-height: 68px;
+                            padding: 0 20px; box-sizing: border-box; border: none; border-radius: 12px; background: #3a3a3c; color: var(--text);
+                            font: inherit; font-size: 16px; text-align: left; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+  .scene-pick .target-row ha-icon { --mdc-icon-size: 28px; }
+  .scene-pick .actions { background: #232325; padding: 16px; }
+  .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4); }
   /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
-  .sheet.actions.bottom { padding: 0 10px calc(10px + var(--safe-bottom)); }
-  .sheet.actions.bottom .box { border-radius: 18px; }
+  .sheet.menu.bottom { padding: 0 10px calc(10px + var(--safe-bottom)); }
+  .sheet.menu.bottom .box { border-radius: 18px; }
   .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: #2c2c2e; }
   .action-sheet button { min-height: 56px; border: none; background: none; color: var(--text); font: inherit; font-size: 17px; cursor: pointer; }
   .action-sheet button:active { background: rgba(255, 255, 255, 0.06); }

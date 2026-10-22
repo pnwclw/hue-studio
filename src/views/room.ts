@@ -5,11 +5,13 @@
 // settings); its automations, like the Hue app.
 
 import { html, nothing } from "lit";
+import type { PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { repeat } from "lit/directives/repeat.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt } from "../color.ts";
+import { paletteArt, paletteColors } from "../color.ts";
 import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
 import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
@@ -27,6 +29,7 @@ import {
   splitSensors,
 } from "../model.ts";
 import { bridgeName, lightsByBridge, type Mismatch, mismatchesIn } from "../rooms.ts";
+import { readyScenesNow } from "../daylight.ts";
 import { gallerySeasons, shownCategories } from "../seasons.ts";
 import { canSpread } from "../space.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
@@ -35,8 +38,7 @@ import { icon, refuse, toggle } from "../ui.ts";
 import "./add-sheet.ts";
 import { roomAutomations } from "./automations.ts";
 import { StudioView } from "./base.ts";
-import { single } from "./choice.ts";
-
+import { otherRoom, type PickedScene, pickPicture } from "./scene-pick.ts";
 
 @customElement("hue-studio-room-view")
 export class RoomView extends StudioView {
@@ -50,6 +52,8 @@ export class RoomView extends StudioView {
   @state() private accessor menu: { scene: string; deleting: boolean } | null = null;
   /** The dynamic speed sheet of a scene: the step on its slider (1-12). */
   @state() private accessor speed: { scene: string; step: number } | null = null;
+  /** "Copy to…": the scene's sheet, going to another room or zone. */
+  @state() private accessor copying: { scene: PickedScene; room: string } | null = null;
   /** The suggested gallery scene, per room (a new one on "shuffle"). */
   @state() private accessor suggested: { room: string; id: string } | null = null;
 
@@ -104,7 +108,11 @@ export class RoomView extends StudioView {
       ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-add-sheet>`
       : nothing}
     ${this.menu ? this.menuSheet(g, this.menu.scene) : nothing}
-    ${this.speed ? this.speedSheet(g, this.speed.scene) : nothing}`;
+    ${this.speed ? this.speedSheet(g, this.speed.scene) : nothing}
+    ${this.copying
+      ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .scene=${this.copying.scene} .room=${this.copying.room}
+          @close=${() => (this.copying = null)}></hue-studio-scene-pick>`
+      : nothing}`;
   }
 
   /**
@@ -240,26 +248,49 @@ export class RoomView extends StudioView {
    */
   private sceneColumns(g: Group, locked: boolean) {
     const { ctx } = this;
-    const cells: unknown[] = [];
-    const empty = html`<span class="scene-gap"></span>`;
+    // Keyed cells: a scene keeps its card when the buttons come in beside another, so it can slide.
+    const cells: { key: string; tpl: unknown }[] = [];
+    const gap = (key: string) => ({ key, tpl: html`<span class="scene-gap"></span>` });
     for (let i = 0; i < g.scenes.length; i += 2) {
       const pair = g.scenes.slice(i, i + 2);
-      cells.push(...pair.map((s) => this.scene(g, s)), ...(pair.length < 2 ? [empty] : []));
+      cells.push(...pair.map((s) => ({ key: s.entity_id, tpl: this.scene(g, s) })), ...(pair.length < 2 ? [gap(`gap-${i}`)] : []));
       const at = pair.findIndex((s) => (ctx.sceneInfo[s.entity_id]?.active ?? "inactive") !== "inactive");
       if (at >= 0) {
-        const side = this.sceneButtons(g, pair[at]);
-        cells.push(at === 0 ? side : empty, at === 1 ? side : empty);
+        const side = { key: `side-${pair[at].entity_id}`, tpl: this.sceneButtons(g, pair[at]) };
+        cells.push(at === 0 ? side : gap(`side-gap-${i}`), at === 1 ? side : gap(`side-gap-${i}`));
       }
     }
     const suggestion = this.suggestion(g);
-    cells.push(this.galleryCard(g), suggestion ? this.suggestedCard(g, suggestion) : empty);
+    cells.push({ key: "gallery", tpl: this.galleryCard(g) }, suggestion ? { key: `suggested-${suggestion.id}`, tpl: this.suggestedCard(g, suggestion) } : gap("suggested-gap"));
     if (suggestion)
-      cells.push(
-        empty,
-        html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
-      );
-    return html`<div class=${classMap({ "scene-cols": true, locked })}>${cells}</div>`;
+      cells.push(gap("shuffle-gap"), {
+        key: "shuffle",
+        tpl: html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
+      });
+    return html`<div class=${classMap({ "scene-cols": true, locked })}>
+      ${repeat(cells, (c) => c.key, (c) => html`<div class="scene-cell" data-k=${c.key}>${c.tpl}</div>`)}
+    </div>`;
   }
+
+  /** Where the scene cards were before an update, to slide them to where they are after it. */
+  private cellsAt = new Map<string, number>();
+
+  protected override willUpdate(changed: PropertyValues): void {
+    super.willUpdate(changed);
+    this.cellsAt.clear();
+    this.querySelectorAll<HTMLElement>(".scene-cols > .scene-cell").forEach((el) => this.cellsAt.set(el.dataset.k!, el.getBoundingClientRect().left));
+  }
+
+  protected override updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    this.querySelectorAll<HTMLElement>(".scene-cols > .scene-cell").forEach((el) => {
+      const was = this.cellsAt.get(el.dataset.k!);
+      const dx = was === undefined ? 0 : was - el.getBoundingClientRect().left;
+      if (Math.abs(dx) > 1) el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], { duration: 360, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" });
+    });
+  }
+
 
   /**
    * A scene tile; its dot shows the matching gallery picture (bridge scenes usually come
@@ -321,16 +352,22 @@ export class RoomView extends StudioView {
       close();
       run();
     };
+    // "Copy to…": the scene's sheet, another room or zone picked, saved there or set once.
     const copy = () => {
-      const others = [...ctx.home.rooms, ...ctx.home.zones].filter((o) => o.key !== g.key);
-      this.choose(
-        single(
-          t("scene.copy_to"),
-          others.map((o) => ({ value: o.key, label: o.name, icon: o.icon })),
-          "",
-          (key) => void this.copyScene(s, ctx.home.rooms.concat(ctx.home.zones).find((o) => o.key === key)!),
-        ),
-      );
+      const match = galleryMatch(ctx.gallery, s.name, info?.image);
+      const points = info?.palette ?? [];
+      const mirek = info?.mirek[0] ?? null;
+      this.copying = {
+        scene: {
+          name: s.name,
+          gallery: match?.id ?? null,
+          picture: match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : pickPicture(points, mirek),
+          points,
+          mirek,
+          gradient: points.length > 1,
+        },
+        room: otherRoom(ctx, g.key),
+      };
     };
     const shuffle = async () => {
       const data = { entity_id: entityId, shuffle: true, recall: true };
@@ -345,7 +382,7 @@ export class RoomView extends StudioView {
       close();
       if (await ctx.call("hue_studio", "delete_scene", { entity_id: entityId }, { optimistic: false })) ctx.toast(t("scene.deleted", { name: s.name }));
     };
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, actions: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box action-sheet" role="dialog" aria-label=${s.name}>
         <button @click=${act(copy)}>${t("scene.copy_to")}</button>
         ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
@@ -354,24 +391,6 @@ export class RoomView extends StudioView {
         <button class="cancel" @click=${close}>${t("common.cancel")}</button>
       </div>
     </div>`;
-  }
-
-  /** "Copy to…": the same scene in another room or zone (its gallery picture, else its palette). */
-  private async copyScene(s: Scene, to: Group): Promise<void> {
-    const { ctx } = this;
-    const info = ctx.sceneInfo[s.entity_id];
-    const match = galleryMatch(ctx.gallery, s.name, info?.image);
-    const what = match
-      ? { gallery_scene: match.id }
-      : info?.palette.length
-        ? { points: info.palette }
-        : info?.mirek.length
-          ? { mirek: info.mirek[0] }
-          : null;
-    const group = await ctx.hueGroupOf(to);
-    if (!group || !what) return;
-    if (await ctx.call("hue_studio", "create_scene", { entity_id: group, name: s.name, ...what }, { optimistic: false }))
-      ctx.toast(ctx.t("scene.copied", { name: s.name, room: to.name }));
   }
 
   /** The dynamic speed of a scene, on a slider like the scene editor's; kept as soon as it is let go. */
@@ -416,9 +435,22 @@ export class RoomView extends StudioView {
     return gallery.scenes.filter((s) => shown.includes(s.category) && !own.has(s.name.toLowerCase()));
   }
 
-  /** The suggested scene of the room: kept until "shuffle", a random one of the gallery first. */
-  private suggestion(g: Group): GalleryScene | null {
+  /**
+   * What a suggestion comes from: the scenes of the day now by Hue Studio's ready-made tags
+   * (none of the user's on top), else the gallery as it is shown.
+   */
+  private suggestible(g: Group): GalleryScene[] {
     const scenes = this.galleryScenes(g);
+    const day = this.ctx.daylight;
+    if (!day) return scenes;
+    const ids = new Set(readyScenesNow(day.defaults, day.now, scenes.map((s) => s.id)));
+    const ofDay = scenes.filter((s) => ids.has(s.id));
+    return ofDay.length ? ofDay : scenes;
+  }
+
+  /** The suggested scene of the room: kept until "shuffle", a random scene of the day first. */
+  private suggestion(g: Group): GalleryScene | null {
+    const scenes = this.suggestible(g);
     const kept = this.suggested?.room === g.key ? scenes.find((s) => s.id === this.suggested!.id) : undefined;
     if (kept) return kept;
     const pick = scenes[Math.floor(Math.random() * scenes.length)];
@@ -427,7 +459,7 @@ export class RoomView extends StudioView {
   }
 
   private shuffleSuggestion(g: Group): void {
-    const scenes = this.galleryScenes(g).filter((s) => s.id !== this.suggested?.id);
+    const scenes = this.suggestible(g).filter((s) => s.id !== this.suggested?.id);
     const pick = scenes[Math.floor(Math.random() * scenes.length)];
     if (!pick) return;
     haptic("selection");
@@ -448,9 +480,10 @@ export class RoomView extends StudioView {
     });
   }
 
-  /** A suggested scene of the gallery, a stack of cards: a tap sets it in the room once. */
+  /** A suggested scene of the day, the top of a stack of cards: a tap sets it in the room once. */
   private suggestedCard(g: Group, scene: GalleryScene) {
     const { ctx } = this;
+    const colors = paletteColors(scene);
     const apply = async (e: Event) => {
       if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
       const spatial = scene.kind === "gradient" && canSpread(ctx.positions, g.lights);
@@ -462,6 +495,8 @@ export class RoomView extends StudioView {
       name: scene.name,
       sub: [ctx.t("room.suggested")],
       classes: { scene: true, suggested: true },
+      // A touch of the scene's colors, on the card and the cards stacked under it.
+      style: { "--tint-a": colors[0], "--tint-b": colors[colors.length - 1] },
       click: apply,
     });
   }

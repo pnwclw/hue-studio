@@ -3,7 +3,7 @@
 // own settings on top of it (`scene_of_the_day`, a blueprint input: extra and skipped scenes,
 // own phase times, brightness). Pure functions, no DOM; every change returns a new object.
 
-import type { DayConfig, DaySettings, Holiday, Mood, Phase, PhaseTimes, SceneTags, Season, Weather } from "./types.ts";
+import type { DayConfig, DayPreview, DaySettings, Holiday, Mood, Phase, PhaseTimes, SceneTags, Season, Weather } from "./types.ts";
 
 export const PHASES: Phase[] = ["morning", "day", "golden", "evening", "night"];
 export const SEASONS: Season[] = ["winter", "spring", "summer", "autumn"];
@@ -127,6 +127,18 @@ export function scenesOf(view: PoolView, tags: Record<string, SceneTags>, order:
   if ("out" in view) return order.filter((id) => !inPool(tags[id]));
   if ("mood" in view) return order.filter((id) => names(tags[id], "moods", view.mood));
   return order.filter((id) => names(tags[id], "phases", view.phase) && (!view.season || fits(tags[id], "seasons", view.season)));
+}
+
+/**
+ * The scenes of the day now by Hue Studio's ready-made tags alone (none of the user's on
+ * top): the phase's scenes fitting the season and the weather; as long as nothing is
+ * left, without the weather, then without the season. In gallery order.
+ */
+export function readyScenesNow(defaults: Record<string, SceneTags>, now: Pick<DayPreview, "phase" | "season" | "weather">, order: string[]): string[] {
+  const ofPhase = order.filter((id) => names(defaults[id], "phases", now.phase));
+  const inSeason = ofPhase.filter((id) => fits(defaults[id], "seasons", now.season));
+  const fitting = inSeason.filter((id) => fits(defaults[id], "weather", now.weather));
+  return fitting.length ? fitting : inSeason.length ? inSeason : ofPhase;
 }
 
 /** A scene added to a view (it gets the view's phase or mood) or taken out of it. */

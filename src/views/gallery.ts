@@ -1,7 +1,7 @@
 // Scene gallery of a room or zone (the "+" in its header), like the Hue app's: a full-screen
-// page with a large title, search and categories of tiles; a scene's sheet sets it once or
-// saves it as a scene of the room (on the bridge, with the gallery picture). The room is
-// implied: nothing to pick.
+// page with a large title, search and categories of tiles; a scene's sheet (scene-pick.ts)
+// sets it once or saves it as a scene of the room it was opened from, or another one (on
+// the bridge, with the gallery picture).
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -9,14 +9,15 @@ import { classMap } from "lit/directives/class-map.js";
 import { guard } from "lit/directives/guard.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt, paletteColors } from "../color.ts";
+import { paletteArt } from "../color.ts";
 import { thumbUrl } from "../gallery-data.ts";
-import { findGroup, type Group } from "../model.ts";
+import { findGroup } from "../model.ts";
 import { gallerySeasons, shownCategories } from "../seasons.ts";
-import { canSpread } from "../space.ts";
+
 import type { Gallery, GalleryScene } from "../types.ts";
 import { icon, normalize } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { galleryPick } from "./scene-pick.ts";
 
 @customElement("hue-studio-gallery-view")
 export class GalleryView extends StudioView {
@@ -26,7 +27,6 @@ export class GalleryView extends StudioView {
   @state() private accessor query = "";
   @state() private accessor searching = false;
   @state() private accessor open: GalleryScene | null = null;
-  @state() private accessor saving = false;
 
   protected override render() {
     const { ctx } = this;
@@ -69,7 +69,11 @@ export class GalleryView extends StudioView {
     const body = html`${ctx.gallery ? guard([ctx.gallery, q, shown.join()], () => this.body(ctx.gallery!, q, shown)) : nothing}
       ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`;
     return html`${this.tabScreen(t("gallery.title"), body, { lead: close, center: field, end: search })}
-      ${this.open ? this.sheet(this.open, target) : nothing}`;
+      ${this.open
+        ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .room=${target.key}
+            .scene=${galleryPick(this.open, `url("${thumbUrl(this.open.id)}") center / cover, ${paletteArt(this.open)}`)}
+            @close=${() => (this.open = null)}></hue-studio-scene-pick>`
+        : nothing}`;
   }
 
   private body(gallery: Gallery, q: string, shown: string[]) {
@@ -99,45 +103,6 @@ export class GalleryView extends StudioView {
     this.open = this.ctx.gallery?.scenes.find((s) => s.id === id) ?? null;
   };
 
-  /**
-   * The scene sheet, like the Hue app's pop-up: set it once (colors by where the lights
-   * stand when they are placed) or save it as a scene of the room. A room without a Hue
-   * room or zone gets a zone of its lights first: scenes live there.
-   */
-  private sheet(scene: GalleryScene, target: Group) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const close = () => (this.open = null);
-    const spatial = scene.kind === "gradient" && canSpread(ctx.positions, target.lights);
-    const apply = async () => {
-      close();
-      const data = { entity_id: target.target, gallery_scene: scene.id, ...(spatial ? { layout: "spatial" } : {}) };
-      await ctx.call("hue_studio", "apply_palette", data);
-    };
-    const save = async () => {
-      if (this.saving) return;
-      this.saving = true;
-      const group = await ctx.hueGroupOf(target);
-      const ok = !!group && (await ctx.call("hue_studio", "create_scene", { entity_id: group, name: scene.name, gallery_scene: scene.id }, { optimistic: false }));
-      this.saving = false;
-      if (!ok) return;
-      close();
-      ctx.toast(t("gallery.saved", { name: target.name }));
-    };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box" role="dialog" aria-label=${scene.name}>
-        <div class="pic" style=${styleMap({ backgroundImage: `url('${thumbUrl(scene.id)}'), ${paletteArt(scene)}` })}>
-          <h3>${scene.name}</h3>
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-        </div>
-        <div class="dots">${paletteColors(scene).map((c) => html`<i style=${styleMap({ background: c })}></i>`)}</div>
-        <div class="actions">
-          <button class="pill apply" @click=${apply}>${t("gallery.set_once")}</button>
-          <button class="pill" ?disabled=${this.saving} @click=${save}>${t("gallery.save")}</button>
-        </div>
-      </div>
-    </div>`;
-  }
 }
 
 declare global {

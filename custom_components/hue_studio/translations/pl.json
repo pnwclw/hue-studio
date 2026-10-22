@@ -340,7 +340,7 @@
         },
         "points": {
           "name": "Kolory",
-          "description": "Kolory palety jako punkty CIE xy."
+          "description": "Kolory palety jako punkty CIE xy. Ze sceną z galerii: jej kolory w tej kolejności (obraz zostaje)."
         },
         "mirek": {
           "name": "Temperatura barwowa",

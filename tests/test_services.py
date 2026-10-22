@@ -310,6 +310,31 @@ async def test_create_scene_from_gallery(
     assert "color" in body["actions"][1]["action"]
 
 
+async def test_create_scene_gallery_colors_in_order(
+    hass: HomeAssistant, hue_room: MagicMock
+) -> None:
+    """Gallery colors shuffled: the picture stays, the colors come in that order."""
+    points = [[0.2, 0.3], [0.6, 0.35]]
+    await hass.services.async_call(
+        DOMAIN,
+        "create_scene",
+        {
+            "entity_id": "light.room",
+            "name": "Mine",
+            "gallery_scene": "blossom",
+            "points": points,
+        },
+        blocking=True,
+    )
+    body = hue_room.request.call_args.kwargs["json"]
+    assert body["metadata"]["image"] == {
+        "rid": "a8897dcb-5c90-4459-8e4a-02b984bd32b5",
+        "rtype": "public_image",
+    }
+    colors = [c["color"]["xy"] for c in body["palette"]["color"]]
+    assert [[c["x"], c["y"]] for c in colors] == points
+
+
 async def test_create_scene_captures_lights(
     hass: HomeAssistant, hue_room: MagicMock
 ) -> None:

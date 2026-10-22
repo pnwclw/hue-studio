@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  readyScenesNow,
   dayConfig,
   hasOwnPhases,
   isLegacy,
@@ -98,4 +99,19 @@ test("pools of an automation from before 0.10", () => {
     settings: { night_from: "22:00", brightness: { day: 80 } },
   });
   assert.equal(isLegacy(split.local), false);
+});
+
+test("the scenes of the day now by the ready-made tags alone", () => {
+  const defaults: Record<string, SceneTags> = {
+    dusk: { phases: ["evening"], seasons: ["autumn"], weather: ["gloomy"] },
+    glow: { phases: ["evening"], seasons: ["autumn"], weather: ["clear"] },
+    snow: { phases: ["evening"], seasons: ["winter"] },
+    noon: { phases: ["day"] },
+  };
+  const order = ["noon", "snow", "glow", "dusk"];
+  assert.deepEqual(readyScenesNow(defaults, { phase: "evening", season: "autumn", weather: "gloomy" }, order), ["dusk"]);
+  // Nothing for the weather: the season's; nothing for the season either: the phase's.
+  assert.deepEqual(readyScenesNow(defaults, { phase: "evening", season: "autumn", weather: "clear" }, ["noon", "snow", "dusk"]), ["dusk"]);
+  assert.deepEqual(readyScenesNow(defaults, { phase: "evening", season: "spring", weather: "clear" }, order), ["snow", "glow", "dusk"]);
+  assert.deepEqual(readyScenesNow(defaults, { phase: "night", season: "spring", weather: "clear" }, order), []);
 });

@@ -228,10 +228,11 @@ SET_EFFECT_SCHEMA = cv.make_entity_service_schema(
 
 SCENE_NAME = vol.All(cv.string, vol.Strip, vol.Length(min=1, max=32))
 
+# A gallery scene with `points`: its picture, the colors in that order (shuffled).
 CREATE_SCENE_SCHEMA = cv.make_entity_service_schema(
     {
         vol.Required(ATTR_NAME): SCENE_NAME,
-        vol.Exclusive(ATTR_GALLERY_SCENE, "palette"): cv.string,
+        vol.Optional(ATTR_GALLERY_SCENE): cv.string,
         vol.Exclusive(ATTR_POINTS, "palette"): vol.All(
             [XY_POINT], vol.Length(min=1, max=9)
         ),
@@ -432,9 +433,14 @@ def async_setup_services(hass: HomeAssistant) -> None:
             )
         palette = image = None
         if call.data.keys() & {ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK}:
-            source = await _async_palette(hass, call.data)
+            colors = {k: v for k, v in call.data.items() if k != ATTR_GALLERY_SCENE}
+            own = ATTR_POINTS in call.data or ATTR_MIREK in call.data
+            source = await _async_palette(hass, colors if own else call.data)
             palette = palette_feature(source, call.data.get(ATTR_BRIGHTNESS))
             image = source.get("public_image")
+            if own and ATTR_GALLERY_SCENE in call.data:
+                gallery = {ATTR_GALLERY_SCENE: call.data[ATTR_GALLERY_SCENE]}
+                image = (await _async_palette(hass, gallery)).get("public_image")
         post = new_scene(group, name, palette, image)
         try:
             created = await group.bridge.request(

@@ -340,7 +340,7 @@
         },
         "points": {
           "name": "Colors",
-          "description": "Palette colors as CIE xy points."
+          "description": "Palette colors as CIE xy points. With a gallery scene: its colors in this order (its picture stays)."
         },
         "mirek": {
           "name": "Color temperature",
