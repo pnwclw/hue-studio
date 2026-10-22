@@ -160,7 +160,9 @@ touching anything outside this repository.
   (wake up, go to sleep) sits on its wheels in place (`timeWheels`) under a "Time" switch
   (waking up: off is with sunrise, an offset on one wheel; going to sleep: off is only by
   its Hue buttons, "Controlled by"), its fade on a sheet with a slider and the time it
-  leads to.
+  leads to. Coming and leaving home are HA-first: a new one shows only a checklist (home
+  zone, people whose phone shares its location "Always"; in the companion app this
+  person's own phone, with a button to the app's settings) until HA can know who is home.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
   warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
@@ -346,6 +348,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows,
                                 the light picker (whole rooms/zones or single lights)
   automation-art.ts             pictures of the automation types ("+" cards), drawn here
+  presence.ts                   pure: whether HA knows who is home (home zone, people's phones from the companion
+                                app, their location access) before coming/leaving home can be set up
   daylight.ts                   pure: scene tags and pool views, an automation's own settings (extra/skipped, own phases, offsets),
                                 splitting settings from before 0.10
   rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`

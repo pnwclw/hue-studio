@@ -56,11 +56,12 @@ import {
   withSettings,
 } from "../daylight.ts";
 import { thumbUrl } from "../gallery-data.ts";
-import { haptic, leavePanel } from "../ha-internals.ts";
+import { haptic, inCompanionApp, leavePanel, openAppSettings } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { allGroups, findGroup, friendlyName, type Group, lightIcon } from "../model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../types.ts";
-import { tileCard } from "../controls.ts";
+import { banner, tileCard } from "../controls.ts";
+import { type PresenceCheck, presenceCheck, presenceReady } from "../presence.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { type MomentKind, momentChoice, navRow, several, single, timeWheels } from "./choice.ts";
@@ -84,6 +85,14 @@ const LIGHT_ICONS: Record<LightKind, string> = {
   auto: "mdi:image-filter-hdr",
 };
 type Legacy = Record<string, { natural: boolean; config: DayConfig }>;
+
+/** A group of a picker sheet (a room or zone) and its items (lights, sensors); `whole`: only all or nothing. */
+interface PickGroup {
+  key: string;
+  name: string;
+  whole?: boolean;
+  items: { id: string; name: string; icon: string }[];
+}
 
 @customElement("hue-studio-automation-edit-view")
 export class AutomationEditView extends StudioView {
@@ -112,6 +121,8 @@ export class AutomationEditView extends StudioView {
   @state() private accessor fadeSheet: { value: number } | null = null;
   /** The light picker sheet: what it has chosen until "Done", the rooms opened in it. */
   @state() private accessor lightsSheet: { places: Pick<AutomationInput, "rooms" | "zones">; open: string[] } | null = null;
+  /** The motion sensor picker sheet: what it has chosen until "Done", the rooms opened in it. */
+  @state() private accessor sensorsSheet: { chosen: string[]; open: string[] } | null = null;
   /** "On certain days" switched on while every day is still chosen. */
   @state() private accessor someDays = false;
   private previewKey = "";
@@ -204,20 +215,26 @@ export class AutomationEditView extends StudioView {
         ${this.picker ? pickerSheet(ctx, this.picker, (picker) => (this.picker = picker)) : nothing}`;
     }
     const typeName = t(`automations.type_${d.type}` as StringKey);
-    const lacking = missing(d);
+    // Arriving and leaving rely on HA knowing who is home: a new one waits until it does.
+    const presence = d.type === "coming_home" || d.type === "leaving_home" ? presenceCheck(ctx.hass, ctx.hass.user?.id) : null;
+    const unready = !!presence && !presenceReady(presence, inCompanionApp(ctx.hass));
+    const lacking = missing(d) || (unready && this.isNew ? "presence" : null);
     // Like the Hue app's editor: what it is in the header with "Save", the name once below.
     const save = html`<button class="pill save" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>
       ${t(this.isNew ? "automations.create" : "zone.save")}
     </button>`;
     return html`${this.screen(
       this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save),
-      html`${this.hero(d, typeName)}
+      unready && this.isNew
+        ? html`${this.hero(d, typeName)}${this.presenceSetup(d, presence!)}`
+        : html`${this.hero(d, typeName)}
+        ${unready ? this.presenceSetup(d, presence!) : nothing}
         ${d.type === "wake_up" ? html`<h2 class="label">${t("automations.time")}</h2>` : d.type === "go_to_sleep" ? nothing : html`<h2 class="label">${t("automations.when")}</h2>`}
         ${this.when(d)}
         ${this.selectedLights(d)}
         ${this.general(d)}
         ${d.type === "go_to_sleep" ? this.controlledBy(d) : nothing}
-        ${lacking && lacking !== "rooms" /* the lights card says so itself */
+        ${lacking && lacking !== "rooms" && lacking !== "presence" /* those say so themselves */
           ? html`<p class="hint warn">${t(`automations.missing_${lacking}` as StringKey)}</p>`
           : nothing}
         ${this.isNew
@@ -236,7 +253,8 @@ export class AutomationEditView extends StudioView {
       "settings-page automation-page",
     )}
     ${this.fadeSheet ? this.fadeSheetView(d) : nothing}
-    ${this.lightsSheet ? this.lightsSheetView() : nothing}`;
+    ${this.lightsSheet ? this.lightsSheetView() : nothing}
+    ${this.sensorsSheet ? this.sensorsSheetView() : nothing}`;
   }
 
   /** Its picture and name (renamed in place), and its type when the name is another. */
@@ -330,6 +348,67 @@ export class AutomationEditView extends StudioView {
       <div class="grow">${title}</div>
       ${timeWheels(hhmm(value) || "00:00", (v) => change(`${v}:00`))}
     </div>`;
+  }
+
+  /** Going to sleep now, as the editor has it (also before it is saved): the lights dim to off. */
+  private startNow(d: AutomationDraft): void {
+    const { rooms, zones = [] } = d.input;
+    haptic("success");
+    void this.ctx.call(
+      "hue_studio",
+      "apply_light",
+      { area_id: rooms, entity_id: zones, light: "off", transition: (d.input.fade ?? 0) * 60 },
+      { optimistic: false },
+    );
+  }
+
+  /**
+   * What arriving and leaving need from HA, like a checklist: the home's location, people
+   * whose phone shares its location all the time, and (in the companion app) this phone.
+   */
+  private presenceSetup(d: AutomationDraft, check: PresenceCheck) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const inApp = inCompanionApp(ctx.hass);
+    const ok = html`<span class="check-ok" aria-label=${t("presence.ok")}>${icon("check")}</span>`;
+    const setUp = (path: string) => html`<button class="pill" @click=${() => ctx.openHa(path)}>${t("presence.set_up")}</button>`;
+    const radius = Math.round(Number(ctx.hass.states["zone.home"]?.attributes.radius) || 0);
+    const phoneLine = (p: PresenceCheck["people"][number]["phones"][number]) =>
+      t(
+        p.issue === "permission"
+          ? /in use/i.test(p.permission || "") ? "presence.permission" : "presence.denied"
+          : p.issue === "no_location" ? "presence.no_location" : "presence.phone_ok",
+        { phone: p.name },
+      );
+    const me = check.me;
+    const meBlocked = inApp && !!me && !(me.ok && me.phones.every((p) => p.issue !== "permission"));
+    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    return html`${banner({ title: t("presence.title"), text: t(d.type === "coming_home" ? "presence.text_coming" : "presence.text_leaving"), warn: true })}
+      <div class="rows presence-rows">
+        <div class="item">
+          <div class="grow">${t("presence.home")}<div class=${classMap({ "dim small": true, warn: !check.home })}>
+            ${check.home ? t("presence.home_ok", { radius }) : t("presence.home_missing")}</div></div>
+          ${check.home ? ok : setUp("/config/zone")}
+        </div>
+        ${check.people.length
+          ? check.people.map(
+              (p) => html`<div class="item">
+                <div class="grow">${p.name}<div class=${classMap({ "dim small": true, warn: !p.ok })}>${p.phones.map(phoneLine).join(" · ")}</div></div>
+                ${p.ok ? ok : html`<ha-icon class="check-warn" icon="mdi:alert-circle-outline"></ha-icon>`}
+              </div>`,
+            )
+          : html`<div class="item">
+              <div class="grow">${t("presence.people")}<div class="dim small warn">${t("presence.no_people")}</div></div>
+              ${setUp("/config/person")}
+            </div>`}
+        ${meBlocked
+          ? html`<div class="item">
+              <div class="grow">${t("presence.this_phone")}<div class="dim small warn">${t("presence.this_phone_sub")}</div></div>
+              <button class="pill" @click=${() => openAppSettings(ctx.hass)}>${t("presence.open_app")}</button>
+            </div>`
+          : nothing}
+      </div>
+      ${meBlocked ? html`<p class="hint">${t(ios ? "presence.ios_hint" : "presence.android_hint")}</p>` : nothing}`;
   }
 
   /** Wheels in place, under the row that says what they choose. */
@@ -533,7 +612,14 @@ export class AutomationEditView extends StudioView {
         // At a time of day on its days, or (switched off) only by its buttons.
         const atTime = i.use_time !== false;
         return html`<div class="rows">
-            ${this.toggleRow("", t("automations.time"), atTime ? "" : t("automations.when_button"), atTime, (on) => this.set({ use_time: on }))}
+            <div class="item time-switch">
+              <div class="grow">${t("automations.time")}${atTime ? nothing : html`<div class="dim small">${t("automations.when_button")}</div>`}</div>
+              <button class="pill start" ?disabled=${!placesOf(i).length} @click=${() => this.startNow(d)}>${icon("play")}${t("automations.start_now")}</button>
+              ${toggle(atTime, t("automations.time"), () => {
+                haptic("selection");
+                this.set({ use_time: !atTime });
+              })}
+            </div>
             ${atTime ? html`${this.wheelsItem(timeWheels(hhmm(i.time) || "23:00", (v) => this.set({ time: `${v}:00` })))}${this.days(d)}` : nothing}
           </div>
           ${atTime ? this.fadeHint(d) : nothing}`;
@@ -581,40 +667,17 @@ export class AutomationEditView extends StudioView {
       return !!area && i.rooms.includes(area);
     };
     const byName = (a: string, b: string) => Number(inRooms(b)) - Number(inRooms(a)) || friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b));
-    const sensors = Object.keys(states)
-      .filter((id) => id.startsWith("binary_sensor.") && ["motion", "occupancy", "presence"].includes(states[id].attributes.device_class))
-      .sort(byName);
     const lux = Object.keys(states)
       .filter((id) => id.startsWith("sensor.") && states[id].attributes.device_class === "illuminance")
       .sort(byName);
-    const chosen = (i.motion || []).filter((id) => states[id]);
     const area = (id: string) => {
-      const entry = ctx.hass.entities?.[id];
-      const areaId = entry?.area_id || (entry?.device_id ? ctx.hass.devices?.[entry.device_id]?.area_id : null);
+      const areaId = this.areaOf(id);
       return (areaId && ctx.hass.areas?.[areaId]?.name) || "";
     };
-    const pickSensors = () =>
-      this.choose(
-        several(
-          t("automations.motion_sensors"),
-          sensors.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), sub: area(id), icon: "mdi:motion-sensor" })),
-          chosen,
-          (motion) => this.set({ motion }),
-          { hint: sensors.length ? t("automations.motion_hint") : t("automations.no_motion_sensors") },
-        ),
-      );
     const below = i.lux_below || 0;
     const luxValues = LUX.includes(below) ? LUX : [...LUX, below].sort((a, b) => a - b);
-    return html`<div class="rows">
-      ${navRow(
-        {
-          icon: "mdi:motion-sensor",
-          title: t("automations.motion_sensors"),
-          sub: chosen.length ? chosen.map((id) => friendlyName(ctx.hass, id)).join(", ") : t("automations.motion_none"),
-          warn: !chosen.length,
-        },
-        pickSensors,
-      )}
+    return html`${this.selectedSensors(d)}
+    <div class="rows">
       ${this.minutesRow("mdi:timer-off-outline", t("automations.off_after"), t("automations.off_after_motion"), i.off_after, OFF_AFTER, "automations.never", (v) => this.set({ off_after: v }))}
     </div>
     <div class="rows">
@@ -703,48 +766,49 @@ export class AutomationEditView extends StudioView {
     </div>`;
   }
 
-  /** The light picker, like the Hue app's "Edit lights": rooms with their lights, zones whole. */
-  private lightsSheetView() {
+  /**
+   * A picker like the Hue app's "Edit lights": groups (rooms) with a check (all, some,
+   * none) that open into a strip of their items with a check each; whole groups (zones)
+   * only check. "Done" keeps what it picked, the close button drops it.
+   */
+  private pickSheet(o: {
+    title: string;
+    sections: { label: string; groups: PickGroup[] }[];
+    /** Said when no section has a group. */
+    empty?: string;
+    picked: (g: PickGroup) => "all" | string[];
+    sub: (g: PickGroup, picked: "all" | string[]) => string;
+    flip: (g: PickGroup) => void;
+    flipItem: (g: PickGroup, id: string) => void;
+    open: string[];
+    setOpen: (open: string[]) => void;
+    close: () => void;
+    done: () => void;
+  }) {
     const { ctx } = this;
     const { t } = ctx;
-    const sheet = this.lightsSheet!;
-    const input = { ...this.draft!.input, ...sheet.places };
-    const set = (places: Pick<AutomationInput, "rooms" | "zones">) => {
-      haptic("selection");
-      this.lightsSheet = { ...sheet, places };
-    };
-    const close = () => (this.lightsSheet = null);
-    const done = () => {
-      haptic("success");
-      this.set(sheet.places);
-      close();
-    };
     const check = (state: "all" | "some" | "none") =>
       html`<span class=${classMap({ "pick-check": true, [state]: true })}>${state === "all" ? icon("check") : state === "some" ? html`<i></i>` : nothing}</span>`;
-    const room = (g: Group, zone: boolean) => {
-      const picked = pickedOf(input, g);
+    const group = (g: PickGroup) => {
+      const picked = o.picked(g);
       const state = picked === "all" ? "all" : picked.length ? "some" : "none";
-      const open = !zone && sheet.open.includes(g.key);
-      const sub =
-        state === "all"
-          ? t(zone ? "automations.entire_zone_selected" : "automations.entire_room_selected")
-          : state === "some"
-            ? t("automations.some_selected", { count: (picked as string[]).length, total: g.lights.length })
-            : "";
+      const open = !g.whole && o.open.includes(g.key);
+      const sub = o.sub(g, picked);
       const flip = () => {
-        set(withGroup(input, g as PlaceGroup));
+        haptic("selection");
+        o.flip(g);
       };
       const expand = () => {
         haptic("selection");
-        this.lightsSheet = { ...sheet, open: open ? sheet.open.filter((k) => k !== g.key) : [...sheet.open, g.key] };
+        o.setOpen(open ? o.open.filter((k) => k !== g.key) : [...o.open, g.key]);
       };
       return html`<div class="pick-room">
         <div class="item">
           <button class="pick-toggle" role="checkbox" aria-checked=${state === "all" ? "true" : state === "some" ? "mixed" : "false"} aria-label=${g.name} @click=${flip}>${check(state)}</button>
-          <button class="pick-name" @click=${zone ? flip : expand}>
+          <button class="pick-name" @click=${g.whole ? flip : expand}>
             <span class="grow">${g.name}${sub ? html`<span class="dim small">${sub}</span>` : nothing}</span>
           </button>
-          ${zone
+          ${g.whole
             ? nothing
             : html`<button class=${classMap({ round: true, expand: true, open })} aria-expanded=${open} aria-label=${g.name} @click=${expand}>
                 <ha-icon icon="mdi:chevron-down"></ha-icon>
@@ -752,38 +816,183 @@ export class AutomationEditView extends StudioView {
         </div>
         ${open
           ? html`<div class="pick-lights">
-              ${g.lights.map((id) => {
-                const on = picked === "all" || picked.includes(id);
+              ${g.items.map((item) => {
+                const on = picked === "all" || picked.includes(item.id);
                 return tileCard({
-                  art: html`<ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>`,
-                  name: friendlyName(ctx.hass, id),
+                  art: html`<ha-icon icon=${item.icon}></ha-icon>`,
+                  name: item.name,
                   toggle: check(on ? "all" : "none"),
                   classes: { "pick-light": true, on },
-                  click: () => set(withLight(input, g as PlaceGroup, id)),
+                  click: () => {
+                    haptic("selection");
+                    o.flipItem(g, item.id);
+                  },
                 });
               })}
             </div>`
           : nothing}
       </div>`;
     };
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form sensor-sheet lights-sheet" role="dialog" aria-label=${t("automations.edit_lights")}>
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && o.close()}>
+      <div class="box form sensor-sheet lights-sheet" role="dialog" aria-label=${o.title}>
         <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-          <div class="grow">${t("automations.edit_lights")}</div>
-          <button class="pill save" @click=${done}>${t("color.done")}</button>
+          <button class="round close" aria-label=${t("common.close")} @click=${o.close}>${icon("close")}</button>
+          <div class="grow">${o.title}</div>
+          <button class="pill save" @click=${() => {
+            haptic("success");
+            o.done();
+          }}>${t("color.done")}</button>
         </div>
         <div class="lights-body">
-          <h2 class="label">${t("automations.rooms")}</h2>
-          <div class="rows pick-rows">${ctx.home.rooms.map((g) => room(g, false))}</div>
-          ${ctx.home.zones.length
-            ? html`<h2 class="label">${t("automations.zones")}</h2>
-                <div class="rows pick-rows">${ctx.home.zones.map((g) => room(g, true))}</div>`
-            : nothing}
+          ${o.empty && !o.sections.some((section) => section.groups.length) ? html`<p class="hint">${o.empty}</p>` : nothing}
+          ${o.sections
+            .filter((section) => section.groups.length)
+            .map((section) => html`<h2 class="label">${section.label}</h2><div class="rows pick-rows">${section.groups.map(group)}</div>`)}
         </div>
       </div>
     </div>`;
   }
+
+  /** The light picker: rooms with their lights, zones whole. */
+  private lightsSheetView() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const sheet = this.lightsSheet!;
+    const input = { ...this.draft!.input, ...sheet.places };
+    const asPick = (g: Group, whole: boolean): PickGroup => ({
+      key: g.key,
+      name: g.name,
+      whole,
+      items: g.lights.map((id) => ({ id, name: friendlyName(ctx.hass, id), icon: lightIcon(ctx.hass, id, ctx.lightInfo[id]) })),
+    });
+    const place = (g: PickGroup): PlaceGroup => ({ key: g.key, lights: g.items.map((i) => i.id) });
+    const set = (places: Pick<AutomationInput, "rooms" | "zones">) => (this.lightsSheet = { ...sheet, places });
+    return this.pickSheet({
+      title: t("automations.edit_lights"),
+      sections: [
+        { label: t("automations.rooms"), groups: ctx.home.rooms.map((g) => asPick(g, false)) },
+        { label: t("automations.zones"), groups: ctx.home.zones.map((g) => asPick(g, true)) },
+      ],
+      picked: (g) => pickedOf(input, place(g)),
+      sub: (g, picked) =>
+        picked === "all"
+          ? t(g.whole ? "automations.entire_zone_selected" : "automations.entire_room_selected")
+          : picked.length
+            ? t("automations.some_selected", { count: picked.length, total: g.items.length })
+            : "",
+      flip: (g) => set(withGroup(input, place(g))),
+      flipItem: (g, id) => set(withLight(input, place(g), id)),
+      open: sheet.open,
+      setOpen: (open) => (this.lightsSheet = { ...sheet, open }),
+      close: () => (this.lightsSheet = null),
+      done: () => {
+        this.set(sheet.places);
+        this.lightsSheet = null;
+      },
+    });
+  }
+
+  /** Motion sensors (any of HA's) by room, for the motion automation. */
+  private motionGroups(): PickGroup[] {
+    const { ctx } = this;
+    const { t } = ctx;
+    const states = ctx.hass.states;
+    const byArea = new Map<string, string[]>();
+    for (const id of Object.keys(states)) {
+      if (!id.startsWith("binary_sensor.") || !["motion", "occupancy", "presence"].includes(states[id].attributes.device_class as string)) continue;
+      const area = this.areaOf(id) || "";
+      byArea.set(area, [...(byArea.get(area) || []), id]);
+    }
+    const name = (area: string) => (area ? ctx.hass.areas?.[area]?.name || area : t("automations.no_room"));
+    return [...byArea.entries()]
+      .sort(([a], [b]) => Number(!a) - Number(!b) || name(a).localeCompare(name(b)))
+      .map(([area, ids]) => ({
+        key: area,
+        name: name(area),
+        items: ids
+          .sort((a, b) => friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)))
+          .map((id) => ({ id, name: friendlyName(ctx.hass, id), icon: "mdi:motion-sensor" })),
+      }));
+  }
+
+  /** An entity's area (its own, else its device's). */
+  private areaOf(id: string): string | null {
+    const entry = this.ctx.hass.entities?.[id];
+    return entry?.area_id || (entry?.device_id ? this.ctx.hass.devices?.[entry.device_id]?.area_id || null : null);
+  }
+
+  /** The motion sensor picker: rooms with their sensors, like the light picker. */
+  private sensorsSheetView() {
+    const { t } = this.ctx;
+    const sheet = this.sensorsSheet!;
+    const set = (chosen: string[]) => (this.sensorsSheet = { ...sheet, chosen });
+    return this.pickSheet({
+      title: t("automations.motion_sensors"),
+      sections: [{ label: t("automations.rooms"), groups: this.motionGroups() }],
+      empty: t("automations.no_motion_sensors"),
+      picked: (g) => {
+        const on = g.items.filter((i) => sheet.chosen.includes(i.id)).map((i) => i.id);
+        return on.length === g.items.length ? "all" : on;
+      },
+      sub: (g, picked) =>
+        picked === "all"
+          ? t(g.items.length === 1 ? "automations.one_sensor" : "automations.all_sensors")
+          : picked.length
+            ? t("automations.some_sensors", { count: picked.length, total: g.items.length })
+            : "",
+      flip: (g) => {
+        const ids = g.items.map((i) => i.id);
+        const all = ids.every((id) => sheet.chosen.includes(id));
+        set(all ? sheet.chosen.filter((id) => !ids.includes(id)) : [...new Set([...sheet.chosen, ...ids])]);
+      },
+      flipItem: (_g, id) => set(sheet.chosen.includes(id) ? sheet.chosen.filter((x) => x !== id) : [...sheet.chosen, id]),
+      open: sheet.open,
+      setOpen: (open) => (this.sensorsSheet = { ...sheet, open }),
+      close: () => (this.sensorsSheet = null),
+      done: () => {
+        this.set({ motion: sheet.chosen });
+        this.sensorsSheet = null;
+      },
+    });
+  }
+
+  /** The motion sensors it has, like its lights: a tile each with its room; none yet: "Add sensors". */
+  private selectedSensors(d: AutomationDraft) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const chosen = (d.input.motion || []).filter((id) => ctx.hass.states[id]);
+    const edit = () => {
+      haptic("selection");
+      const open = this.motionGroups()
+        .filter((g) => g.items.some((i) => chosen.includes(i.id)) && !g.items.every((i) => chosen.includes(i.id)))
+        .map((g) => g.key);
+      this.sensorsSheet = { chosen, open };
+    };
+    if (!chosen.length)
+      return html`<div class="rows lights-card">
+        <div class="item lights-head">
+          <div class="grow">${t("automations.add_sensors")}</div>
+          <button class="round add" aria-label=${t("automations.add_sensors")} @click=${edit}>${icon("plus")}</button>
+        </div>
+      </div>`;
+    return html`<div class="rows lights-card">
+      <div class="item lights-head">
+        <div class="grow">${t("automations.motion_sensors")}</div>
+        <button class="round" aria-label=${t("automations.motion_sensors")} @click=${edit}>${icon("pencil")}</button>
+      </div>
+      <div class="place-tiles">
+        ${chosen.map((id) => {
+          const area = this.areaOf(id);
+          return html`<button class="place-tile" @click=${edit}>
+            <ha-icon icon="mdi:motion-sensor"></ha-icon>
+            <span class="name">${friendlyName(ctx.hass, id)}</span>
+            <span class="sub">${(area && ctx.hass.areas?.[area]?.name) || t("automations.no_room")}</span>
+          </button>`;
+        })}
+      </div>
+    </div>`;
+  }
+
 
   /** "General", like the Hue app's: the light (its kind and settings), then what each type adds. */
   private general(d: AutomationDraft) {

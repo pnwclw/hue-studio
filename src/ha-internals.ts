@@ -225,6 +225,14 @@ interface ExternalBus {
 
 const externalBus = (hass: unknown): ExternalBus | undefined => (hass as { auth?: { external?: ExternalBus } })?.auth?.external;
 
+/** Whether the panel runs in the companion app (HA's frontend has its message bus then). */
+export const inCompanionApp = (hass: unknown): boolean => Boolean(externalBus(hass));
+
+/** The companion app's own settings, like "App configuration" in HA's sidebar (`config_screen/show`). */
+export function openAppSettings(hass: unknown): void {
+  externalBus(hass)?.fireMessage({ type: "config_screen/show" });
+}
+
 /** Whether the companion app scans QR codes itself (HA's QR scanner then uses it too). */
 export const appScansQr = (hass: unknown): boolean => Boolean(externalBus(hass)?.config?.hasBarCodeScanner);
 

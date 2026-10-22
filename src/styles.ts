@@ -1173,8 +1173,22 @@ export const CSS = `
   .pick-room .round.expand.open ha-icon { transform: rotate(180deg); }
   .pick-lights { display: flex; gap: 10px; padding: 2px 16px 16px 56px; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: none; }
   .pick-lights::-webkit-scrollbar { display: none; }
-  .pick-lights .tile-card { flex: none; width: 104px; --zone: 44px; background: #3a3a3c; box-shadow: none; }
-  .pick-lights .tile-card > .switch-zone { background: rgba(0, 0, 0, 0.12); }
+  /* The tiles stand out from the sheet: lighter than its rows, a hairline round them. */
+  .pick-lights .tile-card { flex: none; width: 104px; --zone: 44px; background: #4a4a4e; box-shadow: none;
+                            border: 1px solid rgba(255, 255, 255, 0.08); }
+  .pick-lights .tile-card > .switch-zone { background: rgba(0, 0, 0, 0.22); border-top-color: rgba(255, 255, 255, 0.06); }
+  .pick-lights .tile-card.on { border-color: rgba(10, 98, 255, 0.7); }
+  /* Going to sleep: "Start" by the time's switch, always there. */
+  .automation-page .rows .item.time-switch { gap: 12px; }
+  .automation-page .pill.start { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 14px 0 10px; }
+  .automation-page .pill.start svg { width: 16px; height: 16px; }
+  /* Before arriving and leaving: a checklist of what HA needs. */
+  .presence-rows { margin-top: 14px; }
+  .presence-rows .item .pill { flex: none; height: 32px; }
+  .presence-rows .check-ok { display: flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+                             background: #30d158; color: #fff; }
+  .presence-rows .check-ok svg { width: 16px; height: 16px; }
+  .presence-rows .check-warn { flex: none; --mdc-icon-size: 24px; color: #ffb340; }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }

@@ -563,6 +563,22 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   // ?bridges=two: a second bridge with the balcony's lights; &split=1 puts the candle there too
   // (its living room then has lights on two bridges).
   const params = new URLSearchParams(location.search);
+  // Who is home (coming and leaving home): the home zone, two people with the companion
+  // app. &presence=setup: neither phone shares its location all the time yet.
+  const setup = params.get("presence") === "setup";
+  states["zone.home"] = { entity_id: "zone.home", state: "1", attributes: { friendly_name: "Home", latitude: 0, longitude: 0, radius: 100 } };
+  for (const [person, name, user, permission] of [
+    ["alex", "Alex", "user_demo", "Authorized when in use"],
+    ["sam", "Sam", "user_sam", setup ? "Denied" : "Authorized Always"],
+  ]) {
+    const tracker = `device_tracker.${person}_phone`;
+    const sensor = `sensor.${person}_phone_location_permission`;
+    states[`person.${person}`] = { entity_id: `person.${person}`, state: "home", attributes: { friendly_name: name, user_id: user, device_trackers: [tracker] } };
+    states[tracker] = { entity_id: tracker, state: "home", attributes: { friendly_name: `${name}'s phone`, source_type: "gps" } };
+    states[sensor] = { entity_id: sensor, state: permission, attributes: { friendly_name: `${name}'s phone Location permission` } };
+    entities[tracker] = { platform: "mobile_app", device_id: `phone_${person}` };
+    entities[sensor] = { platform: "mobile_app", device_id: `phone_${person}` };
+  }
   const twoBridges = params.get("bridges") === "two";
   const onSecond = new Set(twoBridges ? ["globe_lights", ...(params.get("split") === "1" ? ["candle"] : [])] : []);
   const lightBridge = (entityId: string) => (onSecond.has(entityId.replace("light.", "")) ? "hue-entry-2" : "hue-entry");
@@ -903,7 +919,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     language,
     locale: { language },
     config: { location_name: "Home" },
-    user: { is_admin: true },
+    user: { id: "user_demo", is_admin: true },
     areas: AREAS,
     // Sidebar panels (the experimental footer's tabs).
     panels: {
