@@ -413,6 +413,11 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   indicator itself (`--safe-area-inset-*`); without it HA pads `ha-panel-custom` and a
   full-height panel overflows the screen in the mobile app. Harness: `&inset=59,34` fakes a
   phone's safe areas, `&pad=59,34` additionally pads the slot like HA would.
+- A room's scenes are the Hue app's: columns of two that scroll sideways; the active one
+  shows play/stop (a dynamic one) in place of its picture and gets edit and "⋯" beside it
+  (copy to another room, dynamic speed, shuffle colors, delete), then the scene gallery
+  and a suggested gallery scene with a shuffle. A light playing a dynamic scene says
+  "Dynamics" and its card's colors drift at the scene's speed (`dynamics` of the light).
 - Gradient lights always show `points_capable` pins on the wheel (fixed per device, like the
   Hue app). Pins with the same color are drawn as one pin with a count (a uniform gradient,
   or pins merged by dropping one on another); a tap spreads them around a disc to pull one

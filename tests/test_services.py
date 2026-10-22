@@ -204,6 +204,17 @@ async def test_save_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
     assert (bulb.color.xy.x, bulb.color.xy.y) == (0.5, 0.4)
     assert bulb.dimming.brightness == 50
 
+    # Only the speed (a playing dynamic scene would be caught mid-way): the lights stay.
+    await hass.services.async_call(
+        DOMAIN,
+        "save_scene",
+        {"entity_id": "scene.sunset", "speed": 60, "capture": False},
+        blocking=True,
+    )
+    put = hue_lights.scenes.scene.update.call_args.args[1]
+    assert put.speed == 0.6
+    assert put.actions is None
+
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(
             DOMAIN, "save_scene", {"entity_id": "scene.missing"}, blocking=True

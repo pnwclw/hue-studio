@@ -346,6 +346,8 @@ export interface LightInfo {
   effects?: string[];
   /** The running effect and its parameters, or null. */
   effect?: RunningEffect | null;
+  /** A dynamic scene playing on it ("dynamic_palette", else "none") and its speed (0-1). */
+  dynamics?: { status: string; speed: number } | null;
   /** Hue archetype (e.g. "hue_signe": the shape chosen in the Hue app), for the light's icon. */
   archetype?: string | null;
   /** Product name (e.g. "Signe gradient table"): one archetype can be several products. */

@@ -130,8 +130,9 @@ def light_info(resource: Light, product: str | None = None) -> dict[str, Any]:
     """Describe what the frontend needs and HA does not expose.
 
     Gamut, white range, gradient (points the light shows and how many it can show),
-    supported and running effects, the archetype (the shape chosen in the Hue app) and
-    the product name (both for its icon: one archetype can be several products).
+    supported and running effects, a dynamic scene playing on it, the archetype (the
+    shape chosen in the Hue app) and the product name (both for its icon: one archetype
+    can be several products).
     """
     info: dict[str, Any] = {"gamut": None, "gamut_type": None, "mirek": None}
     if resource.color is not None:
@@ -157,6 +158,13 @@ def light_info(resource: Light, product: str | None = None) -> dict[str, Any]:
         info["gradient"] = None
     info["effects"] = [effect.value for effect in supported_effects(resource)]
     info["effect"] = _effect_info(resource)
+    # A dynamic scene playing on it (its colors move through the palette) and how fast.
+    dynamics = resource.dynamics
+    info["dynamics"] = (
+        {"status": dynamics.status.value, "speed": dynamics.speed}
+        if dynamics is not None and dynamics.status is not None
+        else None
+    )
     archetype = resource.metadata.archetype if resource.metadata else None
     info["archetype"] = archetype
     info["product"] = product

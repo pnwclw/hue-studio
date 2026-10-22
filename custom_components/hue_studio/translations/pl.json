@@ -381,6 +381,10 @@
         "auto_dynamic": {
           "name": "Autoodtwarzanie",
           "description": "Uruchamiaj scenę dynamicznie przy każdej aktywacji."
+        },
+        "capture": {
+          "name": "Zapisz światła",
+          "description": "Zapisz to, co teraz pokazują światła sceny; wyłączone zmienia tylko nazwę, szybkość lub autoodtwarzanie."
         }
       }
     },

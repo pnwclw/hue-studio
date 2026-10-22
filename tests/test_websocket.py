@@ -30,6 +30,7 @@ async def test_subscribe_lights(
     assert lights["light.strip"]["gradient"]["points"] == [[0.6, 0.35], [0.2, 0.3]]
     assert lights["light.strip"]["effects"] == ["candle", "fire"]
     assert lights["light.strip"]["effect"] is None
+    assert lights["light.strip"]["dynamics"] == {"status": "none", "speed": 0.5}
     assert lights["light.strip"]["archetype"] == "hue_lightstrip"
     assert lights["light.strip"]["product"] == "Hue lightstrip plus"
 

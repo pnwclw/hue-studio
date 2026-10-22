@@ -330,6 +330,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     const ids = Object.keys(sceneInfo).filter((id) => states[id].attributes.group_name === group);
     ids.forEach((id) => (sceneInfo[id] = { ...sceneInfo[id], active: id === scene ? active : "inactive" }));
     pushScenes(ids);
+    // Its lights play it dynamically or not (the bridge's `dynamics.status` of each light).
+    const lights = sceneInfo[scene].lights;
+    const status = active === "dynamic_palette" ? "dynamic_palette" : "none";
+    lights.forEach((id) => (lightInfo[id] = { ...lightInfo[id], dynamics: { status, speed: sceneInfo[scene].speed } }));
+    push(Object.fromEntries(lights.map((id) => [id, lightInfo[id]])));
   };
   /** What the bridge does for a scene: its palette over its lights. */
   const showScene = (scene: string, shuffle = false) => {

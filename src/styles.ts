@@ -103,6 +103,10 @@ export const CSS = `
                       linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.26));
                     opacity: 0; transition: opacity 0.35s var(--ease), background 0.3s var(--ease); }
   .surface.lit::before, .surface.lit::after { opacity: 1; }
+  /* A light playing a dynamic scene: its colors drift, at its speed (--dyn-dur). */
+  .surface.dynamic::before { background-size: 300% 300%; animation: dyn-drift var(--dyn-dur, 12s) ease-in-out infinite alternate; }
+  @keyframes dyn-drift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+  @media (prefers-reduced-motion: reduce) { .surface.dynamic::before { animation: none; } }
   .hero, .card.surface { --lit-angle: 105deg; }
   .surface { transition: color 0.3s var(--ease), opacity 0.3s; }
   .dark-text { color: #1c1c1e; }
@@ -721,16 +725,31 @@ export const CSS = `
   .sync-note { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px;
                line-height: 1.4; color: var(--text-2); background: rgba(10, 98, 255, 0.14); }
   .sync-note svg { flex: none; width: 18px; height: 18px; color: #6c9dff; }
-  /* Phones: a room's scenes scroll sideways in two rows, cards as wide as the light cards (the Hue app's). */
-  @media (max-width: 600px) {
-    .grid.scene-row { grid-template-columns: none; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: 104px;
-                      gap: 12px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none;
-                      scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
-    .grid.scene-row::-webkit-scrollbar { display: none; }
-    .grid.scene-row .tile-card { scroll-snap-align: start; }
-  }
-  .grid.locked .scene { opacity: 0.45; cursor: default; }
-  .grid.locked .scene:active { transform: none; }
+  /* A room's scenes, the Hue app's: columns of two that scroll sideways, cards as wide as the
+     light cards; narrow columns beside the active scene (edit, "⋯") and the suggestion (shuffle). */
+  .scene-cols { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: max-content; gap: 12px 10px;
+                overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-padding: 0 16px; scrollbar-width: none;
+                scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+  .scene-cols::-webkit-scrollbar { display: none; }
+  .scene-cols .tile-card { width: 104px; scroll-snap-align: start; }
+  .scene-side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; height: 100%; }
+  .scene-side .round { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+  .scene-side .round svg { width: 18px; height: 18px; }
+  .scene-cols.locked .scene { opacity: 0.45; cursor: default; }
+  .scene-cols.locked .scene:active { transform: none; }
+  /* A dynamic active scene: play/stop in place of its picture. */
+  .scene-play { width: var(--art); height: var(--art); border: none; border-radius: 50%; padding: 0; display: flex; align-items: center;
+                justify-content: center; background: rgba(255, 255, 255, 0.3); color: #fff; cursor: pointer; transition: transform 0.2s var(--spring); }
+  .scene-play:active { transform: scale(0.9); }
+  .scene-play svg { width: 22px; height: 22px; }
+  .dark-text .scene-play { background: rgba(255, 255, 255, 0.45); color: #1c1c1e; }
+  /* The gallery: three of its pictures overlapping; a suggestion: a stack of cards. */
+  .dots-three { display: flex; height: var(--art); align-items: center; }
+  .dots-three span { width: 38px; height: 38px; border-radius: 50%; margin-left: -10px; box-shadow: -2px 0 6px rgba(0, 0, 0, 0.35); }
+  .dots-three span:first-child { margin-left: 0; box-shadow: none; }
+  .tile-card.gallery-card { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.12); background: transparent; }
+  .tile-card.suggested { margin-left: 6px; box-shadow: -3px 0 0 -1px #3a3a3c, -6px 0 0 -2px #2f2f31, 0 6px 18px rgba(0, 0, 0, 0.22); }
+  .tile-card.suggested .sub { opacity: 0.6; }
   .sync-meta svg { width: 14px; height: 14px; }
 
   /* rooms and zones */
@@ -816,6 +835,14 @@ export const CSS = `
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
   .sheet.bottom .box { width: 100%; max-width: none; border-radius: 18px 18px 0 0; animation: rise 0.3s var(--ease); }
+  /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
+  .sheet.actions.bottom { padding: 0 10px calc(10px + var(--safe-bottom)); }
+  .sheet.actions.bottom .box { border-radius: 18px; }
+  .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: #2c2c2e; }
+  .action-sheet button { min-height: 56px; border: none; background: none; color: var(--text); font: inherit; font-size: 17px; cursor: pointer; }
+  .action-sheet button:active { background: rgba(255, 255, 255, 0.06); }
+  .action-sheet button.danger { color: #ff453a; }
+  .action-sheet button.cancel { border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 15px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
   .sheet.bottom .sensor-sheet .form-body { padding-bottom: calc(20px + var(--safe-bottom)); }
   @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
   /* Motion sensitivity: the level, a stepped slider with the names under its stops, trying it out. */

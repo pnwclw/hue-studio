@@ -381,6 +381,10 @@
         "auto_dynamic": {
           "name": "Auto-play",
           "description": "Start the scene dynamically whenever it is activated."
+        },
+        "capture": {
+          "name": "Store the lights",
+          "description": "Store what the scene's lights show now; off changes only the name, speed or auto-play."
         }
       }
     },

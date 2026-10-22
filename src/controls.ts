@@ -221,6 +221,9 @@ export function tileCard(card: TileCard): TemplateResult {
   </div>`;
 }
 
+/** Seconds of one drift of a dynamic light's colors: slow at speed 0, quick at 1. */
+export const dynamicPeriod = (speed: number): number => Math.round((24 - 20 * Math.min(1, Math.max(0, speed))) * 10) / 10;
+
 /** A light card (room, scene editor, color view): icon, name, toggle; colored like the light. */
 export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false, sub = "" } = {}): TemplateResult {
   const state = ctx.hass.states[id];
@@ -232,15 +235,22 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   // the switch off, a tap refused); unreachable: the bridge lost it. Either is said
   // in place of the room line, and the switch rests.
   const status = busy ? ctx.t("light.sync_active") : unreachable ? ctx.t("light.unreachable") : "";
+  // A dynamic scene playing on it: said under its name, its colors drifting at its speed.
+  const dynamics = ctx.lightInfo[id]?.dynamics;
+  const dynamic = !busy && !unreachable && state?.state === "on" && dynamics?.status === "dynamic_palette";
   return tileCard({
     art: html`<ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>`,
     name: friendlyName(ctx.hass, id),
-    sub: [status || sub],
+    sub: [status || (dynamic ? ctx.t("light.dynamics") : sub)],
     toggle: toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id })),
     inert: busy || unreachable,
     overlay: busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing,
-    classes: { light: true, ...surface.classes, off: false, selected, busy },
-    style: { ...surface.style, "--ring": colors[0] || "rgba(255, 255, 255, 0.85)" },
+    classes: { light: true, ...surface.classes, off: false, selected, busy, dynamic },
+    style: {
+      ...surface.style,
+      "--ring": colors[0] || "rgba(255, 255, 255, 0.85)",
+      ...(dynamic ? { "--lit-bg": colorsCss([...colors, colors[0]], "var(--surface)"), "--dyn-dur": `${dynamicPeriod(dynamics!.speed)}s` } : {}),
+    },
     click: busy ? (e: Event) => refuse(e.currentTarget) : open,
   });
 }

@@ -196,6 +196,10 @@ save_scene:
     auto_dynamic:
       selector:
         boolean:
+    capture:
+      default: true
+      selector:
+        boolean:
 
 reset_scene:
   target:

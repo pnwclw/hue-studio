@@ -16,6 +16,8 @@ from aiohue.v2.models.feature import (
     ColorTemperatureFeature,
     DimmingFeature,
     DimmingFeatureBase,
+    DynamicsFeature,
+    DynamicStatus,
     EffectStatus,
     EffectsV2ActionGet,
     EffectsV2Feature,
@@ -134,6 +136,9 @@ def make_light(
         dimming=DimmingFeature(brightness=50.0),
         metadata=LightMetaData(archetype="hue_lightstrip", name=resource_id),
         effects=None,
+        dynamics=DynamicsFeature(
+            speed=0.5, speed_valid=True, status=DynamicStatus.NONE
+        ),
         effects_v2=EffectsV2Feature(
             action=EffectsV2ActionGet(effect_values=effects),
             status=EffectsV2Status(

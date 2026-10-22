@@ -134,6 +134,7 @@ ATTR_SPEED = "speed"
 ATTR_XY_COLOR = "xy_color"
 ATTR_NAME = "name"
 ATTR_AUTO_DYNAMIC = "auto_dynamic"
+ATTR_CAPTURE = "capture"
 ATTR_SHUFFLE = "shuffle"
 ATTR_RECALL = "recall"
 ATTR_DYNAMIC = "dynamic"
@@ -273,6 +274,7 @@ SAVE_SCENE_SCHEMA = cv.make_entity_service_schema(
         vol.Optional(ATTR_NAME): SCENE_NAME,
         vol.Optional(ATTR_SPEED): SPEED,
         vol.Optional(ATTR_AUTO_DYNAMIC): cv.boolean,
+        vol.Optional(ATTR_CAPTURE, default=True): cv.boolean,
     }
 )
 
@@ -545,9 +547,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
         )
 
     async def save_scene(call: ServiceCall) -> None:
-        """Store what the scene's lights show now (plus name/speed/auto-play)."""
+        """Store what the scene's lights show now (plus name/speed/auto-play).
+
+        `capture` off keeps the scene's lights as they are: only the name, speed or
+        auto-play change (a playing dynamic scene would be caught mid-way otherwise).
+        """
         for scene in await _async_target_scenes(hass, call):
-            put = ScenePut(actions=captured_actions(scene))
+            put = ScenePut()
+            if call.data[ATTR_CAPTURE]:
+                put.actions = captured_actions(scene)
             if ATTR_NAME in call.data:
                 put.metadata = SceneMetadataPut(name=call.data[ATTR_NAME])
             if ATTR_SPEED in call.data:

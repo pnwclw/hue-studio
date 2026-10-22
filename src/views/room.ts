@@ -1,15 +1,20 @@
 // Room: header with toggle, brightness, Adaptive Lighting and "+" (add a scene, an automation
 // or a device: add-sheet.ts); the room's readings (temperature, light level, motion of
-// sensors that are not Hue's); its Hue scenes; its lights; its Hue sensors ("Controls", a
-// card each, opening the sensor's settings); its automations, like the Hue app.
+// sensors that are not Hue's); its Hue scenes, the scene gallery and a suggested scene of
+// it; its lights; its Hue sensors ("Controls", a card each, opening the sensor's
+// settings); its automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
+import { paletteArt } from "../color.ts";
 import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
-import { openStockMoreInfo } from "../ha-internals.ts";
+import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts";
+import { galleryMatch, thumbUrl } from "../gallery-data.ts";
+import type { StringKey } from "../i18n.ts";
+import { haptic, openStockMoreInfo } from "../ha-internals.ts";
 import {
   type AdaptiveSwitch,
   adaptiveFor,
@@ -22,12 +27,15 @@ import {
   splitSensors,
 } from "../model.ts";
 import { bridgeName, lightsByBridge, type Mismatch, mismatchesIn } from "../rooms.ts";
+import { gallerySeasons, shownCategories } from "../seasons.ts";
+import { canSpread } from "../space.ts";
 import { boxesForGroup, currentInput, statusKey, syncingIn } from "../sync.ts";
-import type { RoomSensors, SyncBoxInfo } from "../types.ts";
+import type { GalleryScene, RoomSensors, SyncBoxInfo } from "../types.ts";
 import { icon, refuse, toggle } from "../ui.ts";
 import "./add-sheet.ts";
 import { roomAutomations } from "./automations.ts";
 import { StudioView } from "./base.ts";
+import { single } from "./choice.ts";
 
 
 @customElement("hue-studio-room-view")
@@ -38,8 +46,14 @@ export class RoomView extends StudioView {
   @state() private accessor adding = false;
   /** Brightness while the header's slider is dragged: the header shows just the percentage. */
   @state() private accessor dragging: number | null = null;
+  /** The scene whose "⋯" menu is open, and whether "Delete" was tapped once. */
+  @state() private accessor menu: { scene: string; deleting: boolean } | null = null;
+  /** The dynamic speed sheet of a scene: the step on its slider (1-12). */
+  @state() private accessor speed: { scene: string; step: number } | null = null;
+  /** The suggested gallery scene, per room (a new one on "shuffle"). */
+  @state() private accessor suggested: { room: string; id: string } | null = null;
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const g = findGroup(ctx.home, this.key);
@@ -74,10 +88,8 @@ export class RoomView extends StudioView {
     <div class="screen-body"><div class="page">
       ${this.readings(g.sensors, sensors.rest)}
       ${this.syncCards(g)}
-      ${g.scenes.length
-        ? html`<h2 class="label">${t("room.scenes")}</h2>
-            <div class=${classMap({ grid: true, "scene-row": true, locked: syncing.length > 0 })}>${g.scenes.map((s) => this.scene(g, s))}</div>`
-        : nothing}
+      <h2 class="label">${t("room.scenes")}</h2>
+      ${this.sceneColumns(g, syncing.length > 0)}
       <h2 class="label">${t("room.lights")}</h2>
       ${this.splitNote(g)}
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
@@ -90,7 +102,9 @@ export class RoomView extends StudioView {
     </div></div>
     ${this.adding
       ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-add-sheet>`
-      : nothing}`;
+      : nothing}
+    ${this.menu ? this.menuSheet(g, this.menu.scene) : nothing}
+    ${this.speed ? this.speedSheet(g, this.speed.scene) : nothing}`;
   }
 
   /**
@@ -220,9 +234,37 @@ export class RoomView extends StudioView {
   }
 
   /**
+   * The scenes like the Hue app's: in columns of two that scroll sideways, the active one's
+   * edit and "⋯" buttons in a narrow column beside it (the others move along to make room),
+   * then the gallery and a suggested scene of it, with a button for another suggestion.
+   */
+  private sceneColumns(g: Group, locked: boolean) {
+    const { ctx } = this;
+    const cells: unknown[] = [];
+    const empty = html`<span class="scene-gap"></span>`;
+    for (let i = 0; i < g.scenes.length; i += 2) {
+      const pair = g.scenes.slice(i, i + 2);
+      cells.push(...pair.map((s) => this.scene(g, s)), ...(pair.length < 2 ? [empty] : []));
+      const at = pair.findIndex((s) => (ctx.sceneInfo[s.entity_id]?.active ?? "inactive") !== "inactive");
+      if (at >= 0) {
+        const side = this.sceneButtons(g, pair[at]);
+        cells.push(at === 0 ? side : empty, at === 1 ? side : empty);
+      }
+    }
+    const suggestion = this.suggestion(g);
+    cells.push(this.galleryCard(g), suggestion ? this.suggestedCard(g, suggestion) : empty);
+    if (suggestion)
+      cells.push(
+        empty,
+        html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
+      );
+    return html`<div class=${classMap({ "scene-cols": true, locked })}>${cells}</div>`;
+  }
+
+  /**
    * A scene tile; its dot shows the matching gallery picture (bridge scenes usually come
-   * from the gallery), else its palette. The active scene is lit in its colors and gets
-   * edit and dynamic play/stop buttons, like in the Hue app.
+   * from the gallery), else its palette. The active scene is lit in its colors; a dynamic
+   * one shows play/stop in place of its picture, like in the Hue app.
    */
   private scene(g: Group, s: Scene) {
     const { ctx } = this;
@@ -233,7 +275,6 @@ export class RoomView extends StudioView {
     const playing = info?.active === "dynamic_palette";
     const colors = info ? sceneColors(info) : [];
     const surface = surfaceOf({ on: active, colors });
-    const room = encodeURIComponent(g.key);
     const apply = async (e: Event) => {
       // The Sync Box would overwrite the scene right away.
       if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
@@ -243,35 +284,184 @@ export class RoomView extends StudioView {
       e.stopPropagation();
       if (await ctx.call("hue_studio", "recall_scene", { entity_id: s.entity_id, dynamic: !playing }, { optimistic: false })) ctx.markManual(g);
     };
-    const edit = (e: Event) => {
-      e.stopPropagation();
-      ctx.go(`/room/${room}/scene/${encodeURIComponent(s.entity_id)}`);
-    };
-    // Like the Hue app's "Shuffle colors": the palette spread over the lights anew, kept.
-    const shuffle = async (e: Event) => {
-      e.stopPropagation();
-      const data = { entity_id: s.entity_id, shuffle: true, recall: true };
-      if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
-    };
     return tileCard({
-      art: html`<div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>`,
+      art:
+        active && info.dynamic
+          ? html`<button class="scene-play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>${icon(playing ? "stop" : "play")}</button>`
+          : html`<div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>`,
       name: s.name,
       sub: [s.group !== g.group ? friendlyName(ctx.hass, s.group) : ""],
-      overlay: active
-        ? html`<div class="scene-actions">
-            ${info.dynamic
-              ? html`<button class="round mini play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>
-                  ${icon(playing ? "pause" : "play")}
-                </button>`
-              : nothing}
-            ${info.resettable && (info.palette.length > 1 || info.mirek.length > 1)
-              ? html`<button class="round mini shuffle" aria-label=${t("scene.shuffle_colors")} @click=${shuffle}>${icon("shuffle")}</button>`
-              : nothing}
-            <button class="round mini edit" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
-          </div>`
-        : nothing,
       classes: { scene: true, ...surface.classes, active },
       style: surface.style,
+      click: apply,
+    });
+  }
+
+  /** Beside the active scene: edit it, and "⋯" for the rest. */
+  private sceneButtons(g: Group, s: Scene) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const edit = () => ctx.go(`/room/${encodeURIComponent(g.key)}/scene/${encodeURIComponent(s.entity_id)}`);
+    return html`<div class="scene-side">
+      <button class="round" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
+      <button class="round" aria-label=${t("scene.more")} @click=${() => (this.menu = { scene: s.entity_id, deleting: false })}>${icon("dots")}</button>
+    </div>`;
+  }
+
+  /** The "⋯" of a scene, an action sheet like the Hue app's: copy, speed, shuffle, delete. */
+  private menuSheet(g: Group, entityId: string) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const s = g.scenes.find((x) => x.entity_id === entityId);
+    const info = ctx.sceneInfo[entityId];
+    const close = () => (this.menu = null);
+    if (!s) return nothing;
+    const act = (run: () => void) => () => {
+      haptic("selection");
+      close();
+      run();
+    };
+    const copy = () => {
+      const others = [...ctx.home.rooms, ...ctx.home.zones].filter((o) => o.key !== g.key);
+      this.choose(
+        single(
+          t("scene.copy_to"),
+          others.map((o) => ({ value: o.key, label: o.name, icon: o.icon })),
+          "",
+          (key) => void this.copyScene(s, ctx.home.rooms.concat(ctx.home.zones).find((o) => o.key === key)!),
+        ),
+      );
+    };
+    const shuffle = async () => {
+      const data = { entity_id: entityId, shuffle: true, recall: true };
+      if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
+    };
+    const remove = async () => {
+      if (!this.menu?.deleting) {
+        haptic("warning");
+        this.menu = { scene: entityId, deleting: true };
+        return;
+      }
+      close();
+      if (await ctx.call("hue_studio", "delete_scene", { entity_id: entityId }, { optimistic: false })) ctx.toast(t("scene.deleted", { name: s.name }));
+    };
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, actions: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box action-sheet" role="dialog" aria-label=${s.name}>
+        <button @click=${act(copy)}>${t("scene.copy_to")}</button>
+        ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
+        ${info?.resettable && (info.palette.length > 1 || info.mirek.length > 1) ? html`<button @click=${act(shuffle)}>${t("scene.shuffle_colors")}</button>` : nothing}
+        <button class="danger" @click=${remove}>${t(this.menu?.deleting ? "scene.delete_confirm" : "scene.delete")}</button>
+        <button class="cancel" @click=${close}>${t("common.cancel")}</button>
+      </div>
+    </div>`;
+  }
+
+  /** "Copy to…": the same scene in another room or zone (its gallery picture, else its palette). */
+  private async copyScene(s: Scene, to: Group): Promise<void> {
+    const { ctx } = this;
+    const info = ctx.sceneInfo[s.entity_id];
+    const match = galleryMatch(ctx.gallery, s.name, info?.image);
+    const what = match
+      ? { gallery_scene: match.id }
+      : info?.palette.length
+        ? { points: info.palette }
+        : info?.mirek.length
+          ? { mirek: info.mirek[0] }
+          : null;
+    const group = await ctx.hueGroupOf(to);
+    if (!group || !what) return;
+    if (await ctx.call("hue_studio", "create_scene", { entity_id: group, name: s.name, ...what }, { optimistic: false }))
+      ctx.toast(ctx.t("scene.copied", { name: s.name, room: to.name }));
+  }
+
+  /** The dynamic speed of a scene, on a slider like the scene editor's; kept as soon as it is let go. */
+  private speedSheet(g: Group, entityId: string) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const sheet = this.speed!;
+    const close = () => (this.speed = null);
+    const done = async () => {
+      haptic("success");
+      close();
+      // Only the speed: the lights of a playing scene are mid-way, not the scene.
+      const data = { entity_id: entityId, speed: Math.round(stepToSpeed(sheet.step) * 100), capture: false };
+      if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) ctx.markManual(g);
+    };
+    const word = t(`effects.speed_${speedWord(sheet.step)}` as StringKey);
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form sensor-sheet fade-sheet" role="dialog" aria-label=${t("scene.speed")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+          <div class="grow">${t("scene.speed")}</div>
+          <button class="pill save" @click=${done}>${t("color.done")}</button>
+        </div>
+        <div class="fade-body">
+          <div class="fade-values"><div><div class="caps">${t("scene.speed")}</div><div class="big-value">${sheet.step} - ${word}</div></div></div>
+          <hue-studio-slider class="fade-slider" .min=${1} .max=${SPEED_STEPS} .value=${sheet.step} .label=${t("scene.speed")}
+            @value-input=${(e: CustomEvent<number>) => (this.speed = { ...sheet, step: Math.round(e.detail) })}
+            @value-change=${(e: CustomEvent<number>) => (this.speed = { ...sheet, step: Math.round(e.detail) })}></hue-studio-slider>
+          <div class="fade-ticks">${Array.from({ length: SPEED_STEPS }, (_, i) => html`<span>${i + 1}</span>`)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /** Gallery scenes shown now (seasonal categories in their time), none the room has already. */
+  private galleryScenes(g: Group): GalleryScene[] {
+    const { ctx } = this;
+    const gallery = ctx.gallery;
+    if (!gallery) return [];
+    const shown = shownCategories(gallery.categories, gallerySeasons(ctx.config), ctx.hass);
+    const own = new Set(g.scenes.map((s) => s.name.toLowerCase()));
+    return gallery.scenes.filter((s) => shown.includes(s.category) && !own.has(s.name.toLowerCase()));
+  }
+
+  /** The suggested scene of the room: kept until "shuffle", a random one of the gallery first. */
+  private suggestion(g: Group): GalleryScene | null {
+    const scenes = this.galleryScenes(g);
+    const kept = this.suggested?.room === g.key ? scenes.find((s) => s.id === this.suggested!.id) : undefined;
+    if (kept) return kept;
+    const pick = scenes[Math.floor(Math.random() * scenes.length)];
+    if (pick) queueMicrotask(() => (this.suggested = { room: g.key, id: pick.id }));
+    return pick ?? null;
+  }
+
+  private shuffleSuggestion(g: Group): void {
+    const scenes = this.galleryScenes(g).filter((s) => s.id !== this.suggested?.id);
+    const pick = scenes[Math.floor(Math.random() * scenes.length)];
+    if (!pick) return;
+    haptic("selection");
+    this.suggested = { room: g.key, id: pick.id };
+  }
+
+  /** "Scene gallery": three of its pictures, a tap opens it for the room. */
+  private galleryCard(g: Group) {
+    const { ctx } = this;
+    const scenes = this.galleryScenes(g);
+    const step = Math.max(1, Math.floor(scenes.length / 3));
+    const three = [0, 1, 2].map((i) => scenes[i * step]).filter(Boolean);
+    return tileCard({
+      art: html`<div class="dots-three">${three.map((s) => html`<span style=${styleMap({ background: `url("${thumbUrl(s.id)}") center / cover, ${paletteArt(s)}` })}></span>`)}</div>`,
+      name: ctx.t("room.gallery"),
+      classes: { scene: true, "gallery-card": true },
+      click: () => ctx.go(`/gallery?room=${encodeURIComponent(g.key)}`),
+    });
+  }
+
+  /** A suggested scene of the gallery, a stack of cards: a tap sets it in the room once. */
+  private suggestedCard(g: Group, scene: GalleryScene) {
+    const { ctx } = this;
+    const apply = async (e: Event) => {
+      if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
+      const spatial = scene.kind === "gradient" && canSpread(ctx.positions, g.lights);
+      const data = { entity_id: g.target, gallery_scene: scene.id, ...(spatial ? { layout: "spatial" } : {}) };
+      if (await ctx.call("hue_studio", "apply_palette", data, { optimistic: false })) ctx.markManual(g);
+    };
+    return tileCard({
+      art: html`<div class="dot" style=${styleMap({ background: `url("${thumbUrl(scene.id)}") center / cover, ${paletteArt(scene)}` })}></div>`,
+      name: scene.name,
+      sub: [ctx.t("room.suggested")],
+      classes: { scene: true, suggested: true },
       click: apply,
     });
   }
