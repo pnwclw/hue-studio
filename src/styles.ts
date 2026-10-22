@@ -494,20 +494,33 @@ export const CSS = `
   .ticks span { width: 16px; text-align: center; }
   .ticks span.on { color: var(--text); font-weight: 700; }
 
-  /* scene editor */
+  /* Scene editor, the Hue app's: the top (header, picture, name, brightness) tinted with the
+     scene's colors, fading into the page; the rows below on their own. */
   .scene-edit { padding-bottom: calc(28px + var(--safe-bottom)); }
-  .scene-edit > .topbar.surface { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
-  .scene-edit > .topbar .title { flex: 1; min-width: 0; font-size: 17px; font-weight: 500; }
-  .scene-edit .hero { position: relative; z-index: 0; padding-bottom: 18px; border-radius: 0 0 22px 22px; }
-  .scene-edit .hero .inner { padding-top: 8px; }
-  .scene-edit .dot.big { width: 60px; height: 60px; border-radius: 50%; background: #555 center / cover no-repeat;
+  .scene-tint { position: absolute; top: 0; left: 0; right: 0; height: 460px; z-index: 0; pointer-events: none; background: var(--scene-tint);
+                -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+  hue-studio-scene-view > .screen-body { position: relative; z-index: 1; }
+  .screen-head.scene-head { background: rgba(255, 255, 255, 0.07); border-bottom-color: rgba(255, 255, 255, 0.06); }
+  .scene-top { padding: 16px 2px 6px; }
+  .scene-top .name-row { margin: 14px 0 12px; }
+  .scene-top h1.big { font-size: 32px; }
+  .scene-top .round.rename { background: rgba(255, 255, 255, 0.14); color: var(--text); }
+  .scene-edit .dot.big { width: 52px; height: 52px; border-radius: 50%; background: #555 center / cover no-repeat;
                          box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35); }
+  .rows.scene-brightness { background: rgba(255, 255, 255, 0.09); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .scene-brightness .item.col { display: block; padding: 16px 16px 22px; }
+  .scene-brightness .line { display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; }
+  .scene-brightness .line .dim { font-weight: 400; color: var(--text-2); }
+  .scene-brightness .slider { margin-top: 22px; }
+  .scene-lights { margin-top: 22px; }
+  .scene-lights .light-row { margin: 0; padding: 2px 16px 16px; }
+  .scene-lights .lights-head .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; height: 32px; }
+  .scene-lights .lights-head .pill.shuffle svg { width: 18px; height: 18px; }
+  .scene-edit > .center { margin-top: 28px; }
   .name-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 18px; }
   .name-row h1.big { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; }
   .name-input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: none; border-radius: 12px; font: inherit; font-size: 24px;
                 font-weight: 700; color: inherit; background: rgba(0, 0, 0, 0.25); outline: none; }
-  .scene-edit .hero .line .dim { color: inherit; opacity: 0.75; }
-  .scene-edit .hero .slider { margin-top: 18px; }
   .hero.dark-text .name-input { background: rgba(255, 255, 255, 0.4); }
   .section-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
   .section-head h2.label { margin: 0 2px; }
@@ -729,10 +742,11 @@ export const CSS = `
   .sync-note svg { flex: none; width: 18px; height: 18px; color: #6c9dff; }
   /* A room's scenes, the Hue app's: columns of two that scroll sideways, cards as wide as the
      light cards; narrow columns beside the active scene (edit, "⋯") and the suggestion (shuffle). */
-  .scene-cols { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: max-content; gap: 12px 10px;
-                overflow-x: auto; margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none;
+  .scene-cols { overflow-x: auto; margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none;
                 scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .scene-cols::-webkit-scrollbar { display: none; }
+  .scene-grid { display: grid; grid-template-columns: max-content max-content; gap: 12px 10px; width: max-content; }
+  .scene-line { display: flex; gap: 10px; }
   .scene-cols .tile-card { width: 104px; }
   .scene-cell { display: flex; scroll-snap-align: start; }
   /* The active scene's buttons (and the shuffle) come in softly while the cards slide aside. */
@@ -904,7 +918,7 @@ export const CSS = `
   .sens-try.calibrating .dot { animation: calibrate 1.2s ease-in-out infinite; }
   @keyframes calibrate { 50% { opacity: 0.3; transform: scale(0.8); } }
   @container (max-width: 599px) {
-    .sensor-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+    .sensor-edit .rows, .scene-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
   }
   /* Settings → Devices, like the Hue app's: kinds with their counts, then a kind's devices by
      room under a search field and filters; big pictures, "Unreachable" in orange, separators

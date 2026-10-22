@@ -416,10 +416,11 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   indicator itself (`--safe-area-inset-*`); without it HA pads `ha-panel-custom` and a
   full-height panel overflows the screen in the mobile app. Harness: `&inset=59,34` fakes a
   phone's safe areas, `&pad=59,34` additionally pads the slot like HA would.
-- A room's scenes are the Hue app's: columns of two that scroll sideways; the active one
+- A room's scenes are the Hue app's: two rows that scroll sideways (the scenes in columns
+  of two as they come), the gallery over the suggestion at their end; the active one
   shows play/stop (a dynamic one) in place of its picture and gets edit and "⋯" beside it
-  (copy to another room, dynamic speed, shuffle colors, delete), the cards sliding aside
-  and the buttons fading in; then the scene gallery and a suggested scene (a scene of the
+  (copy to another room, dynamic speed, shuffle colors, delete), the cards after it in
+  its row sliding aside and the buttons fading in; then the scene gallery and a suggested scene (a scene of the
   day now by the ready-made tags alone, tinted with its colors, rising from its stack on
   shuffle). A scene's sheet (`scene-pick.ts`: the gallery's, and "Copy to…") is the Hue
   app's: picture, name and pencil, colors and shuffle, room or zone, "Save to my scenes",

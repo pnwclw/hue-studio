@@ -10,14 +10,15 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import type { SceneDraft } from "../context.ts";
-import { groupSlider, lightTile, sceneColors, sceneDot, surfaceOf } from "../controls.ts";
-import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts";
+import { groupSlider, lightTile, sceneColors, sceneDot, speedSheet } from "../controls.ts";
+import { speedToStep, speedWord, stepToSpeed } from "../effects.ts";
 import { leavePanel } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup, friendlyName, type Group, groupState } from "../model.ts";
 import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { navRow } from "./choice.ts";
 
 const RESET_CONFIRM_MS = 3500;
 
@@ -33,6 +34,8 @@ export class SceneView extends StudioView {
   @state() private accessor editingName = false;
   @state() private accessor confirmReset = false;
   @state() private accessor confirmDelete = false;
+  /** The dynamic speed sheet's step (1-12) while it is open. */
+  @state() private accessor speedStep: number | null = null;
   private started = false;
   private resetTimer?: ReturnType<typeof setTimeout>;
   private deleteTimer?: ReturnType<typeof setTimeout>;
@@ -94,7 +97,6 @@ export class SceneView extends StudioView {
       : room;
     const state = groupState(ctx.hass, group, ctx.lightInfo);
     const dot = sceneDot(ctx.gallery, this.name, info);
-    const surface = surfaceOf({ on: true, colors: sceneColors(info) });
     const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}${this.exitPath ? `?from=${encodeURIComponent(this.exitPath)}` : ""}`;
     const syncing = syncingIn(ctx.boxes, group);
     const name = draft.name ?? this.name;
@@ -107,30 +109,36 @@ export class SceneView extends StudioView {
       <div class="title">${t("scene.edit")}</div>
       <button class="pill save" @click=${() => this.save()}>${t("scene.save")}</button>
     </div>`;
-    return html`<div class="screen-head">${head}</div><div class="screen-body"><div class="page scene-edit">
-      <div class=${classMap({ hero: true, ...surface.classes })} style=${styleMap(surface.style)}>
-        <div class="inner">
-          <div class="dot big" style=${styleMap({ background: dot })}></div>
-          <div class="name-row">
-            ${this.editingName
-              ? html`<input
-                  class="name-input"
-                  .value=${name}
-                  maxlength="32"
-                  aria-label=${t("scene.rename")}
-                  @input=${(e: InputEvent) => this.edit({ name: (e.target as HTMLInputElement).value })}
-                  @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (this.editingName = false)}
-                />`
-              : html`<h1 class="big">${name}</h1>`}
-            <button
-              class="round rename"
-              aria-label=${t("scene.rename")}
-              @click=${() => {
-                this.editingName = !this.editingName;
-                if (this.editingName) this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
-              }}
-            >${icon("pencil")}</button>
-          </div>
+    // Like the Hue app's: the top (header, name, brightness) tinted with the scene's colors.
+    const tint = sceneColors(info).map((c) => `color-mix(in srgb, ${c} 58%, #141416)`);
+    const tintStyle = { "--scene-tint": `linear-gradient(115deg, ${(tint.length > 1 ? tint : [tint[0], tint[0]]).join(", ")})` };
+    return html`<div class="scene-tint" style=${styleMap(tintStyle)}></div>
+      <div class="screen-head scene-head">${head}</div><div class="screen-body"><div class="page scene-edit">
+      <div class="scene-top">
+        <div class="dot big" style=${styleMap({ background: dot })}></div>
+        <div class="name-row">
+          ${this.editingName
+            ? html`<input
+                class="name-input"
+                .value=${name}
+                maxlength="32"
+                aria-label=${t("scene.rename")}
+                @input=${(e: InputEvent) => this.edit({ name: (e.target as HTMLInputElement).value })}
+                @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (this.editingName = false)}
+              />`
+            : html`<h1 class="big">${name}</h1>`}
+          <button
+            class="round rename"
+            aria-label=${t("scene.rename")}
+            @click=${() => {
+              this.editingName = !this.editingName;
+              if (this.editingName) this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
+            }}
+          >${icon("pencil")}</button>
+        </div>
+      </div>
+      <div class="rows scene-brightness">
+        <div class="item col">
           <div class="line"><span>${t("scene.brightness")}</span><span class="dim">${state.on ? `${state.brightness}%` : ""}</span></div>
           ${groupSlider(ctx, group, state, t("scene.brightness"))}
         </div>
@@ -139,19 +147,7 @@ export class SceneView extends StudioView {
       ${info?.dynamic
         ? html`<h2 class="label">${t("scene.dynamic")}</h2>
             <div class="rows">
-              <div class="item col">
-                <div class="line"><span>${t("scene.speed")}</span><span class="dim">${speed} - ${word}</span></div>
-                <hue-studio-slider
-                  class="steps"
-                  .min=${1}
-                  .max=${SPEED_STEPS}
-                  .value=${speed}
-                  .label=${t("scene.speed")}
-                  @value-input=${(e: CustomEvent<number>) => this.edit({ speed: e.detail })}
-                  @value-change=${(e: CustomEvent<number>) => this.edit({ speed: e.detail })}
-                ></hue-studio-slider>
-                <div class="ticks">${Array.from({ length: SPEED_STEPS }, (_, i) => html`<span class=${i + 1 === speed ? "on" : ""}>${i + 1}</span>`)}</div>
-              </div>
+              ${navRow({ title: t("scene.speed"), value: `${speed} - ${word}` }, () => (this.speedStep = speed))}
               <div class="item">
                 <div class="grow"><div>${t("scene.autoplay")}</div><div class="dim small">${t("scene.autoplay_sub")}</div></div>
                 ${toggle(autoplay, t("scene.autoplay"), () => this.edit({ autoplay: !autoplay }))}
@@ -159,31 +155,44 @@ export class SceneView extends StudioView {
             </div>`
         : nothing}
 
-      <div class="section-head">
-        <h2 class="label">${t("room.lights")}</h2>
-        ${info && info.palette.length > 1
-          ? html`<button class="pill shuffle" @click=${() => this.shuffle(lights, info.palette)}>${icon("shuffle")}${t("scene.shuffle")}</button>`
-          : nothing}
-      </div>
-      <div class="grid">
-        ${group.lights.map((id) =>
-          lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
-            busy: syncing.includes(id),
-          }),
-        )}
+      <div class="rows lights-card scene-lights">
+        <div class="item lights-head">
+          <div class="grow">${t("room.lights")}</div>
+          ${info && info.palette.length > 1
+            ? html`<button class="pill shuffle" @click=${() => this.shuffle(lights, info.palette)}>${icon("shuffle")}${t("scene.shuffle")}</button>`
+            : nothing}
+        </div>
+        <div class="light-row">
+          ${group.lights.map((id) =>
+            lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
+              busy: syncing.includes(id),
+            }),
+          )}
+        </div>
       </div>
 
-      <div class="center stack">
-        ${info?.resettable
-          ? html`<button class=${classMap({ pill: true, reset: true, confirm: this.confirmReset })} @click=${() => this.reset()}>
-              ${this.confirmReset ? t("scene.reset_confirm") : t("scene.reset")}
-            </button>`
-          : nothing}
-        <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmDelete })} @click=${() => this.deleteScene()}>
+      ${info?.resettable
+        ? html`<div class="center"><button class=${classMap({ pill: true, reset: true, confirm: this.confirmReset })} @click=${() => this.reset()}>
+            ${this.confirmReset ? t("scene.reset_confirm") : t("scene.reset")}
+          </button></div>`
+        : nothing}
+      <div class="delete-area">
+        <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} @click=${() => this.deleteScene()}>
           ${this.confirmDelete ? t("scene.delete_confirm") : t("scene.delete")}
         </button>
       </div>
-    </div></div>`;
+    </div></div>
+    ${this.speedStep !== null
+      ? speedSheet(ctx, {
+          step: this.speedStep,
+          set: (step) => (this.speedStep = step),
+          close: () => (this.speedStep = null),
+          done: () => {
+            this.edit({ speed: this.speedStep });
+            this.speedStep = null;
+          },
+        })
+      : nothing}`;
   }
 
   /** Spread the palette over the lights in a new order (live; "Save" keeps it). */

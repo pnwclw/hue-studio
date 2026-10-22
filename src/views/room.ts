@@ -12,10 +12,10 @@ import { repeat } from "lit/directives/repeat.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../color.ts";
-import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, surfaceOf, syncBanner, tileCard } from "../controls.ts";
-import { SPEED_STEPS, speedToStep, speedWord, stepToSpeed } from "../effects.ts";
+import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../controls.ts";
+import { speedToStep, stepToSpeed } from "../effects.ts";
 import { galleryMatch, thumbUrl } from "../gallery-data.ts";
-import type { StringKey } from "../i18n.ts";
+
 import { haptic, openStockMoreInfo } from "../ha-internals.ts";
 import {
   type AdaptiveSwitch,
@@ -242,33 +242,44 @@ export class RoomView extends StudioView {
   }
 
   /**
-   * The scenes like the Hue app's: in columns of two that scroll sideways, the active one's
-   * edit and "⋯" buttons in a narrow column beside it (the others move along to make room),
-   * then the gallery and a suggested scene of it, with a button for another suggestion.
+   * The scenes like the Hue app's: two rows that scroll sideways, the active one's edit and
+   * "⋯" buttons beside it (the cards after it in its row move along to make room), then the
+   * gallery over a suggested scene, with a button for another suggestion.
    */
   private sceneColumns(g: Group, locked: boolean) {
     const { ctx } = this;
-    // Keyed cells: a scene keeps its card when the buttons come in beside another, so it can slide.
-    const cells: { key: string; tpl: unknown }[] = [];
-    const gap = (key: string) => ({ key, tpl: html`<span class="scene-gap"></span>` });
-    for (let i = 0; i < g.scenes.length; i += 2) {
-      const pair = g.scenes.slice(i, i + 2);
-      cells.push(...pair.map((s) => ({ key: s.entity_id, tpl: this.scene(g, s) })), ...(pair.length < 2 ? [gap(`gap-${i}`)] : []));
-      const at = pair.findIndex((s) => (ctx.sceneInfo[s.entity_id]?.active ?? "inactive") !== "inactive");
-      if (at >= 0) {
-        const side = { key: `side-${pair[at].entity_id}`, tpl: this.sceneButtons(g, pair[at]) };
-        cells.push(at === 0 ? side : gap(`side-gap-${i}`), at === 1 ? side : gap(`side-gap-${i}`));
-      }
-    }
+    // Two rows, the scenes in columns of two as they come (the first row takes the first of
+    // each pair). The active scene's buttons go in after it in its own row only, so only
+    // the cards after it move; the gallery and the suggestion end the rows, one over the other.
+    const rows: { key: string; tpl: unknown }[][] = [[], []];
+    g.scenes.forEach((s, i) => {
+      const row = rows[i % 2];
+      row.push({ key: s.entity_id, tpl: this.scene(g, s) });
+      if ((ctx.sceneInfo[s.entity_id]?.active ?? "inactive") !== "inactive")
+        row.push({ key: `side-${s.entity_id}`, tpl: this.sceneButtons(g, s) });
+    });
     const suggestion = this.suggestion(g);
-    cells.push({ key: "gallery", tpl: this.galleryCard(g) }, suggestion ? { key: `suggested-${suggestion.id}`, tpl: this.suggestedCard(g, suggestion) } : gap("suggested-gap"));
-    if (suggestion)
-      cells.push(gap("shuffle-gap"), {
-        key: "shuffle",
-        tpl: html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
-      });
+    // Keyed cells: a card keeps its element when others come in, so it can slide.
+    const line = (cells: { key: string; tpl: unknown }[]) =>
+      repeat(cells, (c) => c.key, (c) => html`<div class="scene-cell" data-k=${c.key}>${c.tpl}</div>`);
+    const tail = (cells: { key: string; tpl: unknown }[]) => html`<div class="scene-line scene-tail">${line(cells)}</div>`;
     return html`<div class=${classMap({ "scene-cols": true, locked })}>
-      ${repeat(cells, (c) => c.key, (c) => html`<div class="scene-cell" data-k=${c.key}>${c.tpl}</div>`)}
+      <div class="scene-grid">
+        <div class="scene-line">${line(rows[0])}</div>
+        ${tail([{ key: "gallery", tpl: this.galleryCard(g) }])}
+        <div class="scene-line">${line(rows[1])}</div>
+        ${tail(
+          suggestion
+            ? [
+                { key: `suggested-${suggestion.id}`, tpl: this.suggestedCard(g, suggestion) },
+                {
+                  key: "shuffle",
+                  tpl: html`<div class="scene-side"><button class="round" aria-label=${ctx.t("room.another")} @click=${() => this.shuffleSuggestion(g)}>${icon("shuffle")}</button></div>`,
+                },
+              ]
+            : [],
+        )}
+      </div>
     </div>`;
   }
 
@@ -278,19 +289,18 @@ export class RoomView extends StudioView {
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed);
     this.cellsAt.clear();
-    this.querySelectorAll<HTMLElement>(".scene-cols > .scene-cell").forEach((el) => this.cellsAt.set(el.dataset.k!, el.getBoundingClientRect().left));
+    this.querySelectorAll<HTMLElement>(".scene-cols .scene-cell").forEach((el) => this.cellsAt.set(el.dataset.k!, el.getBoundingClientRect().left));
   }
 
   protected override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    this.querySelectorAll<HTMLElement>(".scene-cols > .scene-cell").forEach((el) => {
+    this.querySelectorAll<HTMLElement>(".scene-cols .scene-cell").forEach((el) => {
       const was = this.cellsAt.get(el.dataset.k!);
       const dx = was === undefined ? 0 : was - el.getBoundingClientRect().left;
       if (Math.abs(dx) > 1) el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], { duration: 360, easing: "cubic-bezier(0.25, 0.8, 0.25, 1)" });
     });
   }
-
 
   /**
    * A scene tile; its dot shows the matching gallery picture (bridge scenes usually come
@@ -393,36 +403,20 @@ export class RoomView extends StudioView {
     </div>`;
   }
 
-  /** The dynamic speed of a scene, on a slider like the scene editor's; kept as soon as it is let go. */
+  /** The dynamic speed of a scene; kept on "Done" (only the speed: a playing scene's lights are mid-way). */
   private speedSheet(g: Group, entityId: string) {
     const { ctx } = this;
-    const { t } = ctx;
     const sheet = this.speed!;
-    const close = () => (this.speed = null);
-    const done = async () => {
-      haptic("success");
-      close();
-      // Only the speed: the lights of a playing scene are mid-way, not the scene.
-      const data = { entity_id: entityId, speed: Math.round(stepToSpeed(sheet.step) * 100), capture: false };
-      if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) ctx.markManual(g);
-    };
-    const word = t(`effects.speed_${speedWord(sheet.step)}` as StringKey);
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form sensor-sheet fade-sheet" role="dialog" aria-label=${t("scene.speed")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-          <div class="grow">${t("scene.speed")}</div>
-          <button class="pill save" @click=${done}>${t("color.done")}</button>
-        </div>
-        <div class="fade-body">
-          <div class="fade-values"><div><div class="caps">${t("scene.speed")}</div><div class="big-value">${sheet.step} - ${word}</div></div></div>
-          <hue-studio-slider class="fade-slider" .min=${1} .max=${SPEED_STEPS} .value=${sheet.step} .label=${t("scene.speed")}
-            @value-input=${(e: CustomEvent<number>) => (this.speed = { ...sheet, step: Math.round(e.detail) })}
-            @value-change=${(e: CustomEvent<number>) => (this.speed = { ...sheet, step: Math.round(e.detail) })}></hue-studio-slider>
-          <div class="fade-ticks">${Array.from({ length: SPEED_STEPS }, (_, i) => html`<span>${i + 1}</span>`)}</div>
-        </div>
-      </div>
-    </div>`;
+    return speedSheet(ctx, {
+      step: sheet.step,
+      set: (step) => (this.speed = { ...sheet, step }),
+      close: () => (this.speed = null),
+      done: async () => {
+        this.speed = null;
+        const data = { entity_id: entityId, speed: Math.round(stepToSpeed(sheet.step) * 100), capture: false };
+        if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) ctx.markManual(g);
+      },
+    });
   }
 
   /** Gallery scenes shown now (seasonal categories in their time), none the room has already. */

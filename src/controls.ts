@@ -8,12 +8,14 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "./color.ts";
 import type { StudioContext } from "./context.ts";
+import { SPEED_STEPS, speedWord } from "./effects.ts";
 import { galleryMatch, thumbUrl } from "./gallery-data.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "./model.ts";
 import { haptic } from "./ha-internals.ts";
+import type { StringKey } from "./i18n.ts";
 import { syncingIn } from "./sync.ts";
 import type { Gallery, SceneInfo, SyncBoxInfo } from "./types.ts";
-import { icon, LightElement, lockedToggle, refuse, type Throttled, throttle, toggle } from "./ui.ts";
+import { icon, LightElement, lockedToggle, refuse, type Throttled, toggle } from "./ui.ts";
 
 /**
  * Bridge limits: ~1 command/s for a Hue group, ~10/s for lights in total. A group command
@@ -218,6 +220,34 @@ export function tileCard(card: TileCard): TemplateResult {
       ${sub.slice(0, 2).map((line) => html`<div class="sub">${line}</div>`)}
     </div>
     ${card.toggle ? html`<div class=${classMap({ "switch-zone": true, inert: !!card.inert })}>${card.toggle}</div>` : nothing}
+  </div>`;
+}
+
+/**
+ * A scene's dynamic speed on a sheet, the Hue app's 1-12 with its word ("9 - Fast"): the
+ * room's "⋯" and the scene editor's "Dynamic speed" row open it; "Done" keeps the step.
+ */
+export function speedSheet(ctx: StudioContext, o: { step: number; set: (step: number) => void; close: () => void; done: () => void }): TemplateResult {
+  const { t } = ctx;
+  const word = t(`effects.speed_${speedWord(o.step)}` as StringKey);
+  return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && o.close()}>
+    <div class="box form sensor-sheet fade-sheet" role="dialog" aria-label=${t("scene.speed")}>
+      <div class="sheet-bar">
+        <button class="round close" aria-label=${t("common.close")} @click=${o.close}>${icon("close")}</button>
+        <div class="grow">${t("scene.speed")}</div>
+        <button class="pill save" @click=${() => {
+          haptic("success");
+          o.done();
+        }}>${t("color.done")}</button>
+      </div>
+      <div class="fade-body">
+        <div class="fade-values"><div><div class="caps">${t("scene.speed")}</div><div class="big-value">${o.step} - ${word}</div></div></div>
+        <hue-studio-slider class="fade-slider" .min=${1} .max=${SPEED_STEPS} .value=${o.step} .label=${t("scene.speed")}
+          @value-input=${(e: CustomEvent<number>) => o.set(Math.round(e.detail))}
+          @value-change=${(e: CustomEvent<number>) => o.set(Math.round(e.detail))}></hue-studio-slider>
+        <div class="fade-ticks">${Array.from({ length: SPEED_STEPS }, (_, i) => html`<span>${i + 1}</span>`)}</div>
+      </div>
+    </div>
   </div>`;
 }
 
