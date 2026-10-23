@@ -321,8 +321,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): the
                                 box sees a picture (`linked`) only on the input it is on and none asleep, so each input's picture
                                 is an HA entity (its player, a sensor) or the box's link while on it; a picture switches (and
-                                wakes) the box in that input's mode, another input with one takes over when it is gone; a
-                                screen (media_player) linked with the box turns on onto its input, off without a picture, and
+                                wakes) the box in that input's mode, another input with one takes over when it is gone; while
+                                the box does not follow the TV over CEC, its one screen (media_player) turns on onto its input,
+                                off without a picture, and
                                 turned on by hand wakes the box, the box waking turns it on; light sync stopped by hand stays
                                 stopped for the session; picking an input wakes its source (a wake entity). Edges only; the
                                 box entry's options

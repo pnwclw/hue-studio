@@ -164,7 +164,7 @@ const SYNC_BOX: SyncBoxInfo = {
   features: ["palette", "background_lighting", "presets", "settings", "follow", "ir"],
   follow: { input4: { action: "game", signal: "binary_sensor.pc_picture" }, input1: { action: "video", signal: null } },
   screen: { entity_id: "media_player.example_tv", source: "HDMI 3", off_after: 300 },
-  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
+  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: false, ha_device: "dev_sync_box" },
   palette: "neutral",
   background_lighting: { video: false, game: true },
   presets: [

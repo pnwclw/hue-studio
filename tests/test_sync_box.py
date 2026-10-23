@@ -979,6 +979,7 @@ async def test_follow_screen_on(
     hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
 ) -> None:
     """A picture turns the linked screen on, then onto the box's input."""
+    box.state["behavior"]["cecPowersave"] = False
     turn_on = async_mock_service(hass, "media_player", "turn_on")
     select = async_mock_service(hass, "media_player", "select_source")
     hass.states.async_set(SCREEN, "off")
@@ -1007,6 +1008,7 @@ async def test_follow_screen_wakes_box(
 ) -> None:
     """The screen turned on by hand while the box sleeps: the box wakes on the input
     with the latest picture; while it is awake, nothing happens."""
+    box.state["behavior"]["cecPowersave"] = False
     box.state["execution"]["mode"] = "powersave"
     hass.states.async_set(SCREEN, "off")
     hass.states.async_set(PC, "on")
@@ -1031,6 +1033,7 @@ async def test_follow_screen_off(
 ) -> None:
     """No picture on any followed input for a while: the screen goes off, unless it
     shows something else by then."""
+    box.state["behavior"]["cecPowersave"] = False
     turn_off = async_mock_service(hass, "media_player", "turn_off")
     hass.states.async_set(SCREEN, "on", {"source": "HDMI 3"})
     hass.states.async_set(PC, "on")
@@ -1174,6 +1177,7 @@ async def test_follow_box_wakes_screen(
     hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
 ) -> None:
     """The box woken any way turns its screen on (its input left as it is)."""
+    box.state["behavior"]["cecPowersave"] = False
     turn_on = async_mock_service(hass, "media_player", "turn_on")
     select = async_mock_service(hass, "media_player", "select_source")
     box.state["execution"]["mode"] = "powersave"
@@ -1278,3 +1282,19 @@ async def test_follow_input_picked_by_hand(
     box.state["execution"]["hdmiSource"] = "input4"
     await _poll(hass, box_entry)
     assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
+
+
+async def test_follow_no_screen_with_cec(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """While the box follows the TV over HDMI CEC, the screen is left to it."""
+    turn_on = async_mock_service(hass, "media_player", "turn_on")
+    hass.states.async_set(SCREEN, "off")
+    hass.states.async_set(PC, "off")
+    await _follow(
+        hass, box_entry, {"input4": {"action": "game", "signal": PC}}, {"off_after": 0}
+    )
+    hass.states.async_set(PC, "on")
+    await hass.async_block_till_done()
+    assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
+    assert turn_on == []

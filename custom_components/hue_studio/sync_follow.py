@@ -11,7 +11,8 @@ it in the mode chosen for that input (or just shows it), waking up if it sleeps;
 the current input has lost its picture for a while, the latest other input with one
 takes over.
 
-A screen (a media player) can be linked too: it turns on and switches to the box's
+A screen (a media player) can be linked too, while the box does not follow the TV
+over HDMI CEC itself: it turns on and switches to the box's
 input when a picture appears, and turns off when no followed input has had one for a
 while, unless it shows something else by then. Turned on by hand while the box
 sleeps, it wakes the box on the input with the latest picture.
@@ -148,7 +149,11 @@ class PictureFollower:
 
     @property
     def screen(self) -> dict[str, Any] | None:
-        """The linked screen's settings, if one is linked."""
+        """The linked screen's settings, if one is linked and the box does not follow
+        the TV over HDMI CEC itself."""
+        behavior = self.coordinator.api.behavior
+        if behavior is not None and behavior.cec_powersave:
+            return None
         screen = self.entry.options.get(CONF_SCREEN)
         return screen if screen and screen.get(ATTR_ENTITY_ID) else None
 

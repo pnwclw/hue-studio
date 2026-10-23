@@ -345,6 +345,7 @@ export class BridgesView extends StudioView {
                       })}
                     </div>`
                   : nothing}
+                ${hasFeature(box, "follow") && !device.tv_power ? this.screenRow(box) : nothing}
               </div>`
           : nothing}
         ${settings && hasFeature(box, "follow") ? this.follow(id, box) : nothing}
@@ -395,7 +396,6 @@ export class BridgesView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const follow = box.follow ?? {};
-    const screen = box.screen;
     return html`<h2 class="label">${t("bridges.follow")}</h2>
       <p class="lead small">${t("bridges.follow_hint")}</p>
       <div class="rows">
@@ -405,23 +405,32 @@ export class BridgesView extends StudioView {
             {
               icon: inputIcon(input),
               title: input.name,
-              sub: !rule ? inputStatus(t, input) : rule.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box_sub"),
-              value: t(`bridges.follow_${rule?.action ?? "off"}`),
+              sub: !rule ? inputStatus(t, input) : rule.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_missing"),
+              warn: !!rule && !rule.signal,
+              value: t(`bridges.follow_short_${rule?.action ?? "off"}`),
             },
             () => this.openBoxPart(input.id),
           );
         })}
-        ${navRow(
-          {
-            icon: "mdi:television",
-            title: t("bridges.screen"),
-            sub: t(Object.keys(follow).length ? "bridges.screen_sub" : "bridges.screen_needs_follow"),
-            warn: !!screen && !Object.keys(follow).length,
-            value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none"),
-          },
-          () => this.openBoxPart("screen"),
-        )}
       </div>`;
+  }
+
+  /** The screen the box runs instead of HDMI CEC (shown while CEC is off). */
+  private screenRow(box: SyncBoxInfo): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const screen = box.screen;
+    const followed = Object.keys(box.follow ?? {}).length > 0;
+    return navRow(
+      {
+        icon: "mdi:television",
+        title: t("bridges.screen"),
+        sub: t(followed || !screen ? "bridges.screen_sub" : "bridges.screen_needs_follow"),
+        warn: !!screen && !followed,
+        value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none"),
+      },
+      () => this.openBoxPart("screen"),
+    );
   }
 
   private openBoxPart(part: string): void {
@@ -450,7 +459,7 @@ export class BridgesView extends StudioView {
       ...FOLLOW_ACTIONS.map((action) => ({
         value: action,
         label: t(`bridges.follow_${action}`),
-        sub: t(action === "passthrough" ? "bridges.follow_passthrough_sub" : "bridges.follow_mode_sub"),
+        sub: action === "passthrough" ? t("bridges.follow_passthrough_sub") : undefined,
       })),
     ];
     const entities = (domains: readonly string[]): ChoiceOption[] => {
@@ -497,14 +506,15 @@ export class BridgesView extends StudioView {
         </div>
         <h2 class="label">${t("bridges.follow")}</h2>
         <div class="rows">
-          ${navRow({ icon: "mdi:play-circle-outline", title: t("bridges.follow_action"), value: t(`bridges.follow_${rule?.action ?? "off"}`) }, () =>
+          ${navRow({ icon: "mdi:play-circle-outline", title: t("bridges.follow_action"), value: t(`bridges.follow_short_${rule?.action ?? "off"}`) }, () =>
             this.choose(single(t("bridges.follow_action"), actions, rule?.action ?? "off", (action) => set(action === "off" ? null : { action }))),
           )}
           ${navRow(
             {
               icon: "mdi:eye-outline",
               title: t("bridges.follow_signal"),
-              sub: rule?.signal ? rule.signal : t("bridges.follow_signal_box_sub"),
+              sub: rule?.signal ? rule.signal : rule ? t("bridges.follow_signal_missing") : t("bridges.follow_signal_box_sub"),
+              warn: !!rule && !rule.signal,
               value: rule?.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box"),
             },
             () =>
@@ -522,7 +532,7 @@ export class BridgesView extends StudioView {
             {
               icon: "mdi:power",
               title: t("bridges.follow_wake"),
-              sub: t("bridges.follow_wake_sub"),
+              sub: rule?.wake ? rule.wake : t("bridges.follow_wake_sub"),
               value: rule?.wake ? friendlyName(ctx.hass, rule.wake) : t("bridges.follow_wake_none"),
               disabled: !rule,
             },
