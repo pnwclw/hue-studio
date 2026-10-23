@@ -861,10 +861,14 @@ PLAYER = "media_player.example_player"
 async def _follow(
     hass: HomeAssistant,
     entry: MockConfigEntry,
+    box: FakeBox,
     follow: dict[str, Any],
     screen: dict[str, Any] | None = None,
+    *,
+    cec: bool = False,
 ) -> None:
-    """Set the box up with these options."""
+    """Set the box up with these options; Hue Studio does CEC unless `cec`."""
+    box.state["behavior"]["cecPowersave"] = cec
     options: dict[str, Any] = {CONF_FOLLOW: follow}
     if screen:
         options[CONF_SCREEN] = {"entity_id": SCREEN} | screen
@@ -888,7 +892,7 @@ async def test_follow_signal(
     """An input's signal turning on switches the box to it in its mode at once; the
     box's link of an input it is not on, and states already there, change nothing."""
     hass.states.async_set(PC, "off")
-    await _follow(hass, box_entry, {"input4": {"action": "game", "signal": PC}})
+    await _follow(hass, box_entry, box, {"input4": {"action": "game", "signal": PC}})
     assert box.sent() == []
 
     box.state["hdmi"]["input3"]["status"] = "linked"
@@ -909,7 +913,7 @@ async def test_follow_current_link(
     """Without a signal, the box's own link counts for the input it is on; settings
     from 0.10.0-alpha.5 (the action alone) still work."""
     box.state["hdmi"]["input1"]["status"] = "plugged"
-    await _follow(hass, box_entry, {"input1": "video", "input4": "game"})
+    await _follow(hass, box_entry, box, {"input1": "video", "input4": "game"})
     box.state["hdmi"]["input1"]["status"] = "linked"
     await _poll(hass, box_entry)
     assert box.sent() == [{"hdmiSource": "input1", "mode": "video"}]
@@ -921,7 +925,7 @@ async def test_follow_already_there(
     """A picture on the input already shown in its mode sends nothing."""
     box.state["execution"].update(mode="video", syncActive=True)
     box.state["hdmi"]["input1"]["status"] = "plugged"
-    await _follow(hass, box_entry, {"input1": {"action": "video"}})
+    await _follow(hass, box_entry, box, {"input1": {"action": "video"}})
     box.state["hdmi"]["input1"]["status"] = "linked"
     await _poll(hass, box_entry)
     assert box.sent() == []
@@ -933,7 +937,9 @@ async def test_follow_wakes_box(
     """A sleeping box sees no picture, but a signal wakes it on its input."""
     box.state["execution"]["mode"] = "powersave"
     hass.states.async_set(PLAYER, "off")
-    await _follow(hass, box_entry, {"input1": {"action": "video", "signal": PLAYER}})
+    await _follow(
+        hass, box_entry, box, {"input1": {"action": "video", "signal": PLAYER}}
+    )
     hass.states.async_set(PLAYER, "idle")
     await hass.async_block_till_done()
     assert box.sent() == [{"hdmiSource": "input1", "mode": "video"}]
@@ -949,6 +955,7 @@ async def test_follow_lost_picture(
     await _follow(
         hass,
         box_entry,
+        box,
         {"input1": {"action": "video", "signal": PLAYER}, "input4": {"action": "game"}},
     )
 
@@ -979,7 +986,6 @@ async def test_follow_screen_on(
     hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
 ) -> None:
     """A picture turns the linked screen on, then onto the box's input."""
-    box.state["behavior"]["cecPowersave"] = False
     turn_on = async_mock_service(hass, "media_player", "turn_on")
     select = async_mock_service(hass, "media_player", "select_source")
     hass.states.async_set(SCREEN, "off")
@@ -987,6 +993,7 @@ async def test_follow_screen_on(
     await _follow(
         hass,
         box_entry,
+        box,
         {"input4": {"action": "game", "signal": PC}},
         {"source": "HDMI 3"},
     )
@@ -1008,12 +1015,15 @@ async def test_follow_screen_wakes_box(
 ) -> None:
     """The screen turned on by hand while the box sleeps: the box wakes on the input
     with the latest picture; while it is awake, nothing happens."""
-    box.state["behavior"]["cecPowersave"] = False
     box.state["execution"]["mode"] = "powersave"
     hass.states.async_set(SCREEN, "off")
     hass.states.async_set(PC, "on")
     await _follow(
-        hass, box_entry, {"input4": {"action": "game", "signal": PC}}, {"off_after": 0}
+        hass,
+        box_entry,
+        box,
+        {"input4": {"action": "game", "signal": PC}},
+        {"off_after": 0},
     )
     hass.states.async_set(SCREEN, "on")
     await hass.async_block_till_done()
@@ -1033,13 +1043,13 @@ async def test_follow_screen_off(
 ) -> None:
     """No picture on any followed input for a while: the screen goes off, unless it
     shows something else by then."""
-    box.state["behavior"]["cecPowersave"] = False
     turn_off = async_mock_service(hass, "media_player", "turn_off")
     hass.states.async_set(SCREEN, "on", {"source": "HDMI 3"})
     hass.states.async_set(PC, "on")
     await _follow(
         hass,
         box_entry,
+        box,
         {"input4": {"action": "game", "signal": PC}},
         {"source": "HDMI 3", "off_after": 60},
     )
@@ -1137,7 +1147,9 @@ async def test_follow_sensor_signal(
     """A sensor is a signal too: a PC agent's monitor state, "PowerOff" is none."""
     monitor = "sensor.example_pc_monitor"
     hass.states.async_set(monitor, "PowerOff")
-    await _follow(hass, box_entry, {"input4": {"action": "game", "signal": monitor}})
+    await _follow(
+        hass, box_entry, box, {"input4": {"action": "game", "signal": monitor}}
+    )
     hass.states.async_set(monitor, "Dimmed")
     await hass.async_block_till_done()
     assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
@@ -1153,6 +1165,7 @@ async def test_follow_pause(
     await _follow(
         hass,
         box_entry,
+        box,
         {"input1": {"action": "video", "signal": PLAYER}, "input4": {"action": "game"}},
     )
     box.state["execution"].update(mode="passthrough", syncActive=False)
@@ -1177,14 +1190,13 @@ async def test_follow_box_wakes_screen(
     hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
 ) -> None:
     """The box woken any way turns its screen on (its input left as it is)."""
-    box.state["behavior"]["cecPowersave"] = False
     turn_on = async_mock_service(hass, "media_player", "turn_on")
     select = async_mock_service(hass, "media_player", "select_source")
     box.state["execution"]["mode"] = "powersave"
     box.state["hdmi"]["input1"]["status"] = "plugged"
     hass.states.async_set(SCREEN, "off")
     await _follow(
-        hass, box_entry, {"input1": {"action": "video"}}, {"source": "HDMI 3"}
+        hass, box_entry, box, {"input1": {"action": "video"}}, {"source": "HDMI 3"}
     )
     box.state["execution"]["mode"] = "passthrough"
     await _poll(hass, box_entry)
@@ -1202,7 +1214,7 @@ async def test_set_sync_wakes_source(
     wol = "button.example_wake_on_lan"
     hass.states.async_set(PC, "off")
     await _follow(
-        hass, box_entry, {"input4": {"action": "game", "signal": PC, "wake": wol}}
+        hass, box_entry, box, {"input4": {"action": "game", "signal": PC, "wake": wol}}
     )
     await hass.services.async_call(
         DOMAIN,
@@ -1277,6 +1289,7 @@ async def test_follow_input_picked_by_hand(
     await _follow(
         hass,
         box_entry,
+        box,
         {"input1": {"action": "video"}, "input4": {"action": "game", "signal": PC}},
     )
     box.state["execution"]["hdmiSource"] = "input4"
@@ -1284,17 +1297,25 @@ async def test_follow_input_picked_by_hand(
     assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
 
 
-async def test_follow_no_screen_with_cec(
+async def test_follow_none_with_box_cec(
     hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
 ) -> None:
-    """While the box follows the TV over HDMI CEC, the screen is left to it."""
+    """While the box does HDMI CEC itself, Hue Studio switches, wakes and turns the
+    screen on for nothing."""
     turn_on = async_mock_service(hass, "media_player", "turn_on")
+    press = async_mock_service(hass, "button", "press")
     hass.states.async_set(SCREEN, "off")
     hass.states.async_set(PC, "off")
-    await _follow(
-        hass, box_entry, {"input4": {"action": "game", "signal": PC}}, {"off_after": 0}
-    )
+    rule = {"action": "game", "signal": PC, "wake": "button.example_wake_on_lan"}
+    await _follow(hass, box_entry, box, {"input4": rule}, {"off_after": 0}, cec=True)
     hass.states.async_set(PC, "on")
     await hass.async_block_till_done()
-    assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
-    assert turn_on == []
+    hass.states.async_set(PC, "off")
+    await hass.services.async_call(
+        DOMAIN,
+        "set_sync",
+        {"entity_id": "switch.sync_box_light_sync", "input": "PC"},
+        blocking=True,
+    )
+    assert box.sent() == [{"hdmiSource": "input4"}]
+    assert (turn_on, press) == ([], [])

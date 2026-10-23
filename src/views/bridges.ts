@@ -323,6 +323,8 @@ export class BridgesView extends StudioView {
     const name = box.name || "Sync Box";
     const configure = (change: Record<string, unknown>) => ctx.ws({ type: "hue_studio/sync/configure", entry_id: id, ...change });
     const wifi = wifiKey(device.wifi);
+    // HDMI CEC by Hue Studio (sync_follow.py) rather than by the box: the box does not follow the TV.
+    const studioCec = hasFeature(box, "follow") && !device.tv_power;
     return this.screen(
       this.subHead(t("bridges.box_page"), () => ctx.go("/settings/bridges"), this.saveButton(name, (n) => configure({ name: n }))),
       html`${this.hero("mdi:television-box", name, box.available ? t(statusKey(box)) : t("bridges.box_offline"), settings)}
@@ -335,20 +337,11 @@ export class BridgesView extends StudioView {
                 ${navRow({ icon: "mdi:led-on", title: t("bridges.led"), value: device.led ? t(`bridges.led_${device.led}` as StringKey) : "" }, () =>
                   this.choose(single(t("bridges.led"), LEDS.map((led) => ({ value: led, label: t(`bridges.led_${led}` as StringKey) })), device.led ?? "", (led) => void configure({ led }))),
                 )}
-                ${device.tv_power != null
-                  ? html`<div class="item">
-                      <ha-icon icon="mdi:television"></ha-icon>
-                      <div class="grow">${t("bridges.tv_power")}<div class="dim small">${t("bridges.tv_power_sub")}</div></div>
-                      ${toggle(!!device.tv_power, t("bridges.tv_power"), () => {
-                        haptic("selection");
-                        void configure({ tv_power: !device.tv_power });
-                      })}
-                    </div>`
-                  : nothing}
-                ${hasFeature(box, "follow") && !device.tv_power ? this.screenRow(box) : nothing}
+                ${device.tv_power != null ? this.cecRow(box, configure) : nothing}
+                ${studioCec ? this.screenRow(box) : nothing}
               </div>`
           : nothing}
-        ${settings && hasFeature(box, "follow") ? this.follow(id, box) : nothing}
+        ${settings && studioCec ? this.follow(id, box) : nothing}
         <h2 class="label">${t("bridges.connection")}</h2>
         <div class="rows">
           <div class="item">
@@ -415,7 +408,22 @@ export class BridgesView extends StudioView {
       </div>`;
   }
 
-  /** The screen the box runs instead of HDMI CEC (shown while CEC is off). */
+  /** Who does HDMI CEC: the box itself (it follows the TV), or Hue Studio from Home
+   *  Assistant's entities (sources switch the box and the screen, for devices without CEC). */
+  private cecRow(box: SyncBoxInfo, configure: (change: Record<string, unknown>) => Promise<boolean>): TemplateResult {
+    const { t } = this.ctx;
+    const studio = hasFeature(box, "follow") && !box.device?.tv_power;
+    const options: ChoiceOption[] = [
+      { value: "box", label: t("bridges.cec_box"), sub: t("bridges.cec_box_sub"), icon: "mdi:television-box" },
+      ...(hasFeature(box, "follow") ? [{ value: "studio", label: t("bridges.cec_studio"), sub: t("bridges.cec_studio_sub"), icon: "mdi:home-assistant" }] : []),
+    ];
+    return navRow(
+      { icon: "mdi:hdmi-port", title: t("bridges.cec"), sub: t(studio ? "bridges.cec_studio_row" : "bridges.cec_box_row"), value: t(studio ? "bridges.cec_studio" : "bridges.cec_box") },
+      () => this.choose(single(t("bridges.cec"), options, studio ? "studio" : "box", (who) => void configure({ tv_power: who === "box" }))),
+    );
+  }
+
+  /** The screen Hue Studio runs while it does HDMI CEC. */
   private screenRow(box: SyncBoxInfo): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;

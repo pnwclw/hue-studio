@@ -11,8 +11,11 @@ it in the mode chosen for that input (or just shows it), waking up if it sleeps;
 the current input has lost its picture for a while, the latest other input with one
 takes over.
 
-A screen (a media player) can be linked too, while the box does not follow the TV
-over HDMI CEC itself: it turns on and switches to the box's
+All of this is the home-made HDMI CEC the box's page offers in place of the box's own
+("HDMI CEC: Hue Studio", which turns the box's following of the TV off); while the
+box does CEC itself, nothing here acts.
+
+A screen (a media player) is linked too: it turns on and switches to the box's
 input when a picture appears, and turns off when no followed input has had one for a
 while, unless it shows something else by then. Turned on by hand while the box
 sleeps, it wakes the box on the input with the latest picture.
@@ -91,6 +94,12 @@ SCREEN_OFF = (STATE_OFF, STATE_STANDBY)
 SCREEN_GONE = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
 
+def box_does_cec(coordinator: SyncBoxCoordinator) -> bool:
+    """Whether the box does HDMI CEC itself (follows the TV); else Hue Studio does."""
+    behavior = coordinator.api.behavior
+    return behavior is not None and bool(behavior.cec_powersave)
+
+
 def has_picture(hass: HomeAssistant, entity_id: str | None) -> bool:
     """Whether a signal entity says its source sends a picture."""
     state = hass.states.get(entity_id) if entity_id else None
@@ -149,10 +158,8 @@ class PictureFollower:
 
     @property
     def screen(self) -> dict[str, Any] | None:
-        """The linked screen's settings, if one is linked and the box does not follow
-        the TV over HDMI CEC itself."""
-        behavior = self.coordinator.api.behavior
-        if behavior is not None and behavior.cec_powersave:
+        """The linked screen's settings, if one is linked and Hue Studio does CEC."""
+        if box_does_cec(self.coordinator):
             return None
         screen = self.entry.options.get(CONF_SCREEN)
         return screen if screen and screen.get(ATTR_ENTITY_ID) else None
@@ -246,6 +253,10 @@ class PictureFollower:
         self._watch_pause(rules, pictures)
         if first:
             self._input = self._current()
+            return
+        if box_does_cec(self.coordinator):
+            self._cancel_lost()
+            self._cancel_dark()
             return
 
         if (
@@ -458,6 +469,8 @@ async def async_wake_source(
 ) -> None:
     """Turn an input's source on (its wake entity) unless it sends a picture."""
     rule = follow_rules(coordinator.config_entry.options).get(key)
+    if box_does_cec(coordinator):
+        return
     if not rule or not (wake := rule["wake"]) or has_picture(hass, rule["signal"]):
         return
     domain = wake.split(".")[0]
