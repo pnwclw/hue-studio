@@ -23,7 +23,7 @@ export const SHEET_CSS = css`
   :host(.closing) { background-color: rgba(0, 0, 0, 0); pointer-events: none; }
   .dlg { position: relative; width: 100%; max-width: 440px; max-height: 92dvh; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain;
          padding: 6px 16px calc(16px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
-         border-radius: var(--r-l) var(--r-l) 0 0; background: var(--bg); animation: sheet-in 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
+         border-radius: var(--r-m) var(--r-m) 0 0; background: var(--bg); animation: sheet-in 0.45s cubic-bezier(0.32, 0.72, 0, 1); }
   :host(.closing) .dlg { transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 1, 1); }
   .grabber { width: 36px; height: 5px; margin: 0 auto 8px; border-radius: var(--r-full); background: var(--text-3); }
   .as-head { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-bottom: 12px; }

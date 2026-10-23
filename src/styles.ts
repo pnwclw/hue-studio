@@ -38,9 +38,9 @@ export const CSS = `
   .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .screen-body > .page { padding-top: 10px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
-  .bar.sub .title { flex: 1; min-width: 0; font-size: var(--fs-headline); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar.sub .title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
-  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); }
+  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); letter-spacing: 0.3px; text-transform: uppercase; }
   /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
      title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
@@ -53,7 +53,7 @@ export const CSS = `
   /* Until measured, the bar's own height (padding, 44px row, border), so the first frame doesn't jump. */
   .screen-head:has(> .tab-head:not(.wide)) + .screen-body > .page { padding-top: var(--head-h, calc(max(6px, var(--safe-top)) + 51px)); }
   h1.big.tab-title { margin: 4px 2px 2px; }
-  .tab-head .bar-title { flex: 1; min-width: 0; font-size: var(--fs-headline); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .tab-head .bar-title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                          opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .screen-head.scrolled .bar-title { opacity: 1; transform: none; }
   /* Desktop (HA's sidebar shown): every screen's header is one row as tall as the sidebar's
@@ -71,7 +71,7 @@ export const CSS = `
   .page { container-type: inline-size; max-width: 960px; margin: 0 auto; padding: 0 var(--gutter) 28px; box-sizing: border-box; }
   .topbar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding-top: max(6px, var(--safe-top)); }
   /* Bars stay put while the page scrolls under them. */
-  .page > .topbar { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding-inline: 16px;
+  .page > .topbar { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding-inline: 16px;
                     background: rgba(28, 28, 30, 0.8); -webkit-backdrop-filter: saturate(1.6) blur(18px); backdrop-filter: saturate(1.6) blur(18px); }
   .topbar .grow, .head .grow, .bar .grow, .tab-head .grow { flex: 1; min-width: 0; }
   /* Desktop header of a top-level screen: title and actions in one row, no bar. */
@@ -85,11 +85,11 @@ export const CSS = `
   .round:active { transform: scale(var(--press-round)); }
   .round[hidden] { display: none; }
   .pill { height: var(--pill); padding: 0 16px; border: none; border-radius: var(--r-full); cursor: pointer; font-size: var(--fs-footnote); font-weight: 500;
-          letter-spacing: 0.3px; text-transform: uppercase; background: var(--fill); transition: transform var(--t-press) var(--ease); }
+          background: var(--fill); transition: transform var(--t-press) var(--ease); }
   .pill:active { transform: scale(var(--press-tile)); }
   .pill:disabled { opacity: 0.4; }
   h1.big { margin: 6px 0 0; font-size: var(--fs-large); font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; }
-  h2.label { margin: var(--section-gap) 2px var(--title-gap); font-size: var(--fs-caption); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
+  h2.label { margin: var(--section-gap) var(--text-inset) var(--title-gap); font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
   .empty { margin: 24px 4px; color: var(--text-2); font-size: var(--fs-callout); line-height: 1.5; }
 
   /* lit surfaces: the color layer fades in instead of jumping */
@@ -114,7 +114,7 @@ export const CSS = `
 
   /* toggle: one size everywhere (the master switch's), a small knob well inside the track (the Hue app's look) */
   .toggle { position: relative; width: var(--switch-w); height: var(--control); flex: none; border: none; border-radius: var(--r-full); padding: 0; cursor: pointer;
-            background: var(--fill-strong); transition: background 0.25s var(--ease); }
+            background: var(--switch-off); transition: background 0.25s var(--ease); }
   .toggle::after { content: ""; position: absolute; inset: -8px -4px; }
   .toggle span { position: absolute; top: 4px; left: 4px; width: var(--knob); height: var(--knob); border-radius: 50%; background: #fff;
                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.3s var(--spring), width var(--t-press) var(--ease); }
@@ -125,7 +125,7 @@ export const CSS = `
   .lit .toggle.on { background: rgba(0, 0, 0, 0.22); }
 
   /* brightness slider: a thin track and a small knob (the Hue app's, measured at 430pt) */
-  .slider { position: relative; height: 6px; margin: 16px 2px 2px; border-radius: var(--r-full); cursor: pointer; touch-action: pan-y;
+  .slider { position: relative; height: 8px; margin: 16px 2px 2px; border-radius: var(--r-full); cursor: pointer; touch-action: pan-y;
             background: rgba(255, 255, 255, 0.14); }
   .slider::before { content: ""; position: absolute; inset: -16px 0; }
   .slider .fill { position: absolute; inset: 0 auto 0 0; width: var(--value); border-radius: var(--r-full);
@@ -144,23 +144,23 @@ export const CSS = `
   /* home: room cards */
   .cards { display: grid; gap: var(--card-gap); }
   /* The Hue app's room card: its icon in a column of its own, the name well clear of it. */
-  .card > .row { gap: 16px; }
-  .card > .row > ha-icon { width: 30px; justify-content: center; --mdc-icon-size: 28px; }
+  .card > .row { gap: 27px; }
+  .card > .row > ha-icon { width: 28px; justify-content: center; --mdc-icon-size: 28px; }
   .card > .slider { margin-top: 20px; }
-  .card { padding: 18px 18px 14px; border-radius: var(--r-xl); cursor: pointer; box-shadow: var(--shadow-raised);
+  .card { padding: 18px 18px 14px; border-radius: var(--r-m); cursor: pointer; box-shadow: var(--shadow-raised);
           transition: transform var(--t-press) var(--ease), color 0.3s var(--ease); }
   .card:active { transform: scale(var(--press-card)); }
   .card.unavailable { opacity: 0.45; }
   .row { display: flex; align-items: center; gap: 12px; }
   .row .text { flex: 1; min-width: 0; }
-  .row .name { font-size: var(--fs-name); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .name { font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .meta { display: flex; align-items: center; gap: 8px; font-size: var(--fs-caption); opacity: 0.7; min-height: 0; }
   .meta:empty { display: none; }
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 
   /* tab bar */
   nav.tabs { flex: none; display: flex; justify-content: center; gap: 4px; padding: 4px 8px max(4px, var(--safe-bottom));
-             background: rgba(18, 18, 20, 0.94); border-top: 1px solid var(--hairline); }
+             background: var(--bar-bottom); border-top: 1px solid var(--hairline); }
   nav.tabs[hidden] { display: none; }
   /* The on-screen keyboard is up (fitToViewport): it covers the tab bar and the home indicator,
      and dialogs move up so their fields stay above it. */
@@ -168,7 +168,7 @@ export const CSS = `
   :host([keyboard]) nav.tabs:not(.top) { display: none; }
   :host([keyboard]) .sheet { align-items: flex-start; padding-top: max(16px, calc(var(--safe-top) + 8px)); }
   nav.tabs button { flex: 0 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px; border: none;
-                    background: none; cursor: pointer; color: var(--text-2); font-size: var(--fs-tab); letter-spacing: 0.4px; text-transform: uppercase;
+                    background: none; cursor: pointer; color: var(--tab-off); font-size: var(--fs-tab); letter-spacing: 0.4px; text-transform: uppercase;
                     transition: color 0.2s; }
   nav.tabs button svg { width: 26px; height: 26px; }
   nav.tabs button.on { color: var(--text); }
@@ -176,7 +176,7 @@ export const CSS = `
   nav.tabs.top { order: -1; gap: 4px;
                  padding: max(8px, var(--safe-top)) 12px 8px; border-top: none; border-bottom: 1px solid var(--hairline); }
   nav.tabs.top button { flex: 1 1 0; min-width: 0; flex-direction: row; justify-content: center; gap: 5px; padding: 7px 8px;
-                        border-radius: var(--r-xl); font-size: var(--fs-caption); letter-spacing: 0; text-transform: none;
+                        border-radius: var(--r-m); font-size: var(--fs-caption); letter-spacing: 0; text-transform: none;
                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   nav.tabs.top button svg { flex: none; }
   nav.tabs.top button svg { width: 18px; height: 18px; }
@@ -185,11 +185,11 @@ export const CSS = `
   main.under-footer .topbar, main.under-footer .screen-head { padding-top: 6px; }
 
   /* room */
-  .hero { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: 0 16px 14px; border-radius: 0 0 var(--r-3xl) var(--r-3xl); box-shadow: var(--shadow-raised); }
+  .hero { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 0 16px 14px; border-radius: 0 0 var(--r-3xl) var(--r-3xl); box-shadow: var(--shadow-raised); }
   /* Its bar row sits where every other screen's is (the 44px row of .bar), the gap below kept. */
   .hero .topbar { min-height: 44px; padding-bottom: 8px; }
   main.wide .hero .topbar { padding-bottom: 0; }
-  .hero .title { flex: 1; min-width: 0; font-size: var(--fs-name); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hero .title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Dragging the brightness: the bar shows just the percentage (the Hue app's). */
   .hero .topbar > :not(.title) { transition: opacity 0.2s var(--ease); }
   .hero .topbar.adjusting > :not(.title) { opacity: 0; pointer-events: none; }
@@ -205,7 +205,7 @@ export const CSS = `
   .hero.dark-text .round { background: rgba(0, 0, 0, 0.1); }
   .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .badges:empty { display: none; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: var(--r-l); cursor: pointer;
+  .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: var(--r-m); cursor: pointer;
            font-size: var(--fs-caption); font-weight: 500; background: rgba(0, 0, 0, 0.22); transition: background 0.2s, transform var(--t-press) var(--ease); }
   .badge:active { transform: scale(var(--press-tile)); }
   .badge svg { width: 16px; height: 16px; }
@@ -214,15 +214,15 @@ export const CSS = `
   /* Cards (scenes, lights, sensors; tileCard): the picture at a fixed distance from the top, a text
      block of fixed height with the name (and lines under it) centered in it, and an optional
      switch zone of its own at the bottom (the Hue app's). Every card is as tall as any other. */
-  .tile-card { --top: 14px; --art: 44px; --gap: 6px; --text-h: 52px; --zone: 52px; --icon-y: calc(var(--top) + var(--art) / 2);
+  .tile-card { --top: 12px; --art: 48px; --gap: 2px; --text-h: 42px; --zone: 56px; --icon-y: calc(var(--top) + var(--art) / 2);
                position: relative; box-sizing: border-box; display: flex; flex-direction: column; align-items: center;
-               min-width: 0; padding: var(--top) 6px 8px; border: none; border-radius: var(--r-xl); cursor: pointer; text-align: center;
+               min-width: 0; padding: var(--top) 6px 6px; border: none; border-radius: var(--r-m); cursor: pointer; text-align: center;
                background: var(--surface); box-shadow: var(--shadow-raised);
                transition: transform var(--t-press) var(--ease), color 0.3s var(--ease); }
-  .tile-card.switchable { padding-bottom: calc(var(--zone) + 8px); }
+  .tile-card.switchable { padding-bottom: var(--zone); }
   .tile-card:active { transform: scale(var(--press-tile)); }
   .tile-card > .art { flex: none; width: 100%; height: var(--art); display: flex; align-items: center; justify-content: center; }
-  .tile-card > .art ha-icon { --mdc-icon-size: 34px; }
+  .tile-card > .art ha-icon { --mdc-icon-size: var(--art); }
   .tile-card > .art .dot { width: var(--art); height: var(--art); border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                            box-shadow: var(--shadow-dot); transition: transform 0.25s var(--spring); }
   .tile-card:active > .art .dot { transform: scale(var(--press-round)); }
@@ -235,7 +235,7 @@ export const CSS = `
   .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: var(--fs-caption); line-height: 1.2; opacity: 0.75; white-space: nowrap;
                     overflow: hidden; text-overflow: ellipsis; }
   .tile-card > .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: var(--zone); display: flex; align-items: center;
-                              justify-content: center; border-radius: 0 0 var(--r-xl) var(--r-xl); background: rgba(0, 0, 0, 0.16);
+                              justify-content: center; border-radius: 0 0 var(--r-m) var(--r-m); background: rgba(0, 0, 0, 0.16);
                               border-top: 1px solid rgba(255, 255, 255, 0.1); }
   .switch-zone.inert { pointer-events: none; }
   .switch-zone.inert .toggle { opacity: 0.35; }
@@ -246,11 +246,11 @@ export const CSS = `
   .light.selected { box-shadow: var(--shadow-raised); outline: 2px solid var(--ring); outline-offset: 3px; }
   /* The Hue app's "Controls" tiles (sensors): picture and switch on top, name and status below. */
   .control-row { display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: 12px; overflow-x: auto;
-                 margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+                 margin: -8px calc(-1 * var(--gutter)); padding: 8px var(--gutter); scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
                  overscroll-behavior-x: contain; }
   .control-row::-webkit-scrollbar { display: none; }
   .control-card { box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; height: 106px; padding: 14px 14px 12px;
-                  border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-raised); cursor: pointer;
+                  border-radius: var(--r-m); background: var(--surface); box-shadow: var(--shadow-raised); cursor: pointer;
                   scroll-snap-align: start; transition: transform var(--t-press) var(--ease); }
   .control-card:active { transform: scale(var(--press-tile)); }
   .control-card .top { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: auto; }
@@ -263,7 +263,7 @@ export const CSS = `
   /* Rows that scroll sideways keep room for their cards' shadows inside (8px) and give it
      back outside, so every section's title sits as far from its cards as any other's. */
   .light-row { display: grid; grid-auto-flow: column; grid-auto-columns: var(--light-tile); gap: var(--card-gap); overflow-x: auto;
-               margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+               margin: -8px calc(-1 * var(--gutter)); padding: 8px var(--gutter); scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
                overscroll-behavior-x: contain; }
   .light-row::-webkit-scrollbar { display: none; }
   .light-row .tile-card { scroll-snap-align: start; }
@@ -271,8 +271,7 @@ export const CSS = `
   .light.busy .switch-zone.inert .toggle { opacity: 1; }
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
-    .tile-card { --top: 10px; --art: 38px; --gap: 4px; --text-h: 48px; --zone: 48px; }
-    .tile-card > .art ha-icon { --mdc-icon-size: 30px; }
+    .tile-card { --top: 10px; --art: 42px; --gap: 2px; --text-h: 40px; --zone: 50px; }
     .tile-card .name { font-size: var(--fs-callout); }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
     .controls { margin-bottom: 12px; }
@@ -299,23 +298,23 @@ export const CSS = `
   .colorview .screen-head { background: none; border: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .cv-bar { position: relative; display: flex; align-items: center; gap: 8px; min-height: 46px; }
   .cv-bar .grow { flex: 1; min-width: 0; }
-  .cv-bar .bar-title { text-align: center; font-size: var(--fs-headline); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .cv-bar .bar-title { text-align: center; font-size: var(--fs-body); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                        opacity: 0; transform: translateY(6px); transition: opacity 0.2s, transform 0.25s var(--ease); }
   .cv-bar.scrolled .bar-title { opacity: 1; transform: none; }
   .colorview .screen-head:has(.cv-bar.scrolled) { background: rgba(22, 22, 24, 0.82); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
-  .fx-title { margin: 8px 0 18px; font-size: var(--fs-display); font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; }
+  .fx-title { margin: 8px 0 18px; font-size: var(--fs-large); font-weight: 700; letter-spacing: -0.6px; line-height: 1.1; }
   .menu-scrim { position: fixed; inset: 0; z-index: 9; }
-  .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: var(--r-l);
+  .menu { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; min-width: 220px; padding: 6px; border-radius: var(--r-m);
           background: rgba(44, 44, 46, 0.97); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
           box-shadow: var(--shadow-overlay); transform-origin: top left; animation: menu-in 0.2s var(--spring); }
   .menu button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border: none; border-radius: var(--r-s);
-                 background: none; color: var(--text); font-size: var(--fs-name); text-align: left; cursor: pointer; }
+                 background: none; color: var(--text); font-size: var(--fs-body); text-align: left; cursor: pointer; }
   .menu button:active { background: rgba(255, 255, 255, 0.1); }
   .menu svg { width: 20px; height: 20px; opacity: 0.85; }
   @keyframes menu-in { from { transform: scale(0.85); opacity: 0; } }
   /* Brightness: a button you drag along, its value above it (the Hue app's). */
   .bri { position: relative; margin-left: auto; }
-  .bri-value { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); text-align: center; font-size: var(--fs-micro); letter-spacing: 1.5px;
+  .bri-value { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); text-align: center; font-size: var(--fs-tab); letter-spacing: 1.5px;
                color: var(--text-2); font-variant-numeric: tabular-nums; }
   .bri-pill { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; width: 72px; height: 48px;
               padding: 0; border: none; border-radius: var(--r-full); background: rgba(60, 60, 64, 0.7); color: #fff; cursor: pointer;
@@ -359,7 +358,7 @@ export const CSS = `
   .colorview .page:has(> .wheel-wrap) { height: 100%; }
   .colorview .wheel-wrap { container-type: size; min-height: 240px; padding: 20px 0 36px; }
   .colorview .wheel { width: min(100cqw, 100cqh, 440px); }
-  .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; padding: 14px 16px max(10px, var(--safe-bottom));
+  .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 14px var(--gutter) max(10px, var(--safe-bottom));
           background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 14px); }
   .colorbody .dock { position: static; margin: 0; padding: 0; background: none; }
   .wheel-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 0 8px; }
@@ -411,7 +410,7 @@ export const CSS = `
   .style-sheet .label { margin: 18px 16px 10px; }
   .style-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
   .style-modes button { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border: none;
-                        border-radius: var(--r-l); background: var(--surface-2); color: var(--text); cursor: pointer; font-size: var(--fs-caption);
+                        border-radius: var(--r-m); background: var(--surface-2); color: var(--text); cursor: pointer; font-size: var(--fs-caption);
                         font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; box-shadow: var(--shadow-raised);
                         transition: background 0.2s, color 0.2s, transform var(--t-press) var(--ease); }
   .style-modes button:active { transform: scale(var(--press-tile)); }
@@ -437,25 +436,25 @@ export const CSS = `
   .modes .m-effects::before { content: none; }
   .modes .sep { width: 1px; height: 22px; margin: 0 2px; background: rgba(255, 255, 255, 0.2); }
   .bright { flex: 1; min-width: 180px; }
-  .bright .value { text-align: right; font-size: var(--fs-micro); letter-spacing: 1px; color: var(--text-2); margin: 0 2px -10px; min-height: 13px; }
+  .bright .value { text-align: right; font-size: var(--fs-tab); letter-spacing: 1px; color: var(--text-2); margin: 0 2px -10px; min-height: 13px; }
   .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: none; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--r-xl); border: 1.5px solid transparent;
+  .chip { flex: none; display: flex; align-items: center; gap: 6px; height: var(--control); padding: 0 12px; border-radius: var(--r-full); border: 2px solid transparent;
           cursor: pointer; background: var(--surface); font-size: var(--fs-footnote); font-weight: 500; transition: border-color 0.2s, background 0.2s; }
   .chip ha-icon { --mdc-icon-size: 16px; }
-  .chip.on { border-color: var(--selected); }
+  .chip.on { border-color: var(--accent); }
   .chip .swatch { width: 10px; height: 10px; border-radius: 50%; background: var(--swatch, #555); transition: background 0.3s; }
 
   /* effects (inside the color view) */
   .colorview hue-studio-effects { flex: 1; }
   .effects .label:first-child { margin-top: 6px; }
   .fx-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
-            margin: 0 -16px 0; padding: 2px 16px 18px; scroll-padding: 0 16px; scrollbar-width: none; scroll-snap-type: x proximity;
+            margin: 0 calc(-1 * var(--gutter)) 0; padding: 2px var(--gutter) 18px; scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
             overscroll-behavior-x: contain; }
   .fx-row::-webkit-scrollbar { display: none; }
   .fx { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border: 2px solid transparent;
         box-shadow: var(--shadow-raised);
-        border-radius: var(--r-l); background: var(--surface); cursor: pointer; scroll-snap-align: start; text-align: center;
+        border-radius: var(--r-m); background: var(--surface); cursor: pointer; scroll-snap-align: start; text-align: center;
         transition: transform var(--t-press) var(--ease), border-color 0.2s; }
   .fx:active { transform: scale(var(--press-tile)); }
   .fx.on { border-color: var(--selected); }
@@ -465,14 +464,14 @@ export const CSS = `
   .fx.create { background: transparent; border: 2px solid var(--surface-2); }
   .fx.create .art.plus { display: flex; align-items: center; justify-content: center; background: var(--surface-2); box-shadow: none; }
   .fx-sheet { max-width: 440px; }
-  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-sheet); font-size: var(--fs-name); font-weight: 500; }
+  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-row); font-size: var(--fs-body); font-weight: 500; }
   .sheet-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fx-head { padding: 16px 16px 4px; }
   .fx-head .art { display: block; width: 56px; height: 56px; border-radius: 50%; box-shadow: var(--shadow-dot); }
   .fx-head h3 { margin: 12px 0 0; font-size: var(--fs-title-2); font-weight: 700; letter-spacing: -0.3px; }
   .fx-sheet .label { margin: 18px 16px 8px; }
-  .rows { border-radius: var(--r-l); background: var(--surface); overflow: hidden; }
-  .fx-sheet .rows { border-radius: 0; background: var(--surface-sheet); }
+  .rows { border-radius: var(--r-m); background: var(--surface-row); overflow: hidden; }
+  .fx-sheet .rows { border-radius: 0; background: var(--surface-row); }
   .rows .item { display: flex; align-items: center; gap: 12px; min-height: var(--row-h-compact); padding: 10px 16px; box-sizing: border-box; font-size: var(--fs-body); }
   .rows .item + .item { border-top: 1px solid var(--separator); }
   .rows .item.col { flex-direction: column; align-items: stretch; gap: 0; padding-bottom: 14px; }
@@ -500,7 +499,7 @@ export const CSS = `
   .screen-head.scene-head { background: rgba(255, 255, 255, 0.07); border-bottom-color: var(--hairline); }
   .scene-top { padding: 16px 2px 6px; }
   .scene-top .name-row { margin: 14px 0 12px; }
-  .scene-top h1.big { font-size: var(--fs-title); }
+  .scene-top h1.big { font-size: var(--fs-large); }
   .scene-top .round.rename { background: rgba(255, 255, 255, 0.14); color: var(--text); }
   .scene-edit .dot.big { width: 52px; height: 52px; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                          box-shadow: var(--shadow-dot); }
@@ -520,11 +519,11 @@ export const CSS = `
                 font-weight: 700; color: inherit; background: rgba(0, 0, 0, 0.25); outline: none; }
   .hero.dark-text .name-input { background: rgba(255, 255, 255, 0.4); }
   .section-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
-  .section-head h2.label { margin: 0 2px; }
+  .section-head h2.label { margin: 0 var(--text-inset); }
   /* The room's bridge, with several bridges: next to "Lights". */
   .move-steps .step-no svg { width: 14px; height: 14px; }
   .move-steps .item.dim { color: var(--text-2); }
-  .power-cycle { display: flex; flex-direction: column; align-items: center; margin: 18px 0 14px; padding: 20px 16px; border-radius: var(--r-xl);
+  .power-cycle { display: flex; flex-direction: column; align-items: center; margin: 18px 0 14px; padding: 20px 16px; border-radius: var(--r-m);
     background: var(--info-tint); text-align: center; }
   .power-cycle > ha-icon { --mdc-icon-size: 40px; color: var(--info); }
   .power-cycle .link-title { margin: 10px 0 0; }
@@ -561,12 +560,12 @@ export const CSS = `
   @keyframes field-in { from { opacity: 0; transform: scaleX(0.96); } }
   .search-field svg { width: 18px; height: 18px; flex: none; }
   .search-field .q { flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0; border: none; background: none; outline: none;
-                     font: inherit; font-size: var(--fs-name); color: var(--text); }
+                     font: inherit; font-size: var(--fs-body); color: var(--text); }
   .search-field .q::placeholder { color: var(--text-2); }
   .tab-head.wide .search-field { flex: 0 1 260px; margin: 0; }
-  .tiles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 2), auto); gap: 10px;
-           grid-auto-columns: calc((100% - 20px) / 2.4); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
-           margin: 0 -16px; padding: 0 16px 2px; scroll-padding: 0 16px; overscroll-behavior-x: contain; }
+  .tiles { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 2), auto); gap: var(--tile-gap);
+           grid-auto-columns: calc((100% - 2 * var(--tile-gap)) / 2.6); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+           margin: 0 calc(-1 * var(--gutter)); padding: 0 var(--gutter) 2px; scroll-padding: 0 var(--gutter); overscroll-behavior-x: contain; }
   .tiles::-webkit-scrollbar { display: none; }
   .tile { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-m); overflow: hidden; scroll-snap-align: start; cursor: pointer;
           background: var(--surface) center / cover no-repeat; box-shadow: var(--shadow-flat); transition: transform var(--t-press) var(--ease); }
@@ -584,13 +583,13 @@ export const CSS = `
   /* scene sheet / dialogs */
   .sheet { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px;
            background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade 0.2s ease; }
-  .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: var(--r-2xl); background: var(--surface);
+  .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: var(--r-2xl); background: var(--surface-row);
                 box-shadow: var(--shadow-overlay); animation: pop 0.3s var(--spring); }
-  .sheet .pic { position: relative; aspect-ratio: 16 / 10; background: var(--surface-sheet) center / cover no-repeat; }
+  .sheet .pic { position: relative; aspect-ratio: 16 / 10; background: var(--surface-row) center / cover no-repeat; }
   .sheet .pic::after { content: ""; position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(0, 0, 0, 0.5)); }
   .sheet .pic h3 { position: absolute; left: 16px; right: 56px; bottom: 12px; z-index: 1; margin: 0; font-size: var(--fs-title-2); font-weight: 700; }
   .sheet .pic .round { position: absolute; top: 12px; right: 12px; z-index: 1; background: rgba(120, 120, 124, 0.75); }
-  .sheet .dots { display: flex; align-items: center; padding: 12px 16px; background: var(--surface-sheet); }
+  .sheet .dots { display: flex; align-items: center; padding: 12px 16px; background: var(--surface-row); }
   .sheet .dots i { width: 34px; height: 34px; border-radius: 50%; margin-left: -9px; box-shadow: -3px 0 6px rgba(0, 0, 0, 0.3); }
   .sheet .dots i:first-child { margin-left: 0; box-shadow: none; }
   .sheet .actions { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; }
@@ -628,7 +627,7 @@ export const CSS = `
   .sync-body.disabled { opacity: 0.4; pointer-events: none; }
   .sync-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .mode-tile { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 8px;
-               padding: 16px 6px 14px; border: 2px solid transparent; border-radius: var(--r-l); cursor: pointer; background: var(--surface);
+               padding: 16px 6px 14px; border: 2px solid transparent; border-radius: var(--r-m); cursor: pointer; background: var(--surface);
                font-size: var(--fs-callout); font-weight: 500; transition: border-color 0.2s, transform var(--t-press) var(--ease); }
   .mode-tile::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 0.4s var(--ease);
                        background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3)); }
@@ -647,7 +646,7 @@ export const CSS = `
   .seg button.on { background: var(--segment-on); font-weight: 500; box-shadow: var(--shadow-flat); }
   .grid.inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-  .palette { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: var(--r-l); border: 1.5px solid transparent;
+  .palette { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: var(--r-m); border: 1.5px solid transparent;
              background: var(--surface); cursor: pointer; font-size: var(--fs-footnote); text-align: left; }
   .palette.on { border-color: var(--selected); }
   .palette .art { width: 34px; height: 34px; flex: none; border-radius: 50%; }
@@ -664,7 +663,7 @@ export const CSS = `
   /* "Add devices": what is added, the steps to get it ready, the search. */
   .kind-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px; }
   .kind-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 100px; padding: 14px; border: none;
-               border-radius: var(--r-l); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
+               border-radius: var(--r-m); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
                transition: transform var(--t-press) var(--ease); }
   .kind-tile:active { transform: scale(var(--press-tile)); }
   .kind-tile ha-icon { --mdc-icon-size: 28px; margin-bottom: 6px; color: var(--text); }
@@ -696,7 +695,7 @@ export const CSS = `
   .rows .item.fresh { animation: pop 0.35s var(--ease); }
   .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
   .item.col .field { margin-top: 10px; }
-  .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--r-l);
+  .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--r-m);
                 cursor: pointer; text-align: left; background: var(--surface); box-shadow: var(--shadow-flat);
                 transition: transform var(--t-press) var(--ease), box-shadow 0.2s; }
   .input-tile:active { transform: scale(var(--press-tile)); }
@@ -715,7 +714,7 @@ export const CSS = `
   .on > .radio { border: 7px solid var(--accent); }
   .sync-cards { display: grid; gap: 10px; margin-top: 16px; }
   .sync-card { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; gap: 12px; padding: 12px 14px;
-               border-radius: var(--r-l); cursor: pointer; background: var(--surface); box-shadow: var(--shadow-flat); }
+               border-radius: var(--r-m); cursor: pointer; background: var(--surface); box-shadow: var(--shadow-flat); }
   .sync-card .text { flex: 1; min-width: 0; }
   .sync-card .name { font-size: var(--fs-body); font-weight: 500; }
   .sync-card .status { font-size: var(--fs-footnote); opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -724,7 +723,7 @@ export const CSS = `
   .sync-card.syncing .toggle.on { background: rgba(0, 0, 0, 0.3); }
   /* A room's scenes, the Hue app's: columns of two that scroll sideways, cards as wide as the
      light cards; narrow columns beside the active scene (edit, "⋯") and the suggestion (shuffle). */
-  .scene-cols { overflow-x: auto; margin: -8px -16px; padding: 8px 16px; scroll-padding: 0 16px; scrollbar-width: none;
+  .scene-cols { overflow-x: auto; margin: -8px calc(-1 * var(--gutter)); padding: 8px var(--gutter); scroll-padding: 0 var(--gutter); scrollbar-width: none;
                 scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
   .scene-cols::-webkit-scrollbar { display: none; }
   /* A room without scenes, the Hue app's: what scenes are, then a suggestion and the gallery, centered. */
@@ -734,8 +733,8 @@ export const CSS = `
   .first-scene-cards { display: flex; align-items: stretch; justify-content: center; gap: 12px; }
   .first-scene-cards .tile-card { width: var(--light-tile); }
   .first-scene-cards .scene-side { align-self: center; height: auto; }
-  .scene-grid { display: grid; grid-template-columns: max-content max-content; gap: 12px 10px; width: max-content; }
-  .scene-line { display: flex; gap: 10px; }
+  .scene-grid { display: grid; grid-template-columns: max-content max-content; gap: var(--tile-gap); width: max-content; }
+  .scene-line { display: flex; gap: var(--tile-gap); }
   .scene-cols .tile-card { width: var(--light-tile); }
   .scene-cell { display: flex; scroll-snap-align: start; }
   /* The active scene's buttons (and the shuffle) come in softly while the cards slide aside. */
@@ -772,7 +771,7 @@ export const CSS = `
 
   /* rooms and zones */
   .notice { display: flex; align-items: center; gap: 10px; width: 100%; margin: 14px 0 0; padding: 12px 14px; border: none;
-            border-radius: var(--r-l); cursor: pointer; text-align: left; font-size: var(--fs-callout); line-height: 1.35;
+            border-radius: var(--r-m); cursor: pointer; text-align: left; font-size: var(--fs-callout); line-height: 1.35;
             background: var(--info-tint); }
   .notice svg { flex: none; color: var(--info); }
   .notice .grow { flex: 1; min-width: 0; }
@@ -791,7 +790,7 @@ export const CSS = `
   .rule-row .chevron { flex: none; opacity: 0.5; }
   .season-state { flex: none; font-size: var(--fs-caption); font-weight: 500; color: var(--text-2); }
   .season-state.on { color: var(--ok); }
-  .lead { margin: 0 2px 10px; font-size: var(--fs-callout); line-height: 1.45; color: var(--text-2); }
+  .lead { margin: 0 var(--text-inset) 10px; font-size: var(--fs-callout); line-height: 1.45; color: var(--text-2); }
   .lead.small { margin-top: 12px; font-size: var(--fs-footnote); }
   .text-link { display: inline; margin-left: 4px; padding: 0; border: none; background: none; cursor: pointer; color: var(--info); font-size: inherit; }
   .rows + .rows { margin-top: 10px; }
@@ -808,7 +807,7 @@ export const CSS = `
   .rooms-page .center { margin-top: 18px; }
   .sheet .box.zone-editor { width: min(100%, 440px); }
   .zone-editor h2.label { margin: 18px 16px 8px; }
-  .zone-editor .rows { border-radius: 0; background: var(--surface-sheet); }
+  .zone-editor .rows { border-radius: 0; background: var(--surface-row); }
   /* A check: one round tick box everywhere (rows, choice lists, the light picker's rooms: all or some). */
   :is(.check, .pick-check) { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; box-sizing: border-box;
                              border: 1.5px solid var(--text-3); border-radius: 50%; color: #fff; transition: background 0.2s, border 0.2s; }
@@ -825,12 +824,12 @@ export const CSS = `
   .sensor-hero { padding: 14px 2px 4px; }
   .sensor-hero .pic { display: block; --mdc-icon-size: 44px; }
   .sensor-hero .name-row { margin: 10px 0 10px; }
-  .sensor-hero h1.big { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-title); }
+  .sensor-hero h1.big { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-large); }
   .sensor-edit .rows { margin-top: 16px; }
   .sensor-edit h2.label + .rows { margin-top: 0; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
   .round.plus-blue { display: flex; align-items: center; justify-content: center; width: var(--control); height: var(--control); background: var(--accent); color: #fff; }
-  .sensor-sheet .rows { border-radius: var(--r-m); background: var(--surface-sheet); }
+  .sensor-sheet .rows { border-radius: var(--r-m); background: var(--surface-row); }
   .sensor-sheet .form-body { padding-bottom: 16px; }
   .sensor-sheet .hint { margin: 0 2px 12px; font-size: var(--fs-body); }
   /* QR scanner sheet (views/qr-scan.ts): the camera, a frame to aim with, what was read */
@@ -843,7 +842,7 @@ export const CSS = `
   .qr-sheet .center { padding: 0 16px 16px; }
   .sensor-sheet .tick { display: flex; color: var(--accent); }
   .sensor-sheet .big-value { margin: 4px 2px 10px; font-size: var(--fs-title); font-weight: 700; }
-  .sensor-sheet .sheet-bar { padding: 12px 16px; font-size: var(--fs-name); }
+  .sensor-sheet .sheet-bar { padding: 12px 16px; font-size: var(--fs-body); }
   .sensor-sheet .sheet-bar .pill.save { padding: 0 16px; }
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
@@ -860,15 +859,15 @@ export const CSS = `
   .scene-pick h2.label { margin: 8px 18px 8px; }
   .scene-pick .target-row { display: flex; align-items: center; gap: 24px; width: calc(100% - 32px); margin: 0 16px 18px; min-height: 68px;
                             padding: 0 20px; box-sizing: border-box; border: none; border-radius: var(--r-m); background: var(--surface-2); color: var(--text);
-                            font: inherit; font-size: var(--fs-name); text-align: left; cursor: pointer; box-shadow: var(--shadow-raised); }
+                            font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; box-shadow: var(--shadow-raised); }
   .scene-pick .target-row ha-icon { --mdc-icon-size: 28px; }
   .scene-pick .actions { background: var(--bg); padding: 16px; }
   .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4); }
   /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
   .sheet.menu.bottom { padding: 0 10px calc(10px + var(--safe-bottom)); }
   .sheet.menu.bottom .box { border-radius: var(--r-2xl); }
-  .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: var(--surface); }
-  .action-sheet button { min-height: 56px; border: none; background: none; color: var(--text); font: inherit; font-size: var(--fs-headline); cursor: pointer; }
+  .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: var(--surface-row); }
+  .action-sheet button { min-height: 56px; border: none; background: none; color: var(--text); font: inherit; font-size: var(--fs-body); cursor: pointer; }
   .action-sheet button:active { background: var(--hairline); }
   .action-sheet button.danger { color: var(--danger); }
   .action-sheet button.cancel { border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: var(--fs-body); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -902,7 +901,7 @@ export const CSS = `
   .sens-try.calibrating .dot { animation: calibrate 1.2s ease-in-out infinite; }
   @keyframes calibrate { 50% { opacity: 0.3; transform: scale(0.8); } }
   @container (max-width: 599px) {
-    .sensor-edit .rows, .scene-edit .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+    .sensor-edit .rows, .scene-edit .rows { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }
   }
   /* Settings → Devices, like the Hue app's: kinds with their counts, then a kind's devices by
      room under a search field and filters; big pictures, "Unreachable" in orange, separators
@@ -916,7 +915,7 @@ export const CSS = `
   .devices-page h2.label + .rows { margin-top: 0; }
   .rows.device-list .item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rows.device-list .item .small.warn { font-weight: 500; }
-  .rows.device-list .item .value { font-size: var(--fs-callout); color: var(--text-2); }
+  .rows.device-list .item .value { color: var(--text-2); }
   .rows.device-list .item .dot-badge.warn { background: var(--warn); }
   .devices-page .device-search { display: flex; height: 38px; margin-top: 12px; padding: 0 14px; border-radius: var(--r-full); }
   :is(.devices-page, .daylight-page) .section-head { margin: 22px 2px 8px; }
@@ -924,21 +923,21 @@ export const CSS = `
   .daylight-page .chips.filters + .hint { margin-top: 12px; }
   .daylight-page .scene-tiles { margin-top: 12px; }
   .chips.filters { gap: 8px; padding-top: 2px; }
-  .chip.filter-chip { height: 30px; gap: 2px; padding: 0 6px 0 12px; border-radius: var(--r-full); border: none; background: var(--fill);
-                      font-size: var(--fs-caption); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+  .chip.filter-chip { height: var(--control); gap: 2px; padding: 0 6px 0 12px; border-radius: var(--r-full); border: none; background: var(--fill);
+                      font-size: var(--fs-footnote); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
   .chip.filter-chip span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip.filter-chip ha-icon { --mdc-icon-size: 18px; }
   .chip.filter-chip.on { background: var(--accent); }
   @container (max-width: 599px) {
-    .rows.device-list { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+    .rows.device-list { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }
   }
   /* A device's settings ("Light settings"): the sensor page's layout, a note, "Delete". */
   .sensor-hero > .small.warn { margin-top: -4px; font-size: var(--fs-footnote); font-weight: 500; }
   .device-edit .rows .item .value { max-width: 50%; text-align: right; }
   /* "Delete" at the bottom of an editor: the pill, outlined in red. */
-  .delete-btn { min-width: 96px; height: var(--pill); padding: 0 22px; border: 1.5px solid var(--danger); border-radius: var(--r-full); cursor: pointer;
-                background: var(--danger-tint); color: var(--text); font: inherit; font-size: var(--fs-footnote); font-weight: 500; letter-spacing: 0.3px;
-                text-transform: uppercase; transition: transform var(--t-press) var(--ease), background 0.2s; }
+  .delete-btn { min-width: 80px; height: var(--pill); padding: 0 22px; border: 2px solid var(--danger); border-radius: var(--r-full); cursor: pointer;
+                background: var(--danger-tint); color: var(--text); font: inherit; font-size: var(--fs-footnote); font-weight: 500;
+                transition: transform var(--t-press) var(--ease), background 0.2s; }
   .delete-btn:active { transform: scale(var(--press-tile)); }
   .delete-btn.confirm { border-color: var(--danger-fill); background: var(--danger-fill); }
   .delete-btn:disabled { opacity: 0.5; }
@@ -965,14 +964,14 @@ export const CSS = `
   .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); }
   .auto-list + .rows { margin-top: 10px; }
   /* An automation's card, the Hue app's: 86px tall, a 32px icon, the text from 72px, 17px over 15px. */
-  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 86px; padding: 0 16px 0 0; box-sizing: border-box;
-               border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-flat); }
+  .auto-card { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 0 16px 0 0; box-sizing: border-box;
+               border-radius: var(--r-m); background: var(--surface); box-shadow: var(--shadow-flat); }
   .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 24px; padding: 14px 0 14px 16px;
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 32px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-headline); font-weight: 500; line-height: 1.25; }
-  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); line-height: 1.3; color: var(--text-2); }
+  .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 500; line-height: 1.25; }
+  .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-footnote); line-height: 1.3; color: var(--text-2); }
   .auto-card .start { flex: none; width: var(--round-l); height: var(--round-l); background: var(--fill-light); color: var(--text); }
   .auto-card .start svg { width: 18px; height: 18px; }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
@@ -985,11 +984,11 @@ export const CSS = `
   .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
   .today span.pic { display: block; }
   .seg button:disabled { opacity: 0.4; }
-  .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--r-l);
+  .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--r-m);
            background: var(--surface); }
   .today .pic { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: var(--shadow-dot); }
   .today .text { flex: 1; min-width: 160px; }
-  .today .name { font-size: var(--fs-name); font-weight: 500; margin: 2px 0; }
+  .today .name { font-size: var(--fs-body); font-weight: 500; margin: 2px 0; }
   .today-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
   .empty-today { color: var(--text-2); font-size: var(--fs-callout); }
   .scene-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
@@ -1003,7 +1002,7 @@ export const CSS = `
   .scene-tiles .tile .tile-open { position: absolute; inset: 0; z-index: 1; padding: 0; border: none; background: none; cursor: pointer; }
   .scene-tiles .tile .tile-open ~ span { pointer-events: none; }
   /* Settings → Light of the day */
-  .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-xs); vertical-align: 1px; font-size: var(--fs-micro); font-weight: 500;
+  .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-xs); vertical-align: 1px; font-size: var(--fs-tab); font-weight: 500;
              background: var(--sun); color: var(--text-dark); }
   .sheet .box.tag-editor { width: min(100%, 560px); }
   .tag-editor .sheet-bar { gap: 12px; }
@@ -1029,7 +1028,7 @@ export const CSS = `
   .round.mini-step:disabled { opacity: 0.35; }
   .round.mini-step svg { width: 16px; height: 16px; }
   /* Below 16px iOS zooms the page in when a field or picker gets focus. */
-  @media (pointer: coarse) { .select { font-size: var(--fs-name); } }
+  @media (pointer: coarse) { .select { font-size: var(--fs-body); } }
 
   /* arrange lights */
   .room { position: relative; width: min(100%, 560px); aspect-ratio: 1; margin: 14px auto 0; border-radius: var(--r-2xl); touch-action: none;
@@ -1037,7 +1036,7 @@ export const CSS = `
                       linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 6% 6% / 22% 22%, var(--surface);
           box-shadow: inset 0 0 0 1px var(--separator); }
   .room.locked { opacity: 0.6; }
-  .edge-label { margin: 8px 0 0; text-align: center; font-size: var(--fs-micro); letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); }
+  .edge-label { margin: 8px 0 0; text-align: center; font-size: var(--fs-tab); letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-2); }
   .edge-label + .room { margin-top: 6px; }
   .room .links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   .room .links line { stroke: rgba(255, 255, 255, 0.45); stroke-width: 0.8; stroke-dasharray: 2 1.5; }
@@ -1064,7 +1063,7 @@ export const CSS = `
              border-radius: 50%; animation: spin 0.9s linear infinite; }
   .spinner.big { width: 28px; height: 28px; border-width: 3px; }
   .bridge-add .item.col .line { align-items: center; margin-top: 0; }
-  .bridge-add .item.col .field { flex: 1; min-width: 0; margin-top: 0; font-size: var(--fs-name); }
+  .bridge-add .item.col .field { flex: 1; min-width: 0; margin-top: 0; font-size: var(--fs-body); }
   .bridge-add .item.col .dim.small { margin-top: 8px; }
   .link-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 28px auto 0; text-align: center; }
   .link-state .lead { margin: 6px 0 0; }
@@ -1088,20 +1087,20 @@ export const CSS = `
   .link-actions .pill { min-width: 180px; }
   
   /* banner (controls.ts banner()): the Hue app's, measured on its screenshot */
-  .banner { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; padding: 12px 14px 14px 16px; border-radius: var(--r-xl);
+  .banner { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; padding: 12px 14px 14px 16px; border-radius: var(--r-m);
             border: 1.5px solid var(--info-line); background: var(--info-bg); }
   .banner.link { cursor: pointer; }
   .banner.link:active { transform: scale(var(--press-row)); }
   .banner.warn { border-color: var(--warn-line); background: var(--warn-bg); }
   .banner .grow { flex: 1; min-width: 0; }
-  .banner-head { display: flex; align-items: center; gap: 9px; font-size: var(--fs-footnote); font-weight: 500; letter-spacing: 2px;
+  .banner-head { display: flex; align-items: center; gap: 9px; font-size: var(--fs-label); font-weight: 500; letter-spacing: 2px;
                  text-transform: uppercase; color: var(--info-head); }
   .banner.warn .banner-head { color: var(--warn); }
   .banner-mark { flex: none; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
                  background: var(--info-mark); color: #fff; --mdc-icon-size: 14px; }
   .banner.warn .banner-mark { background: var(--warn); color: var(--text-dark); }
   .banner-head .dot-badge { margin: 0 4px; }
-  .banner-text { margin-top: 6px; font-size: var(--fs-body); line-height: 1.4; color: var(--text-2); }
+  .banner-text { margin-top: 6px; font-size: var(--fs-footnote); line-height: 1.4; color: var(--text-2); }
   .banner-text p { margin: 0; }
   .banner-text p + p { margin-top: 6px; }
   .banner .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -1124,10 +1123,13 @@ export const CSS = `
   /* A list row: at least 68px, a 28px icon in a 32px column, the text from 72px, a medium 15px title over a
      13px regular line, separators from the text on. */
   :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item {
-    min-height: var(--row-h); gap: 20px; padding: 12px 16px 12px 20px; font-size: var(--fs-body); }
+    min-height: var(--row-h); gap: 28px; padding: 12px 16px 12px 20px; font-size: var(--fs-body); }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item > ha-icon:first-child {
-    flex: none; display: flex; justify-content: center; width: 32px; --mdc-icon-size: var(--row-icon); color: var(--text); }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item :is(.dim.small, .small) { margin-top: 2px; font-size: var(--fs-footnote); }
+    flex: none; display: flex; justify-content: center; width: var(--row-icon); --mdc-icon-size: var(--row-icon); color: var(--text); }
+  .rows.device-list .item { gap: 20px; }
+  .rows.device-list .item > ha-icon:first-child { width: 32px; --mdc-icon-size: 32px; }
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item :is(.dim.small, .small) { margin-top: 2px; font-size: var(--fs-caption); }
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item :is(.value, .value-text) { font-size: var(--fs-footnote); }
   /* Row titles are medium (the Hue app's); what a row says under or beside its title stays regular. */
   :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item { font-weight: 500; }
   :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item :is(.dim, .small, .value, .value-text, input),
@@ -1137,7 +1139,7 @@ export const CSS = `
     content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--separator); }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .tag-pic):first-child)::before {
     left: var(--row-text); }
-  .settings-page .section-head h2.label { margin: 0 2px; }
+  .settings-page .section-head h2.label { margin: 0 var(--text-inset); }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
   .settings-page .lead { font-size: var(--fs-callout); }
   .settings-page .hint { margin: 10px 2px 0; font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
@@ -1152,7 +1154,7 @@ export const CSS = `
   h1.big.new-question { margin: 8px 2px 18px; font-size: var(--fs-title); }
   .type-cards { display: grid; gap: 12px; }
   main.wide .type-cards { grid-template-columns: 1fr 1fr; }
-  .type-card { position: relative; display: block; width: 100%; height: 172px; padding: 0; border: none; border-radius: var(--r-l); overflow: hidden;
+  .type-card { position: relative; display: block; width: 100%; height: 172px; padding: 0; border: none; border-radius: var(--r-m); overflow: hidden;
                background: var(--bg); color: #fff; font: inherit; text-align: left; cursor: pointer; transition: transform var(--t-press) var(--ease); }
   .type-card:active { transform: scale(var(--press-card)); }
   .type-card svg.art { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1166,7 +1168,7 @@ export const CSS = `
   .type-card .open { position: absolute; top: 12px; right: 12px; z-index: 1; --mdc-icon-size: 20px; color: rgba(255, 255, 255, 0.9); }
   /* The editor's head, like the Hue app's: the type's icon over the name. */
   .automation-page .automation-hero > .type-icon { --mdc-icon-size: 40px; color: var(--text); margin: 4px 0 2px; }
-  .automation-page .automation-hero h1.big { font-size: var(--fs-title); }
+  .automation-page .automation-hero h1.big { font-size: var(--fs-large); }
   .lights-card .lights-head .round.add { background: var(--accent); color: #fff; }
   /* A time of day on its wheels in place (wake up, go to sleep): the title over them. */
   .automation-page .rows .item.time-item { display: block; padding: 12px 8px 6px 16px; }
@@ -1199,7 +1201,7 @@ export const CSS = `
   .fade-ticks span { width: 16px; text-align: center; }
   /* "Turn off after": the slider sets the row with the tick (every part of the day, or one of them). */
   .off-sheet .fade-body { max-height: min(70dvh, 620px); overflow-y: auto; overscroll-behavior: contain; }
-  .off-sheet .off-phases { margin-top: 10px; border-radius: var(--r-m); background: var(--surface-sheet); }
+  .off-sheet .off-phases { margin-top: 10px; border-radius: var(--r-m); background: var(--surface-row); }
   .off-sheet .off-phases .item { min-height: 52px; }
   .off-sheet .off-phases .value { color: var(--text-2); }
   .off-sheet .off-phases .value.own { color: var(--text); }
@@ -1210,7 +1212,7 @@ export const CSS = `
   .sheet.bottom .box.lights-sheet { width: 100%; max-height: calc(100% - var(--safe-top) - 24px); }
   .lights-sheet .lights-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 calc(18px + var(--safe-bottom)); }
   .lights-sheet h2.label { margin: 18px 16px 8px; }
-  .lights-sheet .rows.pick-rows { border-radius: 0; background: var(--surface-sheet); }
+  .lights-sheet .rows.pick-rows { border-radius: 0; background: var(--surface-row); }
   .pick-room + .pick-room { border-top: 1px solid var(--separator); }
   .pick-room > .item { display: flex; align-items: center; gap: 4px; min-height: var(--row-h); padding: 0 14px 0 4px; }
   .pick-toggle, .pick-name { border: none; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
@@ -1261,7 +1263,7 @@ export const CSS = `
                   mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
   .wheel-scroll::-webkit-scrollbar { display: none; }
   .wheel-opt { height: 32px; display: flex; align-items: center; justify-content: center; scroll-snap-align: center; cursor: pointer;
-               font-size: var(--fs-name); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+               font-size: var(--fs-body); color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .wheel-opt.on { font-size: var(--fs-headline); font-weight: 500; color: var(--text); }
   .choice-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   .choice-list .item .check { margin-left: 4px; }
@@ -1290,7 +1292,7 @@ export const CSS = `
   .settings-page .save-area .pill.apply { min-width: 180px; background: var(--accent); color: #fff; }
   .settings-page .save-area .lead { margin: 4px 0 0; text-align: center; }
   @container (max-width: 599px) {
-    .settings-page .rows { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+    .settings-page .rows { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }
     .settings-page .scene-tiles, .settings-page .today { margin-left: 0; margin-right: 0; }
   }
 
@@ -1303,7 +1305,7 @@ export const CSS = `
     .grid.inputs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sync-hero { padding: 24px; }
     .tile:hover, .card:hover, .tile-card:hover, .control-card:hover { transform: translateY(-1px); }
-    h1.big { font-size: var(--fs-display); }
+    h1.big { font-size: var(--fs-large); }
     /* Room header: a card in the column instead of a sheet glued to the top edge. */
     .page > .hero:first-child { position: relative; margin: 20px 0 0; padding: 4px 20px 18px; border-radius: var(--r-3xl); }
   }

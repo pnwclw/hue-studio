@@ -65,6 +65,7 @@ const CARD_CSS = css`
     --bg: var(--ha-card-background, var(--card-background-color, var(--text-dark)));
     --surface: color-mix(in srgb, var(--primary-text-color, #fff) 8%, transparent);
     --surface-2: color-mix(in srgb, var(--primary-text-color, #fff) 14%, transparent);
+    --surface-row: color-mix(in srgb, var(--primary-text-color, #fff) 5%, transparent);
     --text: var(--primary-text-color, #fff); --text-2: var(--secondary-text-color, rgba(235, 235, 245, 0.6));
     color: var(--text); font-size: var(--fs-callout);
   }
@@ -72,7 +73,7 @@ const CARD_CSS = css`
   .body { padding: 14px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .grow { flex: 1; min-width: 0; }
-  .name { font-size: var(--fs-name); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .name { font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub { font-size: var(--fs-caption); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .link { display: block; background: none; border: none; padding: 0; cursor: pointer; text-align: left; color: inherit; }
   .card-head.surface { margin: -14px -14px 0; padding: 14px; border-radius: 0; }
@@ -83,7 +84,7 @@ const CARD_CSS = css`
   .dots { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 12px -14px 0; padding: 2px 14px; }
   .dots::-webkit-scrollbar { display: none; }
   .dot-btn { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 5px; border: none; background: none;
-             padding: 0; cursor: pointer; font-size: var(--fs-micro); color: var(--text); }
+             padding: 0; cursor: pointer; font-size: var(--fs-tab); color: var(--text); }
   .dot-btn .dot { width: 52px; height: 52px; border-radius: 50%; background-size: cover; background-position: center;
                   box-shadow: var(--shadow-dot); transition: transform 0.2s; }
   .dot-btn:active .dot { transform: scale(var(--press-round)); }
@@ -111,7 +112,7 @@ const CARD_CSS = css`
                 text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gtile.done::after { content: "✓"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
                        font-size: var(--fs-title); color: #fff; background: rgba(0, 0, 0, 0.35); }
-  .cat { font-size: var(--fs-micro); letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
+  .cat { font-size: var(--fs-tab); letter-spacing: 1px; text-transform: uppercase; color: var(--text-2); margin: 0 0 6px; }
   .warn { color: var(--text-2); font-size: var(--fs-footnote); }
   .auto-card { box-shadow: none; }
 `;

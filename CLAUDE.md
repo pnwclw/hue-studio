@@ -148,16 +148,19 @@ touching anything outside this repository.
   parts — tokens in `src/tokens.ts` (colors, type scale, radii, shadows, sizes, motion) and
   the components in `styles.ts` and their helpers. A missing part is added to the system
   (and the doc) first; no one-off sizes, colors or fonts (`tests/js/styles.test.ts`).
-- **Scale.** The Hue app is the reference (its screenshots: 1pt ≈ 2.09px at 921px wide).
-  Home: room and zone names 16px, a step above everything else (rows 15px, the room and
-  zone screens' tiles 14px). Automation cards are the Hue app's: 86px tall, a 32px icon,
-  the text from 72px, 17px medium titles over 15px subtitles. List rows (settings, devices, sensors, editors, choice
-  sheets) are the Hue app's: ≥68px tall, 28px icons, text from 72px, titles 15px medium
-  with 13px regular subtitles. One switch everywhere: 52×32 with a 24px knob well inside
-  the track, as tall as the 32px round header buttons (a light tile's switch zone keeps
-  10px above and below it). Action buttons are the regular 34px `.pill`, an editor's
-  "Save" sits in its header (a plain grey pill, never the accent), "Delete" is the red outlined pill at the bottom. The
-  automation editor's rows have no icons (its type's icon sits by its name).
+- **Scale.** The Hue app is the reference, measured on the app itself (6.3 in the Android
+  emulator, dp = px here; how and every number: `docs/design-system.md`). Cards sit 12px
+  from the edge, titles at 16; large titles and a thing's name on its own screen 34px;
+  room and zone names, row titles, bar and sheet titles 16px medium; row subtitles 12,
+  values on the right 13, tile names 14. Automation cards ≥72px, a 32px icon, the text
+  from 72px, 16px titles over 13px. List rows (settings, devices, sensors, editors, choice
+  sheets) 72px tall, 24px icons at 20px (32px in device lists), text from 72px. Every card
+  and tile has a 12px radius. One switch everywhere: 52×32 with a 24px knob well inside
+  the track, as tall as the 32px round header buttons. Action buttons are the 36px `.pill`
+  in sentence case (capitals only for header pills such as "SAVE"), an editor's "Save"
+  sits in its header (a plain grey pill, never the accent), "Delete" is the pill with a
+  red border at the bottom. The automation editor's rows have no icons (its type's icon
+  sits by its name).
 - **Times are chosen on wheels**, never the system's time picker: a time screen
   (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
   app's "Start at" — each kind (a time, sunrise, sunset, none) a row with a tick, the
@@ -171,10 +174,10 @@ touching anything outside this repository.
   zone, people whose phone shares its location "Always"; in the companion app this
   person's own phone, with a button to the app's settings) until HA can know who is home.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a
-  warning), a round "i" and a spaced capital title, the text in 15px grey under it, own
+  warning), a round "i" and a spaced capital 10px title, the text in 13px grey under it, own
   buttons, a round chevron on the right when it leads somewhere. A Sync Box's banner is its
   own (`syncBanner`).
-- **Section titles** sit 8px over their cards and 22px under the ones before, everywhere:
+- **Section titles** (10px, spaced capitals) sit 8px over their cards and 32px under the ones before, everywhere:
   rows that scroll sideways keep the room for their cards' shadows inside (padding) and
   give it back outside (negative margin).
 - **Headers: everything is 32px tall** — round buttons, switches, pills, the search field.

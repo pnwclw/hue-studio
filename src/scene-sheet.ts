@@ -23,7 +23,7 @@ import { icon, keepTouchInside } from "./ui.ts";
 const EXPECT_MS = 5000;
 
 const SCENE_CSS = css`
-  .ss-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--r-l); }
+  .ss-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--r-m); }
   .ss-dot { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
             box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
   .ss-card .grow { flex: 1; min-width: 0; }
