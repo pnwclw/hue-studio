@@ -214,7 +214,8 @@ Each part: its class (and helper), its measures, where it is used.
   starts at 16 (its type's icon sits by the name).
 - **Compact row** (`.rows .item` elsewhere): ≥ `--row-h-compact`, for controls in a sheet.
 - **Choice row** (`navRow`, `choiceRows`): a row with its value opens the list to pick from —
-  a sheet for one value, a screen for several; the chosen one gets a tick.
+  a sheet for one value, a screen for several; the chosen one gets a tick. Its caption keeps
+  to one line and its value to 42% of the row, both cut short with an ellipsis.
 
 ### Cards and tiles
 

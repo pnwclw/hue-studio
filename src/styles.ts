@@ -1284,6 +1284,10 @@ export const CSS = `
   .presence-rows .check-warn { flex: none; --mdc-icon-size: 24px; color: var(--warn); }
   .settings-page .rows + .rows { margin-top: 16px; }
   .rows .item .value { flex: none; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; color: var(--text-2); }
+  /* A row that opens a choice: its title over one caption line, the value cut short before either wraps. */
+  .rows .item.nav .grow { min-width: 0; }
+  .rows .item.nav .grow > .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rows .item.nav .value { max-width: 42%; }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
   .rows .item .row-art { flex: none; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
                             font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
