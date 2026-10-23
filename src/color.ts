@@ -150,19 +150,18 @@ export const wheelToXy = (px: number, py: number): XY => rgbToXy(...wheelToRgb(p
 export const xyToWheel = (x: number, y: number): XY => rgbToWheel(xyToRgb(x, y));
 
 // ---------- white disc ----------
-// White mode shows a vertical scale: coolest at the top, warmest at the bottom.
+// White mode shows a vertical scale, the Hue app's: warmest at the top, coolest at the bottom.
 
 export const MIREK_MIN = 153;
 export const MIREK_MAX = 500;
 
-export const WHITE_CSS = `linear-gradient(${[MIREK_MIN, 250, 333, 400, MIREK_MAX]
-  .map((m) => rgbCss(mirekToRgb(m)))
-  .join(", ")})`;
+/** The scale as the Hue app draws it (sampled off its white wheel): amber, white by four fifths, a cool blue at the end. */
+export const WHITE_CSS = "linear-gradient(#fdb247, #fccc6c 20%, #fde39f 40%, #fff6d4 60%, #fffcf3 80%, #f9feff 90%, #c7f3fe)";
 
 /** Vertical wheel position (-1 top … 1 bottom) → mirek. */
-export const wheelYToMirek = (py: number): number => Math.round(MIREK_MIN + ((clamp(py, -1, 1) + 1) / 2) * (MIREK_MAX - MIREK_MIN));
+export const wheelYToMirek = (py: number): number => Math.round(MIREK_MAX - ((clamp(py, -1, 1) + 1) / 2) * (MIREK_MAX - MIREK_MIN));
 /** Mirek → vertical wheel position (-1 top … 1 bottom). */
-export const mirekToWheelY = (mirek: number): number => ((clamp(mirek, MIREK_MIN, MIREK_MAX) - MIREK_MIN) / (MIREK_MAX - MIREK_MIN)) * 2 - 1;
+export const mirekToWheelY = (mirek: number): number => ((MIREK_MAX - clamp(mirek, MIREK_MIN, MIREK_MAX)) / (MIREK_MAX - MIREK_MIN)) * 2 - 1;
 
 // ---------- gradients ----------
 

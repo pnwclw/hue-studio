@@ -50,7 +50,8 @@ test("gamut clipping", () => {
 });
 
 test("white scale", () => {
-  assert.equal(wheelYToMirek(-1), 153);
-  assert.equal(wheelYToMirek(1), 500);
+  // Warmest at the top, coolest at the bottom (the Hue app's).
+  assert.equal(wheelYToMirek(-1), 500);
+  assert.equal(wheelYToMirek(1), 153);
   near(mirekToWheelY(wheelYToMirek(0.3)), 0.3, 0.01);
 });

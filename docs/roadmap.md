@@ -485,7 +485,7 @@ So that new features are not built on a vision of their own, everything is put o
 design system first. **Done (2026-10-22, measured on the Hue app 6.3 on 2026-10-23)**:
 `docs/design-system.md`, tokens in `src/tokens.ts`, `styles.ts` and the cards, sheets and
 dialog on them, kept there by `tests/js/styles.test.ts`. Still to measure: the Sync screens
-with a box, effects and the white wheel, a gallery scene's sheet.
+with a box, a gallery scene's sheet.
 
 1. **Inventory of the Hue app** (done but for the screens above): every screen of the real app (home, rooms, scenes and
    the gallery, the wheel, effects, automations, Sync, settings, devices, sheets and

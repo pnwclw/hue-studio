@@ -143,7 +143,7 @@ Each part: its class (and helper), its measures, where it is used.
   (`--fs-large`); once the title scrolls under, the bar shows it (`--fs-body`) and blurs.
   On desktop one row as tall as HA's sidebar header (`main.wide`), the title `--fs-title-1`.
 - **Sub header** (`subHead`, `.bar.sub`): back (or close) round button at 16, title
-  `--fs-body` 500 at 72, actions at the end ("Save" here, an uppercase grey pill). Everything
+  `--fs-body` 500 at 72 (where list rows' text starts; so in every bar and sheet bar), actions at the end ("Save" here, an uppercase grey pill). Everything
   in it is 32px tall.
 - **Tab bar** (`nav.tabs`): `--bar-bottom`, icons 26px over `--fs-tab` labels, the tabs not
   chosen in `--tab-off`; on top while the experimental footer is at the bottom. Hidden while
@@ -262,9 +262,13 @@ Each part: its class (and helper), its measures, where it is used.
 
 ### Color screen
 
-Wheel `.wheel` (≤440px, the dock's leftover height) with pins `.pin` (42px drops; `.dot`
-22px for other lights; `.stack` with a count; `.round` spread on a disc), mode discs
-`.modes`, brightness `.bri`, gradient style sheet `.style-sheet`, effects rows `.fx-row`.
+Wheel `.wheel` (the page's width, ≤440px, the dock's leftover height) with pins `.pin`
+(42px drops; `.dot` 22px for other lights; `.stack` with a count; `.round` spread on a
+disc), mode discs `.modes`, brightness `.bri`, gradient style sheet `.style-sheet`. The
+white wheel is the Hue app's drawn scale, warmest at the top and coolest at the bottom
+(`WHITE_CSS` in `color.ts`: amber, white by four fifths, a cool blue at the end).
+**Effects** `.fx-row` / `.fx`: a row per effect (its presets, then its outlined "adjust"
+tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name over preset.
 
 ## Inventory
 
@@ -276,7 +280,10 @@ Wheel `.wheel` (≤440px, the dock's leftover height) with pins `.pin` (42px dro
 | Room | header: back 32 at 16, title 16 at 72, "+", "⋯", the switch; slider under it; scene tiles 102×110 with a 48 picture 12 from the top, names 13–14, 12 apart; light tiles 102×160 with a 55 switch zone; controls 150×108; section titles 32 under the cards before them, 8 over their own |
 | Room "⋯", leaving without saving | action sheet 12 from the edges, rows 56, red "Delete", "CANCEL" under a line, a blurred screen |
 | Room "+", new scene | a sheet over the room's colors: title 28, two-column picture tiles 180×156 (20 from the edges); "Custom scene": a 48 picture, name 34, brightness card, lights card, a blue "Save" pill (36) at the bottom; a name sheet over the keyboard |
-| Color | "⋯" and "SAVE" pills, "DONE"; wheel 372 across; mode discs 40; gradient and brightness buttons 48; the light's tile under it, ringed when picked |
+| Color | "⋯" and "SAVE" pills, "DONE"; wheel 380 across (16 from the edges); modes bar 46 with discs; gradient button 48, brightness 72×48 with its value over it; the room's light tiles under it, the picked one ringed 2 in white and the others dimmed; an off light's pin is black, other lights are small dots |
+| White wheel | warmest at the top: `#fdb247` → `#fde39f` (40%) → `#fff6d4` (60%) → `#fffcf3` (80%) → `#c7f3fe` at the bottom |
+| Effects | large title "Effects"; categories as section titles; a row per effect of tiles 102×110 (48 picture, name 14 over preset 12), 12 apart, two rows per category; "Create" at each row's end: outlined, a 40 round "+" |
+| Room, lights off | scenes: "Hue scene gallery" card (three pictures overlapping, outlined) and a suggested scene (a stack, "Suggested", shuffle beside it); an "Automations" section with the room's cards (72, play) |
 | Automations | large title; bridge chips 32 (the chosen one ringed 2px in the accent); grouped by type: a header row (24 icon, 16 title, count, collapse); cards 387×72, radius 12, 16 titles, play 32, the switch |
 | Automation editor | sub header bar 56 (`#26282c`: close, title 16, "SAVE"); type icon 24, name 34; rows 72 with no icons, text at 16, values 13 on the right; a lights card with place tiles 144×108; section titles 10 |
 | Fade and choice sheets | sheet bar 56 (close, title 16, "DONE"); caps 10 over a 16 value; slider with ticks 11 under it; choice rows 72 with a 40 picture, a tick on the chosen one; hint 12 |
@@ -289,9 +296,9 @@ Wheel `.wheel` (≤440px, the dock's leftover height) with pins `.pin` (42px dro
 | Scene gallery | a sheet: title 28, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
 | Colors | page `#181b1f`; rows and sheets `#24262a`; cards and tiles `#34353a`; header bar `#26282c`; header pills `#36383c`; round buttons on a bar `#47484c`; separators `#3a3c3f`; secondary text `#babbbc`; accent `#006aff`; red `#e63535`; switch off `#5e5e61`; tab bar `#0d1013` |
 
-Not measured yet: the Sync screens with a box (this app has none set up), effects and the
-white wheel (switching the picker's mode may send a command), a gallery scene's sheet
-(it previews on the lights).
+Not measured yet: the Sync screens with a box (this app has none set up), a gallery
+scene's sheet (it previews on the lights). Switching the picker between color, white and
+effects sends nothing to the light (checked on an off light against HA's state).
 
 ### Hue Studio against it
 
@@ -322,4 +329,6 @@ white wheel (switching the picker's mode may send a command), a gallery scene's 
   with 24px icons; large titles and hero names 34; radius 12 for every card; pills 36 in
   sentence case (capitals only in headers), "Delete" in sentence case; tiles 102×110 / 160
   with 48px pictures; an 8px slider track; banner text 13 under a 10px title; dim inactive
-  tabs on a near-black bar.
+  tabs on a near-black bar. Then the color screen: the white wheel turned the Hue app's way
+  (warm at the top) with its drawn colors, effect tiles as scene tiles (102×110, 48px
+  pictures), and every bar's title at 72px.

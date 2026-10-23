@@ -41,6 +41,9 @@ export const CSS = `
   .bar.sub .title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
   :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); letter-spacing: 0.3px; text-transform: uppercase; }
+  /* A bar's title after its back or close button starts where list rows' text does (72px), the Hue app's. */
+  :is(.bar, .topbar) > .round:first-child + :is(.title, .grow) { margin-left: 16px; }
+  .sheet-bar > .round:first-child + .grow { margin-left: 12px; }
   /* A tab's header floats: the body scrolls under it. On phones it is a bar over a large
      title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
@@ -431,7 +434,7 @@ export const CSS = `
   .modes button.on::before { inset: 4px; }
   .modes .m-color::before { background: radial-gradient(circle, #fff 0, rgba(255, 255, 255, 0) 62%),
                                         conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
-  .modes .m-white::before { background: linear-gradient(#cfe3ff, #fff3d6, #ffc46b); }
+  .modes .m-white::before { background: linear-gradient(#fdb247, #fff6d4 60%, #c7f3fe); }
   .modes .m-effects { display: flex; align-items: center; justify-content: center; }
   .modes .m-effects::before { content: none; }
   .modes .sep { width: 1px; height: 22px; margin: 0 2px; background: rgba(255, 255, 255, 0.2); }
@@ -448,23 +451,23 @@ export const CSS = `
   /* effects (inside the color view) */
   .colorview hue-studio-effects { flex: 1; }
   .effects .label:first-child { margin-top: 6px; }
-  .fx-row { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 30px) / 3.6); gap: 10px; overflow-x: auto;
-            margin: 0 calc(-1 * var(--gutter)) 0; padding: 2px var(--gutter) 18px; scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
+  .fx-row { display: grid; grid-auto-flow: column; grid-auto-columns: var(--light-tile); gap: var(--tile-gap); overflow-x: auto;
+            margin: 0 calc(-1 * var(--gutter)) 0; padding: 2px var(--gutter) var(--tile-gap); scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
             overscroll-behavior-x: contain; }
   .fx-row::-webkit-scrollbar { display: none; }
-  .fx { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px 10px; border: 2px solid transparent;
+  .fx { display: flex; flex-direction: column; align-items: center; gap: 2px; box-sizing: border-box; height: 110px; padding: 10px 6px 8px; border: 2px solid transparent;
         box-shadow: var(--shadow-raised);
         border-radius: var(--r-m); background: var(--surface); cursor: pointer; scroll-snap-align: start; text-align: center;
         transition: transform var(--t-press) var(--ease), border-color 0.2s; }
   .fx:active { transform: scale(var(--press-tile)); }
   .fx.on { border-color: var(--selected); }
-  .fx .art { width: 54px; height: 54px; margin-bottom: 6px; border-radius: 50%; box-shadow: var(--shadow-dot); }
+  .fx .art { flex: none; width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%; box-shadow: var(--shadow-dot); }
   .fx .name { font-size: var(--fs-callout); font-weight: 500; line-height: 1.2; }
   .fx .sub { font-size: var(--fs-caption); color: var(--text-2); }
-  .fx.create { background: transparent; border: 2px solid var(--surface-2); }
-  .fx.create .art.plus { display: flex; align-items: center; justify-content: center; background: var(--surface-2); box-shadow: none; }
+  .fx.create { background: transparent; border: 1.5px solid var(--outline); box-shadow: none; }
+  .fx.create .art.plus { display: flex; align-items: center; justify-content: center; width: var(--round-l); height: var(--round-l); margin: 4px 0 12px; background: var(--surface-raised); box-shadow: none; }
   .fx-sheet { max-width: 440px; }
-  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-row); font-size: var(--fs-body); font-weight: 500; }
+  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-row); font-size: var(--fs-body); font-weight: 500; }
   .sheet-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fx-head { padding: 16px 16px 4px; }
   .fx-head .art { display: block; width: 56px; height: 56px; border-radius: 50%; box-shadow: var(--shadow-dot); }
