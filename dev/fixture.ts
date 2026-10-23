@@ -160,7 +160,9 @@ const SYNC_BOX: SyncBoxInfo = {
   audio_supported: true,
   connection: "connected",
   bridge: "hue-entry",
-  features: ["palette", "background_lighting", "presets", "settings", "ir"],
+  features: ["palette", "background_lighting", "presets", "settings", "follow", "ir"],
+  follow: { input4: "game" },
+  screen: { entity_id: "media_player.example_tv", source: "HDMI 3", off_after: 300 },
   device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
   palette: "neutral",
   background_lighting: { video: false, game: true },
@@ -250,6 +252,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   });
   // Adaptive Lighting for the office lamp.
   entities["switch.adaptive_lighting_office"] = { platform: "adaptive_lighting" };
+  states["media_player.example_tv"] = {
+    entity_id: "media_player.example_tv",
+    state: "on",
+    attributes: { friendly_name: "TV", source: "HDMI 3", source_list: ["HDMI 1", "HDMI 2", "HDMI 3", "HDMI 4"] },
+  };
   states["switch.adaptive_lighting_office"] = {
     entity_id: "switch.adaptive_lighting_office",
     state: "on",
@@ -1344,6 +1351,17 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "hue_studio/bridges/rename") {
         bridgesMessage[String(msg.hue_entry_id)].name = String(msg.name);
         pushBridges();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/sync/follow") {
+        const follow = { ...box.follow };
+        for (const [input, action] of Object.entries((msg.follow as Record<string, string | null>) ?? {})) {
+          if (action) follow[input] = action as NonNullable<SyncBoxInfo["follow"]>[string];
+          else delete follow[input];
+        }
+        const screen = msg.screen === null ? null : msg.screen ? { source: null, off_after: 300, ...box.screen, ...(msg.screen as object) } : box.screen;
+        box = { ...box, follow, screen: screen as SyncBoxInfo["screen"] };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
         return null as T;
       }
       if (msg.type === "hue_studio/sync/configure") {

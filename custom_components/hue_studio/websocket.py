@@ -114,12 +114,18 @@ from .rooms import (
 )
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
+    INPUTS as SYNC_INPUTS,
     LED_MODES,
     NAME_MAX as SYNC_NAME_MAX,
     BoxBridgeFailed,
     SyncBoxCoordinator,
     async_link_box_bridge,
     async_sync_boxes,
+)
+from .sync_follow import (
+    ACTIONS as FOLLOW_ACTIONS,
+    SCREEN_OFF_AFTER_MAX,
+    async_set_follow,
 )
 
 
@@ -167,6 +173,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_find_lost,
         ws_forget_lost,
         ws_configure_sync_box,
+        ws_follow_sync_box,
         ws_link_sync_box_bridge,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -1411,6 +1418,54 @@ async def ws_configure_sync_box(
             bluetooth=msg.get("bluetooth"),
         ),
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/sync/follow",
+        vol.Required("entry_id"): str,
+        # Input -> what its picture starts (None: the input is not followed).
+        vol.Optional("follow"): {
+            vol.In(SYNC_INPUTS): vol.Any(None, vol.In(FOLLOW_ACTIONS))
+        },
+        # The screen linked with the box (None: none).
+        vol.Optional("screen"): vol.Any(
+            None,
+            {
+                vol.Optional("entity_id"): cv.entity_domain("media_player"),
+                vol.Optional("source"): vol.Any(None, str),
+                vol.Optional("off_after"): vol.All(
+                    int, vol.Range(min=0, max=SCREEN_OFF_AFTER_MAX)
+                ),
+            },
+        ),
+    }
+)
+@callback
+def ws_follow_sync_box(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """What a Sync Box does when an input gets a picture, and its screen (paired
+    directly only)."""
+    box = async_sync_boxes(hass).get(msg["entry_id"])
+    if not isinstance(box, SyncBoxCoordinator):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_FOUND,
+            "Not a Sync Box paired with Hue Studio",
+        )
+        return
+    async_set_follow(
+        hass,
+        box,
+        follow=msg.get("follow"),
+        screen=msg.get("screen"),
+        unlink_screen="screen" in msg and msg["screen"] is None,
+    )
+    connection.send_result(msg["id"])
 
 
 @websocket_api.require_admin

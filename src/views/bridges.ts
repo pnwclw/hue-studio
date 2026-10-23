@@ -2,12 +2,14 @@
 // "Add a bridge" opens bridge-add.ts.
 // A bridge: its name (renamed on the bridge), what it is, its devices, entertainment and (a
 // Bridge Pro) MotionAware areas. A Sync Box: its name, LED, following the TV (paired
-// directly), what it is, how it is connected, its sync controls.
+// directly), what a picture on each input starts and the screen linked with it (HDMI CEC
+// for sources without it, sync_follow.py), what it is, how it is connected, its sync
+// controls.
 // Settings → MotionAware areas (lights as motion sensors, only with a Hue Bridge Pro): each
 // area with how it does and on/off, and "New area"; views/motion-area.ts sets one up and
 // changes it.
 
-import { html, nothing, type TemplateResult } from "lit";
+import { html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 
@@ -17,11 +19,11 @@ import type { StringKey } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { areaState } from "../motion.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
-import { hasFeature, statusKey } from "../sync.ts";
+import { FOLLOW_ACTIONS, hasFeature, inputIcon, SCREEN_OFF_AFTER, statusKey } from "../sync.ts";
 import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { navRow, single } from "./choice.ts";
+import { type ChoiceOption, navRow, single } from "./choice.ts";
 
 const NAME_MAX = 32;
 const LEDS = ["off", "dimmed", "normal"] as const;
@@ -40,6 +42,8 @@ export class BridgesView extends StudioView {
   @state() private accessor busy = false;
   /** A Sync Box's sheet: its bridge or its Wi-Fi. */
   @state() private accessor boxSheet: "bridge" | "wifi" | null = null;
+  /** A Sync Box's screen page (the screen linked with it) over its own page. */
+  @state() private accessor boxScreen = false;
   /** The bridge the box goes to, and how linking it goes (`until`: the button's deadline, ms). */
   @state() private accessor boxTarget: string | null = null;
   @state() private accessor boxLink: { event: BoxBridgeEvent; until: number } | null = null;
@@ -55,6 +59,11 @@ export class BridgesView extends StudioView {
     if (this.ctx.hass.user?.is_admin) {
       this.stopMove = this.ctx.watch<MoveState | null>("hue_studio/bridges/move/subscribe", (m) => (this.move = m));
     }
+  }
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    super.willUpdate(changed);
+    if (changed.has("item")) this.boxScreen = false;
   }
 
   override disconnectedCallback(): void {
@@ -78,6 +87,7 @@ export class BridgesView extends StudioView {
     if (this.item) {
       const box = ctx.boxes[this.item];
       // The box's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
+      if (box && this.boxScreen) return this.screenPage(this.item, box);
       if (box) return html`${this.boxPage(this.item, box)}${this.boxSheet ? this.renderBoxSheet(this.item, box) : nothing}`;
       const bridge = this.bridges?.[this.item];
       if (bridge) return this.bridgePage(this.item, bridge);
@@ -306,6 +316,7 @@ export class BridgesView extends StudioView {
                   : nothing}
               </div>`
           : nothing}
+        ${settings && hasFeature(box, "follow") ? this.follow(id, box) : nothing}
         <h2 class="label">${t("bridges.connection")}</h2>
         <div class="rows">
           <div class="item">
@@ -344,6 +355,103 @@ export class BridgesView extends StudioView {
               ${this.link("mdi:home-assistant", t("sensor.in_ha"), "", () => ctx.openHa(`/config/devices/device/${encodeURIComponent(device.ha_device!)}`), true)}
             </div>`
           : nothing}`,
+      "settings-page",
+    );
+  }
+
+  /** What a picture on each input starts (HDMI CEC for sources without it), and the screen. */
+  private follow(id: string, box: SyncBoxInfo): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const follow = box.follow ?? {};
+    const options: ChoiceOption[] = [
+      { value: "off", label: t("bridges.follow_off"), sub: t("bridges.follow_off_sub") },
+      ...FOLLOW_ACTIONS.map((action) => ({
+        value: action,
+        label: t(`bridges.follow_${action}`),
+        sub: t(action === "passthrough" ? "bridges.follow_passthrough_sub" : "bridges.follow_mode_sub"),
+      })),
+    ];
+    const status = (s?: string | null) => (s === "linked" || s === "plugged" || s === "unplugged" ? t(`sync.input_${s}`) : "");
+    const screen = box.screen;
+    return html`<h2 class="label">${t("bridges.follow")}</h2>
+      <p class="lead small">${t("bridges.follow_hint")}</p>
+      <div class="rows">
+        ${(box.inputs ?? []).map((input) =>
+          navRow({ icon: inputIcon(input), title: input.name, sub: status(input.status), value: t(`bridges.follow_${follow[input.id] ?? "off"}`) }, () =>
+            this.choose(
+              single(input.name, options, follow[input.id] ?? "off", (action) =>
+                void ctx.ws({ type: "hue_studio/sync/follow", entry_id: id, follow: { [input.id]: action === "off" ? null : action } }),
+              ),
+            ),
+          ),
+        )}
+        ${navRow(
+          {
+            icon: "mdi:television",
+            title: t("bridges.screen"),
+            sub: t(Object.keys(follow).length ? "bridges.screen_sub" : "bridges.screen_needs_follow"),
+            warn: !!screen && !Object.keys(follow).length,
+            value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none"),
+          },
+          () => {
+            haptic("selection");
+            this.pushPage();
+            this.boxScreen = true;
+          },
+        )}
+      </div>`;
+  }
+
+  /** The screen linked with a box: which one, its input, when it turns off. */
+  private screenPage(id: string, box: SyncBoxInfo): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const screen = box.screen;
+    const set = (change: Record<string, unknown> | null) => void ctx.ws({ type: "hue_studio/sync/follow", entry_id: id, screen: change });
+    const players = Object.keys(ctx.hass.states)
+      .filter((e) => e.startsWith("media_player."))
+      .map((e) => ({ value: e, label: friendlyName(ctx.hass, e), icon: "mdi:television" }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    const sources: string[] = (screen && ctx.hass.states[screen.entity_id]?.attributes.source_list) || [];
+    const offLabel = (s: number) =>
+      s === 0 ? t("bridges.screen_off_never") : s < 3600 ? t("bridges.screen_off_minutes", { count: s / 60 }) : t("bridges.screen_off_hours", { count: s / 3600 });
+    const back = () => {
+      this.boxScreen = false;
+      this.popPage();
+    };
+    return this.screen(
+      this.subHead(t("bridges.screen"), back),
+      html`<p class="lead small">${t("bridges.screen_hint")}</p>
+        <div class="rows">
+          ${navRow({ icon: "mdi:television", title: t("bridges.screen"), value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none") }, () =>
+            this.choose(
+              single(t("bridges.screen"), [{ value: "", label: t("bridges.screen_none") }, ...players], screen?.entity_id ?? "", (e) =>
+                set(e ? { entity_id: e, ...(e !== screen?.entity_id ? { source: null } : {}) } : null),
+              ),
+            ),
+          )}
+          ${navRow({ icon: "mdi:video-input-hdmi", title: t("bridges.screen_source"), value: screen?.source || t("bridges.screen_source_keep"), disabled: !screen }, () =>
+            this.choose(
+              single(
+                t("bridges.screen_source"),
+                [{ value: "", label: t("bridges.screen_source_keep") }, ...[...new Set([...sources, ...(screen?.source ? [screen.source] : [])])].map((v) => ({ value: v, label: v }))],
+                screen?.source ?? "",
+                (v) => set({ source: v || null }),
+              ),
+            ),
+          )}
+          ${navRow({ icon: "mdi:timer-outline", title: t("bridges.screen_off"), sub: t("bridges.screen_off_sub"), value: screen ? offLabel(screen.off_after) : "", disabled: !screen }, () =>
+            this.choose(
+              single(
+                t("bridges.screen_off"),
+                SCREEN_OFF_AFTER.map((v) => ({ value: String(v), label: offLabel(v) })),
+                String(screen?.off_after ?? ""),
+                (v) => set({ off_after: Number(v) }),
+              ),
+            ),
+          )}
+        </div>`,
       "settings-page",
     );
   }

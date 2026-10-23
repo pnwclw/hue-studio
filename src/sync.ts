@@ -1,7 +1,7 @@
 // Sync Box: which room a box syncs, what a command will change. Pure functions, no DOM.
 
 import type { Group } from "./model.ts";
-import type { SyncArea, SyncBoxInfo, SyncChange } from "./types.ts";
+import type { SyncArea, SyncBoxInfo, SyncChange, SyncInput } from "./types.ts";
 
 export const SYNC_MODES = ["video", "music", "game"] as const;
 export const INTENSITIES = ["subtle", "moderate", "high", "intense"] as const;
@@ -11,6 +11,23 @@ export const IR_ACTIONS = [
   "toggle_sync", "sync_on", "sync_off", "power_off", "passthrough", "mode_video", "mode_music", "mode_game",
   "next_mode", "next_input", "next_intensity", "brighter", "darker", "toggle_background",
 ] as const;
+
+/** What a picture on an input starts (sync_follow.ACTIONS); absent: nothing. */
+export const FOLLOW_ACTIONS = ["passthrough", "video", "game", "music"] as const;
+/** How long the linked screen stays on without a picture, in seconds (0: always). */
+export const SCREEN_OFF_AFTER = [60, 120, 300, 600, 1800, 3600, 0] as const;
+
+// Device types the Sync Box app offers for inputs -> MDI icons.
+const INPUT_ICONS: [RegExp, string][] = [
+  [/appletv/, "mdi:apple"],
+  [/xbox|playstation|nintendo|game/, "mdi:controller"],
+  [/desktop|laptop|monitor|pc/, "mdi:mouse"],
+  [/phone/, "mdi:cellphone"],
+  [/diskplayer/, "mdi:disc-player"],
+  [/roku|shield|chromecast|firetv|settopbox|satellite|video/, "mdi:television-box"],
+  [/music|speaker|soundbar|avreceiver/, "mdi:speaker"],
+];
+export const inputIcon = (input: SyncInput | null | undefined): string => (input && INPUT_ICONS.find(([re]) => re.test(input.type || ""))?.[1]) || "mdi:hdmi-port";
 
 /** Whether a directly paired box offers a feature (a linked one offers none of these). */
 export const hasFeature = (box: SyncBoxInfo, feature: NonNullable<SyncBoxInfo["features"]>[number]): boolean => !!box.features?.includes(feature);

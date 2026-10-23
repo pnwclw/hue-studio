@@ -64,6 +64,7 @@ from .positions import async_setup_positions
 from .rooms import async_align, async_track_areas
 from .services import async_setup_services
 from .sync import SyncBoxCoordinator, async_track_entertainment
+from .sync_follow import PictureFollower
 from .sync_link import SyncBoxLink
 from .websocket import async_setup_websocket
 
@@ -253,6 +254,7 @@ async def _async_setup_sync_box(
     entry.runtime_data = HueStudioData(sync=coordinator)
     entry.async_on_unload(api.close)
     async_track_entertainment(hass, coordinator)
+    entry.async_on_unload(PictureFollower(hass, coordinator).async_start())
     await hass.config_entries.async_forward_entry_setups(entry, SYNC_BOX_PLATFORMS)
     return True
 

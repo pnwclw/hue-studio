@@ -34,6 +34,7 @@ from aiohuesyncbox import (
     LedMode,
     MusicMode,
     MusicPalette,
+    PortStatus,
     Presets,
     SyncMode,
     Unauthorized,
@@ -58,6 +59,7 @@ from .const import (
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
 from .lights import LIGHT_DOMAIN, async_bridges
+from .sync_follow import follow_info
 
 if TYPE_CHECKING:
     from . import HueStudioConfigEntry
@@ -328,6 +330,13 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
     def state(self) -> SyncState:
         """Interpreted state."""
         return SyncState.of(self.api)
+
+    def links(self) -> dict[str, bool]:
+        """Whether each HDMI input gets a picture (TMDS) now."""
+        return {
+            key: port.status == PortStatus.LINKED
+            for key, port in inputs(self.api).items()
+        }
 
     def panel_info(self) -> dict[str, Any]:
         """The payload of hue_studio/sync/subscribe for this box."""
@@ -720,8 +729,10 @@ def sync_box_info(
         if api.ir
         else None,
         # What only a directly paired box can do (not one linked through huesyncbox).
-        "features": ["palette", "background_lighting", "presets", "settings"]
+        "features": ["palette", "background_lighting", "presets", "settings", "follow"]
         + (["ir"] if api.ir else []),
+        # What a picture on an input starts, and the screen linked with the box.
+        **follow_info(coordinator),
         "device": {
             "id": coordinator.box_id,
             "host": api.device.ip_address,

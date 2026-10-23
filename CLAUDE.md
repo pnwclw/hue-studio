@@ -282,7 +282,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
                                 hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/skip|move/finish|move/subscribe,
                                 hue_studio/bridges/lost/subscribe|find|forget,
-                                hue_studio/sync/configure|link_bridge
+                                hue_studio/sync/configure|follow|link_bridge
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   devices.py                    adding devices: Zigbee search (serials, other brands, install codes from QR codes where the
@@ -318,6 +318,10 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV, Bluetooth for the
                                 Hue Sync app's Wi-Fi change), link to bridge entertainment areas, moving it to another bridge
                                 (that bridge's button: its own entertainment credentials, the area of the same name)
+  sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): an
+                                input getting a picture (`linked`) switches the box to it in its own mode, another input
+                                with a picture takes over when it is gone; a screen (media_player) linked with the box
+                                turns on onto its input and off without a picture. Edges only; the box entry's options
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities; the Hue Studio entry's phase sensor and mood select
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+

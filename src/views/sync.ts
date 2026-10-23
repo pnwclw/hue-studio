@@ -13,8 +13,8 @@ import { styleMap } from "lit/directives/style-map.js";
 import { BrightnessControl, type BrightnessSource, tileCard } from "../controls.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { currentArea, currentInput, hasFeature, INTENSITIES, IR_ACTIONS, PALETTES, statusKey, SYNC_MODES } from "../sync.ts";
-import type { SyncBoxInfo, SyncChange, SyncInput, SyncIrCode } from "../types.ts";
+import { currentArea, currentInput, hasFeature, inputIcon, INTENSITIES, IR_ACTIONS, PALETTES, statusKey, SYNC_MODES } from "../sync.ts";
+import type { SyncBoxInfo, SyncChange, SyncIrCode } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -33,18 +33,6 @@ const WAVES: Record<string, string> = {
 };
 const wave = (level: string) =>
   html`<svg class="wave" viewBox="0 0 24 24" aria-hidden="true">${svg`<path d=${WAVES[level]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`}</svg>`;
-
-// Device types the Sync Box app offers for inputs -> MDI icons.
-const INPUT_ICONS: [RegExp, string][] = [
-  [/appletv/, "mdi:apple"],
-  [/xbox|playstation|nintendo|game/, "mdi:controller"],
-  [/desktop|laptop|monitor|pc/, "mdi:mouse"],
-  [/phone/, "mdi:cellphone"],
-  [/diskplayer/, "mdi:disc-player"],
-  [/roku|shield|chromecast|firetv|settopbox|satellite|video/, "mdi:television-box"],
-  [/music|speaker|soundbar|avreceiver/, "mdi:speaker"],
-];
-const inputIcon = (input: SyncInput | null | undefined): string => (input && INPUT_ICONS.find(([re]) => re.test(input.type || ""))?.[1]) || "mdi:hdmi-port";
 
 /** Brightness commands to the box while dragging (it handles a few per second). */
 const BRIGHTNESS_INTERVAL = 300;

@@ -60,6 +60,13 @@ KIND_SYNC_BOX: Final = "sync_box"
 # registration on the box.
 CONF_BOX_ID: Final = "box_id"
 CONF_REGISTRATION_ID: Final = "registration_id"
+# Sync Box entry options (sync_follow.py): what the box does when an input gets a
+# picture, and the screen it turns on and off.
+# {"follow": {<input1-4>: "passthrough" | "video" | "game" | "music"},
+#  "screen": {"entity_id": <media_player>, "source": str | None,
+#             "off_after": seconds without a picture (0: never)}}
+CONF_FOLLOW: Final = "follow"
+CONF_SCREEN: Final = "screen"
 
 # Bridge event: an entertainment area started or stopped streaming.
 SIGNAL_ENTERTAINMENT_UPDATED: Final = "hue_studio_entertainment_updated"
