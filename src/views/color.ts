@@ -27,7 +27,7 @@ import {
   wheelYToMirek,
   xyToWheel,
 } from "../color.ts";
-import { brightnessSender, commandInterval, lightTile } from "../controls.ts";
+import { BrightnessControl, type BrightnessSource, brightnessSender, commandInterval, lightTile } from "../controls.ts";
 import { availableEffects } from "../effects.ts";
 import { haptic, leavePanel, openStockMoreInfo } from "../ha-internals.ts";
 import { type Group, groupOfEntity, groupState, lightIcon } from "../model.ts";
@@ -54,10 +54,6 @@ const GRADIENT_MODES = ["interpolated_palette", "interpolated_palette_mirrored",
 const SENDER = "color:";
 
 const pct = (v: number) => `${((v + 1) / 2) * 100}%`;
-/** Height (px) of the brightness slider the button opens: the whole range over it. */
-const BRIGHT_TRACK = 240;
-/** Finger travel (px) that makes a press on the brightness button a drag, not a tap. */
-const BRIGHT_SLOP = 6;
 
 /** An entry of the "..." menu; `run` gets the picked light (or null: the whole group). */
 export interface MenuItem {
@@ -168,20 +164,11 @@ export class ColorView extends StudioView {
   /** White pins only use their height; where they were dropped sideways (pin key -> x). */
   private whiteX = new Map<string, number>();
 
-  @state() private accessor dragBrightness: number | null = null;
   @state() private accessor menuOpen = false;
   /** The "Save" sheet (a new scene from what the lights show now) is open. */
   @state() private accessor saving = false;
-  /**
-   * The brightness slider the button opens (the Hue app's): `at` is the button's place on
-   * screen, the slider grows up from it. Opened by a press: dragging right away changes the
-   * brightness from where it was and closes on release; a tap leaves it open to drag or tap.
-   */
-  @state() private accessor bri: { at: DOMRect; held: boolean } | null = null;
-  /** A press on the button or the open slider: a swipe moves the brightness from `start`, by how far the finger went. */
-  private briDrag: { id: number; y: number; start: number; moved: boolean; from: "button" | "track" } | null = null;
-  /** Mouse wheel turns: the last one is sent exactly after a pause. */
-  private wheelTimer?: ReturnType<typeof setTimeout>;
+  /** The brightness button and the slider it opens (the Hue app's). */
+  private readonly bri = new BrightnessControl(this);
   /** The body scrolled down (the effects title moves into the bar). */
   @state() private accessor scrolled = false;
   @state() private accessor adjust: { custom: Custom; start: boolean } | null = null;
@@ -372,7 +359,7 @@ export class ColorView extends StudioView {
               </div>
               <div class="grow"></div>
               ${mode === "color" ? this.styleButton() : nothing}
-              ${this.brightness(target)}
+              ${this.bri.button(this.briSource(target))}
             </div>`
           : nothing}
         ${idle && busy.length ? this.syncNote(busy, false) : nothing}
@@ -391,7 +378,7 @@ export class ColorView extends StudioView {
     `;
     // Sheets and the brightness slider sit outside the scrolling body: a scroller (iOS) would clip them.
     const layers = html`
-      ${this.bri ? this.briLayer(target) : nothing}
+      ${this.bri.layer(this.briSource(target))}
       ${this.styleOpen ? this.styleSheet() : nothing}
       ${this.adjust
         ? html`<hue-studio-effect-sheet
@@ -449,43 +436,6 @@ export class ColorView extends StudioView {
     </div>`;
   }
 
-  /** The Hue app's brightness button: its value above it; a press opens the slider. */
-  private brightness(target: Group) {
-    const { ctx } = this;
-    const state = groupState(ctx.hass, target, ctx.lightInfo);
-    const value = this.dragBrightness ?? state.brightness;
-    const inert = !state.on || !state.available;
-    const down = (e: PointerEvent) => {
-      if (inert) return;
-      const at = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      this.capture(e);
-      this.briDrag = { id: e.pointerId, y: e.clientY, start: value, moved: false, from: "button" };
-      haptic("light");
-      this.bri = { at, held: true };
-    };
-    const key = (e: KeyboardEvent) => {
-      if (inert || (e.key !== "Enter" && e.key !== " ")) return;
-      e.preventDefault();
-      this.bri = { at: (e.currentTarget as HTMLElement).getBoundingClientRect(), held: false };
-    };
-    return html`<div class=${classMap({ bri: true, off: inert, open: !!this.bri })}>
-      <div class="bri-value">${state.on ? `${value}%` : ""}</div>
-      <button
-        class="bri-pill"
-        aria-label=${ctx.t("common.brightness")}
-        aria-haspopup="dialog"
-        ?disabled=${inert}
-        style=${styleMap({ "--level": `${state.on ? value : 0}%` })}
-        @pointerdown=${down}
-        @pointermove=${(e: PointerEvent) => this.briMove(e, target)}
-        @pointerup=${(e: PointerEvent) => this.briUp(e, target)}
-        @pointercancel=${(e: PointerEvent) => this.briUp(e, target)}
-        @wheel=${{ handleEvent: (e: WheelEvent) => !inert && this.briWheel(e, target, value), passive: false }}
-        @keydown=${key}
-      >${icon("sun")}</button>
-    </div>`;
-  }
-
   private capture(e: PointerEvent): void {
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -494,100 +444,12 @@ export class ColorView extends StudioView {
     }
   }
 
-  private briSet(target: Group, v: number): void {
-    const next = Math.min(100, Math.max(1, Math.round(v)));
-    const prev = this.dragBrightness;
-    // A tick every 10 %, a firmer one at either end.
-    if (prev !== null && prev !== next) {
-      if (next === 1 || next === 100) haptic("light");
-      else if (Math.floor(prev / 10) !== Math.floor(next / 10)) haptic("selection");
-    }
-    this.dragBrightness = next;
-    brightnessSender(this.ctx, target)(this.dragBrightness);
-  }
-
-  private briMove(e: PointerEvent, target: Group): void {
-    const d = this.briDrag;
-    if (!d || d.id !== e.pointerId) return;
-    if (!d.moved && Math.abs(e.clientY - d.y) < BRIGHT_SLOP) return;
-    d.moved = true;
-    // Up is brighter, by the distance travelled: never jumps to where the finger is.
-    this.briSet(target, d.start + ((d.y - e.clientY) / BRIGHT_TRACK) * 100);
-  }
-
-  /**
-   * Taps only open and close: a tap on the button opens the slider, a tap on the open
-   * slider closes it. A swipe changes the brightness; started on the button it is the
-   * press-and-drag gesture, so the slider closes with the release.
-   */
-  private briUp(e: PointerEvent, target: Group): void {
-    const d = this.briDrag;
-    if (!d || d.id !== e.pointerId) return;
-    this.briDrag = null;
-    if (d.moved) {
-      brightnessSender(this.ctx, target).flush();
-      this.dragBrightness = null;
-    }
-    if (d.from === "button" ? d.moved : !d.moved) {
-      if (!d.moved) haptic("light");
-      this.bri = null;
-    } else if (this.bri) this.bri = { ...this.bri, held: false };
-  }
-
-  /** The mouse wheel (desktop): up is brighter, about 4 % a notch; the value is sent exactly after a pause. */
-  private briWheel(e: WheelEvent, target: Group, value: number): void {
-    e.preventDefault();
-    const lines = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 33 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1;
-    this.briSet(target, (this.dragBrightness ?? value) - e.deltaY * lines * 0.04);
-    clearTimeout(this.wheelTimer);
-    this.wheelTimer = setTimeout(() => {
-      brightnessSender(this.ctx, target).flush();
-      this.dragBrightness = null;
-    }, 400);
-  }
-
-  /** The open brightness slider over a dimmed screen. */
-  private briLayer(target: Group) {
+  /** The brightness button and slider (controls.ts) on the group's lights. */
+  private briSource(target: Group): BrightnessSource {
     const { ctx } = this;
-    const { at } = this.bri!;
     const state = groupState(ctx.hass, target, ctx.lightInfo);
-    const value = this.dragBrightness ?? state.brightness;
-    const close = () => {
-      brightnessSender(ctx, target).flush();
-      this.dragBrightness = null;
-      this.bri = null;
-    };
-    const down = (e: PointerEvent) => {
-      this.capture(e);
-      this.briDrag = { id: e.pointerId, y: e.clientY, start: value, moved: false, from: "track" };
-    };
-    const key = (e: KeyboardEvent) => {
-      const step = { ArrowUp: 5, ArrowRight: 5, ArrowDown: -5, ArrowLeft: -5 }[e.key];
-      if (e.key === "Escape") close();
-      if (!step) return;
-      e.preventDefault();
-      this.briSet(target, value + step);
-    };
-    const place = { left: `${at.left}px`, width: `${at.width}px`, top: `${at.bottom - BRIGHT_TRACK}px`, height: `${BRIGHT_TRACK}px` };
-    return html`<div class="bri-layer" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="bri-chip" style=${styleMap({ left: `${at.left + at.width / 2}px`, top: `${at.bottom - BRIGHT_TRACK - 40}px` })}>${value}%</div>
-      <div
-        class="bri-track"
-        role="slider"
-        tabindex="0"
-        aria-label=${ctx.t("common.brightness")}
-        aria-valuemin="1"
-        aria-valuemax="100"
-        aria-valuenow=${value}
-        style=${styleMap({ ...place, "--level": `${value}%` })}
-        @pointerdown=${down}
-        @pointermove=${(e: PointerEvent) => this.briMove(e, target)}
-        @pointerup=${(e: PointerEvent) => this.briUp(e, target)}
-        @pointercancel=${(e: PointerEvent) => this.briUp(e, target)}
-        @wheel=${{ handleEvent: (e: WheelEvent) => this.briWheel(e, target, value), passive: false }}
-        @keydown=${key}
-      >${icon("sun")}</div>
-    </div>`;
+    const send = brightnessSender(ctx, target);
+    return { value: state.brightness, inert: !state.on || !state.available, label: ctx.t("common.brightness"), send: (v) => send(v), flush: () => send.flush() };
   }
 
   private wheel(mode: Mode) {

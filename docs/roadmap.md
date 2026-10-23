@@ -474,6 +474,13 @@ no more work goes into them — no fixes, no features, no bringing it back.
 
 ### S. The Sync Box screen, reworked (2026-10-22)
 
+**Done (2026-10-23):** the Sync tab is the Hue app's (measured on its iOS screens): the
+input's picture, mode / intensity / brightness as three buttons with their popovers, a dock
+with what (inputs on a sheet), start/stop and where (entertainment areas on a sheet); "⋯"
+holds the box's settings, presets and remote buttons, the mode popover background lighting
+and the music palette (direct pairing). The brightness control is shared with the color
+screen (`BrightnessControl`).
+
 The Sync tab and a box's page get the same pass the rooms, scenes and automations got:
 the Hue app's Sync screens as the reference (modes, intensity, inputs, the entertainment
 area, music and background lighting), laid out on the design system (DS). Direct pairing
@@ -524,7 +531,7 @@ G2 for automations) -> J. Done so far: A, B, C, D, R, D2, E (except the HACS sub
 for later), F, G, J and G2 (scenes 2026-10-21, automations with G). K is dropped.
 
 Next (2026-10-22): **DS** (the design system, first: everything after it is built on it;
-done) -> **S** (the Sync Box screen) -> **I** (one
+done) -> **S** (the Sync Box screen; done) -> **I** (one
 style for every dashboard) -> **H** (Hue Secure, last).
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial

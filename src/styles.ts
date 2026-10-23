@@ -614,47 +614,94 @@ export const CSS = `
   .tv { width: 44px; height: 44px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
         background: var(--fill-light); }
   .tv svg { width: 24px; height: 24px; }
-  .sync .chips.boxes { margin-top: 12px; }
-  .sync-hero { position: relative; isolation: isolate; overflow: hidden; margin-top: 16px; padding: 18px 18px 16px; border-radius: var(--r-3xl);
-               background: var(--surface); box-shadow: var(--shadow-raised); }
-  .sync-hero .name { font-size: var(--fs-headline); font-weight: 500; }
-  .sync-hero .status { margin-top: 2px; font-size: var(--fs-callout); }
-  .sync-hero .center { margin-top: 18px; }
-  .sync-hero .area-line { margin-top: 10px; text-align: center; }
-  .sync-hero.off .tv { opacity: 0.5; }
   .pill.go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 180px; background: #fff; color: var(--text-dark); }
   .pill.go svg { width: 18px; height: 18px; }
   .pill.go.stop { background: rgba(0, 0, 0, 0.35); color: #fff; }
-  .sync-body { transition: opacity 0.3s; }
-  .rows.bright-row { margin-top: 22px; }
-  .sync-body.disabled { opacity: 0.4; pointer-events: none; }
-  .sync-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  .mode-tile { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 8px;
-               padding: 16px 6px 14px; border: 2px solid transparent; border-radius: var(--r-m); cursor: pointer; background: var(--surface);
-               font-size: var(--fs-callout); font-weight: 500; transition: border-color 0.2s, transform var(--t-press) var(--ease); }
-  .mode-tile::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity 0.4s var(--ease);
-                       background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3)); }
-  .mode-tile:nth-child(1) { --g1: #3a5bff; --g2: #b03cff; --g3: #ff3d8b; }
-  .mode-tile:nth-child(2) { --g1: #ff3d8b; --g2: #ff8a3d; --g3: #ffd23d; }
-  .mode-tile:nth-child(3) { --g1: #19e6a0; --g2: #19b5ff; --g3: #6a5bff; }
-  .mode-tile ha-icon { --mdc-icon-size: 30px; }
-  .mode-tile:active { transform: scale(var(--press-tile)); }
-  .mode-tile.on { border-color: var(--selected); }
-  .mode-tile.live::before { opacity: 0.85; }
-  .mode-tile.unsupported { opacity: 0.5; }
   .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 2px; border-radius: var(--r-s);
          background: var(--fill-soft); }
   .seg button { height: 34px; border: none; border-radius: var(--r-s); cursor: pointer; background: transparent; font-size: var(--fs-footnote); font-weight: 500;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; transition: background 0.2s var(--ease); }
   .seg button.on { background: var(--segment-on); font-weight: 500; box-shadow: var(--shadow-flat); }
-  .grid.inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Sync (views/sync.ts), the Hue app's Sync tab: no title, what plays as a picture with its name and
+     status, mode / intensity / brightness as three buttons under small capitals, a dock with what
+     (the HDMI input), start / stop and where (the entertainment area). */
+  .page.sync-page > h1.tab-title { display: none; }
+  .screen-head:has(+ .screen-body > .page.sync-page) { background-color: transparent; border-bottom-color: transparent;
+    -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .screen-head:has(+ .screen-body > .page.sync-page) .bar-title { visibility: hidden; }
+  /* The Hue app's sizes on a tall phone; on shorter screens the picture and the gaps give way, so the dock stays in view. */
+  .page.sync-page { display: flex; flex-direction: column; min-height: 100%; padding-bottom: 8px; }
+  .sync-stage { display: flex; flex: 1; flex-direction: column; align-items: center; align-self: center; width: 100%; max-width: 440px; }
+  .sync-stage > .chips.boxes { align-self: stretch; }
+  .sync-stage .caps { font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
+  .sync-picture { position: relative; isolation: isolate; overflow: hidden; display: flex; flex: none; align-items: center; justify-content: center;
+                  width: min(238px, 58vw, 26dvh); aspect-ratio: 1; margin-top: clamp(8px, 4dvh, 48px); background: var(--surface); box-shadow: var(--shadow-raised); }
+  .sync-picture ha-icon { --mdc-icon-size: 120px; opacity: 0.88; transition: opacity 0.3s; }
+  .sync-picture.off ha-icon { opacity: 0.4; }
+  .sync-caption { margin-top: clamp(14px, 2.6dvh, 26px); text-align: center; }
+  .sync-what { margin-top: 6px; font-size: var(--fs-title-3); font-weight: 500; }
+  .sync-status { margin-top: 4px; font-size: var(--fs-body); color: var(--text-2); }
+  .sync-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; width: 100%; max-width: 336px; margin-top: auto;
+                   padding-top: clamp(28px, 5dvh, 64px); transition: opacity 0.3s; }
+  .sync-controls.inert { opacity: 0.4; pointer-events: none; }
+  .sync-ctl { position: relative; display: flex; }
+  .sync-ctl .bri-value { font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; bottom: calc(100% + 10px); }
+  .sync-ctl > .bri { flex: 1; margin: 0; }
+  .sync-ctl .bri-pill { width: 100%; }
+  .sync-pill { flex: 1; display: flex; align-items: center; justify-content: center; height: 48px; padding: 0; border: none; border-radius: var(--r-full);
+               background: var(--surface-raised); color: var(--text); cursor: pointer; transition: transform var(--t-press) var(--ease); }
+  .sync-pill:active { transform: scale(var(--press-tile)); }
+  .sync-pill ha-icon { --mdc-icon-size: 28px; }
+  svg.wave { width: 28px; height: 28px; }
+  .sync-dock { display: flex; align-items: center; justify-content: space-around; width: 100%; box-sizing: border-box; margin: 20px 0 4px;
+               padding: 18px 8px 14px; border-radius: var(--r-3xl); background: var(--bar-bottom); transition: opacity 0.3s; }
+  .sync-dock.inert { opacity: 0.4; pointer-events: none; }
+  .dock-side { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 112px; min-width: 0; padding: 0; border: none;
+               background: none; color: var(--text); cursor: pointer; }
+  .dock-side:disabled { opacity: 0.4; cursor: default; }
+  .dock-round { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%;
+                background: var(--surface-raised); transition: transform var(--t-press) var(--ease); }
+  .dock-side:active .dock-round { transform: scale(var(--press-round)); }
+  .dock-round ha-icon { --mdc-icon-size: 26px; }
+  .dock-value { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-footnote); color: var(--text-2); }
+  .dock-go { display: flex; flex: none; align-items: center; justify-content: center; width: 76px; height: 76px; padding: 0; border: none; border-radius: 50%;
+             background: var(--surface-raised); color: var(--text); cursor: pointer; transition: transform var(--t-press) var(--ease), background 0.3s; }
+  .dock-go:active { transform: scale(var(--press-round)); }
+  .dock-go:disabled { opacity: 0.4; cursor: default; }
+  .dock-go svg { width: 40px; height: 40px; }
+  .dock-go.on { background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3)); }
+  /* Mode and intensity: a card above the controls over a dimmed screen, the chosen option white. */
+  .pop-layer { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.6); animation: fade 0.2s ease; }
+  .pop-card { position: fixed; box-sizing: border-box; padding: 18px 16px 16px; transform: translateX(-50%);
+              border-radius: var(--r-3xl); background: var(--surface-row); box-shadow: var(--shadow-overlay); animation: pop-up 0.3s var(--spring); }
+  @keyframes pop-up { from { opacity: 0; transform: translateX(-50%) scale(0.94) translateY(8px); } }
+  .pop-title { margin: 0 0 18px; font-size: var(--fs-body); font-weight: 500; }
+  .pop-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pop-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100px; padding: 0; border: none;
+              border-radius: var(--r-m); background: var(--surface); color: var(--text); cursor: pointer; font-size: var(--fs-label); font-weight: 500;
+              letter-spacing: 1.4px; text-transform: uppercase; box-shadow: var(--shadow-flat); transition: background 0.2s, color 0.2s, transform var(--t-press) var(--ease); }
+  .pop-mode ha-icon { --mdc-icon-size: 24px; }
+  .pop-mode:active, .pop-wave:active { transform: scale(var(--press-tile)); }
+  .pop-mode.unsupported { opacity: 0.4; }
+  :is(.pop-mode, .pop-wave).on { background: var(--selected); color: var(--text-dark); }
+  .pop-waves { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .pop-wave { display: flex; align-items: center; justify-content: center; height: 48px; padding: 0; border: none; border-radius: var(--r-full);
+              background: var(--surface-raised); color: var(--text); cursor: pointer; box-shadow: var(--shadow-flat); transition: background 0.2s, color 0.2s; }
+  .pop-sub { margin: 18px 0 8px; }
+  .pop-row { display: flex; align-items: center; gap: 12px; margin-top: 18px; font-size: var(--fs-body); }
+  .pop-row .grow { flex: 1; min-width: 0; }
+  /* "What": the box's inputs as light tiles, a check where the switch would be. */
+  .input-row { display: flex; gap: var(--tile-gap); overflow-x: auto; padding: 0 16px 16px; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .input-row::-webkit-scrollbar { display: none; }
+  .input-row .tile-card { flex: none; width: var(--light-tile); }
+  .input-row .tile-card.unplugged { opacity: 0.55; }
+  .sync-sheet .form-body { padding-bottom: calc(16px + var(--safe-bottom)); }
   .palettes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
   .palette { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: var(--r-m); border: 1.5px solid transparent;
              background: var(--surface); cursor: pointer; font-size: var(--fs-footnote); text-align: left; }
   .palette.on { border-color: var(--selected); }
   .palette .art { width: 34px; height: 34px; flex: none; border-radius: 50%; }
   .select.wide { width: 100%; margin-top: 10px; }
-  .rows.mode-extra { margin-top: 10px; }
   .chips.wrap { flex-wrap: wrap; overflow: visible; }
   .dot-badge.live { background: var(--ok); }
   .hint.warn, .dim.warn, .small.warn { color: var(--warn); }
@@ -698,20 +745,6 @@ export const CSS = `
   .rows .item.fresh { animation: pop 0.35s var(--ease); }
   .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
   .item.col .field { margin-top: 10px; }
-  .input-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border: none; border-radius: var(--r-m);
-                cursor: pointer; text-align: left; background: var(--surface); box-shadow: var(--shadow-flat);
-                transition: transform var(--t-press) var(--ease), box-shadow 0.2s; }
-  .input-tile:active { transform: scale(var(--press-tile)); }
-  .input-tile ha-icon { --mdc-icon-size: 26px; margin-bottom: 6px; }
-  .input-tile .name { font-size: var(--fs-body); font-weight: 500; }
-  .input-tile .dim { display: flex; align-items: center; gap: 6px; }
-  .input-tile.on { box-shadow: 0 0 0 2px var(--selected), var(--shadow-flat); }
-  .input-tile.unplugged { opacity: 0.5; }
-  .led { width: 7px; height: 7px; border-radius: 50%; background: #8e8e93; }
-  .led.linked { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
-  .led.plugged { background: var(--warn); }
-  .rows.areas .item { width: 100%; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
-  .rows.areas ha-icon { color: var(--text-2); }
   .radio { width: 24px; height: 24px; flex: none; box-sizing: border-box; border: 2px solid var(--text-3); border-radius: 50%;
            transition: border 0.2s var(--ease); }
   .on > .radio { border: 7px solid var(--accent); }
@@ -1305,8 +1338,6 @@ export const CSS = `
     .tiles { grid-auto-flow: row; grid-template-rows: none; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
              overflow: visible; margin: 0; padding: 0; }
     .searching { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
-    .grid.inputs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .sync-hero { padding: 24px; }
     .tile:hover, .card:hover, .tile-card:hover, .control-card:hover { transform: translateY(-1px); }
     h1.big { font-size: var(--fs-large); }
     /* Room header: a card in the column instead of a sheet glued to the top edge. */

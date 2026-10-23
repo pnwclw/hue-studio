@@ -1,7 +1,7 @@
 // Room/zone controls shared by the home cards, the room header, the color view and the
 // more-info dialog: the brightness slider, group state classes and throttled commands.
 
-import { html, nothing, type PropertyValues, type TemplateResult } from "lit";
+import { html, nothing, type PropertyValues, type ReactiveController, type ReactiveControllerHost, type TemplateResult } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -41,6 +41,196 @@ export function brightnessSender(ctx: StudioContext, group: Group): Throttled<[n
   return ctx.sender(`bri:${group.key}:${target.join(",")}`, interval, (v: number) =>
     ctx.call("light", "turn_on", { entity_id: target, brightness_pct: v, transition: DRAG_TRANSITION }),
   );
+}
+
+/** What the brightness control shows and drives: a group of lights (the color screen), a Sync Box. */
+export interface BrightnessSource {
+  /** The value while nobody drags, 1–100. */
+  value: number;
+  /** Off or unavailable: the button can't be used. */
+  inert: boolean;
+  /** Above the button in place of its value (the Sync screen's "BRIGHTNESS"). */
+  caption?: string;
+  label: string;
+  send(value: number): void;
+  flush(): void;
+}
+
+/** Height (px) of the open slider (the whole range over it), and the finger travel that makes a press a drag, not a tap. */
+const BRIGHT_TRACK = 240;
+const BRIGHT_SLOP = 6;
+
+/**
+ * The Hue app's brightness button: its value above it; a press opens a slider growing up
+ * from it over a dimmed screen. Dragging right away changes the brightness from where it
+ * was and closes on release; a tap leaves it open to drag or tap. The host renders
+ * `button()` where it sits and `layer()` outside any scrolling element (iOS clips them).
+ */
+export class BrightnessControl implements ReactiveController {
+  /** The value being dragged to (shown instead of the source's). */
+  drag: number | null = null;
+  /** The open slider: the button's place on screen; `held` while the press that opened it lasts. */
+  private open: { at: DOMRect; held: boolean } | null = null;
+  /** A press on the button or the open slider: a swipe moves the brightness from `start`, by how far the finger went. */
+  private press: { id: number; y: number; start: number; moved: boolean; from: "button" | "track" } | null = null;
+  /** Mouse wheel turns: the last one is sent exactly after a pause. */
+  private wheelTimer?: ReturnType<typeof setTimeout>;
+
+  private readonly host: ReactiveControllerHost;
+
+  constructor(host: ReactiveControllerHost) {
+    this.host = host;
+    host.addController(this);
+  }
+
+  hostDisconnected(): void {
+    clearTimeout(this.wheelTimer);
+  }
+
+  get isOpen(): boolean {
+    return this.open !== null;
+  }
+
+  button(src: BrightnessSource): TemplateResult {
+    const value = this.drag ?? src.value;
+    const down = (e: PointerEvent) => {
+      if (src.inert) return;
+      this.capture(e);
+      this.press = { id: e.pointerId, y: e.clientY, start: value, moved: false, from: "button" };
+      haptic("light");
+      this.open = { at: (e.currentTarget as HTMLElement).getBoundingClientRect(), held: true };
+      this.host.requestUpdate();
+    };
+    const key = (e: KeyboardEvent) => {
+      if (src.inert || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      this.open = { at: (e.currentTarget as HTMLElement).getBoundingClientRect(), held: false };
+      this.host.requestUpdate();
+    };
+    return html`<div class=${classMap({ bri: true, off: src.inert, open: this.isOpen, captioned: !!src.caption })}>
+      <div class="bri-value">${src.caption ?? (src.inert ? "" : `${value}%`)}</div>
+      <button
+        class="bri-pill"
+        aria-label=${src.label}
+        aria-haspopup="dialog"
+        ?disabled=${src.inert}
+        style=${styleMap({ "--level": `${src.inert ? 0 : value}%` })}
+        @pointerdown=${down}
+        @pointermove=${(e: PointerEvent) => this.move(e, src)}
+        @pointerup=${(e: PointerEvent) => this.up(e, src)}
+        @pointercancel=${(e: PointerEvent) => this.up(e, src)}
+        @wheel=${{ handleEvent: (e: WheelEvent) => !src.inert && this.wheel(e, src, value), passive: false }}
+        @keydown=${key}
+      >${icon("sun")}</button>
+    </div>`;
+  }
+
+  /** The open slider over a dimmed screen (nothing while closed). */
+  layer(src: BrightnessSource): TemplateResult | typeof nothing {
+    if (!this.open) return nothing;
+    const { at } = this.open;
+    const value = this.drag ?? src.value;
+    const close = () => {
+      src.flush();
+      this.drag = null;
+      this.open = null;
+      this.host.requestUpdate();
+    };
+    const down = (e: PointerEvent) => {
+      this.capture(e);
+      this.press = { id: e.pointerId, y: e.clientY, start: value, moved: false, from: "track" };
+    };
+    const key = (e: KeyboardEvent) => {
+      const step = { ArrowUp: 5, ArrowRight: 5, ArrowDown: -5, ArrowLeft: -5 }[e.key];
+      if (e.key === "Escape") close();
+      if (!step) return;
+      e.preventDefault();
+      this.set(src, value + step);
+    };
+    const place = { left: `${at.left}px`, width: `${at.width}px`, top: `${at.bottom - BRIGHT_TRACK}px`, height: `${BRIGHT_TRACK}px` };
+    return html`<div class="bri-layer" @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="bri-chip" style=${styleMap({ left: `${at.left + at.width / 2}px`, top: `${at.bottom - BRIGHT_TRACK - 40}px` })}>${value}%</div>
+      <div
+        class="bri-track"
+        role="slider"
+        tabindex="0"
+        aria-label=${src.label}
+        aria-valuemin="1"
+        aria-valuemax="100"
+        aria-valuenow=${value}
+        style=${styleMap({ ...place, "--level": `${value}%` })}
+        @pointerdown=${down}
+        @pointermove=${(e: PointerEvent) => this.move(e, src)}
+        @pointerup=${(e: PointerEvent) => this.up(e, src)}
+        @pointercancel=${(e: PointerEvent) => this.up(e, src)}
+        @wheel=${{ handleEvent: (e: WheelEvent) => this.wheel(e, src, value), passive: false }}
+        @keydown=${key}
+      >${icon("sun")}</div>
+    </div>`;
+  }
+
+  private capture(e: PointerEvent): void {
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // A pointer that is already gone: the drag still works while over the element.
+    }
+  }
+
+  private set(src: BrightnessSource, v: number): void {
+    const next = Math.min(100, Math.max(1, Math.round(v)));
+    const prev = this.drag;
+    // A tick every 10 %, a firmer one at either end.
+    if (prev !== null && prev !== next) {
+      if (next === 1 || next === 100) haptic("light");
+      else if (Math.floor(prev / 10) !== Math.floor(next / 10)) haptic("selection");
+    }
+    this.drag = next;
+    src.send(next);
+    this.host.requestUpdate();
+  }
+
+  private move(e: PointerEvent, src: BrightnessSource): void {
+    const d = this.press;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.moved && Math.abs(e.clientY - d.y) < BRIGHT_SLOP) return;
+    d.moved = true;
+    // Up is brighter, by the distance travelled: never jumps to where the finger is.
+    this.set(src, d.start + ((d.y - e.clientY) / BRIGHT_TRACK) * 100);
+  }
+
+  /**
+   * Taps only open and close: a tap on the button opens the slider, a tap on the open
+   * slider closes it. A swipe changes the brightness; started on the button it is the
+   * press-and-drag gesture, so the slider closes with the release.
+   */
+  private up(e: PointerEvent, src: BrightnessSource): void {
+    const d = this.press;
+    if (!d || d.id !== e.pointerId) return;
+    this.press = null;
+    if (d.moved) {
+      src.flush();
+      this.drag = null;
+    }
+    if (d.from === "button" ? d.moved : !d.moved) {
+      if (!d.moved) haptic("light");
+      this.open = null;
+    } else if (this.open) this.open = { ...this.open, held: false };
+    this.host.requestUpdate();
+  }
+
+  /** The mouse wheel (desktop): up is brighter, about 4 % a notch; the value is sent exactly after a pause. */
+  private wheel(e: WheelEvent, src: BrightnessSource, value: number): void {
+    e.preventDefault();
+    const lines = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? 33 : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? 400 : 1;
+    this.set(src, (this.drag ?? value) - e.deltaY * lines * 0.04);
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = setTimeout(() => {
+      src.flush();
+      this.drag = null;
+      this.host.requestUpdate();
+    }, 400);
+  }
 }
 
 export function toggleGroup(ctx: StudioContext, group: Group): void {

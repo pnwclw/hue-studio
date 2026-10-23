@@ -187,8 +187,9 @@ Each part: its class (and helper), its measures, where it is used.
   in from a card's edges; the room/scene brightness, sheets. **Stepped slider**
   `.sens-slider` with names under its stops; **fade slider** on the fade and "Turn off
   after" sheets.
-- **Brightness button** `.bri` (a pill you drag, opening `.bri-track` over a dim screen) on
-  the color screen.
+- **Brightness button** `BrightnessControl` (controls.ts) / `.bri`: a pill you drag, its value
+  (or a caption) over it, opening `.bri-track` over a dimmed screen; the color screen (a group
+  of lights) and the Sync screen (the box) feed it a `BrightnessSource`.
 - **Wheels** `hue-studio-wheel` (`.wheels`, `.wheel-opt`): times are chosen on wheels, never
   the system picker (`momentChoice`, `timeChoice`, `timeWheels`).
 - **Days** `.days-row`: seven 32px round toggles spread over a row.
@@ -260,6 +261,22 @@ Each part: its class (and helper), its measures, where it is used.
 - **Dialog** (`hue-studio-more-info.ts`) and **more-info sheets** (`automation-sheet.ts`,
   `scene-sheet.ts`): full screen from the bottom on phones, a card on wide screens.
 
+### Sync screen
+
+`views/sync.ts`, the Hue app's Sync tab: no title; in the header "+" (add a box), "⋯" (the
+box's settings, presets and remote buttons on a sheet) and the power switch. What plays as
+a 238px square picture of the input (`.sync-picture`, glowing in the mode's colors while
+syncing), the box's name in small capitals, the input's name (`--fs-title-3`) and status
+(`--fs-body`). Mode, intensity and brightness: three 48px pills (`.sync-pill`, the
+brightness control) under 10px capitals; mode and intensity open a **popover**
+(`.pop-card`, the row surface, a title and the options, the chosen one white) above the
+controls over a dimmed screen: three mode tiles 100px tall, four intensity pills drawn as
+waves of growing height. The **dock** (`.sync-dock`, the tab bar's near-black, `--r-3xl`):
+"What" (the inputs as light tiles with a check, on a sheet), a 76px start/stop button
+(in the mode's colors while syncing), "Where" (the entertainment areas with a tick, and a
+way to a new one). On shorter screens the picture and the gaps give way so the dock stays
+in view.
+
 ### Color screen
 
 Wheel `.wheel` (the page's width, ≤440px, the dock's leftover height) with pins `.pin`
@@ -294,10 +311,14 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Motion sensitivity | a sheet: text 12–13, caps 10 over a 16 value, a stepped slider with names 11 under its stops |
 | MotionAware, Sync (empty) | an illustration, title 28–30, text, 36 pills (outlined, accent) |
 | Scene gallery | a sheet: title 28, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
+| Sync (iOS, 440pt) | header "+", "⋯", the switch; no title; the input's picture a 238 square (`#3b3d41`); "SYNC BOX" 10 capitals, the input 20, its status 16 grey; "MODE / INTENSITY / BRIGHTNESS" 10 capitals over pills 95×48 (`#47484c`, brightness white-to-grey), 24 apart; a dock 400 wide (`#0d1114`, radius ~22): "WHAT" and "WHERE" 48 round buttons over 10 capitals and a 12 value, a 76 round start in the middle |
+| Sync popovers | over a dimmed screen, 20 from the edges, the row surface, radius ~24: "Mode" 16, three tiles 115×100 (24 icon, 10 capitals), "Intensity", four pills 83×48 with waves; the chosen one white with dark ink; brightness: the color screen's slider from the button with "100%" over it |
+| Sync sheets | "Sync options": section "TV", a card titled by the box with its inputs as light tiles (102×160) and a round check in the switch zone; "Entertainment area": a hint, rows with a tick, "Create an Entertainment area" with a blue "+"; "⋯" → "Settings": rows 72 (Device, Change Hue Bridge, Wi-Fi, HDMI inputs, TV remote control, voice assistants, shortcuts, automatic control, advanced, updates) |
 | Colors | page `#181b1f`; rows and sheets `#24262a`; cards and tiles `#34353a`; header bar `#26282c`; header pills `#36383c`; round buttons on a bar `#47484c`; separators `#3a3c3f`; secondary text `#babbbc`; accent `#006aff`; red `#e63535`; switch off `#5e5e61`; tab bar `#0d1013` |
 
-Not measured yet: the Sync screens with a box (this app has none set up), a gallery
-scene's sheet (it previews on the lights). Switching the picker between color, white and
+The Sync screens come from the iOS app (the emulator's copy can't discover a box through
+its NAT); iOS and Android measure the same (rows 72, text from 72, titles 16). Not measured
+yet: a gallery scene's sheet (it previews on the lights). Switching the picker between color, white and
 effects sends nothing to the light (checked on an off light against HA's state).
 
 ### Hue Studio against it
@@ -310,7 +331,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Scene editor, new scene, scene sheet (`scene`, `new-scene`, `scene-pick`) | hero, rows, tile cards, sheet | matches; "Save" sits in the header (ours) where a new scene in the Hue app has it at the bottom |
 | Gallery (`gallery`, `gallery-settings`) | tiles, search, list rows | gallery matches; seasonal rules are ours |
 | Automations (`automations`, `automation-edit`, `automation-parts`, `choice`, `day-parts`, `daylight-settings`) | automation cards, type cards, list rows, wheels, days, sliders on sheets, place tiles | matches; light of the day is ours; the Hue app groups cards by type with a header row (not yet) |
-| Sync (`sync`) | hero, mode tiles, segments, input tiles, rows | ours, to be redone on the Hue app's Sync screens (roadmap S) |
+| Sync (`sync`) | picture, sync pills, popovers, brightness control, dock, sheets with tiles and rows | matches; background lighting and the music palette (in the mode popover), presets and remote buttons ("⋯") are ours |
 | Settings (`settings`, `integration`, `rooms`, `experimental`) | list rows, banners | matches; rooms and zones, integration and experimental are ours |
 | Devices (`devices`, `device`, `device-add`, `qr-scan`, `sensor`) | list rows, filter chips, search, kind tiles, steps, delete | matches |
 | Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours |
@@ -331,4 +352,5 @@ effects sends nothing to the light (checked on an off light against HA's state).
   with 48px pictures; an 8px slider track; banner text 13 under a 10px title; dim inactive
   tabs on a near-black bar. Then the color screen: the white wheel turned the Hue app's way
   (warm at the top) with its drawn colors, effect tiles as scene tiles (102×110, 48px
-  pictures), and every bar's title at 72px.
+  pictures), and every bar's title at 72px. Then the Sync screen (roadmap S) as the Hue
+  app's, with the brightness control shared with the color screen.
