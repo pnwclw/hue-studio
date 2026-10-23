@@ -233,8 +233,8 @@ export const CSS = `
                        flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;
                      overflow-wrap: anywhere; font-size: var(--fs-callout); font-weight: 500; line-height: 1.2; }
-  /* Two lines under the name: the name keeps one. */
-  .tile-card .subs-2 .name { -webkit-line-clamp: 1; }
+  /* A line under the name: the name keeps one (two lines of name fill the text block, the Hue app's). */
+  .tile-card :is(.subs-1, .subs-2) .name { -webkit-line-clamp: 1; }
   .tile-card .sub { max-width: 100%; margin-top: 2px; font-size: var(--fs-caption); line-height: 1.2; opacity: 0.75; white-space: nowrap;
                     overflow: hidden; text-overflow: ellipsis; }
   .tile-card > .switch-zone { position: absolute; left: 0; right: 0; bottom: 0; height: var(--zone); display: flex; align-items: center;
