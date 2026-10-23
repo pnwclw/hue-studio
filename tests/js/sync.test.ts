@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { boxesForGroup, confirmed, hasFeature, memoBoxFor, predictSync, statusKey, syncedLights, syncingIn, syncMemo } from "../../src/sync.ts";
+import {
+  boxesForGroup,
+  confirmed,
+  defaultAction,
+  hasFeature,
+  inputIcon,
+  memoBoxFor,
+  predictSync,
+  statusKey,
+  suggestSignals,
+  syncedLights,
+  syncingIn,
+  syncMemo,
+} from "../../src/sync.ts";
 import type { SyncBoxInfo } from "../../src/types.ts";
 
 const BOX: SyncBoxInfo = {
@@ -89,4 +102,30 @@ test("the sync memo answers more-info from the switch's state", () => {
   assert.equal(memoBoxFor(memo, on, "light.play_left"), "tv");
   assert.equal(memoBoxFor(memo, on, "light.candle"), null);
   assert.equal(memoBoxFor(memo, { "switch.sync_box_light_sync": { state: "off" } }, "light.play_left"), null);
+});
+
+test("a picture's default action follows the input's type", () => {
+  assert.equal(defaultAction("desktop"), "game");
+  assert.equal(defaultAction("playstation"), "game");
+  assert.equal(defaultAction("soundbar"), "music");
+  assert.equal(defaultAction("appletv"), "video");
+  assert.equal(defaultAction(null), "video");
+});
+
+test("signals and wake entities are suggested for an input", () => {
+  const candidates = [
+    { entity_id: "media_player.living_room", name: "Living room", platform: "apple_tv" },
+    { entity_id: "media_player.example_tv", name: "TV", platform: "braviatv" },
+    { entity_id: "sensor.example_pc_monitorpowerstate", name: "Example PC MonitorPowerState" },
+    { entity_id: "button.wake_on_lan_example_pc", name: "Wake on LAN" },
+    { entity_id: "binary_sensor.office_motion", name: "Office motion" },
+  ];
+  assert.deepEqual(suggestSignals({ name: "Apple TV", type: "appletv" }, candidates), ["media_player.living_room"]);
+  assert.deepEqual(suggestSignals({ name: "PC", type: "desktop" }, candidates), [
+    "sensor.example_pc_monitorpowerstate",
+    "button.wake_on_lan_example_pc",
+  ]);
+  assert.deepEqual(suggestSignals({ name: "HDMI 2", type: "generic" }, candidates), []);
+  assert.equal(inputIcon({ id: "input1", name: "x", type: "xbox" }), "mdi:microsoft-xbox");
+  assert.equal(inputIcon({ id: "input1", name: "x", type: "unknown" }), "mdi:hdmi-port");
 });

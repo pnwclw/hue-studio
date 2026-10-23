@@ -99,6 +99,7 @@ from .sync import (
     ir_execution,
     pct_to_api,
 )
+from .sync_follow import async_wake_source
 from .sync_link import SyncBoxLink
 
 _LOGGER = logging.getLogger(__name__)
@@ -623,6 +624,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     raise _link_unsupported(box.sync_entry.title)
                 await box.async_set_sync(dict(call.data))
                 continue
+            if (source := call.data.get(ATTR_INPUT)) is not None:
+                # Its source is turned on too (when it can be and sends no picture).
+                await async_wake_source(hass, box, _input_id(box, source))
             if (preset := call.data.get(ATTR_PRESET)) is not None:
                 preset_id = _preset_id(box, preset)
                 await box.async_command(box.presets.activate(preset_id))

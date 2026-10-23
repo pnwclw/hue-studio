@@ -1095,11 +1095,11 @@ async def test_follow_settings(
         }
     )
     assert box["follow"] == {
-        "input4": {"action": "game", "signal": PC},
-        "input1": {"action": "video", "signal": None},
+        "input4": {"action": "game", "signal": PC, "wake": None},
+        "input1": {"action": "video", "signal": None, "wake": None},
     }
     box = await follow(follow={"input4": {"signal": None}, "input1": None})
-    assert box["follow"] == {"input4": {"action": "game", "signal": None}}
+    assert box["follow"] == {"input4": {"action": "game", "signal": None, "wake": None}}
     # A signal alone follows nothing.
     box = await follow(follow={"input2": {"signal": PLAYER}})
     assert "input2" not in box["follow"]
@@ -1115,11 +1115,150 @@ async def test_follow_settings(
     box = await follow(screen=None)
     assert box["screen"] is None
     assert box_entry.options == {
-        CONF_FOLLOW: {"input4": {"action": "game", "signal": None}}
+        CONF_FOLLOW: {"input4": {"action": "game", "signal": None, "wake": None}}
     }
 
     assert not (await follow(screen={"entity_id": "light.example_lamp"}))["success"]
     assert not (await follow(follow={"input9": {"action": "game"}}))["success"]
-    assert not (await follow(follow={"input1": {"signal": "sensor.example"}}))[
+    assert not (await follow(follow={"input1": {"signal": "light.example_lamp"}}))[
         "success"
     ]
+    assert not (await follow(follow={"input1": {"wake": "light.example_lamp"}}))[
+        "success"
+    ]
+
+
+async def test_follow_sensor_signal(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """A sensor is a signal too: a PC agent's monitor state, "PowerOff" is none."""
+    monitor = "sensor.example_pc_monitor"
+    hass.states.async_set(monitor, "PowerOff")
+    await _follow(hass, box_entry, {"input4": {"action": "game", "signal": monitor}})
+    hass.states.async_set(monitor, "Dimmed")
+    await hass.async_block_till_done()
+    assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
+
+
+async def test_follow_pause(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """Light sync stopped by hand while the picture stays: switches carry no sync
+    until no input has a picture."""
+    box.state["execution"].update(hdmiSource="input4", mode="game", syncActive=True)
+    hass.states.async_set(PLAYER, "off")
+    await _follow(
+        hass,
+        box_entry,
+        {"input1": {"action": "video", "signal": PLAYER}, "input4": {"action": "game"}},
+    )
+    box.state["execution"].update(mode="passthrough", syncActive=False)
+    await _poll(hass, box_entry)
+
+    hass.states.async_set(PLAYER, "playing")
+    await hass.async_block_till_done()
+    assert box.sent() == [{"hdmiSource": "input1", "mode": "passthrough"}]
+
+    # The session ends (no picture anywhere): the next one syncs again.
+    hass.states.async_set(PLAYER, "off")
+    box.state["execution"].update(hdmiSource="input1")
+    box.state["hdmi"]["input1"]["status"] = "plugged"
+    box.state["hdmi"]["input4"]["status"] = "plugged"
+    await _poll(hass, box_entry)
+    hass.states.async_set(PLAYER, "playing")
+    await hass.async_block_till_done()
+    assert box.sent()[-1] == {"hdmiSource": "input1", "mode": "video"}
+
+
+async def test_follow_box_wakes_screen(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """The box woken any way turns its screen on (its input left as it is)."""
+    turn_on = async_mock_service(hass, "media_player", "turn_on")
+    select = async_mock_service(hass, "media_player", "select_source")
+    box.state["execution"]["mode"] = "powersave"
+    box.state["hdmi"]["input1"]["status"] = "plugged"
+    hass.states.async_set(SCREEN, "off")
+    await _follow(
+        hass, box_entry, {"input1": {"action": "video"}}, {"source": "HDMI 3"}
+    )
+    box.state["execution"]["mode"] = "passthrough"
+    await _poll(hass, box_entry)
+    assert [c.data for c in turn_on] == [{"entity_id": SCREEN}]
+    hass.states.async_set(SCREEN, "on", {"source": "HDMI 1"})
+    await hass.async_block_till_done()
+    assert select == []
+
+
+async def test_set_sync_wakes_source(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """Picking an input turns its source on first, unless it sends a picture."""
+    press = async_mock_service(hass, "button", "press")
+    wol = "button.example_wake_on_lan"
+    hass.states.async_set(PC, "off")
+    await _follow(
+        hass, box_entry, {"input4": {"action": "game", "signal": PC, "wake": wol}}
+    )
+    await hass.services.async_call(
+        DOMAIN,
+        "set_sync",
+        {"entity_id": "switch.sync_box_light_sync", "input": "PC"},
+        blocking=True,
+    )
+    assert [c.data for c in press] == [{"entity_id": wol}]
+    assert box.sent()[-1] == {"hdmiSource": "input4"}
+
+    hass.states.async_set(PC, "on")
+    await hass.async_block_till_done()
+    await hass.services.async_call(
+        DOMAIN,
+        "set_sync",
+        {"entity_id": "switch.sync_box_light_sync", "input": "input4"},
+        blocking=True,
+    )
+    assert len(press) == 1
+
+
+async def test_input_name_and_type(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    sync_box: FakeBox,
+    box_entry: MockConfigEntry,
+) -> None:
+    """An input's name and type (its icon) are written to the box."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/sync/input",
+            "entry_id": box_entry.entry_id,
+            "input": "input1",
+            "name": " Apple TV ",
+            "port_type": "appletv",
+        }
+    )
+    answer = await client.receive_json()
+    assert answer["success"], answer
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/sync/input",
+            "entry_id": box_entry.entry_id,
+            "input": "input4",
+            "port_type": "desktop",
+        }
+    )
+    assert (await client.receive_json())["success"]
+    assert sync_box.sent("put", "/hdmi/input1") == [
+        {"name": "Apple TV", "type": "appletv"}
+    ]
+    assert sync_box.sent("put", "/hdmi/input4") == [{"type": "desktop"}]
+
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/sync/input",
+            "entry_id": box_entry.entry_id,
+            "input": "input1",
+            "port_type": "toaster",
+        }
+    )
+    assert not (await client.receive_json())["success"]

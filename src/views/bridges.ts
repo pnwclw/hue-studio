@@ -19,7 +19,20 @@ import type { StringKey, Translate } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { areaState } from "../motion.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
-import { FOLLOW_ACTIONS, hasFeature, inputIcon, SCREEN_OFF_AFTER, SIGNAL_DOMAINS, statusKey } from "../sync.ts";
+import {
+  defaultAction,
+  FOLLOW_ACTIONS,
+  hasFeature,
+  inputIcon,
+  PORT_ICONS,
+  PORT_TYPES,
+  type PortType,
+  SCREEN_OFF_AFTER,
+  SIGNAL_DOMAINS,
+  statusKey,
+  suggestSignals,
+  WAKE_DOMAINS,
+} from "../sync.ts";
 import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo, SyncInput } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
@@ -30,8 +43,14 @@ const LEDS = ["off", "dimmed", "normal"] as const;
 /** What the box says of an input ("Signal", "Connected", …). */
 const inputStatus = (t: Translate, input: SyncInput): string =>
   input.status === "linked" || input.status === "plugged" || input.status === "unplugged" ? t(`sync.input_${input.status}`) : "";
-const SIGNAL_ICONS: Record<string, string> = {
+/** The Sync Box's limit for an input's name (sync.INPUT_NAME_MAX). */
+const INPUT_NAME_MAX = 18;
+const ENTITY_ICONS: Record<string, string> = {
   media_player: "mdi:play-box-outline",
+  sensor: "mdi:eye-outline",
+  button: "mdi:gesture-tap-button",
+  input_button: "mdi:gesture-tap-button",
+  script: "mdi:script-text-outline",
   remote: "mdi:remote",
   binary_sensor: "mdi:checkbox-blank-circle-outline",
   input_boolean: "mdi:toggle-switch-outline",
@@ -213,13 +232,13 @@ export class BridgesView extends StudioView {
   }
 
   /** The top of a bridge's or box's page: picture, name (pencil: rename), status. */
-  private hero(glyph: string, name: string, status: TemplateResult | string, canRename: boolean): TemplateResult {
+  private hero(glyph: string, name: string, status: TemplateResult | string, canRename: boolean, max = NAME_MAX): TemplateResult {
     const { t } = this.ctx;
     return html`<div class="sensor-hero">
       <ha-icon class="pic" icon=${glyph}></ha-icon>
       <div class="name-row">
         ${this.name !== null
-          ? html`<input class="name-input" .value=${this.name} maxlength=${NAME_MAX} aria-label=${t("bridges.rename")}
+          ? html`<input class="name-input" .value=${this.name} maxlength=${max} aria-label=${t("bridges.rename")}
               @input=${(e: InputEvent) => (this.name = (e.target as HTMLInputElement).value)} />`
           : html`<h1 class="big">${name}</h1>`}
         ${canRename
@@ -408,20 +427,24 @@ export class BridgesView extends StudioView {
   private openBoxPart(part: string): void {
     haptic("selection");
     this.pushPage();
+    this.name = null;
     this.boxPart = part;
   }
 
   private closeBoxPart(): void {
+    this.name = null;
     this.boxPart = null;
     this.popPage();
   }
 
-  /** One input: what its picture starts, and the entity its picture comes from. */
+  /** One input: its name and icon (kept on the box), what its picture starts, where its
+   *  picture comes from, and what turns its source on. */
   private inputPage(id: string, box: SyncBoxInfo, input: SyncInput): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
     const rule = box.follow?.[input.id];
     const set = (change: Record<string, unknown> | null) => void ctx.ws({ type: "hue_studio/sync/follow", entry_id: id, follow: { [input.id]: change } });
+    const port = (change: Record<string, unknown>) => ctx.ws({ type: "hue_studio/sync/input", entry_id: id, input: input.id, ...change });
     const actions: ChoiceOption[] = [
       { value: "off", label: t("bridges.follow_off"), sub: t("bridges.follow_off_sub") },
       ...FOLLOW_ACTIONS.map((action) => ({
@@ -430,15 +453,49 @@ export class BridgesView extends StudioView {
         sub: t(action === "passthrough" ? "bridges.follow_passthrough_sub" : "bridges.follow_mode_sub"),
       })),
     ];
-    const rank = (e: string) => SIGNAL_DOMAINS.indexOf(e.split(".")[0] as (typeof SIGNAL_DOMAINS)[number]);
-    const signals: ChoiceOption[] = Object.keys(ctx.hass.states)
-      .filter((e) => rank(e) >= 0)
-      .map((e) => ({ value: e, label: friendlyName(ctx.hass, e), sub: e, icon: SIGNAL_ICONS[e.split(".")[0]] }))
-      .sort((a, b) => rank(a.value) - rank(b.value) || a.label.localeCompare(b.label));
-    const status = inputStatus(t, input);
+    const entities = (domains: readonly string[]): ChoiceOption[] => {
+      const rank = (e: string) => domains.indexOf(e.split(".")[0]);
+      // Not the box's own screen: it shows every source.
+      const all = Object.keys(ctx.hass.states).filter((e) => rank(e) >= 0 && e !== box.screen?.entity_id);
+      const suggested = new Set(
+        suggestSignals(
+          input,
+          all.map((e) => ({ entity_id: e, name: friendlyName(ctx.hass, e), platform: ctx.hass.entities?.[e]?.platform })),
+        ),
+      );
+      const option = (e: string, top: boolean): ChoiceOption => ({
+        value: e,
+        label: friendlyName(ctx.hass, e),
+        sub: top ? `${t("bridges.suggested")} · ${e}` : e,
+        icon: ENTITY_ICONS[e.split(".")[0]],
+      });
+      return [
+        ...[...suggested].map((e) => option(e, true)),
+        ...all
+          .filter((e) => !suggested.has(e))
+          .sort((a, b) => rank(a) - rank(b) || friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)))
+          .map((e) => option(e, false)),
+      ];
+    };
+    const name = input.name || input.id;
     return this.screen(
-      this.subHead(input.name, () => this.closeBoxPart()),
-      html`${this.hero(inputIcon(input), input.name, status, false)}
+      this.subHead(name, () => this.closeBoxPart(), this.saveButton(name, (n) => port({ name: n }))),
+      html`${this.hero(inputIcon(input), name, inputStatus(t, input), true, INPUT_NAME_MAX)}
+        <div class="rows">
+          ${navRow(
+            { icon: inputIcon(input), title: t("bridges.port_type"), sub: t("bridges.port_type_sub"), value: t(`sync.port_${(input.type || "generic") as PortType}`) },
+            () =>
+              this.choose(
+                single(
+                  t("bridges.port_type"),
+                  PORT_TYPES.map((type) => ({ value: type, label: t(`sync.port_${type}`), icon: PORT_ICONS[type] })),
+                  input.type || "generic",
+                  (type) => void port({ port_type: type }),
+                ),
+              ),
+          )}
+        </div>
+        <h2 class="label">${t("bridges.follow")}</h2>
         <div class="rows">
           ${navRow({ icon: "mdi:play-circle-outline", title: t("bridges.follow_action"), value: t(`bridges.follow_${rule?.action ?? "off"}`) }, () =>
             this.choose(single(t("bridges.follow_action"), actions, rule?.action ?? "off", (action) => set(action === "off" ? null : { action }))),
@@ -449,15 +506,33 @@ export class BridgesView extends StudioView {
               title: t("bridges.follow_signal"),
               sub: rule?.signal ? rule.signal : t("bridges.follow_signal_box_sub"),
               value: rule?.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box"),
-              disabled: !rule,
             },
             () =>
               this.choose(
                 single(
                   t("bridges.follow_signal"),
-                  [{ value: "", label: t("bridges.follow_signal_box"), sub: t("bridges.follow_signal_box_sub"), icon: "mdi:hdmi-port" }, ...signals],
+                  [{ value: "", label: t("bridges.follow_signal_box"), sub: t("bridges.follow_signal_box_sub"), icon: "mdi:hdmi-port" }, ...entities(SIGNAL_DOMAINS)],
                   rule?.signal ?? "",
-                  (signal) => set({ signal: signal || null }),
+                  // A signal follows the input: in its mode, by its type, unless one is chosen.
+                  (signal) => set({ signal: signal || null, ...(rule ? {} : signal ? { action: defaultAction(input.type) } : {}) }),
+                ),
+              ),
+          )}
+          ${navRow(
+            {
+              icon: "mdi:power",
+              title: t("bridges.follow_wake"),
+              sub: t("bridges.follow_wake_sub"),
+              value: rule?.wake ? friendlyName(ctx.hass, rule.wake) : t("bridges.follow_wake_none"),
+              disabled: !rule,
+            },
+            () =>
+              this.choose(
+                single(
+                  t("bridges.follow_wake"),
+                  [{ value: "", label: t("bridges.follow_wake_none") }, ...entities(WAKE_DOMAINS)],
+                  rule?.wake ?? "",
+                  (wake) => set({ wake: wake || null }),
                 ),
               ),
           )}
@@ -479,7 +554,7 @@ export class BridgesView extends StudioView {
       .sort((a, b) => a.label.localeCompare(b.label));
     const sources: string[] = (screen && ctx.hass.states[screen.entity_id]?.attributes.source_list) || [];
     const offLabel = (s: number) =>
-      s === 0 ? t("bridges.screen_off_never") : s < 3600 ? t("bridges.screen_off_minutes", { count: s / 60 }) : t("bridges.screen_off_hours", { count: s / 3600 });
+      s === 0 ? t("bridges.screen_off_never") : s < 60 ? t("bridges.screen_off_seconds", { count: s }) : s < 3600 ? t("bridges.screen_off_minutes", { count: s / 60 }) : t("bridges.screen_off_hours", { count: s / 3600 });
     return this.screen(
       this.subHead(t("bridges.screen"), () => this.closeBoxPart()),
       html`<p class="lead small">${t("bridges.screen_hint")}</p>

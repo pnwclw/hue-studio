@@ -16,21 +16,84 @@ export const IR_ACTIONS = [
 /** What a picture on an input starts (sync_follow.ACTIONS); absent: nothing. */
 export const FOLLOW_ACTIONS = ["passthrough", "video", "game", "music"] as const;
 /** Domains of the entities that may tell an input's picture (sync_follow.SIGNAL_DOMAINS), players first. */
-export const SIGNAL_DOMAINS = ["media_player", "remote", "binary_sensor", "input_boolean", "switch"] as const;
+export const SIGNAL_DOMAINS = ["media_player", "remote", "binary_sensor", "sensor", "input_boolean", "switch"] as const;
+/** Domains of the entities that may turn a source on (sync_follow.WAKE_DOMAINS). */
+export const WAKE_DOMAINS = ["button", "input_button", "remote", "media_player", "script", "switch"] as const;
 /** How long the linked screen stays on without a picture, in seconds (0: always). */
-export const SCREEN_OFF_AFTER = [60, 120, 300, 600, 1800, 3600, 0] as const;
+export const SCREEN_OFF_AFTER = [30, 60, 120, 300, 600, 1800, 3600, 0] as const;
 
-// Device types the Sync Box app offers for inputs -> MDI icons.
-const INPUT_ICONS: [RegExp, string][] = [
-  [/appletv/, "mdi:apple"],
-  [/xbox|playstation|nintendo|game/, "mdi:controller"],
-  [/desktop|laptop|monitor|pc/, "mdi:mouse"],
-  [/phone/, "mdi:cellphone"],
-  [/diskplayer/, "mdi:disc-player"],
-  [/roku|shield|chromecast|firetv|settopbox|satellite|video/, "mdi:television-box"],
-  [/music|speaker|soundbar|avreceiver/, "mdi:speaker"],
-];
-export const inputIcon = (input: SyncInput | null | undefined): string => (input && INPUT_ICONS.find(([re]) => re.test(input.type || ""))?.[1]) || "mdi:hdmi-port";
+/** Input types the Hue Sync app offers (sync.PORT_TYPES), each with its icon. */
+export const PORT_ICONS = {
+  generic: "mdi:hdmi-port",
+  video: "mdi:filmstrip",
+  game: "mdi:controller",
+  music: "mdi:music",
+  xbox: "mdi:microsoft-xbox",
+  playstation: "mdi:sony-playstation",
+  nintendoswitch: "mdi:nintendo-switch",
+  phone: "mdi:cellphone",
+  desktop: "mdi:desktop-tower-monitor",
+  laptop: "mdi:laptop",
+  appletv: "mdi:apple",
+  roku: "mdi:television-box",
+  shield: "mdi:television-box",
+  chromecast: "mdi:cast",
+  firetv: "mdi:television-box",
+  diskplayer: "mdi:disc-player",
+  settopbox: "mdi:television-box",
+  satellite: "mdi:satellite-variant",
+  avreceiver: "mdi:audio-video",
+  soundbar: "mdi:soundbar",
+  hdmiswitch: "mdi:swap-horizontal",
+  tv: "mdi:television",
+  monitor: "mdi:monitor",
+  beamer: "mdi:projector",
+  speaker: "mdi:speaker",
+  hdmisplitter: "mdi:call-split",
+} as const;
+export type PortType = keyof typeof PORT_ICONS;
+export const PORT_TYPES = Object.keys(PORT_ICONS) as PortType[];
+
+export const inputIcon = (input: SyncInput | null | undefined): string => PORT_ICONS[(input?.type || "generic") as PortType] || "mdi:hdmi-port";
+
+/** What a picture on an input of this type starts by default: games sync as a game, music as music. */
+export function defaultAction(type: string | null | undefined): "video" | "game" | "music" {
+  if (/^(game|xbox|playstation|nintendoswitch|desktop|laptop)$/.test(type || "")) return "game";
+  if (/^(music|speaker|soundbar|avreceiver)$/.test(type || "")) return "music";
+  return "video";
+}
+
+/** An entity that may tell an input's picture, with its platform (from HA's entity registry). */
+export interface SignalCandidate {
+  entity_id: string;
+  name: string;
+  platform?: string;
+}
+
+/**
+ * Entities likely to belong to this input's source, best first: a player of the same kind
+ * (an Apple TV's), a PC agent's monitor state or Wake on LAN button, then any whose name
+ * holds the input's. For its signal and for what turns it on.
+ */
+export function suggestSignals(input: Pick<SyncInput, "name" | "type">, candidates: SignalCandidate[]): string[] {
+  const words = (input.name || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2 && !/^(hdmi|input)\d*$|^tv$/.test(w));
+  const score = (c: SignalCandidate): number => {
+    const domain = c.entity_id.split(".")[0];
+    const text = `${c.entity_id} ${c.name}`.toLowerCase();
+    let n = 0;
+    if (input.type === "appletv" && c.platform === "apple_tv" && domain === "media_player") n += 10;
+    if ((input.type === "desktop" || input.type === "laptop") && /monitor_?power_?state/.test(text)) n += 8;
+    if ((input.type === "desktop" || input.type === "laptop") && /wake_on_lan|\bwol\b/.test(text)) n += 8;
+    if (words.some((w) => text.includes(w))) n += domain === "media_player" ? 5 : 3;
+    return n;
+  };
+  return candidates
+    .map((c) => [c, score(c)] as const)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name))
+    .slice(0, 5)
+    .map(([c]) => c.entity_id);
+}
 
 /** Whether a directly paired box offers a feature (a linked one offers none of these). */
 export const hasFeature = (box: SyncBoxInfo, feature: NonNullable<SyncBoxInfo["features"]>[number]): boolean => !!box.features?.includes(feature);

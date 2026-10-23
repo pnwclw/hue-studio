@@ -576,6 +576,8 @@ export interface SyncBoxInfo {
 export interface SyncFollow {
   action: "passthrough" | "video" | "game" | "music";
   signal: string | null;
+  /** Turns its source on when the input is picked and it sends no picture. */
+  wake?: string | null;
 }
 
 export interface SyncScreen {

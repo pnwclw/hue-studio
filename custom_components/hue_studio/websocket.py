@@ -114,9 +114,11 @@ from .rooms import (
 )
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
+    INPUT_NAME_MAX as SYNC_INPUT_NAME_MAX,
     INPUTS as SYNC_INPUTS,
     LED_MODES,
     NAME_MAX as SYNC_NAME_MAX,
+    PORT_TYPES as SYNC_PORT_TYPES,
     BoxBridgeFailed,
     SyncBoxCoordinator,
     async_link_box_bridge,
@@ -126,6 +128,7 @@ from .sync_follow import (
     ACTIONS as FOLLOW_ACTIONS,
     SCREEN_OFF_AFTER_MAX,
     SIGNAL_DOMAINS as FOLLOW_SIGNAL_DOMAINS,
+    WAKE_DOMAINS as FOLLOW_WAKE_DOMAINS,
     async_set_follow,
 )
 
@@ -175,6 +178,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_forget_lost,
         ws_configure_sync_box,
         ws_follow_sync_box,
+        ws_sync_box_input,
         ws_link_sync_box_bridge,
         ws_set_group_area,
         ws_set_room_sensors,
@@ -1424,6 +1428,41 @@ async def ws_configure_sync_box(
 @websocket_api.require_admin
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): "hue_studio/sync/input",
+        vol.Required("entry_id"): str,
+        vol.Required("input"): vol.In(SYNC_INPUTS),
+        vol.Optional("name"): vol.All(str, vol.Length(min=1, max=SYNC_INPUT_NAME_MAX)),
+        # Its type (the Hue Sync app's icon); "type" is the message's own.
+        vol.Optional("port_type"): vol.In(SYNC_PORT_TYPES),
+    }
+)
+@websocket_api.async_response
+async def ws_sync_box_input(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """An HDMI input's name and type (its icon), on the box (paired directly only)."""
+    box = async_sync_boxes(hass).get(msg["entry_id"])
+    if not isinstance(box, SyncBoxCoordinator):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_FOUND,
+            "Not a Sync Box paired with Hue Studio",
+        )
+        return
+    await _ws_call(
+        connection,
+        msg,
+        box.async_set_input(
+            msg["input"], name=msg.get("name"), port_type=msg.get("port_type")
+        ),
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): "hue_studio/sync/follow",
         vol.Required("entry_id"): str,
         # Input -> what its picture starts and the entity telling it (merged; None,
@@ -1435,6 +1474,9 @@ async def ws_configure_sync_box(
                     vol.Optional("action"): vol.Any(None, vol.In(FOLLOW_ACTIONS)),
                     vol.Optional("signal"): vol.Any(
                         None, cv.entity_domain(FOLLOW_SIGNAL_DOMAINS)
+                    ),
+                    vol.Optional("wake"): vol.Any(
+                        None, cv.entity_domain(FOLLOW_WAKE_DOMAINS)
                     ),
                 },
             )

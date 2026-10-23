@@ -35,6 +35,7 @@ from aiohuesyncbox import (
     MusicMode,
     MusicPalette,
     PortStatus,
+    PortType,
     Presets,
     SyncMode,
     Unauthorized,
@@ -42,7 +43,8 @@ from aiohuesyncbox import (
 )
 from aiohuesyncbox.controllers.behavior import Behavior
 from aiohuesyncbox.controllers.device import Device
-from aiohuesyncbox.models import BehaviorUpdate, ExecutionUpdate
+from aiohuesyncbox.controllers.hdmi import Hdmi
+from aiohuesyncbox.models import BehaviorUpdate, ExecutionUpdate, PortUpdate
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -88,6 +90,9 @@ PALETTES = {
 BRIGHTNESS_STEP = 20  # of the box's 0-200
 LED_MODES = {"off": LedMode.OFF, "normal": LedMode.REGULAR, "dimmed": LedMode.DIMMED}
 NAME_MAX = 32
+INPUT_NAME_MAX = 18
+# Input types the Hue Sync app offers (its icons); not "unknown".
+PORT_TYPES = [t.value for t in PortType if t is not PortType.UNKNOWN_API_VALUE]
 
 # What a remote button (IR code) can do: action -> the execution change it sends.
 # Also "input:<input1-4>" and "preset:<id>".
@@ -168,6 +173,26 @@ class SyncDevice(Device):
     async def set_bluetooth(self, enabled: bool) -> None:
         """Let the Hue Sync app find the box over Bluetooth (to change its Wi-Fi)."""
         await self._put(DeviceUpdate(bluetooth=enabled).to_dict())
+
+
+class SyncHdmi(Hdmi):
+    """The box's HDMI ports with what aiohuesyncbox (0.1.6) does not have yet: an
+    input's name and type (its icon in the Hue Sync app). Built on its controller and
+    models."""
+
+    def __init__(self, hdmi: Hdmi) -> None:
+        """Wrap the HDMI resource of a box (same data, same request function)."""
+        super().__init__(hdmi._data, hdmi._request)
+
+    async def set_input(
+        self, key: str, *, name: str | None = None, port_type: PortType | None = None
+    ) -> None:
+        """Rename an input and/or change its type."""
+        await self._request(
+            "put",
+            f"{self._path}/{key}",
+            data=PortUpdate(name=name, type=port_type).to_dict(),
+        )
 
 
 class SyncBehavior(Behavior):
@@ -422,6 +447,24 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
             await self.async_command(
                 SyncDevice(self.api.device).set_bluetooth(bluetooth)
             )
+
+    async def async_set_input(
+        self, key: str, *, name: str | None = None, port_type: str | None = None
+    ) -> None:
+        """An HDMI input's name and type (its icon), kept on the box."""
+        if self.api.hdmi is None or key not in inputs(self.api):
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="sync_box_command_failed",
+                translation_placeholders={"name": self.box_name},
+            )
+        if name is not None:
+            name = name.strip()[:INPUT_NAME_MAX] or None
+        await self.async_command(
+            SyncHdmi(self.api.hdmi).set_input(
+                key, name=name, port_type=PortType(port_type) if port_type else None
+            )
+        )
 
     @property
     def presets(self) -> SyncPresets:

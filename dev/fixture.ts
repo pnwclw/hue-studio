@@ -253,6 +253,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   });
   // Adaptive Lighting for the office lamp.
   entities["switch.adaptive_lighting_office"] = { platform: "adaptive_lighting" };
+  states["button.wake_on_lan_pc"] = { entity_id: "button.wake_on_lan_pc", state: "unknown", attributes: { friendly_name: "Wake on LAN PC" } };
   states["binary_sensor.pc_picture"] = { entity_id: "binary_sensor.pc_picture", state: "on", attributes: { friendly_name: "PC picture" } };
   states["media_player.example_tv"] = {
     entity_id: "media_player.example_tv",
@@ -1353,6 +1354,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "hue_studio/bridges/rename") {
         bridgesMessage[String(msg.hue_entry_id)].name = String(msg.name);
         pushBridges();
+        return null as T;
+      }
+      if (msg.type === "hue_studio/sync/input") {
+        const inputs = (box.inputs ?? []).map((i) =>
+          i.id === msg.input ? { ...i, ...(msg.name ? { name: String(msg.name) } : {}), ...(msg.port_type ? { type: String(msg.port_type) } : {}) } : i,
+        );
+        box = { ...box, inputs };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
         return null as T;
       }
       if (msg.type === "hue_studio/sync/follow") {

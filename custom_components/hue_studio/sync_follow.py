@@ -58,8 +58,24 @@ _LOGGER = logging.getLogger(__name__)
 
 # What an input's picture starts: just showing it, or syncing in a mode.
 ACTIONS = ["passthrough", "video", "game", "music"]
-# Entities that may tell an input's picture: on (a player: not off) while it sends one.
-SIGNAL_DOMAINS = ["binary_sensor", "input_boolean", "media_player", "remote", "switch"]
+# Entities that may tell an input's picture: on (a player: not off, a sensor: not
+# one of NO_PICTURE) while its source sends one.
+SIGNAL_DOMAINS = [
+    "binary_sensor",
+    "input_boolean",
+    "media_player",
+    "remote",
+    "sensor",
+    "switch",
+]
+# A signal's states (any case) that mean no picture, e.g. a PC agent's "PowerOff".
+NO_PICTURE = frozenset(
+    {"off", "standby", "poweroff", "sleep", "sleeping", "false", "0", "none"}
+    | {STATE_UNAVAILABLE, STATE_UNKNOWN}
+)
+# Entities that turn a source on: a Wake on LAN button, a remote, a player, a script.
+WAKE_DOMAINS = ["button", "input_button", "media_player", "remote", "script", "switch"]
+SYNC_MODES = (ExecutionMode.VIDEO, ExecutionMode.GAME, ExecutionMode.MUSIC)
 # How long the current input may stay without a picture before another one with a
 # picture takes over (a source changing resolution or HDR drops it for a moment).
 LOST_AFTER = 10
@@ -74,8 +90,14 @@ SCREEN_OFF = (STATE_OFF, STATE_STANDBY)
 SCREEN_GONE = (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
 
+def has_picture(hass: HomeAssistant, entity_id: str | None) -> bool:
+    """Whether a signal entity says its source sends a picture."""
+    state = hass.states.get(entity_id) if entity_id else None
+    return state is not None and state.state.casefold() not in NO_PICTURE
+
+
 def follow_rules(options: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Input -> {"action", "signal"} for the inputs that are followed.
+    """Input -> {"action", "signal", "wake"} for the inputs that are followed.
 
     0.10.0-alpha.5 stored the action alone.
     """
@@ -84,7 +106,11 @@ def follow_rules(options: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
         if isinstance(rule, str):
             rule = {"action": rule}
         if isinstance(rule, dict) and rule.get("action") in ACTIONS:
-            rules[key] = {"action": rule["action"], "signal": rule.get("signal")}
+            rules[key] = {
+                "action": rule["action"],
+                "signal": rule.get("signal"),
+                "wake": rule.get("wake"),
+            }
     return rules
 
 
@@ -101,6 +127,13 @@ class PictureFollower:
         # When each input last got its picture (loop time): the latest one wins.
         self._since: dict[str, float] = {}
         self._screen_on: bool | None = None
+        self._awake: bool | None = None
+        # Light sync stopped by hand while the picture stayed: it stays stopped until
+        # no input has a picture (or it is started again), as on the box itself.
+        self._paused = False
+        self._mode: ExecutionMode | None = None
+        # The input and mode last sent (a stop of ours is not a pause).
+        self._sent: tuple[str, ExecutionMode] | None = None
         self._tracked: frozenset[str] = frozenset()
         self._untrack: CALLBACK_TYPE | None = None
         self._lost: CALLBACK_TYPE | None = None
@@ -109,7 +142,7 @@ class PictureFollower:
 
     @property
     def rules(self) -> dict[str, dict[str, Any]]:
-        """Input -> {"action", "signal"}, for the inputs that are followed."""
+        """Input -> {"action", "signal", "wake"}, for the inputs that are followed."""
         return follow_rules(self.entry.options)
 
     @property
@@ -154,7 +187,7 @@ class PictureFollower:
         links = {} if self._asleep() else self.coordinator.links()
         current = self._current()
         return {
-            key: self._is_on(rule["signal"], SCREEN_OFF)
+            key: has_picture(self.hass, rule["signal"])
             or (key == current and links.get(key, False))
             for key, rule in rules.items()
         }
@@ -195,14 +228,29 @@ class PictureFollower:
         first = self._pictures is None
         before = self._pictures or {}
         screen_before = self._screen_on
+        awake = not self._asleep()
+        awake_before = self._awake
         self._pictures = pictures
         self._screen_on = screen_on
+        self._awake = awake
         now = self.hass.loop.time()
         gained = [key for key, on in pictures.items() if on and not before.get(key)]
         for key in gained:
             self._since[key] = now
+        self._watch_pause(rules, pictures)
         if first:
             return
+
+        if (
+            awake
+            and awake_before is False
+            and screen
+            and not screen_on
+            and not gained
+            and (self._screen_task is None or self._screen_task.done())
+        ):
+            # The box woke up (by hand, its remote, the panel): its screen comes on.
+            self._run_screen(self._async_screen_on(select=False))
 
         if gained:
             self._go(max(gained, key=lambda key: self._since[key]), screen=True)
@@ -228,6 +276,25 @@ class PictureFollower:
                 self._dark = async_call_later(self.hass, off_after, self._on_dark)
         else:
             self._cancel_dark()
+
+    def _watch_pause(
+        self, rules: dict[str, dict[str, Any]], pictures: dict[str, bool]
+    ) -> None:
+        """Light sync stopped while the box's own link shows the picture is still
+        there (and not by us): paused until the session ends or it syncs again."""
+        mode = self.coordinator.api.execution.mode
+        current = self._current()
+        if mode in SYNC_MODES or not any(pictures.values()):
+            self._paused = False
+        elif (
+            mode == ExecutionMode.PASSTHROUGH
+            and self._mode in SYNC_MODES
+            and current in rules
+            and self.coordinator.links().get(current or "")
+            and self._sent != (current, mode)
+        ):
+            self._paused = True
+        self._mode = mode
 
     def _latest(self, pictures: dict[str, bool], but: str | None = None) -> str | None:
         """The input whose picture appeared last, of those that have one."""
@@ -261,6 +328,8 @@ class PictureFollower:
     def _go(self, key: str, *, screen: bool) -> None:
         """Switch to an input and start what its picture starts."""
         mode = ExecutionMode(self.rules[key]["action"])
+        if self._paused and mode in SYNC_MODES:
+            mode = ExecutionMode.PASSTHROUGH
         execution = self.coordinator.api.execution
         if self._current() != key or execution.mode != mode:
             _LOGGER.debug("%s: picture on %s, %s", self.entry.title, key, mode.value)
@@ -273,6 +342,7 @@ class PictureFollower:
             self._run_screen(self._async_screen_on())
 
     async def _async_box(self, key: str, mode: ExecutionMode) -> None:
+        self._sent = (key, mode)
         try:
             await self.coordinator.async_set_state(
                 hdmi_source=HdmiSource(key), mode=mode
@@ -293,7 +363,7 @@ class PictureFollower:
             self.hass, coro, f"hue_studio_sync_screen_{self.entry.entry_id}"
         )
 
-    async def _async_screen_on(self) -> None:
+    async def _async_screen_on(self, *, select: bool = True) -> None:
         """Turn the screen on (and wait for it), then onto the box's input."""
         if (screen := self.screen) is None:
             return
@@ -305,7 +375,7 @@ class PictureFollower:
             if not await self._async_wait_on(entity_id):
                 return
             await asyncio.sleep(SCREEN_SETTLE)
-        source = screen.get("source")
+        source = screen.get("source") if select else None
         state = self.hass.states.get(entity_id)
         if source and state and state.attributes.get(ATTR_INPUT_SOURCE) != source:
             await self._async_media(
@@ -367,6 +437,23 @@ class PictureFollower:
             )
 
 
+async def async_wake_source(
+    hass: HomeAssistant, coordinator: SyncBoxCoordinator, key: str
+) -> None:
+    """Turn an input's source on (its wake entity) unless it sends a picture."""
+    rule = follow_rules(coordinator.config_entry.options).get(key)
+    if not rule or not (wake := rule["wake"]) or has_picture(hass, rule["signal"]):
+        return
+    domain = wake.split(".")[0]
+    service = "press" if domain in ("button", "input_button") else SERVICE_TURN_ON
+    try:
+        await hass.services.async_call(
+            domain, service, {ATTR_ENTITY_ID: wake}, blocking=True
+        )
+    except HomeAssistantError as err:
+        _LOGGER.warning("Could not wake %s with %s: %s", key, wake, err)
+
+
 @callback
 def async_set_follow(
     hass: HomeAssistant,
@@ -376,15 +463,18 @@ def async_set_follow(
     screen: dict[str, Any] | None = None,
     unlink_screen: bool = False,
 ) -> None:
-    """Change the settings from the panel: `follow` input -> {"action", "signal"}
-    merged into its rule (None, or no action left: not followed), `screen` merged into
-    the linked screen's (or `unlink_screen`)."""
+    """Change the settings from the panel: `follow` input -> {"action", "signal",
+    "wake"} merged into its rule (None, or no action left: not followed), `screen`
+    merged into the linked screen's (or `unlink_screen`)."""
     entry = coordinator.config_entry
     options = dict(entry.options)
     if follow:
         rules = follow_rules(options)
         for key, change in follow.items():
-            rule = {**rules.get(key, {"signal": None}), **(change or {"action": None})}
+            rule = {
+                **rules.get(key, {"signal": None, "wake": None}),
+                **(change or {"action": None}),
+            }
             if rule.get("action") in ACTIONS:
                 rules[key] = rule
             else:
