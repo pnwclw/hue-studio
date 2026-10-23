@@ -9,6 +9,7 @@ import {
   inputIcon,
   memoBoxFor,
   predictSync,
+  signalChoices,
   statusKey,
   suggestSignals,
   syncedLights,
@@ -128,4 +129,28 @@ test("signals and wake entities are suggested for an input", () => {
   assert.deepEqual(suggestSignals({ name: "HDMI 2", type: "generic" }, candidates), []);
   assert.equal(inputIcon({ id: "input1", name: "x", type: "xbox" }), "mdi:microsoft-xbox");
   assert.equal(inputIcon({ id: "input1", name: "x", type: "unknown" }), "mdi:hdmi-port");
+});
+
+test("entity choices: suggested, near the box, the rest; no hidden, diagnostic or own ones", () => {
+  const groups = signalChoices(
+    { name: "Apple TV", type: "appletv" },
+    [
+      { entity_id: "media_player.living_room", name: "Living room", platform: "apple_tv", area: "living_room" },
+      { entity_id: "media_player.kitchen_speaker", name: "Kitchen speaker", platform: "cast", area: "kitchen" },
+      { entity_id: "binary_sensor.couch_presence", name: "Couch presence", area: "living_room" },
+      { entity_id: "binary_sensor.window", name: "Window", area: "bedroom" },
+      { entity_id: "sensor.box_wifi", name: "Box Wi-Fi", area: "living_room", category: "diagnostic" },
+      { entity_id: "switch.hidden_plug", name: "Hidden plug", area: "living_room", hidden: true },
+      { entity_id: "switch.sync_box_power", name: "Sync Box power", platform: "hue_studio", area: "living_room" },
+      { entity_id: "media_player.example_tv", name: "TV", area: "living_room" },
+      { entity_id: "light.lamp", name: "Lamp", area: "living_room" },
+    ],
+    ["media_player", "binary_sensor", "sensor", "switch"],
+    { area: "living_room", exclude: ["media_player.example_tv"] },
+  );
+  assert.deepEqual(groups, {
+    suggested: ["media_player.living_room"],
+    near: ["media_player.kitchen_speaker", "binary_sensor.couch_presence"],
+    rest: ["binary_sensor.window"],
+  });
 });

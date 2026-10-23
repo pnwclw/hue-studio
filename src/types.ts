@@ -18,6 +18,9 @@ export interface HassEntityEntry {
   platform?: string;
   device_id?: string | null;
   area_id?: string | null;
+  /** "config" or "diagnostic" for entities that are not the device's main ones. */
+  entity_category?: string | null;
+  hidden?: boolean;
   icon?: string | null;
   translation_key?: string | null;
 }

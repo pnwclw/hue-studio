@@ -68,6 +68,36 @@ export interface SignalCandidate {
   entity_id: string;
   name: string;
   platform?: string;
+  /** Its area (its own, else its device's). */
+  area?: string | null;
+  /** "config" / "diagnostic": not a device's main entity. */
+  category?: string | null;
+  hidden?: boolean;
+}
+
+/**
+ * The entities offered for an input's signal or wake, in three groups: suggested for it,
+ * near (in the box's area, or a player), and the rest (behind "Other entity"). Hidden,
+ * diagnostic and config entities and Hue Studio's own are left out; `domains` ranks the rest.
+ */
+export function signalChoices(
+  input: Pick<SyncInput, "name" | "type">,
+  candidates: SignalCandidate[],
+  domains: readonly string[],
+  { area = null, exclude = [] }: { area?: string | null; exclude?: (string | null | undefined)[] } = {},
+): { suggested: string[]; near: string[]; rest: string[] } {
+  const rank = (e: string) => domains.indexOf(e.split(".")[0]);
+  const usable = candidates
+    .filter((c) => rank(c.entity_id) >= 0 && !c.hidden && !c.category && c.platform !== "hue_studio" && !exclude.includes(c.entity_id))
+    .sort((a, b) => rank(a.entity_id) - rank(b.entity_id) || a.name.localeCompare(b.name));
+  const suggested = suggestSignals(input, usable);
+  const others = usable.filter((c) => !suggested.includes(c.entity_id));
+  const isNear = (c: SignalCandidate) => (!!area && c.area === area) || /^(media_player|remote)\./.test(c.entity_id);
+  return {
+    suggested,
+    near: others.filter(isNear).map((c) => c.entity_id),
+    rest: others.filter((c) => !isNear(c)).map((c) => c.entity_id),
+  };
 }
 
 /**

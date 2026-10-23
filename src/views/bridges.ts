@@ -29,8 +29,8 @@ import {
   type PortType,
   SCREEN_OFF_AFTER,
   SIGNAL_DOMAINS,
+  signalChoices,
   statusKey,
-  suggestSignals,
   WAKE_DOMAINS,
 } from "../sync.ts";
 import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo, SyncInput } from "../types.ts";
@@ -43,6 +43,8 @@ const LEDS = ["off", "dimmed", "normal"] as const;
 /** What the box says of an input ("Signal", "Connected", …). */
 const inputStatus = (t: Translate, input: SyncInput): string =>
   input.status === "linked" || input.status === "plugged" || input.status === "unplugged" ? t(`sync.input_${input.status}`) : "";
+/** The "Other entity" option of an entity choice. */
+const MORE = "__more__";
 /** The Sync Box's limit for an input's name (sync.INPUT_NAME_MAX). */
 const INPUT_NAME_MAX = 18;
 const ENTITY_ICONS: Record<string, string> = {
@@ -470,29 +472,48 @@ export class BridgesView extends StudioView {
         sub: action === "passthrough" ? t("bridges.follow_passthrough_sub") : undefined,
       })),
     ];
-    const entities = (domains: readonly string[]): ChoiceOption[] => {
-      const rank = (e: string) => domains.indexOf(e.split(".")[0]);
-      // Not the box's own screen: it shows every source.
-      const all = Object.keys(ctx.hass.states).filter((e) => rank(e) >= 0 && e !== box.screen?.entity_id);
-      const suggested = new Set(
-        suggestSignals(
-          input,
-          all.map((e) => ({ entity_id: e, name: friendlyName(ctx.hass, e), platform: ctx.hass.entities?.[e]?.platform })),
-        ),
+    const hass = ctx.hass;
+    const areaOf = (e: string) => {
+      const entry = hass.entities?.[e];
+      return entry?.area_id ?? (entry?.device_id ? hass.devices?.[entry.device_id]?.area_id : null) ?? null;
+    };
+    const boxArea = box.device?.ha_device ? (hass.devices?.[box.device.ha_device]?.area_id ?? null) : null;
+    /** A choice of an entity: suggested and near ones, the rest behind "Other entity". */
+    const pickEntity = (title: string, domains: readonly string[], first: ChoiceOption, current: string, pick: (e: string) => void) => {
+      const groups = signalChoices(
+        input,
+        Object.keys(hass.states).map((e) => ({
+          entity_id: e,
+          name: friendlyName(hass, e),
+          platform: hass.entities?.[e]?.platform,
+          area: areaOf(e),
+          category: hass.entities?.[e]?.entity_category,
+          hidden: hass.entities?.[e]?.hidden,
+        })),
+        domains,
+        // Not the box's own screen: it shows every source.
+        { area: boxArea, exclude: [box.screen?.entity_id] },
       );
-      const option = (e: string, top: boolean): ChoiceOption => ({
+      const option = (e: string, top = false): ChoiceOption => ({
         value: e,
-        label: friendlyName(ctx.hass, e),
+        label: friendlyName(hass, e),
         sub: top ? `${t("bridges.suggested")} · ${e}` : e,
         icon: ENTITY_ICONS[e.split(".")[0]],
       });
-      return [
-        ...[...suggested].map((e) => option(e, true)),
-        ...all
-          .filter((e) => !suggested.has(e))
-          .sort((a, b) => rank(a) - rank(b) || friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)))
-          .map((e) => option(e, false)),
-      ];
+      const shown = [...groups.suggested, ...groups.near];
+      // The current one stays in view, even from the rest.
+      if (current && !shown.includes(current) && groups.rest.includes(current)) groups.near.unshift(current);
+      const rest = groups.rest.filter((e) => e !== current);
+      const more: ChoiceOption[] = rest.length
+        ? [{ value: MORE, label: t("bridges.entity_more"), sub: t("bridges.entity_more_sub", { count: rest.length }), icon: "mdi:dots-horizontal" }]
+        : [];
+      this.choose(
+        single(title, [first, ...groups.suggested.map((e) => option(e, true)), ...groups.near.map((e) => option(e)), ...more], current, (e) => {
+          if (e !== MORE) return pick(e);
+          // After this sheet closes: every other entity.
+          queueMicrotask(() => this.choose(single(t("bridges.entity_more"), rest.map((r) => option(r)), current, pick)));
+        }),
+      );
     };
     const name = input.name || input.id;
     return this.screen(
@@ -526,14 +547,13 @@ export class BridgesView extends StudioView {
               value: rule?.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box"),
             },
             () =>
-              this.choose(
-                single(
-                  t("bridges.follow_signal"),
-                  [{ value: "", label: t("bridges.follow_signal_box"), sub: t("bridges.follow_signal_box_sub"), icon: "mdi:hdmi-port" }, ...entities(SIGNAL_DOMAINS)],
-                  rule?.signal ?? "",
-                  // A signal follows the input: in its mode, by its type, unless one is chosen.
-                  (signal) => set({ signal: signal || null, ...(rule ? {} : signal ? { action: defaultAction(input.type) } : {}) }),
-                ),
+              pickEntity(
+                t("bridges.follow_signal"),
+                SIGNAL_DOMAINS,
+                { value: "", label: t("bridges.follow_signal_box"), sub: t("bridges.follow_signal_box_sub"), icon: "mdi:hdmi-port" },
+                rule?.signal ?? "",
+                // A signal follows the input: in its mode, by its type, unless one is chosen.
+                (signal) => set({ signal: signal || null, ...(rule ? {} : signal ? { action: defaultAction(input.type) } : {}) }),
               ),
           )}
           ${navRow(
@@ -545,13 +565,8 @@ export class BridgesView extends StudioView {
               disabled: !rule,
             },
             () =>
-              this.choose(
-                single(
-                  t("bridges.follow_wake"),
-                  [{ value: "", label: t("bridges.follow_wake_none") }, ...entities(WAKE_DOMAINS)],
-                  rule?.wake ?? "",
-                  (wake) => set({ wake: wake || null }),
-                ),
+              pickEntity(t("bridges.follow_wake"), WAKE_DOMAINS, { value: "", label: t("bridges.follow_wake_none") }, rule?.wake ?? "", (wake) =>
+                set({ wake: wake || null }),
               ),
           )}
         </div>
