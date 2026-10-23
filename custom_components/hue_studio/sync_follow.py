@@ -128,6 +128,7 @@ class PictureFollower:
         self._since: dict[str, float] = {}
         self._screen_on: bool | None = None
         self._awake: bool | None = None
+        self._input: str | None = None
         # Light sync stopped by hand while the picture stayed: it stays stopped until
         # no input has a picture (or it is started again), as on the box itself.
         self._paused = False
@@ -239,6 +240,7 @@ class PictureFollower:
             self._since[key] = now
         self._watch_pause(rules, pictures)
         if first:
+            self._input = self._current()
             return
 
         if (
@@ -252,8 +254,18 @@ class PictureFollower:
             # The box woke up (by hand, its remote, the panel): its screen comes on.
             self._run_screen(self._async_screen_on(select=False))
 
+        current = self._current()
+        current_before, self._input = self._input, current
         if gained:
             self._go(max(gained, key=lambda key: self._since[key]), screen=True)
+        elif (
+            current != current_before
+            and current in rules
+            and pictures.get(current)
+            and awake
+        ):
+            # Switched by hand (the panel, a remote, a dashboard): that input's mode.
+            self._go(current, screen=False)
         elif (
             screen_on
             and screen_before is False
@@ -263,7 +275,6 @@ class PictureFollower:
             # The screen was turned on by hand: the box wakes up on the latest picture.
             self._go(latest, screen=False)
 
-        current = self._current()
         if current in rules and not pictures.get(current) and not self._asleep():
             if self._lost is None:
                 self._lost = async_call_later(self.hass, LOST_AFTER, self._on_lost)

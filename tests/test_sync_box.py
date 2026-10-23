@@ -1262,3 +1262,19 @@ async def test_input_name_and_type(
         }
     )
     assert not (await client.receive_json())["success"]
+
+
+async def test_follow_input_picked_by_hand(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """An input picked by hand that has a picture gets its own mode."""
+    box.state["execution"].update(hdmiSource="input1", mode="video", syncActive=True)
+    hass.states.async_set(PC, "on")
+    await _follow(
+        hass,
+        box_entry,
+        {"input1": {"action": "video"}, "input4": {"action": "game", "signal": PC}},
+    )
+    box.state["execution"]["hdmiSource"] = "input4"
+    await _poll(hass, box_entry)
+    assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
