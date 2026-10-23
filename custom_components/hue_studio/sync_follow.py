@@ -95,6 +95,9 @@ SCREEN_SETTLE = 3
 SCREEN_REWAKE_WINDOW = 60
 SCREEN_OFF_WAIT = 15
 SCREEN_REWAKE = 3
+# A signal back within this long of not being known (Home Assistant starting, an
+# agent reconnecting) is not its source turning on.
+SIGNAL_FLAP = 60
 
 SCREEN_OFF = (STATE_OFF, STATE_STANDBY)
 SCREEN_GONE = (STATE_UNAVAILABLE, STATE_UNKNOWN)
@@ -158,6 +161,8 @@ class PictureFollower:
         self._screen_task: asyncio.Task[None] | None = None
         # When the screen was last told to turn off (loop time), and whether that
         # command is still on its way (it is never cancelled half way).
+        # Since when each followed input's signal has been unknown or unavailable.
+        self._unknown_since: dict[str, float] = {}
         self._off_sent: float | None = None
         self._turning_off = False
 
@@ -257,7 +262,12 @@ class PictureFollower:
         self._screen_on = screen_on
         self._awake = awake
         now = self.hass.loop.time()
-        gained = [key for key, on in pictures.items() if on and not before.get(key)]
+        flapped = self._watch_unknown(rules, now)
+        gained = [
+            key
+            for key, on in pictures.items()
+            if on and not before.get(key) and key not in flapped
+        ]
         for key in gained:
             self._since[key] = now
         self._watch_pause(rules, pictures)
@@ -314,6 +324,19 @@ class PictureFollower:
                 self._dark = async_call_later(self.hass, off_after, self._on_dark)
         else:
             self._cancel_dark()
+
+    def _watch_unknown(self, rules: dict[str, dict[str, Any]], now: float) -> set[str]:
+        """Inputs whose signal is back after being unknown only for a moment."""
+        flapped: set[str] = set()
+        for key, rule in rules.items():
+            state = self.hass.states.get(rule["signal"]) if rule["signal"] else None
+            if state is not None and state.state in SCREEN_GONE:
+                self._unknown_since.setdefault(key, now)
+            elif (since := self._unknown_since.pop(key, None)) is not None and (
+                now - since < SIGNAL_FLAP
+            ):
+                flapped.add(key)
+        return flapped
 
     def _watch_pause(
         self, rules: dict[str, dict[str, Any]], pictures: dict[str, bool]

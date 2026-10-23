@@ -1384,3 +1384,26 @@ async def test_follow_input_by_hand_turns_screen_on(
     box.state["execution"]["hdmiSource"] = "input4"
     await _poll(hass, box_entry)
     assert [c.data for c in turn_on] == [{"entity_id": SCREEN}]
+
+
+async def test_follow_signal_back_after_a_moment_unknown(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """A signal unknown for a moment (an agent reconnecting) and back is not its
+    source turning on; back after a long while (the PC was off), it is."""
+    box.state["execution"]["mode"] = "powersave"
+    box.state["hdmi"]["input4"]["status"] = "plugged"
+    hass.states.async_set(PC, "on")
+    await _follow(hass, box_entry, box, {"input4": {"action": "game", "signal": PC}})
+    hass.states.async_set(PC, "unavailable")
+    await hass.async_block_till_done()
+    hass.states.async_set(PC, "on")
+    await hass.async_block_till_done()
+    assert box.sent() == []
+
+    hass.states.async_set(PC, "unavailable")
+    await hass.async_block_till_done()
+    with patch.object(sync_follow, "SIGNAL_FLAP", 0):
+        hass.states.async_set(PC, "on")
+        await hass.async_block_till_done()
+    assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
