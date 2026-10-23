@@ -795,7 +795,7 @@ async def test_configure(
         {"name": "Living room box"},
         {"ledMode": 0},
     ]
-    assert sync_box.sent(path="/behavior") == [{"cecPowersave": False}]
+    assert sync_box.sent(path="/behavior") == [{"cecPowersave": 0}]
     device = dr.async_get(hass).async_get_device_by_identifier(
         (DOMAIN, BOX_ID), box_entry.entry_id
     )

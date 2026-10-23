@@ -205,7 +205,9 @@ class SyncBehavior(Behavior):
 
     async def set_cec_powersave(self, enabled: bool) -> None:
         """Follow the TV: on when it turns on, standby when it turns off."""
-        await self._put(BehaviorUpdate(cec_powersave=enabled).to_dict())
+        # The box takes its behavior switches as 0/1 and refuses JSON booleans.
+        update = BehaviorUpdate(cec_powersave=enabled).to_dict()
+        await self._put({key: int(value) for key, value in update.items()})
 
 
 def led_mode(api: HueSyncBox) -> str | None:
