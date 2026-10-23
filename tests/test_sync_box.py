@@ -1319,3 +1319,68 @@ async def test_follow_none_with_box_cec(
     )
     assert box.sent() == [{"hdmiSource": "input4"}]
     assert (turn_on, press) == ([], [])
+
+
+async def test_follow_picture_back_while_screen_turns_off(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """A picture back just as the screen is being turned off (still "on" in HA): the
+    turn-off runs to its end, then the screen is turned on again."""
+    off_calls: list[dict[str, Any]] = []
+    release = asyncio.Event()
+
+    async def slow_off(call: Any) -> None:
+        off_calls.append(dict(call.data))
+        await release.wait()
+
+    hass.services.async_register("media_player", "turn_off", slow_off)
+    turn_on = async_mock_service(hass, "media_player", "turn_on")
+    hass.states.async_set(SCREEN, "on", {"source": "HDMI 3"})
+    hass.states.async_set(PC, "on")
+    await _follow(
+        hass,
+        box_entry,
+        box,
+        {"input4": {"action": "game", "signal": PC}},
+        {"source": "HDMI 3", "off_after": 30},
+    )
+    with (
+        patch.object(sync_follow, "SCREEN_REWAKE", 0),
+        patch.object(sync_follow, "SCREEN_SETTLE", 0),
+    ):
+        hass.states.async_set(PC, "off")
+        await hass.async_block_till_done()
+        _later(hass, 31)
+        await hass.async_block_till_done()
+        assert off_calls == [{"entity_id": SCREEN}]
+
+        # The PC's screen is back while the TV is still on its way off.
+        hass.states.async_set(PC, "on")
+        await hass.async_block_till_done()
+        assert turn_on == []
+        release.set()
+        hass.states.async_set(SCREEN, "off")
+        for _ in range(3):
+            await hass.async_block_till_done()
+            await asyncio.sleep(0)
+        assert [c.data for c in turn_on] == [{"entity_id": SCREEN}]
+
+
+async def test_follow_input_by_hand_turns_screen_on(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """An input picked by hand while the screen is off turns the screen on."""
+    turn_on = async_mock_service(hass, "media_player", "turn_on")
+    box.state["execution"].update(hdmiSource="input1", mode="video")
+    hass.states.async_set(SCREEN, "off")
+    hass.states.async_set(PC, "on")
+    await _follow(
+        hass,
+        box_entry,
+        box,
+        {"input1": {"action": "video"}, "input4": {"action": "game", "signal": PC}},
+        {"off_after": 0},
+    )
+    box.state["execution"]["hdmiSource"] = "input4"
+    await _poll(hass, box_entry)
+    assert [c.data for c in turn_on] == [{"entity_id": SCREEN}]

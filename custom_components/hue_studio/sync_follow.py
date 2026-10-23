@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine, Mapping
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -89,6 +90,11 @@ SCREEN_OFF_AFTER = 300
 SCREEN_OFF_AFTER_MAX = 4 * 3600
 SCREEN_WAKE = 40
 SCREEN_SETTLE = 3
+# A picture back just as the screen was being turned off: wait (at most this long)
+# for it to be off, give it a moment, then turn it on again.
+SCREEN_REWAKE_WINDOW = 60
+SCREEN_OFF_WAIT = 15
+SCREEN_REWAKE = 3
 
 SCREEN_OFF = (STATE_OFF, STATE_STANDBY)
 SCREEN_GONE = (STATE_UNAVAILABLE, STATE_UNKNOWN)
@@ -150,6 +156,10 @@ class PictureFollower:
         self._lost: CALLBACK_TYPE | None = None
         self._dark: CALLBACK_TYPE | None = None
         self._screen_task: asyncio.Task[None] | None = None
+        # When the screen was last told to turn off (loop time), and whether that
+        # command is still on its way (it is never cancelled half way).
+        self._off_sent: float | None = None
+        self._turning_off = False
 
     @property
     def rules(self) -> dict[str, dict[str, Any]]:
@@ -280,8 +290,9 @@ class PictureFollower:
             and pictures.get(current)
             and awake
         ):
-            # Switched by hand (the panel, a remote, a dashboard): that input's mode.
-            self._go(current, screen=False)
+            # Switched by hand (the panel, a remote, a dashboard): that input's mode,
+            # and its screen on, as a source becoming active does over HDMI CEC.
+            self._go(current, screen=True)
         elif (
             screen_on
             and screen_before is False
@@ -384,11 +395,23 @@ class PictureFollower:
         if self.screen is None:
             coro.close()
             return
-        if self._screen_task:
-            self._screen_task.cancel()
+        previous = self._screen_task
+        if previous and not previous.done() and self._turning_off:
+            # A turn-off already on its way is let through; this one follows it.
+            coro = self._async_after(previous, coro)
+        elif previous:
+            previous.cancel()
         self._screen_task = self.entry.async_create_background_task(
             self.hass, coro, f"hue_studio_sync_screen_{self.entry.entry_id}"
         )
+
+    @staticmethod
+    async def _async_after(
+        previous: asyncio.Task[None], coro: Coroutine[Any, Any, None]
+    ) -> None:
+        with contextlib.suppress(asyncio.CancelledError):
+            await asyncio.shield(previous)
+        await coro
 
     async def _async_screen_on(self, *, select: bool = True) -> None:
         """Turn the screen on (and wait for it), then onto the box's input."""
@@ -397,9 +420,26 @@ class PictureFollower:
         entity_id: str = screen[ATTR_ENTITY_ID]
         if (state := self.hass.states.get(entity_id)) is None:
             return
-        if state.state in SCREEN_OFF:
-            await self._async_media(SERVICE_TURN_ON, entity_id)
-            if not await self._async_wait_on(entity_id):
+        loop = self.hass.loop
+        if (
+            self._off_sent is not None
+            and loop.time() - self._off_sent < SCREEN_REWAKE_WINDOW
+        ):
+            # Told to turn off a moment ago: its state may still say on. Let it get
+            # there, then turn it on again.
+            await self._async_wait(entity_id, False, SCREEN_OFF_WAIT)
+            await asyncio.sleep(SCREEN_REWAKE)
+            self._off_sent = None
+            state = self.hass.states.get(entity_id) or state
+        if state.state in SCREEN_OFF + SCREEN_GONE or not self._is_on(
+            entity_id, SCREEN_OFF
+        ):
+            for _attempt in range(2):
+                await self._async_media(SERVICE_TURN_ON, entity_id)
+                if await self._async_wait(entity_id, True, SCREEN_WAKE / 2):
+                    break
+            else:
+                _LOGGER.warning("%s did not turn on", entity_id)
                 return
             await asyncio.sleep(SCREEN_SETTLE)
         source = screen.get("source") if select else None
@@ -420,29 +460,32 @@ class PictureFollower:
         shown = state.attributes.get(ATTR_INPUT_SOURCE)
         if (source := screen.get("source")) and shown not in (None, source):
             return
-        await self._async_media(SERVICE_TURN_OFF, entity_id)
+        self._off_sent = self.hass.loop.time()
+        self._turning_off = True
+        try:
+            await self._async_media(SERVICE_TURN_OFF, entity_id)
+        finally:
+            self._turning_off = False
 
-    async def _async_wait_on(self, entity_id: str) -> bool:
-        """Whether the screen came on within SCREEN_WAKE."""
-        on = asyncio.Event()
+    async def _async_wait(self, entity_id: str, on: bool, seconds: float) -> bool:
+        """Whether the screen is (or gets) on, or off, within `seconds`."""
+        reached = asyncio.Event()
 
-        def is_on() -> bool:
-            state = self.hass.states.get(entity_id)
-            return state is not None and state.state not in SCREEN_OFF + SCREEN_GONE
+        def there() -> bool:
+            return self._is_on(entity_id, SCREEN_OFF) == on
 
         @callback
         def changed(_event: Event[EventStateChangedData]) -> None:
-            if is_on():
-                on.set()
+            if there():
+                reached.set()
 
         remove = async_track_state_change_event(self.hass, [entity_id], changed)
         try:
-            if is_on():
+            if there():
                 return True
-            async with asyncio.timeout(SCREEN_WAKE):
-                await on.wait()
+            async with asyncio.timeout(seconds):
+                await reached.wait()
         except TimeoutError:
-            _LOGGER.warning("%s did not turn on", entity_id)
             return False
         finally:
             remove()
