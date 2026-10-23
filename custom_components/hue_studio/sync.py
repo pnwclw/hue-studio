@@ -44,7 +44,12 @@ from aiohuesyncbox import (
 from aiohuesyncbox.controllers.behavior import Behavior
 from aiohuesyncbox.controllers.device import Device
 from aiohuesyncbox.controllers.hdmi import Hdmi
-from aiohuesyncbox.models import BehaviorUpdate, ExecutionUpdate, PortUpdate
+from aiohuesyncbox.models import (
+    BehaviorUpdate,
+    ExecutionUpdate,
+    InputBehavior,
+    PortUpdate,
+)
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
@@ -196,18 +201,48 @@ class SyncHdmi(Hdmi):
 
 
 class SyncBehavior(Behavior):
-    """The box's behavior with what aiohuesyncbox (0.1.6) does not have yet: turning
-    on and off with the TV (HDMI CEC)."""
+    """The box's behavior with what aiohuesyncbox (0.1.6) does not have yet: its own
+    HDMI CEC as a whole. Built on its controller and models."""
 
     def __init__(self, behavior: Behavior) -> None:
         """Wrap the behavior resource of a box (same data, same request function)."""
         super().__init__(behavior._data, behavior._request)
 
-    async def set_cec_powersave(self, enabled: bool) -> None:
-        """Follow the TV: on when it turns on, standby when it turns off."""
+    async def set_own_cec(self, enabled: bool) -> None:
+        """The box's own HDMI CEC: following the TV (on with it, standby with it) and
+        switching to a source that becomes active or is plugged in (CEC, hot plug),
+        on every input. Off while Hue Studio does CEC, or the two switch against each
+        other."""
+        inputs: dict[str, InputBehavior] = {}
+        for key in INPUTS:
+            if (current := getattr(self, key)) is not None:
+                inputs[key] = InputBehavior(
+                    cec_input_switch=enabled,
+                    link_auto_sync=current.link_auto_sync,
+                    hpd_input_port_switch=None
+                    if current.hpd_input_port_switch is None
+                    else enabled,
+                )
+        update = BehaviorUpdate(
+            cec_powersave=enabled,
+            hpd_input_switch=None if self.hpd_input_switch is None else enabled,
+            **inputs,
+        )
         # The box takes its behavior switches as 0/1 and refuses JSON booleans.
-        update = BehaviorUpdate(cec_powersave=enabled).to_dict()
-        await self._put({key: int(value) for key, value in update.items()})
+        await self._put(_ints(update.to_dict()))
+
+
+def _ints(data: dict[str, Any]) -> dict[str, Any]:
+    """`data` with its booleans as 0/1 and without unset (None) fields, nested too."""
+    return {
+        key: _ints(value)
+        if isinstance(value, dict)
+        else int(value)
+        if isinstance(value, bool)
+        else value
+        for key, value in data.items()
+        if value is not None
+    }
 
 
 def led_mode(api: HueSyncBox) -> str | None:
@@ -443,7 +478,7 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
             await self.async_command(self.api.device.set_led_mode(LED_MODES[led]))
         if tv_power is not None and self.api.behavior is not None:
             await self.async_command(
-                SyncBehavior(self.api.behavior).set_cec_powersave(tv_power)
+                SyncBehavior(self.api.behavior).set_own_cec(tv_power)
             )
         if bluetooth is not None and bluetooth != self.api.device.bluetooth:
             await self.async_command(

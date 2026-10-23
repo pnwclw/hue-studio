@@ -54,6 +54,9 @@ from homeassistant.helpers.event import async_call_later, async_track_state_chan
 
 from .const import CONF_FOLLOW, CONF_SCREEN
 
+# HDMI inputs of a box (sync.INPUTS; not imported: sync imports this module).
+INPUTS = ["input1", "input2", "input3", "input4"]
+
 if TYPE_CHECKING:
     from homeassistant.core import EventStateChangedData
 
@@ -107,6 +110,18 @@ def box_does_cec(coordinator: SyncBoxCoordinator) -> bool:
     """Whether the box does HDMI CEC itself (follows the TV); else Hue Studio does."""
     behavior = coordinator.api.behavior
     return behavior is not None and bool(behavior.cec_powersave)
+
+
+def own_switching_on(coordinator: SyncBoxCoordinator) -> bool:
+    """Whether the box would still switch inputs by itself (CEC, hot plug)."""
+    behavior = coordinator.api.behavior
+    if behavior is None:
+        return False
+    inputs = [getattr(behavior, key) for key in INPUTS]
+    return bool(behavior.hpd_input_switch) or any(
+        i is not None and (i.cec_input_switch or i.hpd_input_port_switch)
+        for i in inputs
+    )
 
 
 def has_picture(hass: HomeAssistant, entity_id: str | None) -> bool:
@@ -165,6 +180,7 @@ class PictureFollower:
         self._unknown_since: dict[str, float] = {}
         self._off_sent: float | None = None
         self._turning_off = False
+        self._quieting = False
 
     @property
     def rules(self) -> dict[str, dict[str, Any]]:
@@ -248,6 +264,19 @@ class PictureFollower:
         """A poll, a command, a signal or a change of the settings: look for edges."""
         if not self.coordinator.last_update_success:
             return
+        if (
+            not box_does_cec(self.coordinator)
+            and own_switching_on(self.coordinator)
+            and not self._quieting
+        ):
+            # Hue Studio does CEC: the box switching inputs by itself would fight it
+            # (turned back on in the Hue Sync app, or from before).
+            self._quieting = True
+            self.entry.async_create_background_task(
+                self.hass,
+                self._async_quiet_box(),
+                f"hue_studio_sync_quiet_{self.entry.entry_id}",
+            )
         rules = self.rules
         self._track(rules)
         pictures = self._read_pictures(rules)
@@ -401,6 +430,15 @@ class PictureFollower:
             )
         if screen:
             self._run_screen(self._async_screen_on())
+
+    async def _async_quiet_box(self) -> None:
+        _LOGGER.info("%s: turning off the box's own input switching", self.entry.title)
+        try:
+            await self.coordinator.async_configure(tv_power=False)
+        except HomeAssistantError as err:
+            _LOGGER.warning("%s: %s", self.entry.title, err)
+        finally:
+            self._quieting = False
 
     async def _async_box(self, key: str, mode: ExecutionMode) -> None:
         self._sent = (key, mode)

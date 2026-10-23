@@ -104,7 +104,17 @@ BOX_STATE: dict[str, Any] = {
         "videoSyncSupported": True,
         "audioSyncSupported": True,
     },
-    "behavior": {"inactivePowersave": 20, "cecPowersave": True},
+    "behavior": {
+        "inactivePowersave": 20,
+        "cecPowersave": True,
+        "hpdInputSwitch": True,
+        "input1": {"cecInputSwitch": True, "linkAutoSync": True},
+        "input4": {
+            "cecInputSwitch": True,
+            "linkAutoSync": False,
+            "hpdInputPortSwitch": True,
+        },
+    },
     "registrations": {},
     "presets": {
         "p1": {"name": "Movie night", "lastUsed": None, "execution": {"mode": "video"}},
@@ -795,7 +805,16 @@ async def test_configure(
         {"name": "Living room box"},
         {"ledMode": 0},
     ]
-    assert sync_box.sent(path="/behavior") == [{"cecPowersave": 0}]
+    # "HDMI CEC: Hue Studio": the box's own CEC and hot plug switching go off as a
+    # whole (as 0/1); each input keeps its own automatic sync.
+    assert sync_box.sent(path="/behavior") == [
+        {
+            "cecPowersave": 0,
+            "hpdInputSwitch": 0,
+            "input1": {"cecInputSwitch": 0, "linkAutoSync": 1},
+            "input4": {"cecInputSwitch": 0, "linkAutoSync": 0, "hpdInputPortSwitch": 0},
+        }
+    ]
     device = dr.async_get(hass).async_get_device_by_identifier(
         (DOMAIN, BOX_ID), box_entry.entry_id
     )
@@ -1407,3 +1426,30 @@ async def test_follow_signal_back_after_a_moment_unknown(
         hass.states.async_set(PC, "on")
         await hass.async_block_till_done()
     assert box.sent() == [{"hdmiSource": "input4", "mode": "game"}]
+
+
+async def test_follow_quiets_box_switching(
+    hass: HomeAssistant, box_entry: MockConfigEntry, box: FakeBox
+) -> None:
+    """With Hue Studio doing CEC, the box's own input switching left on (or turned
+    back on in the Hue Sync app) is turned off."""
+    await _follow(hass, box_entry, box, {"input4": {"action": "game"}})
+    assert box.sent("put", "/behavior") == [
+        {
+            "cecPowersave": 0,
+            "hpdInputSwitch": 0,
+            "input1": {"cecInputSwitch": 0, "linkAutoSync": 1},
+            "input4": {"cecInputSwitch": 0, "linkAutoSync": 0, "hpdInputPortSwitch": 0},
+        }
+    ]
+    box.state["behavior"].update(
+        hpdInputSwitch=False,
+        input1={"cecInputSwitch": False, "linkAutoSync": True},
+        input4={
+            "cecInputSwitch": False,
+            "linkAutoSync": False,
+            "hpdInputPortSwitch": False,
+        },
+    )
+    await _poll(hass, box_entry)
+    assert len(box.sent("put", "/behavior")) == 1
