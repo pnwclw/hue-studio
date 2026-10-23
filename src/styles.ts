@@ -644,6 +644,7 @@ export const CSS = `
   .sync-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; width: 100%; max-width: 336px; margin-top: auto;
                    padding-top: clamp(28px, 5dvh, 64px); transition: opacity 0.3s; }
   .sync-controls.inert { opacity: 0.4; pointer-events: none; }
+  .sync-controls.inert .bri.off { opacity: 1; }
   .sync-ctl { position: relative; display: flex; }
   .sync-ctl .bri-value { font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; bottom: calc(100% + 10px); }
   .sync-ctl > .bri { flex: 1; margin: 0; }
