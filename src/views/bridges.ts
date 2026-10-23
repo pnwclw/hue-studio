@@ -392,7 +392,6 @@ export class BridgesView extends StudioView {
     const { t } = ctx;
     const follow = box.follow ?? {};
     return html`<h2 class="label">${t("bridges.follow")}</h2>
-      <p class="lead small">${t("bridges.follow_hint")}</p>
       <div class="rows">
         ${(box.inputs ?? []).map((input) => {
           const rule = follow[input.id];
@@ -407,7 +406,8 @@ export class BridgesView extends StudioView {
             () => this.openBoxPart(input.id),
           );
         })}
-      </div>`;
+      </div>
+      <p class="hint">${t("bridges.follow_hint")}</p>`;
   }
 
   /** Who does HDMI CEC: the box itself (it follows the TV), or Hue Studio from Home
@@ -570,7 +570,7 @@ export class BridgesView extends StudioView {
               ),
           )}
         </div>
-        <p class="lead small">${t("bridges.input_hint")}</p>`,
+        <p class="hint">${t("bridges.input_hint")}</p>`,
       "settings-page",
     );
   }
@@ -590,8 +590,7 @@ export class BridgesView extends StudioView {
       s === 0 ? t("bridges.screen_off_never") : s < 60 ? t("bridges.screen_off_seconds", { count: s }) : s < 3600 ? t("bridges.screen_off_minutes", { count: s / 60 }) : t("bridges.screen_off_hours", { count: s / 3600 });
     return this.screen(
       this.subHead(t("bridges.screen"), () => this.closeBoxPart()),
-      html`<p class="lead small">${t("bridges.screen_hint")}</p>
-        <div class="rows">
+      html`<div class="rows">
           ${navRow({ icon: "mdi:television", title: t("bridges.screen"), value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none") }, () =>
             this.choose(
               single(t("bridges.screen"), [{ value: "", label: t("bridges.screen_none") }, ...players], screen?.entity_id ?? "", (e) =>
@@ -619,7 +618,8 @@ export class BridgesView extends StudioView {
               ),
             ),
           )}
-        </div>`,
+        </div>
+        <p class="hint">${t("bridges.screen_hint")}</p>`,
       "settings-page",
     );
   }

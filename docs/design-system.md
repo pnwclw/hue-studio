@@ -59,6 +59,7 @@ everything else stays.
 | `--segment-on` | `#636366` | the chosen segment |
 | `--separator` | 10% white | lines between rows, hairline borders |
 | `--hairline` | 6% white | bar borders, pressed rows |
+| `--scrim` | 55% black | under every overlay, with a 14px blur (sheets, popovers, the brightness slider) |
 | `--outline` | grey 45% | outlined "add" tiles |
 | `--selected` | `#fff` | ring of a chosen tile or mode |
 | `--accent` | `#006aff` | switches on, checks, the main button, "+", a chosen chip's ring |
@@ -102,9 +103,10 @@ rooms, scenes, lights, automations, gallery, banners, groups of rows) · `--r-2x
 
 ### Shadow
 
-`--shadow-flat` (rows, small cards, gallery tiles) · `--shadow-raised` (tiles, room cards,
-heroes, sheet buttons) · `--shadow-overlay` (menus, sheets, the brightness track) ·
-`--shadow-dot` (round pictures and discs). The Hue app's cards cast almost no shadow; ours
+`--shadow-flat` (groups of rows outside sheets, small cards, gallery tiles, pills such as
+Sync's) · `--shadow-raised` (tiles, room cards, heroes, sheet buttons, the Sync picture and
+dock) · `--shadow-overlay` (menus, sheets, popovers, the brightness track) · `--shadow-dot`
+(round pictures and discs, round buttons standing on their own like the Sync dock's). The Hue app's cards cast almost no shadow; ours
 are kept soft. Pins and knobs keep their own small shadows.
 
 ### Size
@@ -250,6 +252,10 @@ Each part: its class (and helper), its measures, where it is used.
 
 ### Overlays
 
+- **Scrim**: every overlay (sheet, popover, the brightness slider) lies over the same
+  `--scrim` with a 14px blur, so what opens stands apart from the controls under it; never a
+  plain dim.
+
 - **Sheet** `.sheet` + `.box`: centered card (`--r-2xl`, max 400–560px, `--surface-row`) on
   wide screens, from the bottom on phones (`.sheet.bottom`); bar `.sheet-bar` (56px, close
   round button, title `--fs-body` 500, "DONE"/"SAVE" pill). Never inside a scrolling element.
@@ -270,8 +276,9 @@ syncing), the box's name in small capitals, the input's name (`--fs-title-3`) an
 (`--fs-body`). Mode, intensity and brightness: three 48px pills (`.sync-pill`, the
 brightness control) under 10px capitals; mode and intensity open a **popover**
 (`.pop-card`, the row surface, a title and the options, the chosen one white) above the
-controls over a dimmed screen: three mode tiles 100px tall, four intensity pills drawn as
-waves of growing height. The **dock** (`.sync-dock`, the tab bar's near-black, `--r-3xl`):
+controls over the scrim, anchored to the button that opened it (its bottom 44px above the
+button, not measured from the window's height): three mode tiles 100px tall and four
+intensity pills drawn as waves of growing height, on `--surface-raised` (tiles on a sheet). The **dock** (`.sync-dock`, the tab bar's near-black, `--r-3xl`):
 "What" (the inputs as light tiles with a check, on a sheet), a 76px start/stop button
 (in the mode's colors while syncing), "Where" (the entertainment areas with a tick, and a
 way to a new one). On shorter screens the picture and the gaps give way so the dock stays
@@ -334,7 +341,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Sync (`sync`) | picture, sync pills, popovers, brightness control, dock, sheets with tiles and rows | matches; background lighting and the music palette (in the mode popover), presets and remote buttons ("⋯") are ours |
 | Settings (`settings`, `integration`, `rooms`, `experimental`) | list rows, banners | matches; rooms and zones, integration and experimental are ours |
 | Devices (`devices`, `device`, `device-add`, `qr-scan`, `sensor`) | list rows, filter chips, search, kind tiles, steps, delete | matches |
-| Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours |
+| Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours, and so is a Sync Box's page beyond the Hue Sync app's (HDMI CEC by Hue Studio, its screen, automatic switching, an input's page with its name and icon, signal and wake): list rows and choice sheets, hints under the rows |
 | Moving between bridges (`bridge-move`, `lost`) | — | dropped (roadmap K), not maintained |
 | More-info dialog and sheets, dashboard cards | the same parts | cards follow the dashboard's theme colors |
 
@@ -354,3 +361,8 @@ effects sends nothing to the light (checked on an off light against HA's state).
   (warm at the top) with its drawn colors, effect tiles as scene tiles (102×110, 48px
   pictures), and every bar's title at 72px. Then the Sync screen (roadmap S) as the Hue
   app's, with the brightness control shared with the color screen.
+- 2026-10-24, the Sync screens checked against the system: one scrim (dimmed and blurred)
+  under every overlay, the Sync popovers anchored to their button, their tiles raised;
+  groups of rows cast `--shadow-flat` as written (they had none); the Sync picture rounded
+  12 with the pills, dock and its round buttons shadowed; a Sync Box page's hints under its
+  rows and its row subtitles on one line.

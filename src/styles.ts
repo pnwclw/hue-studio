@@ -331,7 +331,7 @@ export const CSS = `
   .bri.off { opacity: 0.4; }
   .bri.off .bri-pill { cursor: default; }
   /* The open slider: grows up from the button over a dimmed screen. */
-  .bri-layer { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.6); animation: fade 0.2s ease; touch-action: none; }
+  .bri-layer { position: fixed; inset: 0; z-index: 30; animation: fade 0.2s ease; touch-action: none; }
   .bri-track { position: fixed; box-sizing: border-box; overflow: hidden; display: flex; align-items: flex-end; justify-content: center;
                padding-bottom: 13px; border-radius: var(--r-full); background: rgba(72, 72, 76, 0.92); color: #fff; touch-action: none; outline: none;
                box-shadow: var(--shadow-overlay); transform-origin: 50% 100%; animation: bri-grow 0.32s var(--spring); }
@@ -473,7 +473,8 @@ export const CSS = `
   .fx-head .art { display: block; width: 56px; height: 56px; border-radius: 50%; box-shadow: var(--shadow-dot); }
   .fx-head h3 { margin: 12px 0 0; font-size: var(--fs-title-2); font-weight: 700; letter-spacing: -0.3px; }
   .fx-sheet .label { margin: 18px 16px 8px; }
-  .rows { border-radius: var(--r-m); background: var(--surface-row); overflow: hidden; }
+  .rows { border-radius: var(--r-m); background: var(--surface-row); overflow: hidden; box-shadow: var(--shadow-flat); }
+  .sheet .rows { box-shadow: none; }
   .fx-sheet .rows { border-radius: 0; background: var(--surface-row); }
   .rows .item { display: flex; align-items: center; gap: 12px; min-height: var(--row-h-compact); padding: 10px 16px; box-sizing: border-box; font-size: var(--fs-body); }
   .rows .item + .item { border-top: 1px solid var(--separator); }
@@ -584,8 +585,9 @@ export const CSS = `
   .note { margin-top: 20px; color: var(--text-2); }
 
   /* scene sheet / dialogs */
-  .sheet { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px;
-           background: rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: fade 0.2s ease; }
+  .sheet { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fade 0.2s ease; }
+  /* One scrim under every overlay: the screen dimmed and blurred, so what opens stands apart from the controls under it. */
+  :is(.sheet, .pop-layer, .bri-layer) { background: var(--scrim); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: var(--r-2xl); background: var(--surface-row);
                 box-shadow: var(--shadow-overlay); animation: pop 0.3s var(--spring); }
   .sheet .pic { position: relative; aspect-ratio: 16 / 10; background: var(--surface-row) center / cover no-repeat; }
@@ -635,7 +637,8 @@ export const CSS = `
   .sync-stage > .chips.boxes { align-self: stretch; }
   .sync-stage .caps { font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
   .sync-picture { position: relative; isolation: isolate; overflow: hidden; display: flex; flex: none; align-items: center; justify-content: center;
-                  width: min(238px, 58vw, 26dvh); aspect-ratio: 1; margin-top: clamp(8px, 4dvh, 48px); background: var(--surface); box-shadow: var(--shadow-raised); }
+                  width: min(238px, 58vw, 26dvh); aspect-ratio: 1; margin-top: clamp(8px, 4dvh, 48px); border-radius: var(--r-m); background: var(--surface);
+                  box-shadow: var(--shadow-raised); }
   .sync-picture ha-icon { --mdc-icon-size: 120px; opacity: 0.88; transition: opacity 0.3s; }
   .sync-picture.off ha-icon { opacity: 0.4; }
   .sync-caption { margin-top: clamp(14px, 2.6dvh, 26px); text-align: center; }
@@ -648,38 +651,38 @@ export const CSS = `
   .sync-ctl { position: relative; display: flex; }
   .sync-ctl .bri-value { font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; bottom: calc(100% + 10px); }
   .sync-ctl > .bri { flex: 1; margin: 0; }
-  .sync-ctl .bri-pill { width: 100%; }
+  .sync-ctl .bri-pill { width: 100%; box-shadow: var(--shadow-flat); }
   .sync-pill { flex: 1; display: flex; align-items: center; justify-content: center; height: 48px; padding: 0; border: none; border-radius: var(--r-full);
-               background: var(--surface-raised); color: var(--text); cursor: pointer; transition: transform var(--t-press) var(--ease); }
+               background: var(--surface-raised); color: var(--text); cursor: pointer; box-shadow: var(--shadow-flat); transition: transform var(--t-press) var(--ease); }
   .sync-pill:active { transform: scale(var(--press-tile)); }
   .sync-pill ha-icon { --mdc-icon-size: 28px; }
   svg.wave { width: 28px; height: 28px; }
   .sync-dock { display: flex; align-items: center; justify-content: space-around; width: 100%; box-sizing: border-box; margin: 20px 0 4px;
-               padding: 18px 8px 14px; border-radius: var(--r-3xl); background: var(--bar-bottom); transition: opacity 0.3s; }
+               padding: 18px 8px 14px; border-radius: var(--r-3xl); background: var(--bar-bottom); box-shadow: var(--shadow-raised); transition: opacity 0.3s; }
   .sync-dock.inert { opacity: 0.4; pointer-events: none; }
   .dock-side { display: flex; flex-direction: column; align-items: center; gap: 1px; width: 112px; min-width: 0; padding: 0; border: none;
                background: none; color: var(--text); cursor: pointer; }
   .dock-side:disabled { opacity: 0.4; cursor: default; }
   .dock-round { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-bottom: 8px; border-radius: 50%;
-                background: var(--surface-raised); transition: transform var(--t-press) var(--ease); }
+                background: var(--surface-raised); box-shadow: var(--shadow-dot); transition: transform var(--t-press) var(--ease); }
   .dock-side:active .dock-round { transform: scale(var(--press-round)); }
   .dock-round ha-icon { --mdc-icon-size: 26px; }
   .dock-value { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-footnote); color: var(--text-2); }
   .dock-go { display: flex; flex: none; align-items: center; justify-content: center; width: 76px; height: 76px; padding: 0; border: none; border-radius: 50%;
-             background: var(--surface-raised); color: var(--text); cursor: pointer; transition: transform var(--t-press) var(--ease), background 0.3s; }
+             background: var(--surface-raised); color: var(--text); cursor: pointer; box-shadow: var(--shadow-dot); transition: transform var(--t-press) var(--ease), background 0.3s; }
   .dock-go:active { transform: scale(var(--press-round)); }
   .dock-go:disabled { opacity: 0.4; cursor: default; }
   .dock-go svg { width: 40px; height: 40px; }
   .dock-go.on { background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3)); }
   /* Mode and intensity: a card above the controls over a dimmed screen, the chosen option white. */
-  .pop-layer { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.6); animation: fade 0.2s ease; }
-  .pop-card { position: fixed; box-sizing: border-box; padding: 18px 16px 16px; transform: translateX(-50%);
+  .pop-layer { position: fixed; inset: 0; z-index: 20; animation: fade 0.2s ease; }
+  .pop-card { position: fixed; box-sizing: border-box; padding: 18px 16px 16px; transform: translate(-50%, -100%);
               border-radius: var(--r-3xl); background: var(--surface-row); box-shadow: var(--shadow-overlay); animation: pop-up 0.3s var(--spring); }
-  @keyframes pop-up { from { opacity: 0; transform: translateX(-50%) scale(0.94) translateY(8px); } }
+  @keyframes pop-up { from { opacity: 0; transform: translate(-50%, -100%) scale(0.94) translateY(8px); } }
   .pop-title { margin: 0 0 18px; font-size: var(--fs-body); font-weight: 500; }
   .pop-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
   .pop-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; height: 100px; padding: 0; border: none;
-              border-radius: var(--r-m); background: var(--surface); color: var(--text); cursor: pointer; font-size: var(--fs-label); font-weight: 500;
+              border-radius: var(--r-m); background: var(--surface-raised); color: var(--text); cursor: pointer; font-size: var(--fs-label); font-weight: 500;
               letter-spacing: 1.4px; text-transform: uppercase; box-shadow: var(--shadow-flat); transition: background 0.2s, color 0.2s, transform var(--t-press) var(--ease); }
   .pop-mode ha-icon { --mdc-icon-size: 24px; }
   .pop-mode:active, .pop-wave:active { transform: scale(var(--press-tile)); }

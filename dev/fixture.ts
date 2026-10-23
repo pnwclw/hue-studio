@@ -917,15 +917,21 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     }
   }
   const auth = params.get("app") === "1" ? { external: new FakeBus() } : undefined;
-  // &click=<text>: press the first button with that text once the page is up (screenshots
-  // of what opens on a tap, e.g. &click=QR for the QR scanner).
+  // &click=<text>: press the first button with that text (or label) once the page is up
+  // (screenshots of what opens on a tap, e.g. &click=QR for the QR scanner); several
+  // presses one after another: &click=PC|Ikona.
   const click = params.get("click");
   if (click) {
     const buttons = (root: Document | ShadowRoot | Element): HTMLButtonElement[] => [
       ...root.querySelectorAll<HTMLButtonElement>("button"),
       ...[...root.querySelectorAll("*")].flatMap((el) => (el.shadowRoot ? buttons(el.shadowRoot) : [])),
     ];
-    setTimeout(() => buttons(document).find((b) => b.textContent?.includes(click))?.click(), 1500);
+    click.split("|").forEach((text, i) =>
+      setTimeout(
+        () => buttons(document).find((b) => b.textContent?.includes(text) || b.getAttribute("aria-label") === text)?.click(),
+        1500 + i * 900,
+      ),
+    );
   }
   (window as { fakeBus?: unknown }).fakeBus = auth?.external;
 

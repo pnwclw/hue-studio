@@ -34,6 +34,8 @@ export const COLORS = {
   "bar-bottom": "#0d1013",
   "tab-off": "#404345",
   hairline: "rgba(255, 255, 255, 0.06)",
+  // Under every overlay (sheets, popovers, the brightness slider), with a blur.
+  scrim: "rgba(0, 0, 0, 0.55)",
   outline: "rgba(120, 120, 128, 0.45)",
   selected: "#fff",
   accent: "#006aff",

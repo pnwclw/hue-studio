@@ -55,7 +55,7 @@ interface IrDraft {
 }
 
 /** What is open over the screen: a popover above the controls, or a sheet. */
-type Open = { kind: "mode" | "intensity"; at: { bottom: number; center: number; width: number } } | { kind: "what" | "where" | "more" };
+type Open = { kind: "mode" | "intensity"; at: { top: number; center: number; width: number } } | { kind: "what" | "where" | "more" };
 
 @customElement("hue-studio-sync-view")
 export class SyncView extends StudioView {
@@ -97,12 +97,14 @@ export class SyncView extends StudioView {
     const area = currentArea(box);
     const off = !box.available || !box.power;
     const status = off || box.syncing || !input?.status ? t(statusKey(box)) : t(`sync.input_${input.status}` as StringKey);
-    // The popover sits over the column, just above the label of the button that opened it.
+    // The popover sits over the column, its bottom just above the label of the button that
+    // opened it (anchored to the button, not to the window's height, which the visible area
+    // may not match).
     const pop = (kind: "mode" | "intensity") => (e: Event) => {
       haptic("light");
       const button = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const column = (e.currentTarget as HTMLElement).closest(".sync-stage")!.getBoundingClientRect();
-      this.open = { kind, at: { bottom: window.innerHeight - button.top + 44, center: column.left + column.width / 2, width: column.width } };
+      this.open = { kind, at: { top: button.top - 44, center: column.left + column.width / 2, width: column.width } };
     };
     return html`<div class="sync-stage">
       ${ids.length > 1
@@ -172,7 +174,7 @@ export class SyncView extends StudioView {
   }
 
   /** The mode or intensity popover above the controls, over a dimmed screen. */
-  private popCard(id: string, box: SyncBoxInfo, kind: "mode" | "intensity", at: { bottom: number; center: number; width: number }) {
+  private popCard(id: string, box: SyncBoxInfo, kind: "mode" | "intensity", at: { top: number; center: number; width: number }) {
     const { t } = this.ctx;
     const close = () => (this.open = null);
     const pick = (change: SyncChange) => {
@@ -195,7 +197,7 @@ export class SyncView extends StudioView {
           )}</div>`;
     return html`<div class="pop-layer" @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="pop-card" role="dialog" aria-label=${t(`sync.${kind}` as StringKey)}
-        style=${styleMap({ bottom: `${at.bottom}px`, left: `${at.center}px`, width: `min(400px, ${at.width - 24}px)` })}>
+        style=${styleMap({ top: `${at.top}px`, left: `${at.center}px`, width: `min(400px, ${at.width - 24}px)` })}>
         <div class="pop-title">${t(`sync.${kind}` as StringKey)}</div>
         ${body}
       </div>
