@@ -125,6 +125,7 @@ from .sync import (
 from .sync_follow import (
     ACTIONS as FOLLOW_ACTIONS,
     SCREEN_OFF_AFTER_MAX,
+    SIGNAL_DOMAINS as FOLLOW_SIGNAL_DOMAINS,
     async_set_follow,
 )
 
@@ -1425,9 +1426,18 @@ async def ws_configure_sync_box(
     {
         vol.Required("type"): "hue_studio/sync/follow",
         vol.Required("entry_id"): str,
-        # Input -> what its picture starts (None: the input is not followed).
+        # Input -> what its picture starts and the entity telling it (merged; None,
+        # or no action: the input is not followed).
         vol.Optional("follow"): {
-            vol.In(SYNC_INPUTS): vol.Any(None, vol.In(FOLLOW_ACTIONS))
+            vol.In(SYNC_INPUTS): vol.Any(
+                None,
+                {
+                    vol.Optional("action"): vol.Any(None, vol.In(FOLLOW_ACTIONS)),
+                    vol.Optional("signal"): vol.Any(
+                        None, cv.entity_domain(FOLLOW_SIGNAL_DOMAINS)
+                    ),
+                },
+            )
         },
         # The screen linked with the box (None: none).
         vol.Optional("screen"): vol.Any(

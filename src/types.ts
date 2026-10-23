@@ -557,8 +557,8 @@ export interface SyncBoxInfo {
   bridge?: string | null;
   /** Direct pairing only (not a box linked through huesyncbox). */
   features?: ("palette" | "background_lighting" | "presets" | "ir" | "settings" | "follow")[];
-  /** Input -> what its picture starts (sync_follow.py); inputs not in it are not followed. */
-  follow?: Record<string, "passthrough" | "video" | "game" | "music">;
+  /** Input -> what its picture starts and the entity telling it (sync_follow.py); inputs not in it are not followed. */
+  follow?: Record<string, SyncFollow>;
   /** The screen linked with the box: on with a picture, off after `off_after` s without one. */
   screen?: SyncScreen | null;
   /** The box itself (settings only for a box paired directly). */
@@ -570,6 +570,12 @@ export interface SyncBoxInfo {
   /** The preset applied last, if the box reports it. */
   preset?: string | null;
   ir?: { scanning: boolean; scanned: string[]; codes: SyncIrCode[] } | null;
+}
+
+/** What a picture on an input starts; `signal` is on while its source sends one (null: only the box's own link). */
+export interface SyncFollow {
+  action: "passthrough" | "video" | "game" | "music";
+  signal: string | null;
 }
 
 export interface SyncScreen {

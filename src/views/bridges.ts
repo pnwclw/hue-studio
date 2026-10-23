@@ -15,18 +15,28 @@ import { classMap } from "lit/directives/class-map.js";
 
 import { wifiKey } from "../devices.ts";
 import { haptic } from "../ha-internals.ts";
-import type { StringKey } from "../i18n.ts";
+import type { StringKey, Translate } from "../i18n.ts";
 import { friendlyName } from "../model.ts";
 import { areaState } from "../motion.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
-import { FOLLOW_ACTIONS, hasFeature, inputIcon, SCREEN_OFF_AFTER, statusKey } from "../sync.ts";
-import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo } from "../types.ts";
+import { FOLLOW_ACTIONS, hasFeature, inputIcon, SCREEN_OFF_AFTER, SIGNAL_DOMAINS, statusKey } from "../sync.ts";
+import type { BoxBridgeEvent, BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxDevice, SyncBoxInfo, SyncInput } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { type ChoiceOption, navRow, single } from "./choice.ts";
 
 const NAME_MAX = 32;
 const LEDS = ["off", "dimmed", "normal"] as const;
+/** What the box says of an input ("Signal", "Connected", …). */
+const inputStatus = (t: Translate, input: SyncInput): string =>
+  input.status === "linked" || input.status === "plugged" || input.status === "unplugged" ? t(`sync.input_${input.status}`) : "";
+const SIGNAL_ICONS: Record<string, string> = {
+  media_player: "mdi:play-box-outline",
+  remote: "mdi:remote",
+  binary_sensor: "mdi:checkbox-blank-circle-outline",
+  input_boolean: "mdi:toggle-switch-outline",
+  switch: "mdi:toggle-switch-outline",
+};
 
 @customElement("hue-studio-bridges-view")
 export class BridgesView extends StudioView {
@@ -42,8 +52,8 @@ export class BridgesView extends StudioView {
   @state() private accessor busy = false;
   /** A Sync Box's sheet: its bridge or its Wi-Fi. */
   @state() private accessor boxSheet: "bridge" | "wifi" | null = null;
-  /** A Sync Box's screen page (the screen linked with it) over its own page. */
-  @state() private accessor boxScreen = false;
+  /** A page over a Sync Box's own: its screen ("screen") or one of its inputs (its id). */
+  @state() private accessor boxPart: string | null = null;
   /** The bridge the box goes to, and how linking it goes (`until`: the button's deadline, ms). */
   @state() private accessor boxTarget: string | null = null;
   @state() private accessor boxLink: { event: BoxBridgeEvent; until: number } | null = null;
@@ -63,7 +73,7 @@ export class BridgesView extends StudioView {
 
   protected override willUpdate(changed: PropertyValues<this>): void {
     super.willUpdate(changed);
-    if (changed.has("item")) this.boxScreen = false;
+    if (changed.has("item")) this.boxPart = null;
   }
 
   override disconnectedCallback(): void {
@@ -87,7 +97,9 @@ export class BridgesView extends StudioView {
     if (this.item) {
       const box = ctx.boxes[this.item];
       // The box's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
-      if (box && this.boxScreen) return this.screenPage(this.item, box);
+      if (box && this.boxPart === "screen") return this.screenPage(this.item, box);
+      const input = box && this.boxPart ? box.inputs?.find((i) => i.id === this.boxPart) : undefined;
+      if (box && input) return this.inputPage(this.item, box, input);
       if (box) return html`${this.boxPage(this.item, box)}${this.boxSheet ? this.renderBoxSheet(this.item, box) : nothing}`;
       const bridge = this.bridges?.[this.item];
       if (bridge) return this.bridgePage(this.item, bridge);
@@ -364,28 +376,22 @@ export class BridgesView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const follow = box.follow ?? {};
-    const options: ChoiceOption[] = [
-      { value: "off", label: t("bridges.follow_off"), sub: t("bridges.follow_off_sub") },
-      ...FOLLOW_ACTIONS.map((action) => ({
-        value: action,
-        label: t(`bridges.follow_${action}`),
-        sub: t(action === "passthrough" ? "bridges.follow_passthrough_sub" : "bridges.follow_mode_sub"),
-      })),
-    ];
-    const status = (s?: string | null) => (s === "linked" || s === "plugged" || s === "unplugged" ? t(`sync.input_${s}`) : "");
     const screen = box.screen;
     return html`<h2 class="label">${t("bridges.follow")}</h2>
       <p class="lead small">${t("bridges.follow_hint")}</p>
       <div class="rows">
-        ${(box.inputs ?? []).map((input) =>
-          navRow({ icon: inputIcon(input), title: input.name, sub: status(input.status), value: t(`bridges.follow_${follow[input.id] ?? "off"}`) }, () =>
-            this.choose(
-              single(input.name, options, follow[input.id] ?? "off", (action) =>
-                void ctx.ws({ type: "hue_studio/sync/follow", entry_id: id, follow: { [input.id]: action === "off" ? null : action } }),
-              ),
-            ),
-          ),
-        )}
+        ${(box.inputs ?? []).map((input) => {
+          const rule = follow[input.id];
+          return navRow(
+            {
+              icon: inputIcon(input),
+              title: input.name,
+              sub: !rule ? inputStatus(t, input) : rule.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box_sub"),
+              value: t(`bridges.follow_${rule?.action ?? "off"}`),
+            },
+            () => this.openBoxPart(input.id),
+          );
+        })}
         ${navRow(
           {
             icon: "mdi:television",
@@ -394,13 +400,71 @@ export class BridgesView extends StudioView {
             warn: !!screen && !Object.keys(follow).length,
             value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none"),
           },
-          () => {
-            haptic("selection");
-            this.pushPage();
-            this.boxScreen = true;
-          },
+          () => this.openBoxPart("screen"),
         )}
       </div>`;
+  }
+
+  private openBoxPart(part: string): void {
+    haptic("selection");
+    this.pushPage();
+    this.boxPart = part;
+  }
+
+  private closeBoxPart(): void {
+    this.boxPart = null;
+    this.popPage();
+  }
+
+  /** One input: what its picture starts, and the entity its picture comes from. */
+  private inputPage(id: string, box: SyncBoxInfo, input: SyncInput): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const rule = box.follow?.[input.id];
+    const set = (change: Record<string, unknown> | null) => void ctx.ws({ type: "hue_studio/sync/follow", entry_id: id, follow: { [input.id]: change } });
+    const actions: ChoiceOption[] = [
+      { value: "off", label: t("bridges.follow_off"), sub: t("bridges.follow_off_sub") },
+      ...FOLLOW_ACTIONS.map((action) => ({
+        value: action,
+        label: t(`bridges.follow_${action}`),
+        sub: t(action === "passthrough" ? "bridges.follow_passthrough_sub" : "bridges.follow_mode_sub"),
+      })),
+    ];
+    const rank = (e: string) => SIGNAL_DOMAINS.indexOf(e.split(".")[0] as (typeof SIGNAL_DOMAINS)[number]);
+    const signals: ChoiceOption[] = Object.keys(ctx.hass.states)
+      .filter((e) => rank(e) >= 0)
+      .map((e) => ({ value: e, label: friendlyName(ctx.hass, e), sub: e, icon: SIGNAL_ICONS[e.split(".")[0]] }))
+      .sort((a, b) => rank(a.value) - rank(b.value) || a.label.localeCompare(b.label));
+    const status = inputStatus(t, input);
+    return this.screen(
+      this.subHead(input.name, () => this.closeBoxPart()),
+      html`${this.hero(inputIcon(input), input.name, status, false)}
+        <div class="rows">
+          ${navRow({ icon: "mdi:play-circle-outline", title: t("bridges.follow_action"), value: t(`bridges.follow_${rule?.action ?? "off"}`) }, () =>
+            this.choose(single(t("bridges.follow_action"), actions, rule?.action ?? "off", (action) => set(action === "off" ? null : { action }))),
+          )}
+          ${navRow(
+            {
+              icon: "mdi:eye-outline",
+              title: t("bridges.follow_signal"),
+              sub: rule?.signal ? rule.signal : t("bridges.follow_signal_box_sub"),
+              value: rule?.signal ? friendlyName(ctx.hass, rule.signal) : t("bridges.follow_signal_box"),
+              disabled: !rule,
+            },
+            () =>
+              this.choose(
+                single(
+                  t("bridges.follow_signal"),
+                  [{ value: "", label: t("bridges.follow_signal_box"), sub: t("bridges.follow_signal_box_sub"), icon: "mdi:hdmi-port" }, ...signals],
+                  rule?.signal ?? "",
+                  (signal) => set({ signal: signal || null }),
+                ),
+              ),
+          )}
+        </div>
+        <p class="lead small">${t("bridges.input_hint")}</p>`,
+      "settings-page",
+    );
   }
 
   /** The screen linked with a box: which one, its input, when it turns off. */
@@ -416,12 +480,8 @@ export class BridgesView extends StudioView {
     const sources: string[] = (screen && ctx.hass.states[screen.entity_id]?.attributes.source_list) || [];
     const offLabel = (s: number) =>
       s === 0 ? t("bridges.screen_off_never") : s < 3600 ? t("bridges.screen_off_minutes", { count: s / 60 }) : t("bridges.screen_off_hours", { count: s / 3600 });
-    const back = () => {
-      this.boxScreen = false;
-      this.popPage();
-    };
     return this.screen(
-      this.subHead(t("bridges.screen"), back),
+      this.subHead(t("bridges.screen"), () => this.closeBoxPart()),
       html`<p class="lead small">${t("bridges.screen_hint")}</p>
         <div class="rows">
           ${navRow({ icon: "mdi:television", title: t("bridges.screen"), value: screen ? friendlyName(ctx.hass, screen.entity_id) : t("bridges.screen_none") }, () =>

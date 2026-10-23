@@ -33,6 +33,7 @@ import type {
   ServiceData,
   SyncBoxDevice,
   SyncBoxInfo,
+  SyncFollow,
   SyncChange,
   XY,
 } from "../src/types.ts";
@@ -161,7 +162,7 @@ const SYNC_BOX: SyncBoxInfo = {
   connection: "connected",
   bridge: "hue-entry",
   features: ["palette", "background_lighting", "presets", "settings", "follow", "ir"],
-  follow: { input4: "game" },
+  follow: { input4: { action: "game", signal: "binary_sensor.pc_picture" }, input1: { action: "video", signal: null } },
   screen: { entity_id: "media_player.example_tv", source: "HDMI 3", off_after: 300 },
   device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: true, ha_device: "dev_sync_box" },
   palette: "neutral",
@@ -252,6 +253,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   });
   // Adaptive Lighting for the office lamp.
   entities["switch.adaptive_lighting_office"] = { platform: "adaptive_lighting" };
+  states["binary_sensor.pc_picture"] = { entity_id: "binary_sensor.pc_picture", state: "on", attributes: { friendly_name: "PC picture" } };
   states["media_player.example_tv"] = {
     entity_id: "media_player.example_tv",
     state: "on",
@@ -1355,8 +1357,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }
       if (msg.type === "hue_studio/sync/follow") {
         const follow = { ...box.follow };
-        for (const [input, action] of Object.entries((msg.follow as Record<string, string | null>) ?? {})) {
-          if (action) follow[input] = action as NonNullable<SyncBoxInfo["follow"]>[string];
+        for (const [input, change] of Object.entries((msg.follow as Record<string, Partial<SyncFollow> | null>) ?? {})) {
+          const rule = { ...{ signal: null }, ...follow[input], ...(change ?? { action: undefined }) } as SyncFollow;
+          if (rule.action) follow[input] = rule;
           else delete follow[input];
         }
         const screen = msg.screen === null ? null : msg.screen ? { source: null, off_after: 300, ...box.screen, ...(msg.screen as object) } : box.screen;

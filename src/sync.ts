@@ -1,4 +1,5 @@
-// Sync Box: which room a box syncs, what a command will change. Pure functions, no DOM.
+// Sync Box: which room a box syncs, what a command will change, its inputs' icons. Pure
+// functions, no DOM.
 
 import type { Group } from "./model.ts";
 import type { SyncArea, SyncBoxInfo, SyncChange, SyncInput } from "./types.ts";
@@ -14,6 +15,8 @@ export const IR_ACTIONS = [
 
 /** What a picture on an input starts (sync_follow.ACTIONS); absent: nothing. */
 export const FOLLOW_ACTIONS = ["passthrough", "video", "game", "music"] as const;
+/** Domains of the entities that may tell an input's picture (sync_follow.SIGNAL_DOMAINS), players first. */
+export const SIGNAL_DOMAINS = ["media_player", "remote", "binary_sensor", "input_boolean", "switch"] as const;
 /** How long the linked screen stays on without a picture, in seconds (0: always). */
 export const SCREEN_OFF_AFTER = [60, 120, 300, 600, 1800, 3600, 0] as const;
 

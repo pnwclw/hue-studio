@@ -318,10 +318,12 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV, Bluetooth for the
                                 Hue Sync app's Wi-Fi change), link to bridge entertainment areas, moving it to another bridge
                                 (that bridge's button: its own entertainment credentials, the area of the same name)
-  sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): an
-                                input getting a picture (`linked`) switches the box to it in its own mode, another input
-                                with a picture takes over when it is gone; a screen (media_player) linked with the box
-                                turns on onto its input and off without a picture. Edges only; the box entry's options
+  sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): the
+                                box sees a picture (`linked`) only on the input it is on and none asleep, so each input's picture
+                                is an HA entity (its player, a sensor) or the box's link while on it; a picture switches (and
+                                wakes) the box in that input's mode, another input with one takes over when it is gone; a
+                                screen (media_player) linked with the box turns on onto its input, off without a picture, and
+                                turned on by hand wakes the box. Edges only; the box entry's options
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities; the Hue Studio entry's phase sensor and mood select
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
