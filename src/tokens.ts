@@ -11,8 +11,10 @@ export const COLORS = {
   surface: "#34353a",
   // Tiles on a surface, header pills.
   "surface-2": "#36383c",
-  // List rows, sheets and action sheets, a sub screen's header bar.
+  // Groups of list rows (in sheets too), action sheets.
   "surface-row": "#24262a",
+  // A header bar: a sheet's and a sub screen's (the Hue app's, a shade over the rows).
+  "surface-bar": "#26282c",
   // Round buttons on a bar, tiles on a sheet's rows.
   "surface-raised": "#47484c",
   text: "#fff",
@@ -34,8 +36,9 @@ export const COLORS = {
   "bar-bottom": "#0d1013",
   "tab-off": "#404345",
   hairline: "rgba(255, 255, 255, 0.06)",
-  // Under every overlay (sheets, popovers, the brightness slider), with a blur.
-  scrim: "rgba(0, 0, 0, 0.55)",
+  // Under every overlay (sheets, popovers, the brightness slider): the Hue app's, a plain
+  // dim (no blur).
+  scrim: "rgba(0, 0, 0, 0.7)",
   outline: "rgba(120, 120, 128, 0.45)",
   selected: "#fff",
   accent: "#006aff",
@@ -90,6 +93,10 @@ export const RADII = {
 /** Shadows: flat (rows, small cards), raised (tiles and cards), overlay (menus, sheets), dot (round pictures). */
 export const SHADOWS = {
   flat: "0 3px 10px rgba(0, 0, 0, 0.18)",
+  // A group of rows (the Hue app's: short and dense, a hint above, more below).
+  row: "0 2px 6px rgba(0, 0, 0, 0.45)",
+  // Under a header bar (a sheet's, a sub screen's): long and soft.
+  bar: "0 6px 20px rgba(0, 0, 0, 0.45)",
   raised: "0 6px 18px rgba(0, 0, 0, 0.22)",
   overlay: "0 16px 44px rgba(0, 0, 0, 0.5)",
   dot: "0 3px 10px rgba(0, 0, 0, 0.35)",

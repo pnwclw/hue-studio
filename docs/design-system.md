@@ -45,7 +45,8 @@ everything else stays.
 | `--bg` | `#181b1f` | page background (under a warm glow at the top) |
 | `--surface` | `#34353a` | cards and tiles: rooms, scenes, lights, automations, controls |
 | `--surface-2` | `#36383c` | tiles on a surface, header pills |
-| `--surface-row` | `#24262a` | list rows, sheets, action sheets, a sub screen's header bar |
+| `--surface-row` | `#24262a` | groups of list rows (in sheets too), action sheets |
+| `--surface-bar` | `#26282c` | header bars: a sheet's and a sub screen's, a shade over the rows (Hue app, measured) |
 | `--surface-raised` | `#47484c` | round buttons on a bar, tiles on a sheet's rows |
 | `--text` | `#fff` | text and icons |
 | `--text-2` | `#babbbc` | secondary text, values, subtitles, section titles |
@@ -59,7 +60,7 @@ everything else stays.
 | `--segment-on` | `#636366` | the chosen segment |
 | `--separator` | 10% white | lines between rows, hairline borders |
 | `--hairline` | 6% white | bar borders, pressed rows |
-| `--scrim` | 55% black | under every overlay, with a 14px blur (sheets, popovers, the brightness slider) |
+| `--scrim` | 70% black | under every overlay (sheets, popovers, the brightness slider): a plain dim, no blur (Hue app, measured) |
 | `--outline` | grey 45% | outlined "add" tiles |
 | `--selected` | `#fff` | ring of a chosen tile or mode |
 | `--accent` | `#006aff` | switches on, checks, the main button, "+", a chosen chip's ring |
@@ -103,10 +104,12 @@ rooms, scenes, lights, automations, gallery, banners, groups of rows) · `--r-2x
 
 ### Shadow
 
-`--shadow-flat` (groups of rows outside sheets, small cards, gallery tiles, pills such as
-Sync's) · `--shadow-raised` (tiles, room cards, heroes, sheet buttons, the Sync picture and
-dock) · `--shadow-overlay` (menus, sheets, popovers, the brightness track) · `--shadow-dot`
-(round pictures and discs, round buttons standing on their own like the Sync dock's). The Hue app's cards cast almost no shadow; ours
+`--shadow-row` (a group of rows, in sheets too: short and dense, the Hue app's) ·
+`--shadow-bar` (under a header bar, a sheet's or a sub screen's: long and soft) ·
+`--shadow-flat` (small cards, gallery tiles, pills such as Sync's) · `--shadow-raised`
+(tiles, room cards, heroes, sheet buttons, the Sync picture and dock) · `--shadow-overlay`
+(menus, sheets, popovers, the brightness track) · `--shadow-dot` (round pictures and discs,
+round buttons standing on their own like the Sync dock's). The Hue app's cards cast almost no shadow; ours
 are kept soft. Pins and knobs keep their own small shadows.
 
 ### Size
@@ -141,6 +144,8 @@ Each part: its class (and helper), its measures, where it is used.
 - **Screen** (`StudioView.screen`, `.screen-head` + `.screen-body`): a fixed header over a
   body that scrolls on its own (`overflow: auto; overscroll-behavior: contain`). The panel
   never scrolls; sheets render outside the scrolling body.
+- **Sub screen header** (`.screen-head` with `.bar.sub`): a solid bar in `--surface-bar` with
+  `--shadow-bar` under it, the Hue app's (not translucent, no hairline).
 - **Tab header** (`tabScreen`, `.tab-head`): on phones a clear bar over a large title
   (`--fs-large`); once the title scrolls under, the bar shows it (`--fs-body`) and blurs.
   On desktop one row as tall as HA's sidebar header (`main.wide`), the title `--fs-title-1`.
@@ -254,12 +259,15 @@ Each part: its class (and helper), its measures, where it is used.
 ### Overlays
 
 - **Scrim**: every overlay (sheet, popover, the brightness slider) lies over the same
-  `--scrim` with a 14px blur, so what opens stands apart from the controls under it; never a
-  plain dim.
+  `--scrim`, a plain 70% dim with no blur, as in the Hue app.
 
-- **Sheet** `.sheet` + `.box`: centered card (`--r-2xl`, max 400–560px, `--surface-row`) on
-  wide screens, from the bottom on phones (`.sheet.bottom`); bar `.sheet-bar` (56px, close
-  round button, title `--fs-body` 500, "DONE"/"SAVE" pill). Never inside a scrolling element.
+- **Sheet** `.sheet` + `.box`: centered card (`--r-m`, max 400–560px) on wide screens, from
+  the bottom on phones (`.sheet.bottom`, top corners `--r-m`). Three layers, the Hue app's
+  (measured on its "Function" sheet): the bar `.sheet-bar` (56px, `--surface-bar`,
+  `--shadow-bar`; close round button, title `--fs-body` 500, "DONE"/"SAVE" pill), the body
+  in the page's color (`--bg`) with its hint in `--fs-body` `--text-2` (24px above the
+  rows), and groups of rows across the whole sheet (`--surface-row`, no radius,
+  `--shadow-row`). Never inside a scrolling element.
 - **Action sheet** `.sheet.menu.bottom` + `.action-sheet`: 12px from the edges, 56px centered
   rows (`--fs-body`), the red one, "Cancel" under a line, over a blurred screen.
 - **Menu** `.menu`: a dropdown from a "⋯" button.
@@ -362,8 +370,13 @@ effects sends nothing to the light (checked on an off light against HA's state).
   (warm at the top) with its drawn colors, effect tiles as scene tiles (102×110, 48px
   pictures), and every bar's title at 72px. Then the Sync screen (roadmap S) as the Hue
   app's, with the brightness control shared with the color screen.
-- 2026-10-24, the Sync screens checked against the system: one scrim (dimmed and blurred)
-  under every overlay, the Sync popovers anchored to their button, their tiles raised;
+- 2026-10-24, the Sync screens checked against the system: one scrim under every overlay
+  (first blurred, a mistake: corrected below), the Sync popovers anchored to their button, their tiles raised;
   groups of rows cast `--shadow-flat` as written (they had none); the Sync picture rounded
   12 with the pills, dock and its round buttons shadowed; a Sync Box page's hints under its
   rows and its row subtitles on one line.
+- 2026-10-24, sheets measured on the Hue app (its "Function" sheet, emulator and iOS): the
+  scrim a plain 70% dim (no blur); a sheet in three layers, a `--surface-bar` bar with a
+  long shadow over a body in the page's color and groups of rows across it with a short
+  dense shadow; sheets' corners 12; sub screen headers solid `--surface-bar` with the same
+  bar shadow. New tokens `--surface-bar`, `--shadow-row`, `--shadow-bar`.

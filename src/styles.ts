@@ -34,6 +34,9 @@ export const CSS = `
   .screen-head { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; background: rgba(24, 24, 26, 0.62);
                  -webkit-backdrop-filter: saturate(1.8) blur(24px); backdrop-filter: saturate(1.8) blur(24px); border-bottom: 1px solid var(--hairline); z-index: 3; }
   .screen-head > * { max-width: 928px; margin-left: auto; margin-right: auto; }
+  /* A sub screen's header, the Hue app's: a solid bar a shade over the rows, a long shadow under it. */
+  .screen-head:has(> .bar.sub) { position: relative; background: var(--surface-bar); -webkit-backdrop-filter: none; backdrop-filter: none;
+                                 border-bottom: none; box-shadow: var(--shadow-bar); }
   .screen-head:empty { display: none; }
   .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .screen-body > .page { padding-top: 10px; }
@@ -467,14 +470,14 @@ export const CSS = `
   .fx.create { background: transparent; border: 1.5px solid var(--outline); box-shadow: none; }
   .fx.create .art.plus { display: flex; align-items: center; justify-content: center; width: var(--round-l); height: var(--round-l); margin: 4px 0 12px; background: var(--surface-raised); box-shadow: none; }
   .fx-sheet { max-width: 440px; }
-  .sheet-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-row); font-size: var(--fs-body); font-weight: 500; }
+  .sheet-bar { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-bar);
+               box-shadow: var(--shadow-bar); font-size: var(--fs-body); font-weight: 500; }
   .sheet-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fx-head { padding: 16px 16px 4px; }
   .fx-head .art { display: block; width: 56px; height: 56px; border-radius: 50%; box-shadow: var(--shadow-dot); }
   .fx-head h3 { margin: 12px 0 0; font-size: var(--fs-title-2); font-weight: 700; letter-spacing: -0.3px; }
   .fx-sheet .label { margin: 18px 16px 8px; }
-  .rows { border-radius: var(--r-m); background: var(--surface-row); overflow: hidden; box-shadow: var(--shadow-flat); }
-  .sheet .rows { box-shadow: none; }
+  .rows { border-radius: var(--r-m); background: var(--surface-row); overflow: hidden; box-shadow: var(--shadow-row); }
   .fx-sheet .rows { border-radius: 0; background: var(--surface-row); }
   .rows .item { display: flex; align-items: center; gap: 12px; min-height: var(--row-h-compact); padding: 10px 16px; box-sizing: border-box; font-size: var(--fs-body); }
   .rows .item + .item { border-top: 1px solid var(--separator); }
@@ -586,9 +589,10 @@ export const CSS = `
 
   /* scene sheet / dialogs */
   .sheet { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fade 0.2s ease; }
-  /* One scrim under every overlay: the screen dimmed and blurred, so what opens stands apart from the controls under it. */
-  :is(.sheet, .pop-layer, .bri-layer) { background: var(--scrim); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-  .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: var(--r-2xl); background: var(--surface-row);
+  /* One scrim under every overlay (sheets, popovers, the brightness slider): the Hue app's plain dim, no blur. */
+  :is(.sheet, .pop-layer, .bri-layer) { background: var(--scrim); }
+  /* A sheet, the Hue app's: its bar a shade lighter with a long shadow over a body in the page's color, groups of rows across it. */
+  .sheet .box { width: min(100%, 400px); max-height: 100%; overflow: auto; border-radius: var(--r-m); background: var(--bg);
                 box-shadow: var(--shadow-overlay); animation: pop 0.3s var(--spring); }
   .sheet .pic { position: relative; aspect-ratio: 16 / 10; background: var(--surface-row) center / cover no-repeat; }
   .sheet .pic::after { content: ""; position: absolute; inset: 45% 0 0; background: linear-gradient(transparent, rgba(0, 0, 0, 0.5)); }
@@ -869,9 +873,9 @@ export const CSS = `
   .sensor-edit h2.label + .rows { margin-top: 0; }
   .sensor-edit .rows .item .value { color: var(--text-2); }
   .round.plus-blue { display: flex; align-items: center; justify-content: center; width: var(--control); height: var(--control); background: var(--accent); color: #fff; }
-  .sensor-sheet .rows { border-radius: var(--r-m); background: var(--surface-row); }
+  .sensor-sheet .rows { margin: 0 -16px; border-radius: 0; background: var(--surface-row); }
   .sensor-sheet .form-body { padding-bottom: 16px; }
-  .sensor-sheet .hint { margin: 0 2px 12px; font-size: var(--fs-body); }
+  .sensor-sheet .hint { margin: 8px 0 24px; font-size: var(--fs-body); }
   /* QR scanner sheet (views/qr-scan.ts): the camera, a frame to aim with, what was read */
   .qr-sheet .qr-camera { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; overflow: hidden; background: #000; }
   .qr-sheet .qr-camera video { width: 100%; height: 100%; object-fit: cover; }
@@ -886,7 +890,7 @@ export const CSS = `
   .sensor-sheet .sheet-bar .pill.save { padding: 0 16px; }
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
-  .sheet.bottom .box { width: 100%; max-width: none; border-radius: var(--r-2xl) var(--r-2xl) 0 0; animation: rise 0.3s var(--ease); }
+  .sheet.bottom .box { width: 100%; max-width: none; border-radius: var(--r-m) var(--r-m) 0 0; animation: rise 0.3s var(--ease); }
   /* A scene's sheet (scene-pick.ts), the Hue app's: picture with name and pencil, colors with
      shuffle, the room or zone it goes to, "Save to my scenes" and "Set once". */
   hue-studio-scene-pick { display: contents; }
