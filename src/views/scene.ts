@@ -3,6 +3,9 @@
 // now plus the name, dynamic speed and auto-play. "Colors" shuffles the palette over the
 // lights, "Reset scene" rebuilds the scene from its palette, "Delete scene" removes it from
 // the bridge (and so from the Hue app).
+// A new scene ("Custom scene" of a room's "+", the scene `new`) is the Hue app's: a picker
+// starting from what the lights show now, its name asked first; the lights are set the same
+// way (brightness here, colors on the wheel) and "Save" at the bottom creates it.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -14,13 +17,16 @@ import { groupSlider, lightTile, sceneColors, sceneDot, speedSheet } from "../co
 import { speedToStep, speedWord, stepToSpeed } from "../effects.ts";
 import { leavePanel } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { findGroup, friendlyName, type Group, groupState } from "../model.ts";
+import { colorsCss, findGroup, friendlyName, type Group, groupState } from "../model.ts";
 import { syncingIn } from "../sync.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { navRow } from "./choice.ts";
 
 const RESET_CONFIRM_MS = 3500;
+
+/** The scene "id" of a new one (`/room/<key>/scene/new`). */
+export const NEW_SCENE = "new";
 
 @customElement("hue-studio-scene-view")
 export class SceneView extends StudioView {
@@ -36,6 +42,11 @@ export class SceneView extends StudioView {
   @state() private accessor confirmDelete = false;
   /** The dynamic speed sheet's step (1-12) while it is open. */
   @state() private accessor speedStep: number | null = null;
+  /** A new scene's name sheet: what is typed (null while it is closed). */
+  @state() private accessor naming: string | null = null;
+  @state() private accessor busy = false;
+  /** "Close and don't save?" over a new scene (the Hue app's). */
+  @state() private accessor leaving = false;
   private started = false;
   private resetTimer?: ReturnType<typeof setTimeout>;
   private deleteTimer?: ReturnType<typeof setTimeout>;
@@ -45,10 +56,15 @@ export class SceneView extends StudioView {
     return st?.attributes.name || friendlyName(this.ctx.hass, this.scene);
   }
 
+  private get isNew(): boolean {
+    return this.scene === NEW_SCENE;
+  }
+
   /** Unsaved edits, kept in the context while the user visits the color wheel. */
   private get draft(): SceneDraft {
     const { ctx } = this;
-    if (ctx.sceneDraft?.scene !== this.scene) ctx.sceneDraft = { scene: this.scene, name: null, speed: null, autoplay: null };
+    const scene = this.isNew ? `${NEW_SCENE}:${this.key}` : this.scene;
+    if (ctx.sceneDraft?.scene !== scene) ctx.sceneDraft = { scene, name: null, speed: null, autoplay: null };
     return ctx.sceneDraft;
   }
 
@@ -58,6 +74,12 @@ export class SceneView extends StudioView {
   }
 
   protected override willUpdate(): void {
+    // A new scene asks for its name first (once: a visit to the wheel keeps it).
+    if (this.isNew) {
+      if (!this.started && this.ctx.ready && this.draft.name === null) this.naming = this.ctx.t("room.new_scene");
+      this.started = true;
+      return;
+    }
     // Show the scene on its lights first: editing works on what the lights show.
     if (this.started || !this.ctx.ready || !this.ctx.hass.states[this.scene]) return;
     this.started = true;
@@ -77,6 +99,7 @@ export class SceneView extends StudioView {
   }
 
   protected override render() {
+    if (this.isNew) return this.renderNew();
     const { ctx } = this;
     const { t } = ctx;
     const room = findGroup(ctx.home, this.key);
@@ -193,6 +216,128 @@ export class SceneView extends StudioView {
           },
         })
       : nothing}`;
+  }
+
+  /** A new scene: what the room's lights show now, set here and on the wheel, then "Save". */
+  private renderNew() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const room = findGroup(ctx.home, this.key);
+    const roomPath = `/room/${encodeURIComponent(this.key)}`;
+    const leave = () => {
+      ctx.sceneDraft = null;
+      ctx.go(roomPath);
+    };
+    const head = html`<div class="bar"><button class="round back" aria-label=${t("common.back")} @click=${() => (this.leaving = true)}>${icon("back")}</button></div>`;
+    if (!room) return this.screen(head, html`<p class="empty">${t("room.not_found")}</p>`);
+    const state = groupState(ctx.hass, room, ctx.lightInfo);
+    const name = this.draft.name ?? t("room.new_scene");
+    const here = `${roomPath}/scene/${NEW_SCENE}`;
+    const syncing = syncingIn(ctx.boxes, room);
+    const body = html`<div class="scene-top">
+        <div class="dot big" style=${styleMap({ background: colorsCss(state.colors, "var(--surface-raised)") })}></div>
+        <div class="name-row">
+          <h1 class="big">${name}</h1>
+          <button class="round rename" aria-label=${t("scene.rename")} @click=${() => (this.naming = name)}>${icon("pencil")}</button>
+        </div>
+      </div>
+      <div class="rows scene-brightness">
+        <div class="item col">
+          <div class="line"><span>${t("scene.brightness")}</span><span class="dim">${state.on ? `${state.brightness}%` : ""}</span></div>
+          ${groupSlider(ctx, room, state, t("scene.brightness"))}
+        </div>
+      </div>
+      <div class="rows lights-card scene-lights">
+        <div class="item lights-head"><div class="grow">${t("room.lights")}</div></div>
+        <div class="light-row">
+          ${room.lights.map((id) =>
+            lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), { busy: syncing.includes(id) }),
+          )}
+        </div>
+      </div>
+      ${room.group ? nothing : html`<p class="hint">${t("room.no_group", { room: room.name })}</p>`}`;
+    return html`${this.screen(head, body, "scene-edit scene-new")}
+      <div class="screen-foot">
+        <button class="pill apply" ?disabled=${!room.group || this.busy} @click=${() => this.create(room, name)}>${t("scene.save")}</button>
+      </div>
+      ${this.naming !== null ? this.nameSheet() : nothing}
+      ${this.leaving
+        ? html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && (this.leaving = false)}>
+            <div class="box action-sheet" role="dialog" aria-label=${t("scene.leave")}>
+              <p class="note">${t("scene.leave_note")}</p>
+              <button class="danger" @click=${leave}>${t("scene.leave")}</button>
+              <button class="cancel" @click=${() => (this.leaving = false)}>${t("common.cancel")}</button>
+            </div>
+          </div>`
+        : nothing}`;
+  }
+
+  /** The Hue app's "Scene name" sheet: the name in a field with a clear button, "Done". */
+  private nameSheet() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const done = () => {
+      const name = this.naming?.trim();
+      this.edit({ name: name || this.draft.name || t("room.new_scene") });
+      this.naming = null;
+    };
+    const cancel = () => {
+      if (this.draft.name === null) this.edit({ name: t("room.new_scene") });
+      this.naming = null;
+    };
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && cancel()}>
+      <div class="box form name-sheet" role="dialog" aria-label=${t("room.new_scene_name")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${cancel}>${icon("close")}</button>
+          <div class="grow">${t("room.new_scene_name")}</div>
+          <button class="pill" @click=${done}>${t("common.done")}</button>
+        </div>
+        <div class="form-body">
+          <label class="name-field">
+            <input
+              class="field"
+              maxlength="32"
+              aria-label=${t("room.new_scene_name")}
+              .value=${this.naming ?? ""}
+              @input=${(e: InputEvent) => (this.naming = (e.target as HTMLInputElement).value)}
+              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()}
+            />
+            ${this.naming
+              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+                  e.preventDefault();
+                  this.naming = "";
+                  this.querySelector<HTMLInputElement>(".name-field input")?.focus();
+                }}>${icon("close")}</button>`
+              : nothing}
+          </label>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  override updated(): void {
+    // The name sheet comes up ready to type.
+    const field = this.querySelector<HTMLInputElement>(".name-sheet input");
+    if (field && !this.#focused) {
+      this.#focused = true;
+      field.focus();
+      field.select();
+    }
+    if (!field) this.#focused = false;
+  }
+
+  #focused = false;
+
+  private async create(room: Group, name: string): Promise<void> {
+    const { ctx } = this;
+    if (!room.group || this.busy) return;
+    this.busy = true;
+    const ok = await ctx.call("hue_studio", "create_scene", { entity_id: room.group, name }, { optimistic: false });
+    this.busy = false;
+    if (!ok) return;
+    ctx.sceneDraft = null;
+    ctx.toast(ctx.t("room.scene_created", { name }));
+    ctx.go(`/room/${encodeURIComponent(this.key)}`);
   }
 
   /** Spread the palette over the lights in a new order (live; "Save" keeps it). */

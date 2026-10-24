@@ -264,6 +264,10 @@ Each part: its class (and helper), its measures, where it is used.
 - **Type header** `.auto-type` (the Automations tab): the type's icon in a 32px column at 16,
   its name `--fs-body` 500 at 72, the count (13px) and a round button that folds its cards;
   48px tall, 24px under the cards before it.
+- **New scene** (`scene.ts`, `/room/<key>/scene/new`, the Hue app's "Custom scene"): a
+  picker; its name asked first on a name sheet; picture (the lights' colors) 48 and name 34
+  12px into the panel, the brightness and lights cards rounded 20px in, 20px apart; "Save"
+  in the footer; leaving asks "Close and don't save" on an action sheet.
 - **Pick tile** `.pick-tile` (a room's "+"): two columns 12px apart, 156px tall, a 72px dark
   disc with a 40px icon over the name (`--fs-body` 500); `.way` (a scene's ways) 108px, the
   picture at the top left, the name (`--fs-callout` 500) at the bottom.
@@ -299,8 +303,13 @@ Each part: its class (and helper), its measures, where it is used.
   in the page's color (`--bg`) with its hint in `--fs-body` `--text-2` (24px above the
   rows), and groups of rows across the whole sheet (`--surface-row`, no radius,
   `--shadow-row`). Never inside a scrolling element.
-- **Action sheet** `.sheet.menu.bottom` + `.action-sheet`: 12px from the edges, 56px centered
-  rows (`--fs-body`), the red one, "Cancel" under a line, over a blurred screen.
+- **Action sheet** `.sheet.menu.bottom` + `.action-sheet`: 12px from the edges, an optional
+  note on top (`.note`, 13px grey, centered, a line under it), 56px centered rows
+  (`--fs-body`), the red one, "CANCEL" (13px capitals) under a line, over the scrim.
+- **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
+  name in a 46px field with a 1.5px `--outline` border and a round clear button.
+- **Footer** `.screen-foot`: a line over the screen's one action (the accent pill), centered,
+  the safe area under it (a new scene's "Save").
 - **Menu** `.menu`: a dropdown from a "⋯" button.
 - **Scene sheet** (`scene-pick.ts`): picture with name and pencil, colors and shuffle, room,
   "Save to my scenes", "Set once".
@@ -344,7 +353,7 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Home | the page glows in the lit rooms' color (`#2e2c26` at the top with a yellow room on, to `#181b1f` at the bottom), cards white 12% over it; large title 34 (Söhne Breit); banner 86 tall, 12 from the edges; section titles 10 (cap 7.2); room cards 387×96 at 12 from the edges, 12 apart, radius 12, a 28 icon 18 in, the name 16 at 73 from the card's edge, an 8 track with a 16 knob 12 in from the card's edges, the switch 52×32; tab bar 56 + safe area, labels 11, tabs not chosen `#404345` |
 | Room | the page glows in its lit lights' color down to the bottom; header: back 32 at 16, title 16 at 72, "+", "⋯", the switch; slider under it; its bottom corners 12; scene tiles 102×110 with a 48 picture 12 from the top, names 13–14, 12 apart; light tiles 102×160 with a 55 switch zone; controls 150×108 (24 icon 20 in, name 14, line 12); section titles 32 under the cards before them, 8 over their own |
 | Room "⋯", leaving without saving | action sheet 12 from the edges, rows 56, red "Delete", "CANCEL" under a line, a blurred screen |
-| Room "+", new scene | a picker (a deep blue top `#08225d`, the page a panel from 80 with 18 corners and a light edge): "Tap the item you want to add to …" 28, two-column tiles 180×156 (20 from the edges, 12 apart, a 72 dark disc over the name 16); "Add a scene": a lead 16, tiles 180×108 (picture top left, name 14 at the bottom); "Custom scene": a 48 picture, name 34, brightness card, lights card, a blue "Save" pill (36) at the bottom; a name sheet over the keyboard |
+| Room "+", new scene | a picker (a deep blue top `#08225d`, the page a panel from 80 with 18 corners and a light edge): "Tap the item you want to add to …" 28, two-column tiles 180×156 (20 from the edges, 12 apart, a 72 dark disc over the name 16); "Add a scene": a lead 16, tiles 180×108 (picture top left, name 14 at the bottom: gallery, custom scene, save current settings, all-day scene); "Custom scene": a 48 picture, name 34, brightness card, lights card, a blue "Save" pill (36) at the bottom; a name sheet over the keyboard |
 | Color | "⋯" and "SAVE" pills, "DONE"; wheel 380 across (16 from the edges, its middle at 336 on a 914 screen), a glow in its colors around it; modes bar 46 with discs; gradient button 48, brightness 72×48 with its value over it; modes at 648 and the tiles at 712; the room's light tiles under it (no room line), the picked one ringed 2 in its own color and the others dimmed; an off light's pin is black, other lights are small dots |
 | White wheel | warmest at the top: `#fdb247` → `#fde39f` (40%) → `#fff6d4` (60%) → `#fffcf3` (80%) → `#c7f3fe` at the bottom |
 | Effects | large title "Effects"; categories as section titles; a row per effect of tiles 102×110 (48 picture, name 14 over preset 12), 12 apart, two rows per category; "Create" at each row's end: outlined, a 40 round "+" |
@@ -352,6 +361,7 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Automations | a blue glow at the top (`#11145d` in the middle, gone by ~330); accent "+"; large title; bridge chips 32 (`#2e3134`, grey text; the chosen one white on an accent tint, ringed 2px in the accent); grouped by type: a header row 48 (icon at 16, 16 title at 72, count 13, a 32 round collapse), 24 under the cards before; cards 387×72 (`#2f3235`), no icon, text at 16, 16 titles over 13, play 32, the switch |
 | Automation editor | a sheet 37 from the top (corners 12, the screen behind dimmed); sub header bar 56 (`#26282c`: close, title 16, "SAVE"); type icon 24, name 34; rows 72 with no icons, text at 16, values 13 on the right; a lights card with place tiles 144×108; section titles 10 |
 | Fade and choice sheets | sheet bar 56 (close, title 16, "DONE"); caps 10 over a 16 value; slider with ticks 11 under it; choice rows 72 with a 40 picture, a tick on the chosen one; hint 12 |
+| "Custom scene" | a picker: the "Scene name" sheet first (close, "DONE", a 46 field with a 1.5 light border and a clear button, prefilled "New scene"); then picture 48 at 24 / 112, name 34, pencil 32; "Scene brightness" card 20 in (`#24262a`, 12 corners, 120 tall), "Lights" card 20 under it; a line at the bottom over a centered accent "Save" (36); back asks "Your settings will not be saved…" with a red "Close and don't save" and "CANCEL" (13) |
 | "+" new automation | a picker (deep blue top, the page a panel from 80): no bar title, the question 28 at 24, picture cards 371×159 (20 from the edges, 12 apart), title 16 over two lines of 14 |
 | Scene editor | a sheet 37 from the top; picture 48, name 34; the top tinted down through the brightness (label 16, value 13, slider 48 under the label), then 22 of page; "Lights" group (`#24262a`, title row 72, tiles 12 in); "Reset scene" and "Delete scene" centered 40 under it, 12 apart, 24 of room around their words (`#4b4b4b`; the red one `#371f22` with a 2 red border) |
 | Settings | large title; rows 72, 24 icons at 20, text at 72, titles 16 (500), subtitles 12, chevrons; separators from the text on; section titles 10 |
@@ -376,9 +386,9 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Screen (view) | Parts | Against the Hue app |
 |---|---|---|
 | Home (`home`) | tab header, room cards, banner, zones | matches |
-| Room (`room`, `add-sheet`) | room header, tile cards (scenes, lights), control cards, chips, Sync card, banner, the "+" picker with pick tiles | matches; sensor chips and the Sync card are ours; "+" offers what Hue Studio adds (no MotionAware or SpatialAware tiles, no "Custom scene" or "Color palette from photo") |
+| Room (`room`, `add-sheet`) | room header, tile cards (scenes, lights), control cards, chips, Sync card, banner, the "+" picker with pick tiles | matches; sensor chips and the Sync card are ours; "+" offers what Hue Studio adds (no MotionAware or SpatialAware tiles, no "Color palette from photo") |
 | Color (`color`, `effects`, `effect-sheet`) | wheel, pins, modes, brightness, effect tiles, style sheet | matches; gradient style sheet is ours |
-| Scene editor, new scene, scene sheet (`scene`, `new-scene`, `scene-pick`) | hero, rows, tile cards, sheet | matches; "Save" sits in the header (ours) where a new scene in the Hue app has it at the bottom |
+| Scene editor, new scene, scene sheet (`scene`, `new-scene`, `scene-pick`) | hero, rows, tile cards, sheets, footer, action sheet | matches; "Custom scene" as the Hue app's (a picker, the name first, "Save" at the bottom) |
 | Gallery (`gallery`, `gallery-settings`) | tiles, search, list rows | gallery matches; seasonal rules are ours |
 | Automations (`automations`, `automation-edit`, `automation-parts`, `choice`, `day-parts`, `daylight-settings`) | automation cards, type headers, type cards, list rows, wheels, days, sliders on sheets, place tiles | matches; light of the day is ours; a room's screen lists its own automations |
 | Sync (`sync`) | picture, sync pills, popovers, brightness control, dock, sheets with tiles and rows | matches; background lighting and the music palette (in the mode popover), presets and remote buttons ("⋯") are ours |
@@ -425,3 +435,6 @@ effects sends nothing to the light (checked on an off light against HA's state).
   corners 12; control cards 150×108; the scene editor's spacing, "Reset" and "Delete"
   centered; the color screen's wheel 16 from the edges, its tiles without a room line in a
   room. New tokens `--surface-low`, `--round`, `--tab-on`, `--glow-*`, `--picker-top*`.
+- 2026-10-24, "Custom scene" as the Hue app's: a new scene set light by light from the room's
+  "+", its name asked first, "Save" in a footer, leaving confirmed on an action sheet (whose
+  rows are now centered, 12px from the edges, "CANCEL" 13px).

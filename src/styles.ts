@@ -553,6 +553,18 @@ export const CSS = `
   .scene-lights .light-row { margin: 0; padding: 0 var(--gutter) 20px; }
   .scene-lights .lights-head .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; height: 32px; }
   .scene-lights .lights-head .pill.shuffle svg { width: 18px; height: 18px; }
+  /* A new scene (the Hue app's "Custom scene"): on a picker's panel, its cards rounded and 20px in,
+     "Save" (the accent) at the bottom over a line. */
+  .scene-new .scene-top { padding: 12px var(--text-inset) 6px; }
+  .page.scene-new .rows { margin-left: 0; margin-right: 0; border-radius: var(--r-m); }
+  .page.scene-new .rows.scene-lights { margin-top: 20px; }
+  .page.scene-new > .hint { margin: 16px var(--text-inset) 0; }
+  .screen-foot { flex: none; display: flex; justify-content: center; padding: 15px 16px calc(16px + var(--safe-bottom));
+                 border-top: 1px solid var(--separator); background: var(--bg); }
+  .screen-foot .pill.apply { background: var(--accent); color: var(--text); }
+  .name-sheet .name-field { position: relative; display: flex; align-items: center; }
+  .name-sheet .name-field .field { height: 46px; padding-right: 44px; border: 1.5px solid var(--outline); border-radius: var(--r-xs); background: var(--surface); }
+  .name-sheet .name-field .round { position: absolute; right: 8px; }
   .scene-edit > .center { margin-top: 40px; }
   .scene-edit > .center + .delete-area { margin-top: 12px; }
   .name-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 18px; }
@@ -965,13 +977,17 @@ export const CSS = `
   .scene-pick .actions { background: var(--bg); padding: 16px; }
   .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4); }
   /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
-  .sheet.menu.bottom { padding: 0 10px calc(10px + var(--safe-bottom)); }
+  .sheet.menu.bottom { padding: 0 var(--gutter) calc(10px + var(--safe-bottom)); }
   .sheet.menu.bottom .box { border-radius: var(--r-2xl); }
   .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: var(--surface-row); }
   .action-sheet button { min-height: 56px; border: none; background: none; color: var(--text); font: inherit; font-size: var(--fs-body); cursor: pointer; }
   .action-sheet button:active { background: var(--hairline); }
+  /* Centered rows across the sheet (not a dropdown menu's). */
+  .menu .action-sheet button { justify-content: center; padding: 0 16px; border-radius: 0; text-align: center; }
   .action-sheet button.danger { color: var(--danger); }
-  .action-sheet button.cancel { border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: var(--fs-body); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .action-sheet .note { margin: 0; padding: 14px 16px; border-bottom: 1px solid var(--separator); font-size: var(--fs-footnote); line-height: 1.4;
+                        color: var(--text-2); text-align: center; }
+  .action-sheet button.cancel { border-top: 1px solid var(--separator); font-size: var(--fs-footnote); font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
   .sheet.bottom .sensor-sheet .form-body { padding-bottom: calc(20px + var(--safe-bottom)); }
   @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
   /* Motion sensitivity: the level, a stepped slider with the names under its stops, trying it out. */

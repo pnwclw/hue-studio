@@ -1,7 +1,7 @@
 // "+" of a room or zone, like the Hue app's: a picker (a deep blue top, the page a rounded
 // panel over it) asking what to add, as picture tiles. A scene (from the Hue scene gallery,
-// from what the lights show now, or an all-day scene: a schedule showing the scene of the
-// day), a device ("Add devices", the room's area picked) or an automation of the room.
+// a custom one set light by light, from what the lights show now, or an all-day scene: a
+// schedule showing the scene of the day), a device ("Add devices", the room's area picked) or an automation of the room.
 // Fires `close`.
 
 import { html, nothing, type TemplateResult } from "lit";
@@ -66,6 +66,7 @@ export class AddSheet extends StudioView {
                   "add.gallery",
                   () => go(`/gallery?room=${room}`),
                 )}
+                ${small(html`<ha-icon icon="mdi:pencil"></ha-icon>`, "add.custom", () => go(`/room/${room}/scene/new`))}
                 ${small(html`<ha-icon icon="mdi:check"></ha-icon>`, "add.current", () => next("current"))}
                 ${small(html`<ha-icon icon="mdi:clock-time-four"></ha-icon>`, "add.all_day", () => go(`/automations/new/schedule?room=${room}&preset=all_day`))}
               </div>`
