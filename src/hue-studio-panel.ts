@@ -41,13 +41,14 @@
 import { html, LitElement, nothing, type PropertyValues, unsafeCSS } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
 import { keyed } from "lit/directives/keyed.js";
 
 import { PANEL_PATH, StudioContext } from "./context.ts";
 import { fitToViewport, outsidePath, toggleSidebar } from "./ha-internals.ts";
 import { tabTarget } from "./footer-model.ts";
 import { type DeviceGroup, isDeviceGroup } from "./devices.ts";
-import { findGroup } from "./model.ts";
+import { findGroup, glowColor, lightColors } from "./model.ts";
 import { CSS } from "./styles.ts";
 import type { Hass } from "./types.ts";
 import { icon, type IconName, keepTouchInside } from "./ui.ts";
@@ -253,11 +254,23 @@ export class HueStudioPanel extends LitElement {
       route.name === "sensor" ||
       route.name === "deviceSensor" ||
       route.name === "device" ||
+      route.name === "automation" ||
+      route.name === "automationNew" ||
       route.name === "gallery";
+    // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
+    // rounded under the status bar).
+    const sheet = ctx.narrow && (route.name === "scene" || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation");
+    // Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
+    // page as a rounded panel over it.
+    const picker = route.name === "automationNew" || route.name === "gallery";
+    const glow = this.glow(ctx, route);
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;
     return html`
-      <main class=${classMap({ colorview: route.name === "color", "under-footer": top, wide: !ctx.narrow })}>${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
+      <main
+        class=${classMap({ colorview: route.name === "color", "under-footer": top, wide: !ctx.narrow, "as-sheet": sheet, picker, [`glow-${glow.kind}`]: !!glow.kind })}
+        style=${styleMap({ "--glow": glow.color })}
+      >${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
       <nav class=${classMap({ tabs: true, top })} ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) =>
@@ -266,6 +279,21 @@ export class HueStudioPanel extends LitElement {
       </nav>
       <div class=${classMap({ toast: true, on: ctx.toastOn })}>${ctx.toastText}</div>
     `;
+  }
+
+  /** The page's glow, the Hue app's: Home and a room in their lit lights' colors, the
+   *  Automations and Sync tabs in their own; Settings and sub screens have none. */
+  private glow(ctx: StudioContext, route: Route): { kind: "light" | "blue" | "violet" | null; color?: string } {
+    if (route.name === "automations") return { kind: "blue" };
+    if (route.name === "sync") return { kind: "violet" };
+    const lights =
+      route.name === "home"
+        ? [...new Set([...ctx.home.rooms, ...ctx.home.zones].flatMap((g) => g.lights))]
+        : route.name === "room"
+          ? (findGroup(ctx.home, route.key)?.lights ?? [])
+          : [];
+    const color = glowColor(lights.flatMap((id) => lightColors(ctx.hass, id, ctx.lightInfo[id])));
+    return color ? { kind: "light", color } : { kind: null };
   }
 
   /** A fresh element per route (keyed), so no screen state leaks into the next one. */

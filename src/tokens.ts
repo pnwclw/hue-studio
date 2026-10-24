@@ -7,8 +7,11 @@
  *  the Hue app 6.3 (docs/design-system.md, "Inventory"). */
 export const COLORS = {
   bg: "#181b1f",
-  // Cards and tiles (rooms, scenes, lights, automations, controls).
-  surface: "#34353a",
+  // Cards and tiles (rooms, scenes, lights, controls): white over the page, so they take
+  // its glow (#34353a on the plain page), the Hue app's.
+  surface: "rgba(255, 255, 255, 0.12)",
+  // Automation cards and filter chips: a shade lower (#2f3235 on the plain page).
+  "surface-low": "rgba(255, 255, 255, 0.1)",
   // Tiles on a surface, header pills.
   "surface-2": "#36383c",
   // Groups of list rows (in sheets too), action sheets.
@@ -27,6 +30,8 @@ export const COLORS = {
   "fill-strong": "rgba(120, 120, 128, 0.36)",
   // A round button on a tinted or colored surface.
   "fill-light": "rgba(255, 255, 255, 0.12)",
+  // Round buttons, the Hue app's: white over whatever they sit on (#47484c on a bar).
+  round: "rgba(255, 255, 255, 0.15)",
   // The chosen button of a segmented control.
   "segment-on": "#636366",
   separator: "rgba(255, 255, 255, 0.1)",
@@ -35,6 +40,16 @@ export const COLORS = {
   // The tab bar and its tabs that are not chosen.
   "bar-bottom": "#0d1013",
   "tab-off": "#404345",
+  "tab-on": "#b9baba",
+  // A tab's glow at the top of the page (Automations blue, Sync violet); Home and a room glow
+  // in their lit lights' colors (the panel's --glow), Settings and sub screens don't.
+  "glow-blue": "rgba(10, 12, 150, 0.4)",
+  "glow-blue-wash": "rgba(14, 16, 110, 0.35)",
+  "glow-violet": "rgba(100, 55, 180, 0.31)",
+  "glow-violet-wash": "rgba(90, 50, 170, 0.33)",
+  // A picker's top (the gallery, a new automation's types), under its rounded page.
+  "picker-top": "#08225d",
+  "picker-top-2": "#091b40",
   hairline: "rgba(255, 255, 255, 0.06)",
   // Under every overlay (sheets, popovers, the brightness slider): the Hue app's, a plain
   // dim (no blur).

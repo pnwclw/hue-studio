@@ -1,18 +1,19 @@
 // Automations (a tab, like the Hue app's): Hue Studio's automations with their switch, by
-// room and zone (one in several rooms shows in each), the other Home Assistant automations
-// that touch Hue lights, and "+" with the Hue app's types.
+// type under a header that folds them away (a room's screen lists its own), the other Home
+// Assistant automations that touch Hue lights, and "+" with the Hue app's types.
 // Every automation is a Home Assistant automation (a blueprint of ours, see automations.ts):
 // HA stores and runs it, and its own editor stays one tap away.
 
 import { html, nothing, type TemplateResult } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 
 import { automationArt, customArt } from "../automation-art.ts";
 import { type AutomationDraft, cardLines, type Controls, controlsGroup, fromConfig, placesOf, roomsLine, TYPE_ICONS, TYPES } from "../automations.ts";
+import { haptic } from "../ha-internals.ts";
 import type { StudioContext } from "../context.ts";
 import type { StringKey } from "../i18n.ts";
 import { automationCard } from "../controls.ts";
-import { allGroups, friendlyName, type Group } from "../model.ts";
+import { friendlyName, type Group } from "../model.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -45,8 +46,9 @@ const haEditor = (ctx: StudioContext, entityId: string | null): void => {
 /** The automations of one room or zone. */
 const ofGroup = (list: Listed[], g: Group): Listed[] => list.filter((l) => controlsGroup(l.controls, g.key, g.group, g.lights));
 
-/** One of ours; `inGroup`: listed under its room, so other rooms are named only if it has any. */
-function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null = null): TemplateResult {
+/** One of ours; `inGroup`: listed under its room, so other rooms are named only if it has any;
+ *  `byType`: under its type's header, which shows the type's icon (the card has none). */
+function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null = null, byType = false): TemplateResult {
   const { t } = ctx;
   const state = ctx.hass.states[l.entityId];
   const on = state?.state === "on";
@@ -62,7 +64,7 @@ function row(ctx: StudioContext, l: Listed, inGroup = false, from: Group | null 
   const sub = [lines.sub, rooms].filter(Boolean).join(" · ");
   // Going to sleep starts right here too, like the Hue app's play (its conditions skipped).
   const start = draft?.type === "go_to_sleep" && !l.custom ? { label: t("automations.start_now"), run: () => void ctx.call("automation", "trigger", { entity_id: l.entityId, skip_condition: true }) } : null;
-  return automationCard(glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })), start);
+  return automationCard(byType ? "" : glyph, lines.title, sub, open, toggle(on, name, () => ctx.call("automation", on ? "turn_off" : "turn_on", { entity_id: l.entityId })), start);
 }
 
 /** The automations of a room or zone, for its screen (nothing without any: its "+" adds them). */
@@ -73,29 +75,44 @@ export function roomAutomations(ctx: StudioContext, g: Group): TemplateResult | 
     <div class="auto-list">${list.map((l) => row(ctx, l, true, g))}</div>`;
 }
 
-/** Ours by room and zone (the home's order), then those of no room or zone known here. */
-function byGroup(ctx: StudioContext, list: Listed[]): TemplateResult[] {
-  const groups = allGroups(ctx.home);
-  const sections = groups
-    .map((g) => ({ g, items: ofGroup(list, g) }))
-    .filter((s) => s.items.length)
-    .map(
-      ({ g, items }) => html`<h2 class="label">${g.name}</h2>
-        <div class="auto-list">${items.map((l) => row(ctx, l, true))}</div>`,
-    );
-  const rest = list.filter((l) => !groups.some((g) => controlsGroup(l.controls, g.key, g.group, g.lights)));
-  if (rest.length)
-    sections.push(html`<h2 class="label">${ctx.t("automations.no_room")}</h2>
-      <div class="auto-list">${rest.map((l) => row(ctx, l))}</div>`);
-  return sections;
+/** Ours by type (the order of "+"), the ones taken over in HA's editor last. */
+function byType(list: Listed[]): { type: string; items: Listed[] }[] {
+  const typeOf = (l: Listed) => (l.custom || !l.type || !(TYPES as readonly string[]).includes(l.type) ? "custom" : l.type);
+  return [...TYPES, "custom"].map((type) => ({ type, items: list.filter((l) => typeOf(l) === type) })).filter((s) => s.items.length);
 }
 
 @customElement("hue-studio-automations-view")
 export class AutomationsView extends StudioView {
+  /** Types folded away under their header (for this visit). */
+  @state() private accessor folded = new Set<string>();
+
+  /** A type's header (the Hue app's): its icon, name and count, a round button that folds it. */
+  private typeHead(type: string, count: number): TemplateResult {
+    const { t } = this.ctx;
+    const folded = this.folded.has(type);
+    const glyph = type in TYPE_ICONS ? TYPE_ICONS[type as keyof typeof TYPE_ICONS] : "mdi:home-assistant";
+    const name = type === "custom" ? t("automations.custom") : t(`automations.type_${type}` as StringKey);
+    const flip = () => {
+      haptic("selection");
+      const next = new Set(this.folded);
+      if (folded) next.delete(type);
+      else next.add(type);
+      this.folded = next;
+    };
+    return html`<div class="auto-type">
+      <ha-icon icon=${glyph}></ha-icon>
+      <span class="title">${name}</span>
+      <span class="count">${count}</span>
+      <button class="round" aria-expanded=${!folded} aria-label=${name} @click=${flip}>
+        <ha-icon icon=${folded ? "mdi:chevron-down" : "mdi:chevron-up"}></ha-icon>
+      </button>
+    </div>`;
+  }
+
   protected override render() {
     const { ctx } = this;
     const { t } = ctx;
-    const add = html`<button class="round" aria-label=${t("automations.add")} @click=${() => ctx.go("/automations/new")}>${icon("plus")}</button>`;
+    const add = html`<button class="round plus-blue" aria-label=${t("automations.add")} @click=${() => ctx.go("/automations/new")}>${icon("plus")}</button>`;
     const msg = ctx.automations;
     if (!msg) return this.tabScreen(t("automations.title"), html`<p class="empty">${t("rooms.loading")}</p>`, { end: add });
     const list = ours(ctx);
@@ -103,7 +120,10 @@ export class AutomationsView extends StudioView {
     return this.tabScreen(
       t("automations.title"),
       html`${list.length
-          ? byGroup(ctx, list)
+          ? byType(list).map(
+              ({ type, items }) => html`${this.typeHead(type, items.length)}
+                ${this.folded.has(type) ? nothing : html`<div class="auto-list">${items.map((l) => row(ctx, l, false, null, true))}</div>`}`,
+            )
           : html`<div class="automations-empty">
               <p class="lead">${t("automations.empty")}</p>
               <button class="pill apply" @click=${() => ctx.go("/automations/new")}>${t("automations.add")}</button>
@@ -143,7 +163,8 @@ export class AutomationNewView extends StudioView {
     const room = this.room ? `?room=${encodeURIComponent(this.room)}` : "";
     // Like the Hue app's: a picture card for each type; last and outlined, a custom one in HA's editor.
     return this.screen(
-      this.subHead(t("automations.new"), () => history.back()),
+      // No title in the bar: the question under it is the title (the Hue app's).
+      this.subHead("", () => history.back(), nothing, nothing, true),
       html`<h1 class="big new-question">${t("automations.new_question")}</h1>
         <div class="type-cards">
           ${TYPES.map(

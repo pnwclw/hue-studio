@@ -134,7 +134,7 @@ export class AutomationEditView extends AutomationParts {
       ${t(this.isNew ? "automations.create" : "zone.save")}
     </button>`;
     return html`${this.screen(
-      this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save),
+      this.subHead(t(this.isNew ? "automations.new" : "automations.edit"), back, save, nothing, true),
       unready && this.isNew
         ? html`${this.hero(d, typeName)}${this.presenceSetup(d, presence!)}`
         : html`${this.hero(d, typeName)}

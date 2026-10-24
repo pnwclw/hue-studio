@@ -370,8 +370,8 @@ export class ColorView extends StudioView {
           }, {
             selected: id === this.selected,
             busy: busy.includes(id),
-            // The light's room, like the Hue app's cards (a zone's lights come from several).
-            sub: groupOfEntity(ctx.home, id)?.name ?? "",
+            // A zone's lights come from several rooms: each says its own (a room's say nothing, the Hue app's).
+            sub: group.kind === "hue" ? (groupOfEntity(ctx.home, id)?.name ?? "") : "",
           }),
         )}</div>
       </div>

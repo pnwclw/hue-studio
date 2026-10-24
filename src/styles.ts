@@ -14,7 +14,7 @@ export const CSS = `
     --safe-top: max(0px, calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) - var(--hue-top, 0px)));
     --safe-bottom: max(0px, calc(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) - var(--hue-bottom, 0px)));
     position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
-    background: radial-gradient(140% 70% at 50% -10%, #3b322c 0%, var(--bg) 55%);
+    background: var(--bg);
     color: var(--text); font-family: var(--ha-font-family-body, -apple-system, system-ui, Roboto, sans-serif);
     font-size: var(--fs-body); -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
   }
@@ -31,6 +31,30 @@ export const CSS = `
   /* The panel does not scroll; every screen has a fixed header and a body that scrolls on its own. */
   main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   main > * { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* The page's glow (the Hue app's): Home and a room fade from their lit lights' color at the
+     top to the page at the bottom; Automations (its sheets and the gallery too) and Sync have
+     their own at the top. On a sheet it is the sheet's. */
+  main.glow-light:not(.as-sheet), main.as-sheet.glow-light > * {
+    background: linear-gradient(color-mix(in srgb, var(--glow) 10%, var(--bg)), var(--bg)); }
+  main.glow-blue:not(.as-sheet), main.as-sheet.glow-blue > * {
+    background: radial-gradient(60% 300px at 40% 0, var(--glow-blue), transparent), linear-gradient(var(--glow-blue-wash), transparent 330px), var(--bg); }
+  main.glow-violet:not(.as-sheet), main.as-sheet.glow-violet > * {
+    background: radial-gradient(55% 260px at 50% 0, var(--glow-violet), transparent), linear-gradient(var(--glow-violet-wash), transparent 300px), var(--bg); }
+  /* An editor as a sheet (phones): it starts under the status bar with its top corners rounded,
+     the screen behind it dimmed. */
+  main.as-sheet { background: linear-gradient(var(--scrim), var(--scrim)), var(--bg); }
+  main.as-sheet > * { margin-top: calc(var(--safe-top) + 8px); border-radius: var(--r-m) var(--r-m) 0 0; overflow: hidden; background: var(--bg); }
+  main.as-sheet .screen-head { padding-top: 6px; }
+  /* A picker (the gallery, a new automation's types): a deep blue top, the page a rounded panel
+     over it with a light edge; the bar's buttons sit on the blue. */
+  main.picker { background: linear-gradient(100deg, var(--picker-top), var(--picker-top-2) 60%); }
+  main.picker .screen-head, main.picker .screen-head:has(> .bar.sub) { background: none; border: none; box-shadow: none;
+                                                                      -webkit-backdrop-filter: none; backdrop-filter: none; }
+  main.picker .screen-head + .screen-body > .page, main.picker .screen-head:has(> .bar.sub) + .screen-body > .page { min-height: 100%; padding: 20px 20px 28px; border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+                                     background: var(--bg); box-shadow: inset 0 1px 0 var(--surface-low); }
+  main.picker .screen-head:has(> .tab-head) + .screen-body > .page { margin-top: var(--head-h, 56px); padding-top: 20px; }
+  main.picker .page > h1.big:first-child { margin-top: 6px; margin-left: var(--text-inset); margin-right: var(--text-inset); }
+  main.picker .screen-body { scrollbar-width: none; }
   .screen-head { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; background: rgba(24, 24, 26, 0.62);
                  -webkit-backdrop-filter: saturate(1.8) blur(24px); backdrop-filter: saturate(1.8) blur(24px); border-bottom: 1px solid var(--hairline); z-index: 3; }
   .screen-head > * { max-width: 928px; margin-left: auto; margin-right: auto; }
@@ -40,10 +64,14 @@ export const CSS = `
   .screen-head:empty { display: none; }
   .screen-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .screen-body > .page { padding-top: 10px; }
+  /* Under a sub screen's bar the first group of rows starts 20px down (the Hue app's). */
+  .screen-head:has(> .bar.sub) + .screen-body > .page { padding-top: 4px; }
+  .screen-head:has(> .bar.sub) + .screen-body > .page > :is(p, .lead):first-child { margin-top: 16px; }
   .bar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
   .bar.sub .title { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
-  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); letter-spacing: 0.3px; text-transform: uppercase; }
+  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); padding: 0 14px; background: var(--surface-2);
+                                                                       letter-spacing: 0.3px; text-transform: uppercase; }
   /* A bar's title after its back or close button starts where list rows' text does (72px), the Hue app's. */
   :is(.bar, .topbar) > .round:first-child + :is(.title, .grow) { margin-left: 16px; }
   .sheet-bar > .round:first-child + .grow { margin-left: 12px; }
@@ -84,14 +112,15 @@ export const CSS = `
   .head { display: flex; align-items: center; gap: 12px; padding: max(28px, var(--safe-top)) 0 4px; }
   .head h1.big { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .round { position: relative; width: var(--control); height: var(--control); border: none; border-radius: 50%; padding: 0; flex: none; cursor: pointer;
-           display: flex; align-items: center; justify-content: center; background: var(--fill);
+           display: flex; align-items: center; justify-content: center; background: var(--round);
            transition: background 0.2s, transform var(--t-press) var(--ease); }
   .round::after { content: ""; position: absolute; inset: -5px; }
   .round > svg { width: 22px; height: 22px; }
   .round:active { transform: scale(var(--press-round)); }
   .round[hidden] { display: none; }
-  .pill { height: var(--pill); padding: 0 16px; border: none; border-radius: var(--r-full); cursor: pointer; font-size: var(--fs-footnote); font-weight: 500;
-          background: var(--fill); transition: transform var(--t-press) var(--ease); }
+  /* The Hue app's action button: a light grey pill, 24px of room around its words. */
+  .pill { height: var(--pill); padding: 0 24px; border: none; border-radius: var(--r-full); cursor: pointer; font-size: var(--fs-footnote); font-weight: 500;
+          background: var(--surface-raised); transition: transform var(--t-press) var(--ease); }
   .pill:active { transform: scale(var(--press-tile)); }
   .pill:disabled { opacity: 0.4; }
   h1.big { margin: 6px 0 0; font-size: var(--fs-large); font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; }
@@ -165,8 +194,9 @@ export const CSS = `
   .meta .motion { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 
   /* tab bar */
+  /* The Hue app's: no line, the page fading into the bar's near-black. */
   nav.tabs { flex: none; display: flex; justify-content: center; gap: 4px; padding: 4px 8px max(4px, var(--safe-bottom));
-             background: var(--bar-bottom); border-top: 1px solid var(--hairline); }
+             background: linear-gradient(var(--bg), var(--bar-bottom) 40px); }
   nav.tabs[hidden] { display: none; }
   /* The on-screen keyboard is up (fitToViewport): it covers the tab bar and the home indicator,
      and dialogs move up so their fields stay above it. */
@@ -177,7 +207,7 @@ export const CSS = `
                     background: none; cursor: pointer; color: var(--tab-off); font-size: var(--fs-tab); letter-spacing: 0.4px; text-transform: uppercase;
                     transition: color 0.2s; }
   nav.tabs button svg { width: 26px; height: 26px; }
-  nav.tabs button.on { color: var(--text); }
+  nav.tabs button.on { color: var(--tab-on); }
   /* tabs on top while the experimental footer sits at the bottom */
   nav.tabs.top { order: -1; gap: 4px;
                  padding: max(8px, var(--safe-top)) 12px 8px; border-top: none; border-bottom: 1px solid var(--hairline); }
@@ -191,7 +221,7 @@ export const CSS = `
   main.under-footer .topbar, main.under-footer .screen-head { padding-top: 6px; }
 
   /* room */
-  .hero { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 0 16px 14px; border-radius: 0 0 var(--r-3xl) var(--r-3xl); box-shadow: var(--shadow-raised); }
+  .hero { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 0 16px 14px; border-radius: 0 0 var(--r-m) var(--r-m); box-shadow: var(--shadow-raised); }
   /* Its bar row sits where every other screen's is (the 44px row of .bar), the gap below kept. */
   .hero .topbar { min-height: 44px; padding-bottom: 8px; }
   main.wide .hero .topbar { padding-bottom: 0; }
@@ -251,19 +281,19 @@ export const CSS = `
   .light.unavailable { opacity: 0.45; }
   .light.selected { box-shadow: var(--shadow-raised); outline: 2px solid var(--ring); outline-offset: 3px; }
   /* The Hue app's "Controls" tiles (sensors): picture and switch on top, name and status below. */
-  .control-row { display: grid; grid-auto-flow: column; grid-auto-columns: 148px; gap: 12px; overflow-x: auto;
+  .control-row { display: grid; grid-auto-flow: column; grid-auto-columns: 150px; gap: 12px; overflow-x: auto;
                  margin: -8px calc(-1 * var(--gutter)); padding: 8px var(--gutter); scroll-padding: 0 var(--gutter); scrollbar-width: none; scroll-snap-type: x proximity;
                  overscroll-behavior-x: contain; }
   .control-row::-webkit-scrollbar { display: none; }
-  .control-card { box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; height: 106px; padding: 14px 14px 12px;
+  .control-card { box-sizing: border-box; display: flex; flex-direction: column; min-width: 0; height: 108px; padding: 16px 12px 12px 16px;
                   border-radius: var(--r-m); background: var(--surface); box-shadow: var(--shadow-raised); cursor: pointer;
                   scroll-snap-align: start; transition: transform var(--t-press) var(--ease); }
   .control-card:active { transform: scale(var(--press-tile)); }
   .control-card .top { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-bottom: auto; }
-  .control-card .top ha-icon { --mdc-icon-size: 30px; }
+  .control-card .top ha-icon { --mdc-icon-size: 24px; margin-left: 4px; }
   .control-card .top .inert { pointer-events: none; opacity: 0.35; }
-  .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 500; line-height: 1.25; }
-  .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-footnote); line-height: 1.3; color: var(--text-2); }
+  .control-card .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-callout); font-weight: 500; line-height: 1.3; }
+  .control-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-caption); line-height: 1.3; color: var(--text-2); }
   .control-card.off .top ha-icon { opacity: 0.5; }
   /* A row of cards that scrolls sideways (lights, sensors), like the Hue app's. */
   /* Rows that scroll sideways keep room for their cards' shadows inside (8px) and give it
@@ -362,9 +392,9 @@ export const CSS = `
   .colorview .page { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding-bottom: 0; }
   /* The wheel takes the height the dock leaves (container units), a little above the middle. */
   .colorview .page:has(> .wheel-wrap) { height: 100%; }
-  .colorview .wheel-wrap { container-type: size; min-height: 240px; padding: 20px 0 36px; }
-  .colorview .wheel { width: min(100cqw, 100cqh, 440px); }
-  .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 14px var(--gutter) max(10px, var(--safe-bottom));
+  .colorview .wheel-wrap { container-type: size; min-height: 240px; padding: 8px 0 48px; }
+  .colorview .wheel { width: min(calc(100cqw - 8px), 100cqh, 440px); }
+  .dock { position: sticky; bottom: 0; z-index: 5; margin: 0 calc(-1 * var(--gutter)); padding: 14px var(--gutter) max(16px, calc(var(--safe-bottom) + 14px));
           background: linear-gradient(rgba(28, 28, 30, 0), var(--bg) 14px); }
   .colorbody .dock { position: static; margin: 0; padding: 0; background: none; }
   .wheel-wrap { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px 0 8px; }
@@ -445,10 +475,13 @@ export const CSS = `
   .bright .value { text-align: right; font-size: var(--fs-tab); letter-spacing: 1px; color: var(--text-2); margin: 0 2px -10px; min-height: 13px; }
   .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
+  /* The Hue app's chips (bridges, a scene's room): grey on a low surface; the chosen one white on
+     an accent tint, ringed in the accent. */
   .chip { flex: none; display: flex; align-items: center; gap: 6px; height: var(--control); padding: 0 12px; border-radius: var(--r-full); border: 2px solid transparent;
-          cursor: pointer; background: var(--surface); font-size: var(--fs-footnote); font-weight: 500; transition: border-color 0.2s, background 0.2s; }
+          cursor: pointer; background: var(--surface-low); color: var(--text-2); font-size: var(--fs-footnote); font-weight: 500; box-shadow: var(--shadow-flat);
+          transition: border-color 0.2s, background 0.2s, color 0.2s; }
   .chip ha-icon { --mdc-icon-size: 16px; }
-  .chip.on { border-color: var(--accent); }
+  .chip.on { border-color: var(--accent); background: var(--info-tint); color: var(--text); }
   .chip .swatch { width: 10px; height: 10px; border-radius: 50%; background: var(--swatch, #555); transition: background 0.3s; }
 
   /* effects (inside the color view) */
@@ -503,23 +536,25 @@ export const CSS = `
   .scene-tint { position: absolute; top: 0; left: 0; right: 0; height: 460px; z-index: 0; pointer-events: none; background: var(--scene-tint);
                 -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
   hue-studio-scene-view > .screen-body { position: relative; z-index: 1; }
-  .screen-head.scene-head { background: rgba(255, 255, 255, 0.07); border-bottom-color: var(--hairline); }
+  .screen-head.scene-head, .screen-head.scene-head:has(> .bar.sub) { background: rgba(255, 255, 255, 0.07); border-bottom-color: var(--hairline); }
+  .scene-head .bar .pill { background: var(--fill-light); }
   .scene-top { padding: 16px 2px 6px; }
   .scene-top .name-row { margin: 14px 0 12px; }
   .scene-top h1.big { font-size: var(--fs-large); }
   .scene-top .round.rename { background: rgba(255, 255, 255, 0.14); color: var(--text); }
-  .scene-edit .dot.big { width: 52px; height: 52px; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
+  .scene-edit .dot.big { width: 48px; height: 48px; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                          box-shadow: var(--shadow-dot); }
   .rows.scene-brightness { background: rgba(255, 255, 255, 0.09); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-  .scene-brightness .item.col { display: block; padding: 16px 16px 22px; }
+  .scene-brightness .item.col { display: block; padding: 30px 16px 32px; }
   .scene-brightness .line { display: flex; justify-content: space-between; font-size: var(--fs-body); font-weight: 500; }
   .scene-brightness .line .dim { font-weight: 400; color: var(--text-2); }
-  .scene-brightness .slider { margin-top: 22px; }
-  .scene-lights { margin-top: 22px; }
-  .scene-lights .light-row { margin: 0; padding: 2px 16px 16px; }
+  .scene-brightness .slider { margin-top: 30px; }
+  .scene-edit .rows.scene-lights { margin-top: 22px; }
+  .scene-lights .light-row { margin: 0; padding: 0 var(--gutter) 20px; }
   .scene-lights .lights-head .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; height: 32px; }
   .scene-lights .lights-head .pill.shuffle svg { width: 18px; height: 18px; }
-  .scene-edit > .center { margin-top: 28px; }
+  .scene-edit > .center { margin-top: 40px; }
+  .scene-edit > .center + .delete-area { margin-top: 12px; }
   .name-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 18px; }
   .name-row h1.big { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; }
   .name-input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: none; border-radius: var(--r-m); font: inherit; font-size: var(--fs-title-2);
@@ -549,13 +584,35 @@ export const CSS = `
   .pill.shuffle svg { width: 18px; height: 18px; }
   .section-head + .grid { margin-top: 10px; }
   .center { display: flex; justify-content: center; margin-top: 28px; }
-  .pill.reset { min-width: 180px; }
   .pill.reset.confirm { background: var(--danger-fill); }
   .center.stack { flex-direction: column; align-items: center; gap: 12px; }
   .pill.reset.danger { color: var(--danger); }
   .pill.reset.danger.confirm { color: #fff; }
   .sheet .form-body { padding: 16px 16px 0; }
-  .sheet .add-sheet .rows { border-radius: 0; background: none; }
+  /* A room's "+" (the Hue app's): a picker over the whole panel, the question over picture tiles. */
+  main > :has(.add-picker) { position: static; }
+  .add-picker { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column;
+                background: linear-gradient(100deg, var(--picker-top), var(--picker-top-2) 60%); }
+  .add-picker > .bar { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; }
+  .add-panel { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 20px 20px calc(28px + var(--safe-bottom));
+               border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg); box-shadow: inset 0 1px 0 var(--surface-low); }
+  .add-panel > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+  .add-panel h1.big { margin: 6px var(--text-inset) 0; font-size: var(--fs-title); }
+  .add-panel .lead { margin: 12px var(--text-inset) 0; font-size: var(--fs-body); color: var(--text-2); }
+  .pick-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); margin-top: 24px; }
+  .pick-tile { display: flex; flex-direction: column; align-items: center; height: 156px; padding: 16px 12px 0; border: none; border-radius: var(--r-m);
+              background: var(--surface); box-shadow: var(--shadow-flat); color: var(--text); font: inherit; cursor: pointer;
+              transition: transform var(--t-press) var(--ease); }
+  .pick-tile:active { transform: scale(var(--press-tile)); }
+  .pick-tile .disc { flex: none; display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 50%; background: var(--bar-bottom); }
+  .pick-tile .disc ha-icon { --mdc-icon-size: 40px; }
+  .pick-tile .name { flex: 1; display: flex; align-items: center; text-align: center; font-size: var(--fs-body); font-weight: 500; line-height: 1.2; }
+  /* A scene's ways: the picture at the top left, the name at the bottom. */
+  .pick-tile.way { align-items: flex-start; justify-content: space-between; height: 108px; padding: 16px; }
+  .pick-tile.way .art { display: flex; height: 32px; align-items: center; }
+  .pick-tile.way .art ha-icon { --mdc-icon-size: 28px; }
+  .pick-tile.way .dots-three { height: 32px; }
+  .pick-tile.way .name { flex: none; text-align: left; font-size: var(--fs-callout); }
   .sheet .field, .page .field { width: 100%; box-sizing: border-box; height: 44px; padding: 0 12px; border: none; border-radius: var(--r-m); font: inherit;
                   font-size: var(--fs-headline); color: inherit; background: var(--fill-soft); outline: none; }
   .sheet .hint { margin: 10px 2px 0; font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
@@ -963,15 +1020,16 @@ export const CSS = `
   .rows.device-list .item .dot-badge.warn { background: var(--warn); }
   .devices-page .device-search { display: flex; height: 38px; margin-top: 12px; padding: 0 14px; border-radius: var(--r-full); }
   :is(.devices-page, .daylight-page) .section-head { margin: 22px 2px 8px; }
-  :is(.devices-page, .daylight-page) .section-head .count { font-size: var(--fs-body); color: var(--text-2); }
+  :is(.devices-page, .daylight-page) .section-head .count { margin-right: var(--text-inset); font-size: var(--fs-caption); color: var(--text-2); }
   .daylight-page .chips.filters + .hint { margin-top: 12px; }
   .daylight-page .scene-tiles { margin-top: 12px; }
   .chips.filters { gap: 8px; padding-top: 2px; }
-  .chip.filter-chip { height: var(--control); gap: 2px; padding: 0 6px 0 12px; border-radius: var(--r-full); border: none; background: var(--fill);
-                      font-size: var(--fs-footnote); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+  /* The Hue app's filter chips: grey capitals (not spaced), a white chevron. */
+  .chip.filter-chip { height: var(--control); gap: 8px; padding: 0 6px 0 12px; border-radius: var(--r-full); border: none; background: var(--surface-low);
+                      color: var(--text-2); font-size: var(--fs-footnote); font-weight: 500; text-transform: uppercase; }
   .chip.filter-chip span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip.filter-chip ha-icon { --mdc-icon-size: 18px; }
-  .chip.filter-chip.on { background: var(--accent); }
+  .chip.filter-chip ha-icon { --mdc-icon-size: 24px; color: var(--text); }
+  .chip.filter-chip.on { background: var(--accent); color: var(--text); }
   @container (max-width: 599px) {
     .rows.device-list { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }
   }
@@ -979,12 +1037,14 @@ export const CSS = `
   .sensor-hero > .small.warn { margin-top: -4px; font-size: var(--fs-footnote); font-weight: 500; }
   .device-edit .rows .item .value { max-width: 50%; text-align: right; }
   /* "Delete" at the bottom of an editor: the pill, outlined in red. */
-  .delete-btn { min-width: 80px; height: var(--pill); padding: 0 22px; border: 2px solid var(--danger); border-radius: var(--r-full); cursor: pointer;
+  .delete-btn { min-width: 80px; height: var(--pill); padding: 0 24px; border: 2px solid var(--danger); border-radius: var(--r-full); cursor: pointer;
                 background: var(--danger-tint); color: var(--text); font: inherit; font-size: var(--fs-footnote); font-weight: 500;
                 transition: transform var(--t-press) var(--ease), background 0.2s; }
   .delete-btn:active { transform: scale(var(--press-tile)); }
   .delete-btn.confirm { border-color: var(--danger-fill); background: var(--danger-fill); }
   .delete-btn:disabled { opacity: 0.5; }
+  /* "Delete" (and "Reset") centered under an editor's rows, the Hue app's. */
+  .delete-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 40px; }
   .delete-area .hint { max-width: 380px; margin: 0; font-size: var(--fs-footnote); line-height: 1.45; text-align: center; }
   /* MotionAware areas: a row that opens the area beside its switch, the new area's steps,
      the art of "leave the room" and "ready", each light's state. */
@@ -1007,17 +1067,27 @@ export const CSS = `
   /* Automation cards, like the Hue app's: picture, "07:00 • Wake up" over "Weekdays", switch. */
   .auto-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); }
   .auto-list + .rows { margin-top: 10px; }
-  /* An automation's card, the Hue app's: 86px tall, a 32px icon, the text from 72px, 17px over 15px. */
+  /* An automation's card, the Hue app's: 72px tall, a 32px icon, the text from 72px (16 when its type's
+     header shows the icon), 16px over 13px. */
   .auto-card { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 0 16px 0 0; box-sizing: border-box;
-               border-radius: var(--r-m); background: var(--surface); box-shadow: var(--shadow-flat); }
+               border-radius: var(--r-m); background: var(--surface-low); box-shadow: var(--shadow-flat); }
   .auto-card .row-open { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 24px; padding: 14px 0 14px 16px;
                          border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .auto-card .row-open ha-icon { flex: none; --mdc-icon-size: 32px; color: var(--text); }
   .auto-card .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .auto-card .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 500; line-height: 1.25; }
   .auto-card .sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-footnote); line-height: 1.3; color: var(--text-2); }
-  .auto-card .start { flex: none; width: var(--round-l); height: var(--round-l); background: var(--fill-light); color: var(--text); }
-  .auto-card .start svg { width: 18px; height: 18px; }
+  .auto-card .row-open:not(:has(ha-icon)) { gap: 0; }
+  .auto-card .start { flex: none; width: var(--control); height: var(--control); background: var(--round); color: var(--text); }
+  /* The Automations tab's header of a type (the Hue app's): its icon in a 32px column at 16, the name
+     at 72, the count and a round button that folds the type's cards away. */
+  .auto-type { display: flex; align-items: center; gap: 24px; height: 48px; margin: 24px 0 4px; padding: 0 var(--text-inset); }
+  .page > .auto-type:first-child { margin-top: 8px; }
+  .auto-type > ha-icon { width: 32px; justify-content: center; --mdc-icon-size: 28px; }
+  .auto-type .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: 500; }
+  .auto-type .count { font-size: var(--fs-footnote); color: var(--text-2); }
+  .auto-type .round ha-icon { --mdc-icon-size: 24px; }
+  .auto-card .start svg { width: 16px; height: 16px; }
   .automations-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; text-align: center; }
   /* light of the day (natural light, scene of the day) */
   .rows .item .thumb { width: 32px; height: 32px; flex: none; border-radius: 50%; object-fit: cover; }
@@ -1164,24 +1234,24 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  /* A list row: at least 68px, a 28px icon in a 32px column, the text from 72px, a medium 15px title over a
-     13px regular line, separators from the text on. */
-  :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item {
+  /* A list row (settings, editors, devices; choices in sheets): at least 72px, a 24px icon at 20px, the text
+     from 72px, a medium 16px title over a 12px regular line, separators from the text on. */
+  :is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows .item, .rows.device-list .item {
     min-height: var(--row-h); gap: 28px; padding: 12px 16px 12px 20px; font-size: var(--fs-body); }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item > ha-icon:first-child {
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item > ha-icon:first-child {
     flex: none; display: flex; justify-content: center; width: var(--row-icon); --mdc-icon-size: var(--row-icon); color: var(--text); }
   .rows.device-list .item { gap: 20px; }
   .rows.device-list .item > ha-icon:first-child { width: 32px; --mdc-icon-size: 32px; }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item :is(.dim.small, .small) { margin-top: 2px; font-size: var(--fs-caption); }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item :is(.value, .value-text) { font-size: var(--fs-footnote); }
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item :is(.dim.small, .small) { margin-top: 2px; font-size: var(--fs-caption); }
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item :is(.value, .value-text) { font-size: var(--fs-footnote); }
   /* Row titles are medium (the Hue app's); what a row says under or beside its title stays regular. */
-  :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item, .rows.device-list .item { font-weight: 500; }
-  :is(.settings-page, .sensor-edit, .choice-sheet) .rows .item :is(.dim, .small, .value, .value-text, input),
+  :is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows .item, .rows.device-list .item { font-weight: 500; }
+  :is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows .item :is(.dim, .small, .value, .value-text, input),
   .rows.device-list .item :is(.dim, .small, .value) { font-weight: 400; }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item + .item { position: relative; border-top: none; }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item + .item::before {
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item + .item { position: relative; border-top: none; }
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item + .item::before {
     content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--separator); }
-  :is(:is(.settings-page, .sensor-edit, .choice-sheet) .rows, .rows.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .tag-pic):first-child)::before {
+  :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .tag-pic):first-child)::before {
     left: var(--row-text); }
   .settings-page .section-head h2.label { margin: 0 var(--text-inset); }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
@@ -1220,8 +1290,8 @@ export const CSS = `
   .automation-page .rows .item.time-item .wheels::before { border-radius: var(--r-s); }
   .automation-page .hint + .rows { margin-top: 16px; }
   /* Selected lights, like the Hue app's: a card with its pencil, a tile for each room or zone. */
-  .lights-card .item.lights-head { min-height: 60px; }
-  .lights-card .lights-head .round { background: var(--fill-light); color: var(--text); }
+  .lights-card .item.lights-head { min-height: var(--row-h); }
+  .lights-card .lights-head .round { background: var(--round); color: var(--text); }
   .lights-card .lights-head .round svg { width: 18px; height: 18px; }
   .place-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 2px 12px 14px; }
   .place-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: none;

@@ -368,6 +368,15 @@ export function colorsCss(colors: string[], fallback: string): string {
   return `linear-gradient(var(--lit-angle, 160deg), ${list.join(", ")})`;
 }
 
+/** The page's glow (the Hue app's Home and room screens): the mean of the lit lights' colors as
+ *  a CSS rgb(), or null when none is lit. */
+export function glowColor(colors: string[]): string | null {
+  const rgbs = colors.map((c) => c.match(/\d+/g)?.slice(0, 3).map(Number)).filter((c): c is number[] => c?.length === 3);
+  if (!rgbs.length) return null;
+  const mean = [0, 1, 2].map((i) => Math.round(rgbs.reduce((s, c) => s + c[i], 0) / rgbs.length));
+  return `rgb(${mean.join(", ")})`;
+}
+
 /** True when the mean of CSS rgb() colors is light enough to need dark text on top. */
 export function needsDarkText(colors: string[]): boolean {
   const rgbs = colors.map((c) => c.match(/\d+/g)?.slice(0, 3).map(Number)).filter((c): c is number[] => c?.length === 3);

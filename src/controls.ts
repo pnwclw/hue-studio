@@ -371,7 +371,7 @@ export function automationCard(
 ): TemplateResult {
   return html`<div class="auto-card">
     <button class="row-open" @click=${open}>
-      <ha-icon icon=${glyph}></ha-icon>
+      ${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}
       <span class="text"><span class="title">${title}</span>${sub ? html`<span class="sub">${sub}</span>` : nothing}</span>
     </button>
     ${start

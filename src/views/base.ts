@@ -218,10 +218,12 @@ export class StudioView extends LightElement {
     void this.updateComplete.then(() => this.querySelector<HTMLElement>(":scope > .screen-body")?.scrollTo(0, top));
   }
 
-  /** Header of a screen opened from another one: back, the title (or `center` instead), actions. */
-  protected subHead(title: string, back: () => void, end: Slot = nothing, center: Slot = nothing): TemplateResult {
+  /** Header of a screen opened from another one: back (close for an editor that comes up as a
+   *  sheet), the title (or `center` instead), actions. */
+  protected subHead(title: string, back: () => void, end: Slot = nothing, center: Slot = nothing, close = false): TemplateResult {
+    const { t } = this.ctx;
     return html`<div class="bar sub">
-      <button class="round back" aria-label=${this.ctx.t("common.back")} @click=${back}>${icon("back")}</button>
+      <button class=${close ? "round close" : "round back"} aria-label=${t(close ? "common.close" : "common.back")} @click=${back}>${icon(close ? "close" : "back")}</button>
       ${center === nothing ? html`<div class="title">${title}</div>` : center}
       ${end}
     </div>`;

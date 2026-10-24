@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildHome, groupState, hueSensor, sensitivityLevels, splitSensors } from "../../src/model.ts";
+import { buildHome, glowColor, groupState, hueSensor, sensitivityLevels, splitSensors } from "../../src/model.ts";
 import type { HassData, XY } from "../../src/types.ts";
 
 const light = (state: string, attrs = {}) => ({ state, attributes: { friendly_name: "x", ...attrs } });
@@ -200,4 +200,9 @@ test("gradient line: a smooth curve through every pin, stacked pins skipped", ()
   assert.equal(d.match(/C/g)?.length, 2);
   assert.ok(d.endsWith("0.5000 0.0000"));
   assert.equal(smoothPath([[0.1, 0.1], [0.1, 0.1]]), "");
+});
+test("the page glows in the mean of the lit lights' colors, not at all with none lit", () => {
+  assert.equal(glowColor([]), null);
+  assert.equal(glowColor(["rgb(255,214,160)"]), "rgb(255, 214, 160)");
+  assert.equal(glowColor(["rgb(255, 0, 0)", "rgb(0, 0, 255)"]), "rgb(128, 0, 128)");
 });
