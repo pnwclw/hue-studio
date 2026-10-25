@@ -92,6 +92,19 @@ test("options map a Hue group onto an area and mark another as a zone", () => {
   assert.ok(zones.some((z) => z.key === "hue.light.office"));
 });
 
+test("a zone given to an area that has its room: a zone in that room", () => {
+  const h = structuredClone(hass) as Required<HassData>;
+  h.states["light.tv_zone"].attributes.entity_id = ["light.desk"];
+  h.states["scene.tv_movie"] = { state: "unknown", attributes: { group_name: "TV", name: "Movie" } };
+  const { rooms, zones } = buildHome(h, { groups: { "light.tv_zone": "office" } });
+  const office = rooms.find((r) => r.key === "area.office")!;
+  // The room keeps the group with exactly its lights; the zone's scenes join it.
+  assert.equal(office.group, "light.office");
+  assert.deepEqual(office.target, ["light.office"]);
+  assert.deepEqual(office.scenes.map((s) => s.entity_id), ["scene.office_read", "scene.tv_movie"]);
+  assert.ok(!zones.some((z) => z.key === "hue.light.tv_zone"));
+});
+
 test("room sensors: defaults from the area, overridable by options", () => {
   const h = structuredClone(hass) as Required<HassData>;
   h.entities["binary_sensor.office_motion"] = { platform: "hue", device_id: "d_desk" };

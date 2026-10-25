@@ -135,9 +135,10 @@ def async_auto_areas(hass: HomeAssistant, groups: list[HueGroup]) -> dict[str, s
 
 @callback
 def async_group_areas(hass: HomeAssistant) -> dict[str, str]:
-    """Hue group unique id -> the area it is the room of (zones are left out).
+    """Hue group unique id -> the area it belongs to (zones of their own are left out).
 
-    The stored mapping where there is one, else the automatic match (as the panel).
+    The stored mapping where there is one, and the automatic match of the others (as
+    the panel); an area may hold several.
     """
     groups = async_hue_groups(hass)
     known = {g.unique_id for g in groups}
@@ -147,9 +148,8 @@ def async_group_areas(hass: HomeAssistant) -> dict[str, str]:
         for uid, target in stored.items()
         if uid in known and target not in (GROUP_AUTO, GROUP_ZONE)
     }
-    taken = set(areas.values())
     for uid, area in async_auto_areas(hass, groups).items():
-        if uid not in stored and area not in taken:
+        if uid not in stored:
             areas[uid] = area
     return areas
 
@@ -243,7 +243,9 @@ def async_set_group_area(
 ) -> None:
     """Which area a Hue room/zone belongs to: an area id, None (a zone of its own) or
     "auto" (the area with exactly its lights). Only deviations from the automatic
-    match are stored, so the rest keeps following changes of lights and areas."""
+    match are stored, so the rest keeps following changes of lights and areas. An area
+    may hold several (as an entity's area in Home Assistant): its room keeps the one
+    with exactly its lights, the others are zones in that room (the panel)."""
     registry = er.async_get(hass)
     reg = registry.async_get(entity_id)
     groups = async_hue_groups(hass, reg.config_entry_id if reg else None)
@@ -256,22 +258,15 @@ def async_set_group_area(
         )
     stored = dict(async_options(hass).get(CONF_GROUPS, {}))
     auto = async_auto_areas(hass, groups)
-    if target not in (None, GROUP_AUTO):
-        if ar.async_get(hass).async_get_area(target) is None:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="unknown_ha_area",
-                translation_placeholders={"area": target},
-            )
-        taken = {
-            uid: area for uid, area in stored.items() if uid != group.unique_id
-        } | {uid: a for uid, a in auto.items() if uid not in stored}
-        if target in {a for uid, a in taken.items() if uid != group.unique_id}:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="area_taken",
-                translation_placeholders={"area": target},
-            )
+    if (
+        target not in (None, GROUP_AUTO)
+        and ar.async_get(hass).async_get_area(target) is None
+    ):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="unknown_ha_area",
+            translation_placeholders={"area": target},
+        )
     if target == GROUP_AUTO or target == auto.get(group.unique_id):
         stored.pop(group.unique_id, None)
     elif target is None:

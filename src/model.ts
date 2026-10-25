@@ -156,15 +156,22 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
   const rooms: Group[] = [];
   for (const [areaId, area] of Object.entries(hass.areas || {})) {
     const inArea = lights.filter((id) => areaOf(hass, id) === areaId);
-    const explicit = groups.find((g) => mapping[g] === areaId) || null;
-    if (!inArea.length && !explicit) continue;
+    const mapped = groups.filter((g) => mapping[g] === areaId);
+    if (!inArea.length && !mapped.length) continue;
     const auto = groups.find((g) => !used.has(g) && !mapping[g] && sameSet(members(g), inArea)) || null;
-    const group = explicit || auto;
-    if (group) used.add(group);
+    // An area may hold several Hue groups (as an entity's area in HA): its own (the commands'
+    // target) is the one with exactly its lights, else a Hue room, else the first; the others
+    // are zones in the room (their scenes show here, not as zones on Home).
+    const own = unique([...mapped, ...(auto ? [auto] : [])]);
+    const exact = (g: string): boolean => inArea.length > 0 && sameSet(members(g), inArea);
+    const group =
+      own.find((g) => exact(g) && isRoom(g) === 0) || own.find(exact) || own.find((g) => isRoom(g) === 0) || own[0] || null;
+    for (const g of own) used.add(g);
+    const inside = own.filter((g) => g !== group);
     const roomLights = unique([...inArea, ...(group ? members(group) : [])]);
     // Without a group of its own, offer scenes of Hue groups that lie inside the area.
     const sceneGroups = group
-      ? [group]
+      ? [group, ...inside]
       : groups.filter((g) => !mapping[g] && members(g).length && members(g).every((id) => inArea.includes(id)));
     const key = `area.${areaId}`;
     rooms.push({

@@ -209,9 +209,6 @@
     "unknown_motion_area": {
       "message": "No MotionAware area {area} on the bridges."
     },
-    "area_taken": {
-      "message": "Another Hue room or zone already belongs to the area {area}."
-    },
     "no_scene_of_the_day": {
       "message": "The scene of the day has no scene for now: add scenes to the pool in Hue Studio (Settings → Light of the day)."
     },

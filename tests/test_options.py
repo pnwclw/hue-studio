@@ -132,9 +132,10 @@ async def test_groups_follow_automatic_match(
     assert (await set_group("grp-office", office.id))["success"]
     assert studio_entry.options["groups"] == {}
 
-    # Two groups for one area is an error.
-    reply = await set_group("grp-tv", office.id)
-    assert not reply["success"]
+    # An area may hold another group too (a zone in that room, as in Home Assistant).
+    assert (await set_group("grp-tv", office.id))["success"]
+    assert studio_entry.options["groups"] == {"grp-tv": office.id}
+    assert (await set_group("grp-tv", "auto"))["success"]
     assert studio_entry.options["groups"] == {}
 
     # Leaving an automatic match makes the group a zone; back again removes it.

@@ -209,9 +209,6 @@
     "unknown_motion_area": {
       "message": "Brak obszaru MotionAware {area} na mostkach."
     },
-    "area_taken": {
-      "message": "Inny pokój lub strefa Hue należy już do obszaru {area}."
-    },
     "no_scene_of_the_day": {
       "message": "Scena dnia nie ma teraz żadnej sceny: dodaj sceny do puli w Hue Studio (Ustawienia → Światło dnia)."
     },
