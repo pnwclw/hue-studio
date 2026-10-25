@@ -34,7 +34,8 @@ presence, Schedule — each a form with time, days, rooms and a light (scene, br
 fade). In scope as HA automations (G).
 
 **Security** (Hue Secure): cameras (wired, battery, floodlight, desktop), contact sensors,
-armed/disarmed modes, alarms with lights and sirens, recordings in the cloud. Later (H).
+armed/disarmed modes, alarms with lights and sirens, recordings in the cloud. Out of scope:
+it all runs through the Hue cloud (H, dropped).
 
 **Out of scope for us** (Home Assistant's job or hardware-bound): MotionAware, the AI
 assistant, Sports Live, doorbell, bridge backup. Sync is in scope for the Hue Play HDMI
@@ -249,7 +250,7 @@ directly. Per HA area with auto light settings:
 - ~~Settings tab~~ — In this home: Devices (all, by area, plus adding), Bridges, MotionAware
   areas, Entertainment areas; Hue Studio: Rooms and zones, Auto light, Integration
   settings (the integration's options, only in the panel: there is no options flow since
-  0.9.1-alpha.2), Experimental. Security comes later.
+  0.9.1-alpha.2), Experimental. No Security (H, dropped).
 - ~~One Hue Studio for all bridges~~ — done (0.9.1-alpha.2): one config entry that uses every bridge
   of the native `hue` integration and follows its entries (connects when one is loaded,
   closes when it is unloaded, retries while a bridge does not answer); each bridge is a
@@ -508,21 +509,12 @@ with a box, a gallery scene's sheet.
 5. **Rule:** a new screen is made of the system's parts; a part that is missing is added
    to the system first.
 
-### H. Later: Hue Secure
+### H. Hue Secure: dropped (2026-10-25)
 
-Only after everything else on this list (S, DS, I) is done. Plans, after research:
-
-1. **What the bridge and the cloud expose** (2026): CLIP v2 resources for contact sensors,
-   tamper, camera motion and security areas; whether cameras talk to the bridge at all or
-   only to the Hue cloud; any documented local or cloud API for live view, events and
-   recordings. HA has no Hue camera support today.
-2. **Contact sensors and camera motion** as HA entities when the native `hue` does not
-   provide them (respecting the rule: extend `hue`, never duplicate it).
-3. **Security in Settings** (the "Security comes later" row of F): armed/disarmed modes
-   built on HA's `alarm_control_panel`, not a mode store of our own; alarms as HA
-   automations (G) that flash lights and sound sirens.
-4. **Cameras** only with a usable API (live view as a `camera` entity, events, recordings);
-   otherwise a link to the Hue app.
+Hue Secure (cameras, contact sensors in security mode, armed/disarmed modes, alarms,
+recordings) runs entirely through the Hue cloud: there is nothing local for Hue Studio to
+build on or change. Not planned. Contact sensors stay whatever the native `hue` makes of
+them; HA's own alarm panel and automations cover arming with lights.
 
 ## Order
 
@@ -532,7 +524,7 @@ for later), F, G, J and G2 (scenes 2026-10-21, automations with G). K is dropped
 
 Next (2026-10-22): **DS** (the design system, first: everything after it is built on it;
 done) -> **S** (the Sync Box screen; done) -> **I** (one
-style for every dashboard) -> **H** (Hue Secure, last).
+style for every dashboard). H (Hue Secure) is dropped: it is cloud-only.
 
 Space (C) comes after auto light: retiring the legacy prototype matters more than spatial
 rendering, which only pays off in rooms with several lights.
