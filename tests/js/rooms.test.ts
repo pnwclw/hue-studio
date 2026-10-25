@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { buildHome } from "../../src/model.ts";
 import {
   bridgeAreas,
+  bridgeRoomAreas,
   bridgeName,
   bridgeOf,
   groupBridge,
@@ -125,4 +126,9 @@ test("several bridges: which bridge has what", () => {
   // Rooms of a bridge: areas with lights on it, once each.
   assert.deepEqual(bridgeAreas(two, "b"), ["office", "balcony"]);
   assert.deepEqual(bridgeAreas(two, "a"), ["office"]);
+  // Where a new device of an area goes: its Hue room, empty ones too (by name when no area has it).
+  const areas = { office: { name: "Office" }, balcony: { name: "Balcony" }, hall: { name: "Hall" }, study: { name: "Study" } };
+  const emptied = { ...two, empty: [{ name: "Study", group: "light.study", scenes: 2 }], bridge_of: { ...two.bridge_of, "light.study": "a" } };
+  assert.deepEqual(bridgeRoomAreas(emptied, "b", areas), ["office", "balcony", "hall"]);
+  assert.deepEqual(bridgeRoomAreas(emptied, "a", areas), ["office", "study"]);
 });

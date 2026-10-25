@@ -1,8 +1,12 @@
-// "Add devices", like the Hue app's: what is added (Hue lights, accessories, other brands'
-// Zigbee lights), how to get it ready, the bridge's search (about a minute; devices show up
-// as they join), then every device found gets a name and a room: identify it, name it, pick
-// an HA area (or create one); a light also moves into the Hue room of that area. Opened from
-// Settings → Devices or from a room's "+" (`room`: the room it returns to, its area picked).
+// "Add devices", the Hue app's flow: where (a room, by bridge), the QR code or another way
+// (a bridge that takes install codes), what is added (Hue lights and smart plugs, switches
+// and sensors, other brands' Zigbee lights), getting it ready (serial numbers on "Enter
+// code"), the bridge's search (about a minute, a few rounds while nothing joined; devices
+// show up as they join), what was found, naming it (and making a light breathe), and what
+// was added. Every screen is a picker: a deep blue top (its art), the page a rounded panel,
+// the buttons in a footer. A device goes into the room's HA area, so a light also moves into
+// the Hue room of that area. Opened from Settings → Devices or from a room's "+" (`room`:
+// its area picked, "Done" goes back there).
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -14,7 +18,6 @@ import {
   deviceIcon,
   type FoundDevice,
   type InstallCode,
-  MAX_SERIALS,
   newDevices,
   parseSerials,
   searchOver,
@@ -25,35 +28,35 @@ import {
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { findGroup } from "../model.ts";
-import { groupBridge } from "../rooms.ts";
+import { bridgeRoomAreas } from "../rooms.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
-import { bridgeRow } from "./choice.ts";
-import { qrRows } from "./qr-scan.ts";
 
-type Step = "kind" | "prepare" | "search" | "results" | "setup";
+type Step = "where" | "intro" | "benefits" | "kind" | "prepare" | "code" | "search" | "result" | "name" | "summary";
 
 const NAME_MAX = 32;
 
-const ADD_KINDS: { kind: AddKind; icon: string }[] = [
-  { kind: "light", icon: "mdi:lightbulb-on-outline" },
-  { kind: "accessory", icon: "mdi:remote" },
-  { kind: "other", icon: "mdi:zigbee" },
-];
+const KIND_ICONS: Record<AddKind, string> = {
+  light: "hue-studio:bulb-sultan-v2",
+  accessory: "mdi:remote",
+  other: "mdi:zigbee",
+};
 
-/** Instructions per kind: how to get the device ready before the search. */
+/** How to get each kind ready before the search. */
 const STEPS: Record<AddKind, StringKey[]> = {
   light: ["add_device.light_1", "add_device.light_2", "add_device.light_3"],
   accessory: ["add_device.accessory_1", "add_device.accessory_2", "add_device.accessory_3"],
   other: ["add_device.other_1", "add_device.other_2", "add_device.other_3"],
 };
 
-/** A device set up in this flow (it leaves the list of new ones). */
+/** The kind a device found counts as (its section on the last screen). */
+const kindOf = (d: Pick<HueDeviceInfo, "kind">): AddKind => (d.kind === "light" ? "light" : d.kind === "other" ? "other" : "accessory");
+
+/** A device set up in this flow. */
 interface Done {
   name: string;
-  area: string | null;
-  kind: HueDeviceInfo["kind"];
+  kind: AddKind;
   icon: string;
 }
 
@@ -63,11 +66,14 @@ export class DeviceAddView extends StudioView {
   @property() accessor room: string | null = null;
 
   @state() private accessor devices: DevicesMessage | null = null;
-  @state() private accessor step: Step = "kind";
+  @state() private accessor step: Step = "where";
+  /** Steps gone through, for "back". */
+  private trail: Step[] = [];
   @state() private accessor kind: AddKind = "light";
   @state() private accessor bridge: string | null = null;
+  /** The HA area the devices go into. */
+  @state() private accessor area: string | null = null;
   @state() private accessor serials = "";
-  @state() private accessor showSerials = false;
   /** Devices' QR codes read (their install codes), and whether the scanner is open. */
   @state() private accessor qr: InstallCode[] = [];
   @state() private accessor scanning = false;
@@ -79,12 +85,13 @@ export class DeviceAddView extends StudioView {
   private searchMsg: ({ type: string } & Record<string, unknown>) | null = null;
   private seenActive = false;
   @state() private accessor now = Date.now();
-  /** The device being set up, its draft and the devices set up so far. */
-  @state() private accessor current: FoundDevice | null = null;
-  @state() private accessor name = "";
-  @state() private accessor area: string | null = null;
-  @state() private accessor newArea: string | null = null;
+  /** Names typed for the devices found (by device id), the one being named, set up ones. */
+  @state() private accessor names: Record<string, string> = {};
+  @state() private accessor naming: { device: FoundDevice; name: string } | null = null;
   @state() private accessor done: Record<string, Done> = {};
+  @state() private accessor help = false;
+  /** A new room's name being typed (null: not asked). */
+  @state() private accessor newRoom: string | null = null;
   @state() private accessor busy = false;
   /** Areas created here, until HA's `hass` has them. */
   private created: Record<string, string> = {};
@@ -93,12 +100,13 @@ export class DeviceAddView extends StudioView {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.area = areaOfRoom(this.room);
     let first = true;
     this.stop = this.ctx.watch<DevicesMessage>("hue_studio/devices/subscribe", (msg) => {
       this.devices = msg;
       if (first) {
         first = false;
-        this.resume(msg);
+        if (!this.resume(msg) && this.area) this.step = this.qrBridge ? "intro" : "kind";
       }
       this.watchSearch();
     });
@@ -111,39 +119,61 @@ export class DeviceAddView extends StudioView {
   }
 
   /** Opened while a bridge searches (a search started elsewhere): show that search. */
-  private resume(msg: DevicesMessage): void {
+  private resume(msg: DevicesMessage): boolean {
     const searching = Object.entries(msg).find(([, b]) => b.searching);
-    if (!searching) return;
+    if (!searching) return false;
     this.bridge = searching[0];
     this.seenActive = true;
     this.started = (searching[1].search_started ?? Date.now() / 1000) * 1000;
     this.firstStarted = this.started;
     this.go("search");
+    return true;
   }
 
   private get bridges(): [string, DevicesMessage[string]][] {
     return Object.entries(this.devices || {});
   }
 
-  /** The bridge to search on: the one picked, else the room's (an area is on one bridge), else the first that can search. */
+  /** The bridge to search on: the one picked, else the room's, else the first that can search. */
   private get bridgeId(): string | null {
     const all = this.bridges;
     if (this.bridge && this.devices?.[this.bridge]) return this.bridge;
-    const group = this.room ? findGroup(this.ctx.home, this.room) : undefined;
-    const own = group ? groupBridge(this.ctx.rooms, group) : null;
-    if (own && this.devices?.[own]) return own;
+    const areas = this.ctx.hass.areas || {};
+    const own = this.area ? all.find(([id]) => bridgeRoomAreas(this.ctx.rooms, id, areas).includes(this.area!))?.[0] : undefined;
+    if (own) return own;
     return (all.find(([, b]) => b.searching !== null) ?? all[0])?.[0] ?? null;
+  }
+
+  /** Whether the bridge takes devices by their QR codes (install codes: a Bridge Pro). */
+  private get qrBridge(): boolean {
+    return !!this.devices?.[this.bridgeId ?? ""]?.install_codes;
   }
 
   private get exitPath(): string {
     return this.room && findGroup(this.ctx.home, this.room) ? `/room/${encodeURIComponent(this.room)}` : "/settings/devices";
   }
 
-  private go(step: Step): void {
+  private get roomName(): string {
+    return this.areaName(this.area) ?? (this.room ? findGroup(this.ctx.home, this.room)?.name : null) ?? "";
+  }
+
+  /** The devices this search found that are not set up yet. */
+  private get found(): FoundDevice[] {
+    return newDevices(this.devices, (this.firstStarted || this.started) - 5000).filter((d) => !this.done[d.id]);
+  }
+
+  private go(step: Step, remember = true): void {
+    if (remember && this.step !== step && this.step !== "search") this.trail.push(this.step);
     this.step = step;
     clearInterval(this.timer);
     if (step === "search") this.timer = setInterval(() => (this.now = Date.now()), 500);
     this.querySelector(".screen-body")?.scrollTo({ top: 0 });
+  }
+
+  private back(): void {
+    const prev = this.trail.pop();
+    if (prev) this.go(prev, false);
+    else this.ctx.go(this.exitPath);
   }
 
   /** The search is over: on to what it found. */
@@ -153,275 +183,382 @@ export class DeviceAddView extends StudioView {
     if (bridge?.searching) this.seenActive = true;
     if (searchOver(bridge, this.started, Date.now(), this.seenActive)) {
       // Nothing joined yet: search again, a few times (a light may come on meanwhile).
-      if (this.searchMsg && this.round < SEARCH_ROUNDS && !newDevices(this.devices, this.firstStarted - 5000).length) {
+      if (this.searchMsg && this.round < SEARCH_ROUNDS && !this.found.length) {
         void this.searchAgain();
         return;
       }
-      haptic("success");
-      this.go("results");
+      haptic(this.found.length ? "success" : "warning");
+      this.help = false;
+      this.go("result");
     }
   }
 
   protected override updated(changed: Map<PropertyKey, unknown>): void {
     super.updated(changed);
     if (changed.has("now")) this.watchSearch();
+    const field = this.querySelector<HTMLInputElement>(".name-sheet input");
+    if (field && field.dataset.focused !== "1") {
+      field.dataset.focused = "1";
+      field.focus();
+      field.select();
+    }
   }
 
   protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
-    const back = (): void => {
-      if (this.step === "prepare") this.go("kind");
-      else if (this.step === "setup") this.go("results");
-      else if (this.step === "results" || this.step === "search") this.go(this.step === "search" ? "kind" : "prepare");
-      else ctx.go(this.exitPath);
-    };
-    const titles: Record<Step, string> = {
-      kind: t("devices.title"),
-      prepare: t(`add_device.kind_${this.kind}` as StringKey),
-      search: t("add_device.searching"),
-      results: t("add_device.results"),
-      setup: t("add_device.setup"),
-    };
-    const end =
-      this.step === "results"
-        ? html`<button class="pill save" @click=${() => ctx.go(this.exitPath)}>${t("add_device.done")}</button>`
-        : this.step === "setup" && this.current
-          ? html`<button class="pill save" ?disabled=${this.busy || !this.area} @click=${() => this.save(this.current!)}>${t("scene.save")}</button>`
-          : nothing;
-    let body: TemplateResult;
-    if (!this.devices) body = html`<p class="empty">${t("rooms.loading")}</p>`;
-    else if (!this.bridges.length) body = html`<p class="empty">${t("add_device.no_bridge")}</p>`;
-    else if (this.step === "prepare") body = this.prepare();
-    else if (this.step === "search") body = this.searching();
-    else if (this.step === "results") body = this.results();
-    else if (this.step === "setup" && this.current) body = this.setup(this.current);
-    else body = this.kinds();
-    // The scanner's sheet sits outside the scrolling body: a scroller (iOS) would clip it.
-    return html`${this.screen(this.subHead(titles[this.step], back, end), body, "settings-page add-device")}
-      <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning}
-        @qr-code=${(e: CustomEvent<InstallCode>) => (this.qr = withCodes(this.qr, [e.detail]))}
+    const first = !this.trail.length;
+    const head = html`<div class="bar">
+      <button class=${first ? "round close" : "round back"} aria-label=${t(first ? "common.close" : "common.back")} @click=${() => this.back()}>
+        ${icon(first ? "close" : "back")}
+      </button>
+    </div>`;
+    let art: TemplateResult | typeof nothing = nothing;
+    let panel: TemplateResult;
+    let foot: TemplateResult | typeof nothing = nothing;
+    if (!this.devices) panel = html`<p class="empty">${t("rooms.loading")}</p>`;
+    else if (!this.bridges.length) panel = html`<p class="empty">${t("add_device.no_bridge")}</p>`;
+    else {
+      const view = this.screenOf(this.step);
+      ({ art = nothing, panel, foot = nothing } = view);
+    }
+    // The scanner's and the name's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
+    return html`${this.screen(
+        head,
+        html`${art !== nothing ? html`<div class="flow-art">${art}</div>` : nothing}<div class="flow-panel">${panel}</div>`,
+        art !== nothing ? "add-flow with-art" : "add-flow",
+      )}
+      ${foot !== nothing ? html`<div class="screen-foot stack">${foot}</div>` : nothing}
+      ${this.naming ? this.nameSheet(this.naming) : nothing}
+      ${this.newRoom !== null ? this.roomSheet() : nothing}
+      <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning} @qr-code=${(e: CustomEvent<InstallCode>) => this.scanned(e.detail)}
         @close=${() => (this.scanning = false)}></hue-studio-qr-scan>`;
   }
 
-  /** Step 1: what is added (and on which bridge). */
-  private kinds(): TemplateResult {
+  private screenOf(step: Step): { art?: TemplateResult; panel: TemplateResult; foot?: TemplateResult } {
+    switch (step) {
+      case "where":
+        return this.where();
+      case "intro":
+        return this.intro();
+      case "benefits":
+        return this.benefits();
+      case "prepare":
+        return this.prepare();
+      case "code":
+        return this.code();
+      case "search":
+        return this.searching();
+      case "result":
+        return this.result();
+      case "name":
+        return this.nameStep();
+      case "summary":
+        return this.summary();
+      default:
+        return this.kinds();
+    }
+  }
+
+  private heading(text: string, lead?: TemplateResult | string): TemplateResult {
+    return html`<h1 class="big flow-title">${text}</h1>${lead ? html`<p class="lead flow-lead">${lead}</p>` : nothing}`;
+  }
+
+  /** Where the devices go: the HA areas, by bridge, and a new one. */
+  private where() {
     const { ctx } = this;
     const { t } = ctx;
-    const id = this.bridgeId;
-    const bridge = id ? this.devices?.[id] : undefined;
-    const waiting = newDevices(this.devices);
+    const areas = ctx.hass.areas || {};
+    const of = new Map(this.bridges.map(([id]) => [id, bridgeRoomAreas(ctx.rooms, id, areas)]));
+    const placed = new Set([...of.values()].flat());
+    // Areas without a Hue room yet: under the bridge with most rooms (each area on one bridge, the Hue app's).
+    const main = [...of].sort(([, a], [, b]) => b.length - a.length)[0]?.[0];
+    const loose = Object.keys(areas).filter((id) => !placed.has(id));
+    const byName = (a: string, b: string) => (areas[a]?.name ?? a).localeCompare(areas[b]?.name ?? b);
+    const pick = (bridge: string, area: string) => {
+      haptic("selection");
+      this.bridge = bridge;
+      this.area = area;
+      this.go(this.qrBridge ? "intro" : "kind");
+    };
+    return {
+      panel: html`${this.heading(t("add_device.where"))}
+        ${this.bridges.map(
+          ([id, b]) => html`<h2 class="label">${b.name}</h2>
+            <div class="rows inset">
+              ${[...(of.get(id) ?? []), ...(id === main ? loose : [])].sort(byName).map(
+                (area) => html`<button class="item" @click=${() => pick(id, area)}>
+                  <ha-icon icon=${areas[area]?.icon || "mdi:texture-box"}></ha-icon><div class="grow">${areas[area]?.name ?? area}</div>
+                </button>`,
+              )}
+              <button class="item" @click=${() => {
+                this.bridge = id;
+                this.newRoom = "";
+              }}>
+                <span class="round plus-blue">${icon("plus")}</span><div class="grow">${t("add_device.new_room")}</div>
+              </button>
+            </div>`,
+        )}`,
+    };
+  }
+
+  /** A bridge that takes QR codes: scan one, or go another way. */
+  private intro() {
+    const { t } = this.ctx;
+    return {
+      art: html`<ha-icon class="art-icon" icon="hue-studio:devices"></ha-icon>`,
+      panel: this.heading(t("add_device.add_to", { room: this.roomName }), t("add_device.qr_lead")),
+      foot: html`<button class="pill" @click=${() => this.go("benefits")}>${t("add_device.alternative")}</button>
+        <button class="pill apply" @click=${() => (this.scanning = true)}>${t("add_device.scan_qr")}</button>`,
+    };
+  }
+
+  private benefits() {
+    const { t } = this.ctx;
+    return {
+      panel: html`${this.heading(t("add_device.benefits"), t("add_device.benefits_1"))}<p class="lead flow-lead">${t("add_device.benefits_2")}</p>`,
+      foot: html`<button class="pill" @click=${() => this.go("kind")}>${t("add_device.without_qr")}</button>
+        <button class="pill apply" @click=${() => (this.scanning = true)}>${t("add_device.scan_qr")}</button>`,
+    };
+  }
+
+  /** What is added; and devices that joined earlier and wait to be named. */
+  private kinds() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const bridge = this.devices?.[this.bridgeId ?? ""];
+    const waiting = newDevices(this.devices).filter((d) => !this.done[d.id]);
     const pick = (kind: AddKind) => {
       haptic("selection");
       this.kind = kind;
       this.go("prepare");
     };
-    return html`<p class="lead">${t("add_device.intro")}</p>
-      ${this.bridges.length > 1
-        ? html`<div class="rows">
-            ${bridgeRow(t("add_device.bridge"), this.bridges.map(([bid, b]) => [bid, b.name]), id, (c) => this.choose(c), (bid) => (this.bridge = bid))}
-          </div>`
-        : nothing}
-      ${bridge?.searching === null
-        ? html`<div class="rows"><div class="item"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><div class="grow">${t("devices.unsupported")}</div></div></div>`
-        : html`<div class="kind-tiles">
-            ${ADD_KINDS.filter((k) => k.kind !== "other" || bridge?.other_brands).map(
-              (k) => html`<button class="kind-tile" @click=${() => pick(k.kind)}>
-                <ha-icon icon=${k.icon}></ha-icon>
-                <span class="name">${t(`add_device.kind_${k.kind}` as StringKey)}</span>
-                <span class="dim small">${t(`add_device.kind_${k.kind}_sub` as StringKey)}</span>
-              </button>`,
-            )}
-          </div>`}
-      ${waiting.length
-        ? html`<h2 class="label">${t("add_device.waiting")}</h2>
-            <div class="rows">${waiting.map((d) => this.deviceRow(d))}</div>`
-        : nothing}`;
+    const tile = (kind: AddKind, wide = false) =>
+      html`<button class=${classMap({ "pick-tile": true, plain: true, wide })} @click=${() => pick(kind)}>
+        <ha-icon icon=${KIND_ICONS[kind]}></ha-icon><span class="name">${t(`add_device.kind_${kind}` as StringKey)}</span>
+      </button>`;
+    return {
+      panel: html`${this.heading(t("add_device.which"))}
+        ${bridge?.searching === null
+          ? html`<p class="lead flow-lead">${t("devices.unsupported")}</p>`
+          : html`<h2 class="label">${t("add_device.section_light")}</h2>
+              <div class="pick-tiles">${tile("light", true)}</div>
+              <h2 class="label">${t("add_device.section_accessory")}</h2>
+              <div class="pick-tiles">${tile("accessory", true)}</div>
+              ${bridge?.other_brands ? html`<h2 class="label">${t("add_device.section_other")}</h2><div class="pick-tiles">${tile("other", true)}</div>` : nothing}`}
+        ${waiting.length
+          ? html`<h2 class="label">${t("add_device.waiting")}</h2>
+              <div class="dev-tiles">${waiting.map((d) => this.devTile(d, () => this.nameNow(d)))}</div>`
+          : nothing}`,
+    };
   }
 
-  /** Step 2: get the device ready, serial numbers if needed, search. */
-  private prepare(): TemplateResult {
-    const { ctx } = this;
-    const { t } = ctx;
+  /** Get it ready: what to do, then search (or by serial number: "Enter code"). */
+  private prepare() {
+    const { t } = this.ctx;
+    return {
+      art: html`<ha-icon class="art-icon" icon=${KIND_ICONS[this.kind]}></ha-icon>`,
+      panel: html`${this.heading(t(`add_device.add_${this.kind}` as StringKey, { room: this.roomName }), STEPS[this.kind].map((key) => t(key)).join(" "))}
+        ${this.kind === "other" ? html`<p class="lead flow-lead">${t("add_device.other_note")}</p>` : nothing}`,
+      foot: html`${this.kind === "accessory" ? nothing : html`<button class="pill" @click=${() => this.go("code")}>${t("add_device.enter_code")}</button>`}
+        <button class="pill apply" ?disabled=${this.busy} @click=${() => this.search()}>${t("add_device.next")}</button>`,
+    };
+  }
+
+  /** Serial numbers (setup codes): the bridge takes those devices even from another bridge. */
+  private code() {
+    const { t } = this.ctx;
     const parsed = parseSerials(this.serials);
     const bad = parsed.invalid.length > 0 || parsed.tooMany;
-    return html`<div class="add-art"><ha-icon icon=${ADD_KINDS.find((k) => k.kind === this.kind)!.icon}></ha-icon></div>
-      <ol class="add-steps">
-        ${STEPS[this.kind].map((key) => html`<li>${t(key)}</li>`)}
-      </ol>
-      ${this.kind === "other" ? html`<p class="lead small">${t("add_device.other_note")}</p>` : nothing}
-      <div class="rows">
-        ${this.devices?.[this.bridgeId ?? ""]?.install_codes
-          ? qrRows(ctx, {
-              codes: this.qr,
-              sub: t("qr.scan_sub"),
-              scan: () => (this.scanning = true),
-              remove: (mac) => (this.qr = this.qr.filter((c) => c.mac !== mac)),
-            })
-          : nothing}
-        ${this.showSerials
-          ? html`<div class="item col">
-              <div class="line"><span>${t("devices.serials")}</span><span class="dim">${parsed.codes.length}/${MAX_SERIALS}</span></div>
-              <input class="field" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="A1B2C3, D4E5F6"
-                aria-label=${t("devices.serials")} .value=${this.serials}
-                @input=${(e: InputEvent) => (this.serials = (e.target as HTMLInputElement).value)} />
-              <div class=${classMap({ "dim small": true, error: bad })}>
-                ${bad ? t(parsed.tooMany ? "add_device.serials_many" : "add_device.serials_bad", { codes: parsed.invalid.join(", ") }) : t("devices.serials_hint")}
-              </div>
-            </div>`
-          : html`<button class="item" @click=${() => (this.showSerials = true)}>
-              <ha-icon icon="mdi:numeric"></ha-icon>
-              <div class="grow">${t("add_device.add_serials")}<div class="dim small">${t("add_device.add_serials_sub")}</div></div>
-              <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-            </button>`}
-      </div>
-      <div class="add-actions">
-        <button class="pill go" ?disabled=${this.busy || bad} @click=${() => this.search()}>${icon("search")}${t("devices.search_button")}</button>
-      </div>`;
-  }
-
-  /** Step 3: the bridge searches; devices show up as they join. */
-  private searching(): TemplateResult {
-    const { t } = this.ctx;
-    const progress = searchProgress(this.started, this.now);
-    const left = Math.max(0, Math.ceil((60_000 - (this.now - this.started)) / 1000));
-    const found = newDevices(this.devices, (this.firstStarted || this.started) - 5000);
-    const r = 54;
-    const c = 2 * Math.PI * r;
-    return html`<div class="search-ring" role="status" aria-live="polite">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="track" cx="60" cy="60" r=${r}></circle>
-          <circle class="bar" cx="60" cy="60" r=${r} stroke-dasharray=${c} stroke-dashoffset=${c * (1 - progress)}></circle>
-        </svg>
-        <div class="ring-text">
-          <ha-icon icon=${ADD_KINDS.find((k) => k.kind === this.kind)!.icon}></ha-icon>
-          <span>${left ? t("add_device.seconds", { n: left }) : t("add_device.almost")}</span>
-        </div>
-      </div>
-      <p class="lead center-text">${t("add_device.searching_hint")}</p>
-      ${this.round > 1 ? html`<p class="lead small center-text dim">${t("add_device.round", { round: this.round, rounds: SEARCH_ROUNDS })}</p>` : nothing}
-      ${this.kind !== "accessory" && !found.length
-        ? html`<div class="power-cycle">
-            <ha-icon icon="mdi:power-cycle"></ha-icon>
-            <h2 class="link-title">${t("add_device.power_title")}</h2>
-            <p class="lead center-text">${t("add_device.power_text")}</p>
-          </div>`
-        : nothing}
-      ${found.length
-        ? html`<h2 class="label">${t("add_device.found_count", { count: found.length })}</h2>
-            <div class="rows">${found.map((d) => this.deviceRow(d, false))}</div>
-            <div class="add-actions"><button class="pill go" @click=${() => this.go("results")}>${t("add_device.continue")}</button></div>`
-        : nothing}`;
-  }
-
-  /** Step 4: what was found, set up each; or what to try when nothing joined. */
-  private results(): TemplateResult {
-    const { ctx } = this;
-    const { t } = ctx;
-    const waiting = newDevices(this.devices);
-    const done = Object.entries(this.done);
-    const nothingFound = !waiting.length && !done.length;
-    return html`${nothingFound
-        ? html`<div class="add-art dim"><ha-icon icon="mdi:magnify-close"></ha-icon></div>
-            <p class="lead center-text">${t("add_device.none")}</p>
-            <h2 class="label">${t("add_device.tips")}</h2>
-            <ul class="add-steps tips">
-              ${(["add_device.tip_power", "add_device.tip_close", "add_device.tip_reset", "add_device.tip_serial"] as StringKey[]).map((key) => html`<li>${t(key)}</li>`)}
-            </ul>`
-        : html`<p class="lead">${t(waiting.length ? "add_device.results_intro" : "add_device.all_done")}</p>`}
-      ${waiting.length ? html`<h2 class="label">${t("add_device.to_set_up")}</h2><div class="rows">${waiting.map((d) => this.deviceRow(d))}</div>` : nothing}
-      ${done.length
-        ? html`<h2 class="label">${t("add_device.set_up")}</h2>
-            <div class="rows">
-              ${done.map(
-                ([, d]) => html`<div class="item">
-                  <ha-icon icon=${d.icon}></ha-icon>
-                  <div class="grow">${d.name}<div class="dim small">${this.areaName(d.area) ?? ""}</div></div>
-                  <span class="check on">${icon("check")}</span>
-                </div>`,
-              )}
-            </div>`
-        : nothing}
-      <div class="add-actions">
-        <button class="pill" @click=${() => this.go("prepare")}>${t("add_device.search_again")}</button>
-      </div>`;
-  }
-
-  /** Step 5: one device: identify it, its name and room. */
-  private setup(d: FoundDevice): TemplateResult {
-    const { ctx } = this;
-    const { t } = ctx;
-    const areas = Object.entries(ctx.hass.areas || {})
-      .map(([id, a]) => [id, a.name] as const)
-      .concat(Object.entries(this.created).filter(([id]) => !ctx.hass.areas?.[id]))
-      .sort(([, a], [, b]) => a.localeCompare(b));
-    const pick = (id: string) => {
-      haptic("selection");
-      this.area = id;
+    const empty = !parsed.codes.length && !parsed.qr.length;
+    return {
+      panel: html`${this.heading(t("add_device.code_title"), t("add_device.code_lead"))}
+        <input class="field flow-field" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder=${t("add_device.code_placeholder")}
+          aria-label=${t("devices.serials")} .value=${this.serials} @input=${(e: InputEvent) => (this.serials = (e.target as HTMLInputElement).value)} />
+        ${bad
+          ? html`<p class="hint error">${t(parsed.tooMany ? "add_device.serials_many" : "add_device.serials_bad", { codes: parsed.invalid.join(", ") })}</p>`
+          : nothing}`,
+      foot: html`<button class="pill apply" ?disabled=${this.busy || bad || empty} @click=${() => this.search()}>${t("add_device.search")}</button>`,
     };
-    return html`<div class="sensor-hero">
-        <ha-icon class="pic" icon=${deviceIcon(this.ctx.hass, d)}></ha-icon>
-        <div class="dim">${d.product}</div>
-      </div>
-      <div class="rows">
-        <div class="item col">
-          <div class="line"><span>${t("devices.name")}</span></div>
-          <input class="field" maxlength=${NAME_MAX} aria-label=${t("devices.name")} .value=${this.name}
-            @input=${(e: InputEvent) => (this.name = (e.target as HTMLInputElement).value)} />
-        </div>
-        <button class="item" @click=${() => this.identify(d)}>
-          <ha-icon icon="mdi:lightbulb-alert-outline"></ha-icon>
-          <div class="grow">${t("devices.identify")}<div class="dim small">${t(d.kind === "light" ? "add_device.identify_light" : "add_device.identify_other")}</div></div>
-        </button>
-      </div>
-      <h2 class="label">${t("add_device.room")}</h2>
-      <div class="rows areas">
-        ${areas.map(
-          ([id, name]) => html`<button class=${classMap({ item: true, on: this.area === id })} role="radio" aria-checked=${this.area === id} @click=${() => pick(id)}>
-            <ha-icon icon=${ctx.hass.areas?.[id]?.icon || "mdi:texture-box"}></ha-icon>
-            <div class="grow">${name}</div>
-            <span class="radio"></span>
-          </button>`,
-        )}
-        ${this.newArea === null
-          ? html`<button class="item" @click=${() => (this.newArea = "")}>
-              <ha-icon icon="mdi:plus"></ha-icon><div class="grow">${t("add_device.new_area")}</div>
-            </button>`
-          : html`<div class="item col">
-              <input class="field" maxlength="50" placeholder=${t("add_device.new_area_name")} aria-label=${t("add_device.new_area_name")} .value=${this.newArea}
-                @input=${(e: InputEvent) => (this.newArea = (e.target as HTMLInputElement).value)}
-                @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.createArea()} />
-              <div class="actions-row">
-                <button class="pill" @click=${() => (this.newArea = null)}>${t("common.cancel")}</button>
-                <button class="pill apply" ?disabled=${!this.newArea.trim() || this.busy} @click=${() => this.createArea()}>${t("add_device.create")}</button>
-              </div>
-            </div>`}
-      </div>
-      <p class="lead small">${t(d.kind === "light" ? "devices.room_hint" : "devices.area_hint")}</p>`;
   }
 
-  /** A device found (and not set up yet): opens its setup. */
-  private deviceRow(d: FoundDevice, open = true): TemplateResult {
+  /** The search ring around the kind's picture; a badge once it is over. */
+  private ring(badge: "ok" | "none" | null): TemplateResult {
+    const progress = badge ? 1 : searchProgress(this.started, this.now);
+    const r = 148;
+    const c = 2 * Math.PI * r;
+    return html`<div class=${classMap({ "flow-ring": true, over: !!badge })} role="status" aria-live="polite">
+      <svg viewBox="0 0 300 300" aria-hidden="true">
+        <circle class="track" cx="150" cy="150" r=${r}></circle>
+        ${badge ? nothing : html`<circle class="bar" cx="150" cy="150" r=${r} stroke-dasharray=${c} stroke-dashoffset=${c * (1 - progress)}></circle>`}
+      </svg>
+      <ha-icon class="art-icon" icon=${KIND_ICONS[this.kind]}></ha-icon>
+      ${badge ? html`<span class=${`badge ${badge}`}>${icon(badge === "ok" ? "check" : "close")}</span>` : nothing}
+    </div>`;
+  }
+
+  /** The bridge searches; what joined shows up as it does. */
+  private searching() {
     const { t } = this.ctx;
-    const content = html`<ha-icon icon=${deviceIcon(this.ctx.hass, d)}></ha-icon>
-      <div class="grow">${d.name}<div class="dim small">${d.product} · ${t(`devices.kind_${d.kind}` as StringKey)}</div></div>`;
-    if (!open) return html`<div class="item fresh">${content}</div>`;
-    return html`<button class="item" @click=${() => this.open(d)}>
-      ${content}<span class="dim small">${t("add_device.set_up_one")}</span><ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-    </button>`;
+    const found = this.found;
+    return {
+      art: this.ring(null),
+      panel: html`${this.heading(t(`add_device.searching_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
+        ${this.round > 1 ? html`<p class="lead flow-lead small">${t("add_device.round", { round: this.round, rounds: SEARCH_ROUNDS })}</p>` : nothing}
+        ${found.length
+          ? html`<p class="lead flow-lead">${t("add_device.found_these")}</p><div class="dev-tiles">${found.map((d) => this.devTile(d))}</div>`
+          : nothing}`,
+      foot: html`<button class="pill apply" ?disabled=${!found.length} @click=${() => this.go("result")}>${t("add_device.next")}</button>`,
+    };
+  }
+
+  /** What the search found: on to naming it; or what to try when nothing joined. */
+  private result() {
+    const { t } = this.ctx;
+    const found = this.found;
+    if (found.length)
+      return {
+        art: this.ring("ok"),
+        panel: html`${this.heading(t("add_device.success"), t("add_device.success_lead", { room: this.roomName }))}
+          <div class="dev-tiles">${found.map((d) => this.devTile(d, null, true))}</div>`,
+        foot: html`<button class="pill apply" @click=${() => this.go("name")}>${t("add_device.next")}</button>`,
+      };
+    return {
+      art: this.ring("none"),
+      panel: html`${this.heading(t(`add_device.none_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
+        ${this.help
+          ? html`<h2 class="label">${t("add_device.tips")}</h2>
+              <ul class="add-steps tips">
+                ${(["add_device.tip_power", "add_device.tip_close", "add_device.tip_reset", "add_device.tip_serial"] as StringKey[]).map((key) => html`<li>${t(key)}</li>`)}
+              </ul>`
+          : nothing}`,
+      foot: html`<button class="pill outline" @click=${() => (this.help = !this.help)}>${t("add_device.help")}</button>
+        <button class="pill outline" @click=${() => this.go("summary")}>${t("add_device.skip")}</button>
+        ${this.kind === "accessory" ? nothing : html`<button class="pill" @click=${() => this.go("code")}>${t("add_device.enter_code")}</button>`}
+        <button class="pill apply" ?disabled=${this.busy} @click=${() => this.search()}>${t("add_device.try_again")}</button>`,
+    };
+  }
+
+  /** Name what was found (a tap opens its name; a light breathes meanwhile), then it is set up. */
+  private nameStep() {
+    const { t } = this.ctx;
+    const found = this.found;
+    const renamed = found.some((d) => this.names[d.id] !== undefined);
+    return {
+      panel: html`${this.heading(t(`add_device.name_${this.kind}` as StringKey), t("add_device.name_lead"))}
+        <div class="dev-tiles">${found.map((d) => this.devTile(d, () => this.openName(d)))}</div>`,
+      foot: html`<button class=${classMap({ pill: true, outline: !renamed, apply: renamed })} ?disabled=${this.busy} @click=${() => this.saveAll(found)}>
+        ${t(renamed ? "add_device.next" : "add_device.skip")}
+      </button>`,
+    };
+  }
+
+  /** What was added (or that nothing was); more, or done. */
+  private summary() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const done = Object.entries(this.done);
+    const sections = (["light", "accessory", "other"] as AddKind[])
+      .map((kind) => [kind, done.filter(([, d]) => d.kind === kind)] as const)
+      .filter(([, list]) => list.length);
+    return {
+      panel: done.length
+        ? html`${this.heading(t("add_device.added", { room: this.roomName }), t("add_device.added_lead"))}
+            ${sections.map(
+              ([kind, list]) => html`<h2 class="label">${t(`add_device.section_${kind}` as StringKey)}</h2>
+                <div class="dev-tiles">${list.map(([, d]) => html`<div class="dev-tile"><ha-icon icon=${d.icon}></ha-icon><span class="name">${d.name}</span></div>`)}</div>`,
+            )}`
+        : this.heading(t("add_device.none_added"), t("add_device.none_added_lead")),
+      foot: html`<button class="pill" @click=${() => this.go("kind")}>${t("add_device.add_more")}</button>
+        <button class="pill apply" @click=${() => ctx.go(this.exitPath)}>${t("add_device.done")}</button>`,
+    };
+  }
+
+  /** A device as a tile: its picture, its name; ticked once found. */
+  private devTile(d: FoundDevice, open: (() => void) | null = null, ticked = false): TemplateResult {
+    const content = html`<ha-icon icon=${deviceIcon(this.ctx.hass, d)}></ha-icon><span class="name">${this.names[d.id] ?? d.name}</span>
+      ${ticked ? html`<span class="tick">${icon("check")}</span>` : nothing}`;
+    return open ? html`<button class="dev-tile" @click=${open}>${content}</button>` : html`<div class="dev-tile">${content}</div>`;
+  }
+
+  /** "Edit name": the device's name, and a way to tell which one it is. */
+  private nameSheet(n: { device: FoundDevice; name: string }): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const d = n.device;
+    const done = () => {
+      const name = n.name.trim();
+      this.names = { ...this.names, [d.id]: name || d.name };
+      this.naming = null;
+    };
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && (this.naming = null)}>
+      <div class="box form name-sheet" role="dialog" aria-label=${t("add_device.edit_name")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${() => (this.naming = null)}>${icon("close")}</button>
+          <div class="grow">${t("add_device.edit_name")}</div>
+          <button class="pill" @click=${done}>${t("common.done")}</button>
+        </div>
+        <div class="form-body">
+          <div class="name-pic"><ha-icon icon=${deviceIcon(ctx.hass, d)}></ha-icon></div>
+          <label class="name-field">
+            <input class="field" maxlength=${NAME_MAX} aria-label=${t("devices.name")} .value=${n.name}
+              @input=${(e: InputEvent) => (this.naming = { device: d, name: (e.target as HTMLInputElement).value })}
+              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()} />
+            ${n.name
+              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+                  e.preventDefault();
+                  this.naming = { device: d, name: "" };
+                }}>${icon("close")}</button>`
+              : nothing}
+          </label>
+        </div>
+        <div class="rows">
+          <button class="item" @click=${() => this.identify(d)}>
+            <ha-icon icon="mdi:lightbulb-alert-outline"></ha-icon>
+            <div class="grow">${t("devices.identify")}<div class="dim small">${t(d.kind === "light" ? "add_device.identify_light" : "add_device.identify_other")}</div></div>
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /** "Create new room": an HA area of that name (the light's Hue room follows it). */
+  private roomSheet(): TemplateResult {
+    const { ctx } = this;
+    const { t } = ctx;
+    const name = this.newRoom ?? "";
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && (this.newRoom = null)}>
+      <div class="box form name-sheet" role="dialog" aria-label=${t("add_device.new_room")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${() => (this.newRoom = null)}>${icon("close")}</button>
+          <div class="grow">${t("add_device.new_room")}</div>
+          <button class="pill" ?disabled=${!name.trim() || this.busy} @click=${() => this.createArea()}>${t("common.done")}</button>
+        </div>
+        <div class="form-body">
+          <label class="name-field">
+            <input class="field" maxlength="50" placeholder=${t("add_device.new_room_name")} aria-label=${t("add_device.new_room_name")} .value=${name}
+              @input=${(e: InputEvent) => (this.newRoom = (e.target as HTMLInputElement).value)}
+              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.createArea()} />
+          </label>
+        </div>
+      </div>
+    </div>`;
   }
 
   private areaName(id: string | null): string | null {
-    return id ? this.ctx.hass.areas?.[id]?.name ?? this.created[id] ?? id : null;
+    return id ? (this.ctx.hass.areas?.[id]?.name ?? this.created[id] ?? id) : null;
   }
 
-  private open(d: FoundDevice): void {
+  /** A device that joined earlier: straight to naming it. */
+  private nameNow(d: FoundDevice): void {
+    this.firstStarted = ((d.found ?? Date.now() / 1000) - 1) * 1000;
+    this.kind = kindOf(d);
+    this.go("name");
+  }
+
+  private openName(d: FoundDevice): void {
     haptic("selection");
-    this.current = d;
-    this.name = d.name;
-    this.area = d.area ?? areaOfRoom(this.room);
-    this.newArea = null;
-    this.go("setup");
+    this.naming = { device: d, name: this.names[d.id] ?? d.name };
     // The Hue app makes a light breathe as soon as it is picked.
     if (d.kind === "light") void this.identify(d, true);
   }
@@ -432,8 +569,8 @@ export class DeviceAddView extends StudioView {
   }
 
   private async createArea(): Promise<void> {
-    const name = this.newArea?.trim();
-    if (!name) return;
+    const name = this.newRoom?.trim();
+    if (!name || this.busy) return;
     this.busy = true;
     const area = await this.ctx.query<{ area_id: string; name: string }>({ type: "config/area_registry/create", name });
     this.busy = false;
@@ -441,19 +578,28 @@ export class DeviceAddView extends StudioView {
     haptic("success");
     this.created = { ...this.created, [area.area_id]: area.name };
     this.area = area.area_id;
-    this.newArea = null;
+    this.newRoom = null;
+    this.go(this.qrBridge ? "intro" : "kind");
+  }
+
+  /** A QR code read: the bridge searches for that device. */
+  private scanned(code: InstallCode): void {
+    this.qr = withCodes(this.qr, [code]);
+    this.scanning = false;
+    void this.search();
   }
 
   private async search(): Promise<void> {
     const { ctx } = this;
     const bridge = this.bridgeId;
-    if (!bridge) return;
+    if (!bridge || this.busy) return;
     this.busy = true;
+    const parsed = parseSerials(this.serials);
     const msg = {
       type: "hue_studio/devices/search",
       hue_entry_id: bridge,
-      serials: parseSerials(this.serials).codes,
-      install_codes: withCodes(this.qr, parseSerials(this.serials).qr),
+      serials: parsed.codes,
+      install_codes: withCodes(this.qr, parsed.qr),
       other_brands: this.kind === "other",
     };
     const ok = await ctx.ws(msg);
@@ -479,21 +625,23 @@ export class DeviceAddView extends StudioView {
     this.seenActive = false;
     const ok = await this.ctx.ws(this.searchMsg);
     this.busy = false;
-    if (!ok) this.go("results");
+    if (!ok) this.go("result");
   }
 
-  private async save(d: FoundDevice): Promise<void> {
+  /** Every device found gets its name and the room's area; then what was added. */
+  private async saveAll(found: FoundDevice[]): Promise<void> {
     const { ctx } = this;
-    const name = this.name.trim() || d.name;
     this.busy = true;
-    const ok = await ctx.ws({ type: "hue_studio/devices/setup", device: d.id, name, area_id: this.area });
+    const done = { ...this.done };
+    for (const d of found) {
+      const name = (this.names[d.id] ?? d.name).trim() || d.name;
+      const ok = await ctx.ws({ type: "hue_studio/devices/setup", device: d.id, name, area_id: this.area });
+      if (ok) done[d.id] = { name, kind: kindOf(d), icon: deviceIcon(ctx.hass, d) };
+    }
     this.busy = false;
-    if (!ok) return;
+    this.done = done;
     haptic("success");
-    ctx.toast(ctx.t("devices.saved", { name }));
-    this.done = { ...this.done, [d.id]: { name, area: this.area, kind: d.kind, icon: deviceIcon(this.ctx.hass, d) } };
-    this.current = null;
-    this.go("results");
+    this.go("summary");
   }
 }
 

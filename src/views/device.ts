@@ -38,7 +38,6 @@ export class DeviceView extends StudioView {
   @state() private accessor sheet: Sheet | null = null;
   @state() private accessor saving = false;
   /** "Delete" was tapped once: the next tap deletes. */
-  @state() private accessor confirmDelete = false;
   private stop?: () => void;
 
   override connectedCallback(): void {
@@ -166,17 +165,18 @@ export class DeviceView extends StudioView {
       </div>
 
       <div class="delete-area">
-        <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${this.saving} @click=${() => this.deleteDevice(d)}>
-          ${t(this.confirmDelete ? "devices.delete_confirm" : "devices.delete")}
-        </button>
-        ${this.confirmDelete ? html`<p class="hint warn">${t("devices.delete_hint")}</p>` : nothing}
+        <button class="delete-btn" ?disabled=${this.saving} @click=${() => this.askDelete(
+          t(light ? "devices.delete_note_light" : "devices.delete_note"),
+          t(light ? "devices.delete_light" : "devices.delete_device"),
+          () => void this.deleteDevice(d),
+        )}>${t("devices.delete")}</button>
       </div>
     </div>`;
     // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
     return html`<div class="screen-head">${head}</div>
       <div class="screen-body">${body}</div>
       ${this.sheet ? this.renderSheet(this.sheet, d, area, fn, power) : nothing}
-      ${this.leaveSheet()}`;
+      ${this.askSheet()}`;
   }
 
   /** A setting: title and what it is about, its value on the right. */
@@ -198,7 +198,6 @@ export class DeviceView extends StudioView {
   private open(sheet: Sheet): void {
     haptic("selection");
     this.editingName = false;
-    this.confirmDelete = false;
     this.sheet = sheet;
   }
 
@@ -304,15 +303,9 @@ export class DeviceView extends StudioView {
 
   private async deleteDevice(d: FoundDevice): Promise<void> {
     const { ctx } = this;
-    if (!this.confirmDelete) {
-      haptic("warning");
-      this.confirmDelete = true;
-      return;
-    }
     this.saving = true;
     const ok = await ctx.ws({ type: "hue_studio/devices/delete", device: d.id });
     this.saving = false;
-    this.confirmDelete = false;
     if (!ok) return;
     haptic("success");
     ctx.toast(ctx.t("devices.deleted", { name: d.name }));

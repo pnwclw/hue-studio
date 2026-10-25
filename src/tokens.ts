@@ -54,6 +54,8 @@ export const COLORS = {
   // Under every overlay (sheets, popovers, the brightness slider): the Hue app's, a plain
   // dim (no blur).
   scrim: "rgba(0, 0, 0, 0.7)",
+  // Under an action sheet (a question: leave, delete, a scene's "⋯"): a lighter dim over a blur.
+  "scrim-blur": "rgba(0, 0, 0, 0.5)",
   outline: "rgba(120, 120, 128, 0.45)",
   selected: "#fff",
   accent: "#006aff",

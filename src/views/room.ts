@@ -49,7 +49,7 @@ export class RoomView extends StudioView {
   /** Brightness while the header's slider is dragged: the header shows just the percentage. */
   @state() private accessor dragging: number | null = null;
   /** The scene whose "⋯" menu is open, and whether "Delete" was tapped once. */
-  @state() private accessor menu: { scene: string; deleting: boolean } | null = null;
+  @state() private accessor menu: { scene: string } | null = null;
   /** The dynamic speed sheet of a scene: the step on its slider (1-12). */
   @state() private accessor speed: { scene: string; step: number } | null = null;
   /** "Copy to…": the scene's sheet, going to another room or zone. */
@@ -353,7 +353,7 @@ export class RoomView extends StudioView {
     const edit = () => ctx.go(`/room/${encodeURIComponent(g.key)}/scene/${encodeURIComponent(s.entity_id)}`);
     return html`<div class="scene-side">
       <button class="round" aria-label=${t("scene.edit")} @click=${edit}>${icon("pencil")}</button>
-      <button class="round" aria-label=${t("scene.more")} @click=${() => (this.menu = { scene: s.entity_id, deleting: false })}>${icon("dots")}</button>
+      <button class="round" aria-label=${t("scene.more")} @click=${() => (this.menu = { scene: s.entity_id })}>${icon("dots")}</button>
     </div>`;
   }
 
@@ -391,21 +391,19 @@ export class RoomView extends StudioView {
       const data = { entity_id: entityId, shuffle: true, recall: true };
       if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
     };
-    const remove = async () => {
-      if (!this.menu?.deleting) {
-        haptic("warning");
-        this.menu = { scene: entityId, deleting: true };
-        return;
-      }
+    // Deleting asks on its own action sheet (the Hue app's).
+    const remove = () => {
       close();
-      if (await ctx.call("hue_studio", "delete_scene", { entity_id: entityId }, { optimistic: false })) ctx.toast(t("scene.deleted", { name: s.name }));
+      this.askDelete(t("scene.delete_note"), t("scene.delete"), async () => {
+        if (await ctx.call("hue_studio", "delete_scene", { entity_id: entityId }, { optimistic: false })) ctx.toast(t("scene.deleted", { name: s.name }));
+      });
     };
     return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box action-sheet" role="dialog" aria-label=${s.name}>
         <button @click=${act(copy)}>${t("scene.copy_to")}</button>
         ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
         ${info?.resettable && (info.palette.length > 1 || info.mirek.length > 1) ? html`<button @click=${act(shuffle)}>${t("scene.shuffle_colors")}</button>` : nothing}
-        <button class="danger" @click=${remove}>${t(this.menu?.deleting ? "scene.delete_confirm" : "scene.delete")}</button>
+        <button class="danger" @click=${remove}>${t("scene.delete")}</button>
         <button class="cancel" @click=${close}>${t("common.cancel")}</button>
       </div>
     </div>`;

@@ -919,19 +919,23 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const auth = params.get("app") === "1" ? { external: new FakeBus() } : undefined;
   // &click=<text>: press the first button with that text (or label) once the page is up
   // (screenshots of what opens on a tap, e.g. &click=QR for the QR scanner); several
-  // presses one after another: &click=PC|Ikona.
+  // presses one after another: &click=PC|Ikona; `~<ms>` waits that much longer before the next
+  // (a search to end: &click=Next|~12000|Next).
   const click = params.get("click");
   if (click) {
     const buttons = (root: Document | ShadowRoot | Element): HTMLButtonElement[] => [
       ...root.querySelectorAll<HTMLButtonElement>("button"),
       ...[...root.querySelectorAll("*")].flatMap((el) => (el.shadowRoot ? buttons(el.shadowRoot) : [])),
     ];
-    click.split("|").forEach((text, i) =>
-      setTimeout(
-        () => buttons(document).find((b) => b.textContent?.includes(text) || b.getAttribute("aria-label") === text)?.click(),
-        1500 + i * 900,
-      ),
-    );
+    let at = 1500;
+    for (const text of click.split("|")) {
+      if (text.startsWith("~")) {
+        at += Number(text.slice(1)) || 0;
+        continue;
+      }
+      setTimeout(() => buttons(document).find((b) => b.textContent?.includes(text) || b.getAttribute("aria-label") === text)?.click(), at);
+      at += 900;
+    }
   }
   (window as { fakeBus?: unknown }).fakeBus = auth?.external;
 

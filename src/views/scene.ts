@@ -39,7 +39,6 @@ export class SceneView extends StudioView {
 
   @state() private accessor editingName = false;
   @state() private accessor confirmReset = false;
-  @state() private accessor confirmDelete = false;
   /** The dynamic speed sheet's step (1-12) while it is open. */
   @state() private accessor speedStep: number | null = null;
   /** A new scene's name sheet: what is typed (null while it is closed). */
@@ -47,7 +46,6 @@ export class SceneView extends StudioView {
   @state() private accessor busy = false;
   private started = false;
   private resetTimer?: ReturnType<typeof setTimeout>;
-  private deleteTimer?: ReturnType<typeof setTimeout>;
 
   private get name(): string {
     const st = this.ctx.hass.states[this.scene];
@@ -93,7 +91,6 @@ export class SceneView extends StudioView {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     clearTimeout(this.resetTimer);
-    clearTimeout(this.deleteTimer);
   }
 
   protected override render() {
@@ -201,8 +198,8 @@ export class SceneView extends StudioView {
           </button></div>`
         : nothing}
       <div class="delete-area">
-        <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} @click=${() => this.deleteScene()}>
-          ${this.confirmDelete ? t("scene.delete_confirm") : t("scene.delete")}
+        <button class="delete-btn" @click=${() => this.askDelete(t("scene.delete_note"), t("scene.delete"), () => void this.deleteScene())}>
+          ${t("scene.delete")}
         </button>
       </div>
     </div></div>
@@ -217,7 +214,7 @@ export class SceneView extends StudioView {
           },
         })
       : nothing}
-    ${this.leaveSheet()}`;
+    ${this.askSheet()}`;
   }
 
   /** A new scene: what the room's lights show now, set here and on the wheel, then "Save". */
@@ -263,7 +260,7 @@ export class SceneView extends StudioView {
         <button class="pill apply" ?disabled=${!room.group || this.busy} @click=${() => this.create(room, name)}>${t("scene.save")}</button>
       </div>
       ${this.naming !== null ? this.nameSheet() : nothing}
-      ${this.leaveSheet()}`;
+      ${this.askSheet()}`;
   }
 
   /** The Hue app's "Scene name" sheet: the name in a field with a clear button, "Done". */
@@ -367,14 +364,6 @@ export class SceneView extends StudioView {
   }
 
   private async deleteScene(): Promise<void> {
-    if (!this.confirmDelete) {
-      this.confirmDelete = true;
-      clearTimeout(this.deleteTimer);
-      this.deleteTimer = setTimeout(() => (this.confirmDelete = false), RESET_CONFIRM_MS);
-      return;
-    }
-    this.confirmDelete = false;
-    clearTimeout(this.deleteTimer);
     const { ctx } = this;
     const name = this.name;
     if (await ctx.call("hue_studio", "delete_scene", { entity_id: this.scene }, { optimistic: false })) {

@@ -148,7 +148,7 @@ class Identities:
                 continue
             known = self.devices.get(mac)
             if known is not None and known["device_id"] != device.id:
-                if not self._free(known):
+                if not self._free(known, device):
                     continue
                 await self._async_restore_device(entry_id, bridge, device, known)
                 by_unique_id = {}
@@ -166,13 +166,28 @@ class Identities:
                 changed |= await self._async_group(entry_id, bridge, kind, group)
         return changed
 
-    def _free(self, known: dict[str, Any]) -> bool:
-        """Whether no entity holds the remembered entity ids any more."""
+    def _still_there(self, known: dict[str, Any], kind: str) -> bool:
+        """Whether a remembered room or zone is still on its bridge."""
+        bridge = async_bridges(self.hass).get(known.get("bridge", ""))
+        if bridge is None:
+            return False
+        groups = bridge.groups.room if kind == "room" else bridge.groups.zone
+        return any(g.id == known["id"] for g in groups)
+
+    def _free(self, known: dict[str, Any], device: Any) -> bool:
+        """Whether no other entity holds the remembered entity ids any more. The new
+        device's own entities may already hold them: Home Assistant names a device
+        added again by its default name, which often gives the remembered ids."""
         entities = er.async_get(self.hass)
         ids = [light["entity"].get("entity_id") for light in known["lights"]] + [
             other["entity"].get("entity_id") for other in known["others"]
         ]
-        return all(entities.async_get(e) is None for e in ids if e)
+        own = {service.rid for service in device.services}
+        return all(
+            (entry := entities.async_get(e)) is None or entry.unique_id in own
+            for e in ids
+            if e
+        )
 
     def _device(
         self,
@@ -282,6 +297,14 @@ class Identities:
             else None
         )
         scenes = [s for s in bridge.scenes.scene if s.group.rid == group.id]
+        if (
+            known is not None
+            and known["id"] != group.id
+            and self._still_there(known, kind)
+        ):
+            # A room of the same name elsewhere while the remembered one is still on its
+            # bridge (left empty, its light gone with its last device): not this one.
+            return False
         if known is not None:
             old = known["entity"].get("entity_id")
             if (

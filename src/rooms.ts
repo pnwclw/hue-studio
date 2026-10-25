@@ -97,3 +97,16 @@ export function groupBridge(plan: RoomsPlan | null, group: Pick<Group, "lights" 
 export const bridgeAreas = (plan: RoomsPlan | null, bridge: string): string[] => [
   ...new Set((plan?.rooms || []).filter((r) => r.bridge === bridge && r.lights.length).map((r) => r.area)),
 ];
+
+/** The areas whose Hue room is on a bridge, with lights or not (a room left empty, as when its
+ *  only light is deleted to be added again, keeps its area there by name): where "Add devices"
+ *  puts a new device of that area. */
+export function bridgeRoomAreas(plan: RoomsPlan | null, bridge: string, areas: Record<string, { name: string }>): string[] {
+  const byName = new Map(Object.entries(areas).map(([id, a]) => [a.name.trim().toLowerCase(), id]));
+  const empty = (plan?.empty || [])
+    .filter((r) => r.group && bridgeOf(plan, r.group) === bridge)
+    .map((r) => byName.get(r.name.trim().toLowerCase()))
+    .filter((id): id is string => !!id);
+  const rooms = (plan?.rooms || []).filter((r) => r.bridge === bridge && (r.lights.length || r.group)).map((r) => r.area);
+  return [...new Set([...rooms, ...empty])];
+}

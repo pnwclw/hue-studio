@@ -64,7 +64,6 @@ export class MotionAreaView extends StudioView {
   @state() private accessor now = Date.now();
   @state() private accessor sheet: Sheet | null = null;
   @state() private accessor editingName = false;
-  @state() private accessor confirmDelete = false;
   /** The sensitivity sheet: the value tried out and the one it opened with. */
   @state() private accessor trying: number | null = null;
   private opened: number | null = null;
@@ -104,7 +103,7 @@ export class MotionAreaView extends StudioView {
     if (this.area === "new") return this.newArea();
     const found = this.found;
     if (!found) return this.screen(this.subHead(t("settings.motionaware"), () => ctx.go(LIST)), html`<p class="empty">${t("ma.not_found")}</p>`);
-    return this.edit(found[0], found[1], found[2]);
+    return html`${this.edit(found[0], found[1], found[2])}${this.askSheet()}`;
   }
 
   // --- A new area ------------------------------------------------------------------
@@ -414,10 +413,9 @@ export class MotionAreaView extends StudioView {
       </div>
 
       <div class="delete-area">
-        <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${this.busy} @click=${() => this.deleteArea(entry, area)}>
-          ${t(this.confirmDelete ? "ma.delete_confirm" : "ma.delete")}
+        <button class="delete-btn" ?disabled=${this.busy} @click=${() => this.askDelete(t("ma.delete_hint"), t("ma.delete"), () => void this.deleteArea(entry, area))}>
+          ${t("ma.delete")}
         </button>
-        ${this.confirmDelete ? html`<p class="hint warn">${t("ma.delete_hint")}</p>` : nothing}
       </div>`;
     // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
     return html`<div class="screen-head">${head}</div>
@@ -447,7 +445,6 @@ export class MotionAreaView extends StudioView {
   private open(sheet: Sheet, area: MotionArea): void {
     haptic("selection");
     this.editingName = false;
-    this.confirmDelete = false;
     this.sheet = sheet;
     this.picked = area.lights.map((l) => l.entity_id).filter((id): id is string => !!id);
     const current = sheet === "sensitivity" ? area.sensitivity : sheet === "security" ? area.security_sensitivity : null;
@@ -559,15 +556,9 @@ export class MotionAreaView extends StudioView {
 
   private async deleteArea(entry: string, area: MotionArea): Promise<void> {
     const { ctx } = this;
-    if (!this.confirmDelete) {
-      haptic("warning");
-      this.confirmDelete = true;
-      return;
-    }
     this.busy = true;
     const ok = await ctx.ws({ type: "hue_studio/motion_areas/delete", area_id: area.id });
     this.busy = false;
-    this.confirmDelete = false;
     if (!ok) return;
     haptic("success");
     ctx.toast(ctx.t("ma.deleted", { name: area.name }));

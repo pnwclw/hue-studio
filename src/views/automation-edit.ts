@@ -58,7 +58,6 @@ export class AutomationEditView extends AutomationParts {
   /** Where "back" and saving leave the panel for (the page its more-info sheet was on). */
   @property() accessor exitPath: string | null = null;
 
-  @state() private accessor confirmDelete = false;
   @state() private accessor saving = false;
   @state() private accessor editingName = false;
   /** "On certain days" switched on while every day is still chosen. */
@@ -164,14 +163,12 @@ export class AutomationEditView extends AutomationParts {
                 </button>
               </div>
               <div class="delete-area">
-                <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} @click=${() => this.deleteIt()}>
-                  ${t(this.confirmDelete ? "automations.delete_confirm" : "automations.delete")}
-                </button>
+                <button class="delete-btn" @click=${() =>
+                  this.askDelete(t("automations.delete_note"), t("automations.delete_action"), () => void this.deleteIt())}>${t("automations.delete")}</button>
               </div>`}`,
       "settings-page automation-page",
     )}
-    ${this.partSheets(d)}
-    ${this.leaveSheet()}`;
+    ${this.partSheets(d)}`;
   }
 
   /** Its picture and name (renamed in place), and its type when the name is another. */
@@ -216,11 +213,6 @@ export class AutomationEditView extends AutomationParts {
   }
 
   private async deleteIt(): Promise<void> {
-    if (!this.confirmDelete) {
-      this.confirmDelete = true;
-      haptic("warning");
-      return;
-    }
     if (!(await this.ctx.deleteAutomation(this.draft!.id))) return;
     if (this.exitPath) leavePanel(this.exitPath);
     else this.ctx.go("/automations");

@@ -790,26 +790,60 @@ export const CSS = `
   .rows .item .value-text { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   .settings-page .sensor-hero { padding-bottom: 14px; }
   /* "Add devices": what is added, the steps to get it ready, the search. */
-  .kind-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px; }
-  .kind-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 100px; padding: 14px; border: none;
-               border-radius: var(--r-m); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer;
-               transition: transform var(--t-press) var(--ease); }
-  .kind-tile:active { transform: scale(var(--press-tile)); }
-  .kind-tile ha-icon { --mdc-icon-size: 28px; margin-bottom: 6px; color: var(--text); }
-  .kind-tile .name { font-size: var(--fs-body); font-weight: 500; }
-  @container (max-width: 560px) {
-    .kind-tiles { grid-template-columns: 1fr; }
-    .kind-tile { display: grid; grid-template-columns: auto 1fr; column-gap: 14px; min-height: 0; align-items: center; }
-    .kind-tile ha-icon { grid-row: span 2; margin: 0; }
-  }
-  .add-art { display: flex; justify-content: center; padding: 18px 0 8px; }
-  .add-art ha-icon { --mdc-icon-size: 76px; }
-  .add-art.dim ha-icon { color: var(--text-2); }
+  /* "Add devices" (the Hue app's flow): a picker whose art (a picture, or the search's ring with a
+     badge once it is over) sits on the blue over the rounded panel; buttons in the footer. */
+  main.picker .screen-head + .screen-body > .page.add-flow { padding: 0; background: none; box-shadow: none; border-radius: 0;
+                                                             display: flex; flex-direction: column; }
+  .add-flow .flow-art { flex: none; display: flex; align-items: center; justify-content: center; height: clamp(200px, 40dvh, 378px); }
+  .add-flow .flow-panel { flex: 1; padding: 20px 20px 28px; border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg);
+                          box-shadow: inset 0 1px 0 var(--surface-low); }
+  .add-flow .flow-title { margin: 6px var(--text-inset) 0; font-size: var(--fs-title); }
+  .add-flow .flow-lead { margin: 12px var(--text-inset) 0; font-size: var(--fs-body); color: var(--text-2); line-height: 1.35; }
+  .add-flow .flow-lead.small { font-size: var(--fs-footnote); }
+  .add-flow .flow-title + .rows, .add-flow .flow-title + h2.label { margin-top: 40px; }
+  .add-flow .flow-field { margin-top: 24px; height: 46px; border: 1.5px solid var(--outline); border-radius: var(--r-xs); background: var(--surface); font-size: var(--fs-body); }
+  .add-flow .art-icon { --mdc-icon-size: 140px; color: var(--text); filter: drop-shadow(0 0 36px var(--glow-blue)); }
+  .add-flow .rows.inset { border-radius: var(--r-m); box-shadow: var(--shadow-row); }
+  .add-flow .rows.inset .item { min-height: var(--row-h); gap: 24px; padding: 12px 16px; font-size: var(--fs-body); font-weight: 500; }
+  .add-flow .rows.inset .item > ha-icon:first-child { width: 32px; justify-content: center; --mdc-icon-size: 28px; }
+  .add-flow .rows.inset .item .plus-blue { flex: none; }
+  .add-flow .pick-tiles { margin-top: 0; }
+  .pick-tile.plain { justify-content: center; gap: 16px; padding: 16px 12px; }
+  .pick-tile.plain > ha-icon { --mdc-icon-size: 64px; }
+  .pick-tile.plain .name { flex: none; }
+  .pick-tile.wide { grid-column: 1 / -1; }
+  .flow-ring { position: relative; display: flex; align-items: center; justify-content: center; width: min(300px, 32dvh + 40px); aspect-ratio: 1; }
+  .flow-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .flow-ring circle { fill: none; stroke-width: 3; }
+  .flow-ring .track { stroke: var(--outline); }
+  .flow-ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; filter: drop-shadow(0 0 6px var(--accent)); }
+  .flow-ring > .art-icon { --mdc-icon-size: 128px; }
+  .flow-ring:not(.over) > .art-icon { animation: breathe 2s ease-in-out infinite; }
+  .flow-ring .badge { position: absolute; top: 9%; right: 9%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+                      border-radius: 50%; color: var(--text); box-shadow: var(--shadow-dot); }
+  .flow-ring .badge svg { width: 26px; height: 26px; }
+  .flow-ring .badge.ok { background: var(--ok); }
+  .flow-ring .badge.none { background: var(--danger); }
+  .dev-tiles { display: grid; grid-template-columns: repeat(auto-fill, 120px); gap: var(--tile-gap); margin-top: 20px; }
+  h2.label + .dev-tiles { margin-top: 0; }
+  .dev-tile { position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 115px; padding: 12px;
+              border: none; border-radius: var(--r-m); background: var(--surface); box-shadow: var(--shadow-flat); color: var(--text); font: inherit; text-align: left; }
+  button.dev-tile { cursor: pointer; transition: transform var(--t-press) var(--ease); }
+  button.dev-tile:active { transform: scale(var(--press-tile)); }
+  .dev-tile > ha-icon { --mdc-icon-size: 32px; }
+  .dev-tile .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--fs-callout); font-weight: 500; line-height: 1.25; }
+  .dev-tile .tick { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+                    border-radius: 50%; background: var(--accent); }
+  .dev-tile .tick svg { width: 14px; height: 14px; }
+  .name-sheet .name-pic { display: flex; justify-content: center; padding: 4px 0 16px; }
+  .name-sheet .name-pic ha-icon { --mdc-icon-size: 48px; }
+  .name-sheet > .rows { margin-top: 20px; }
   .add-steps { margin: 6px 0 16px; padding: 0; list-style: none; counter-reset: step; }
   .add-steps li { position: relative; padding: 10px 4px 10px 44px; font-size: var(--fs-body); line-height: 1.45; counter-increment: step; }
   .add-steps li::before { content: counter(step); position: absolute; left: 4px; top: 8px; width: 28px; height: 28px; border-radius: 50%;
                           display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: var(--fs-callout); font-weight: 500; }
   .add-steps.tips li::before { content: "•"; background: none; font-size: var(--fs-title-3); }
+  /* MotionAware's calibration: a ring counting down, buttons under it. */
   .add-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 6px; }
   .add-actions .pill:not(.go) { min-width: 180px; }
   .search-ring { position: relative; width: 180px; height: 180px; margin: 22px auto 10px; }
@@ -820,6 +854,9 @@ export const CSS = `
   .search-ring .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
                             font-size: var(--fs-title-3); font-weight: 500; font-variant-numeric: tabular-nums; }
   .search-ring .ring-text ha-icon { --mdc-icon-size: 40px; animation: breathe 2s ease-in-out infinite; }
+  /* A footer's buttons one over the other (the Hue app's flows), the main one last. */
+  .screen-foot.stack { flex-direction: column; align-items: center; gap: 12px; }
+  .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px var(--outline); }
   @keyframes breathe { 50% { opacity: 0.45; } }
   .rows .item.fresh { animation: pop 0.35s var(--ease); }
   .actions-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
@@ -983,6 +1020,8 @@ export const CSS = `
   .scene-pick .actions { background: var(--bg); padding: 16px; }
   .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4); }
   /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
+  /* An action sheet over the screen blurred and dimmed (the Hue app's; other sheets are a plain dim). */
+  .sheet.menu { background: var(--scrim-blur); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
   .sheet.menu.bottom { padding: 0 var(--gutter) calc(10px + var(--safe-bottom)); }
   .sheet.menu.bottom .box { border-radius: var(--r-2xl); }
   .action-sheet { display: flex; flex-direction: column; padding: 4px 0; background: var(--surface-row); }

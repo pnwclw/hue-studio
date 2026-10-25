@@ -25,8 +25,8 @@ export class StudioView extends LightElement {
 
   /** The choice open over the view (views/choice.ts), shown by `withChoice`. */
   @state() protected accessor choosing: Choice | null = null;
-  /** Leaving an editor with unsaved changes: what leaving does, asked first (`leaveSheet`). */
-  @state() protected accessor leaveAsk: (() => void) | null = null;
+  /** A question on an action sheet (the Hue app's): leaving with changes, deleting (`askSheet`). */
+  @state() protected accessor ask: { note: string; action: string; run: () => void } | null = null;
 
   #headObserver?: ResizeObserver;
   /** Where the body was scrolled to on the pages below the one shown (`pushPage`). */
@@ -58,23 +58,30 @@ export class StudioView extends LightElement {
   /** Leave an editor at once, or (the Hue app's) ask first when it has unsaved changes. */
   protected confirmLeave(dirty: boolean, leave: () => void): void {
     if (!dirty) return leave();
+    const { t } = this.ctx;
     haptic("warning");
-    this.leaveAsk = leave;
+    this.ask = { note: t("common.leave_note"), action: t("common.leave"), run: leave };
   }
 
-  /** "Close and don't save" over an editor (render it outside the scrolling body). */
-  protected leaveSheet(): TemplateResult | typeof nothing {
-    const leave = this.leaveAsk;
-    if (!leave) return nothing;
+  /** Delete something only once the action sheet asked (its note, the red action). */
+  protected askDelete(note: string, action: string, run: () => void): void {
+    haptic("warning");
+    this.ask = { note, action, run };
+  }
+
+  /** The action sheet of `ask` (render it outside the scrolling body). */
+  protected askSheet(): TemplateResult | typeof nothing {
+    const ask = this.ask;
+    if (!ask) return nothing;
     const { t } = this.ctx;
-    const stay = () => (this.leaveAsk = null);
+    const stay = () => (this.ask = null);
     return html`<div class=${classMap({ sheet: true, bottom: this.ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && stay()}>
-      <div class="box action-sheet" role="dialog" aria-label=${t("common.leave")}>
-        <p class="note">${t("common.leave_note")}</p>
+      <div class="box action-sheet" role="dialog" aria-label=${ask.action}>
+        <p class="note">${ask.note}</p>
         <button class="danger" @click=${() => {
-          this.leaveAsk = null;
-          leave();
-        }}>${t("common.leave")}</button>
+          this.ask = null;
+          ask.run();
+        }}>${ask.action}</button>
         <button class="cancel" @click=${stay}>${t("common.cancel")}</button>
       </div>
     </div>`;
@@ -130,7 +137,7 @@ export class StudioView extends LightElement {
   }
 
   protected override render(): unknown {
-    return this.withChoice(this.renderPage());
+    return html`${this.withChoice(this.renderPage())}${this.askSheet()}`;
   }
 
   /** Open a choice: a sheet over the view, or a screen of its own. */

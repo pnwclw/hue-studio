@@ -865,6 +865,52 @@ async def test_identity_comes_back(hass: HomeAssistant, world: SimpleNamespace) 
     assert ids.devices[MAC["desk"].lower()]["device_id"] == new
 
 
+async def test_identity_comes_back_under_its_own_id(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """A light added again whose new entity Home Assistant already named with the
+    remembered id (its default name gives the same one) still gets its name, area and
+    bridge name back."""
+    ids = identity.Identities(hass)
+    await ids.async_reconcile()
+    entities = er.async_get(hass)
+    await world.a.request("delete", "clip/v2/resource/device/a-desk")
+    await hass.async_block_till_done()
+    assert entities.async_get("light.desk") is None
+    new = world.a.add_device("desk")
+    # Home Assistant gave the new light the old id by itself.
+    current = entities.async_get_entity_id("light", "hue", f"{new}-light")
+    hass.states.async_remove(current)
+    entities.async_update_entity(current, new_entity_id="light.desk")
+    await ids.async_reconcile()
+
+    entry = entities.async_get("light.desk")
+    assert entry.unique_id == f"{new}-light"
+    assert (entry.name, entry.icon) == ("Desk lamp", "mdi:desk-lamp")
+    assert dr.async_get(hass).async_get(entry.device_id).area_id == world.office
+    assert world.a.devices.get(new).metadata.name == "Hue lamp a-desk"
+    assert ids.devices[MAC["desk"].lower()]["device_id"] == new
+
+
+async def test_identity_keeps_a_room_still_on_its_bridge(
+    hass: HomeAssistant, world: SimpleNamespace
+) -> None:
+    """A room of the same name on another bridge does not take the light of a room
+    that is still on its own bridge, even while that one has none (left empty)."""
+    ids = identity.Identities(hass)
+    await ids.async_reconcile()
+    entities = er.async_get(hass)
+    # The office's room is left empty: the bridge drops its grouped light.
+    office = world.a.groups.room.get("a-office")
+    office.grouped_light = None
+    hass.states.async_remove("light.office")
+    entities.async_remove("light.office")
+    world.b.add_group("room", "b-office", "Office", [world.b.add_device("lamp")])
+    await ids.async_reconcile()
+    assert entities.async_get("light.office") is None
+    assert ids.groups["room:Office"]["id"] == "a-office"
+
+
 async def test_identity_waits_for_the_old_device(
     hass: HomeAssistant, world: SimpleNamespace
 ) -> None:

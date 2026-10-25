@@ -37,7 +37,6 @@ export class EntertainmentView extends StudioView {
   @property() accessor area: string | null = null;
   @state() private accessor data: EntertainmentMessage | null = null;
   @state() private accessor draft: Draft | null = null;
-  @state() private accessor confirmDelete = false;
   @state() private accessor busy = false;
   private stop?: () => void;
 
@@ -155,10 +154,6 @@ export class EntertainmentView extends StudioView {
       }
     };
     const remove = async () => {
-      if (!this.confirmDelete) {
-        this.confirmDelete = true;
-        return;
-      }
       if (await ctx.ws({ type: "hue_studio/entertainment/delete", area_id: draft.id })) ctx.go("/settings/entertainment");
     };
     const changed = !area || this.draft !== null;
@@ -197,8 +192,8 @@ export class EntertainmentView extends StudioView {
                 </button>
               </div>
               <div class="delete-area">
-                <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${streaming} @click=${remove}>
-                  ${this.confirmDelete ? t("ent.delete_confirm") : t("ent.delete")}
+                <button class="delete-btn" ?disabled=${streaming} @click=${() => this.askDelete(t("ent.delete_note"), t("ent.delete"), () => void remove())}>
+                  ${t("ent.delete")}
                 </button>
               </div>`
           : nothing}`,

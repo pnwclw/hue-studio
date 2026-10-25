@@ -63,6 +63,7 @@ everything else stays.
 | `--separator` | 10% white | lines between rows, hairline borders |
 | `--hairline` | 6% white | bar borders, pressed rows |
 | `--scrim` | 70% black | under every overlay (sheets, popovers, the brightness slider): a plain dim, no blur (Hue app, measured) |
+| `--scrim-blur` | 50% black | under an action sheet (a question: leave, delete, a scene's "⋯"), over a 16px blur (Hue app, measured) |
 | `--outline` | grey 45% | outlined "add" tiles |
 | `--selected` | `#fff` | ring of a chosen tile or mode |
 | `--accent` | `#006aff` | switches on, checks, the main button, "+", a chosen chip's ring |
@@ -272,6 +273,15 @@ Each part: its class (and helper), its measures, where it is used.
   picker; its name asked first on a name sheet; picture (the lights' colors) 48 and name 34
   12px into the panel, the brightness and lights cards rounded 20px in, 20px apart; "Save"
   in the footer; leaving asks "Close and don't save" on an action sheet.
+- **Flow** (`.add-flow`, "Add devices"; the Hue app's): every step a picker; steps with a
+  picture show it on the blue (`.flow-art`, up to 378px, the panel under it), the others
+  start the panel at the top; a 28px title (`.flow-title`), a 16px grey lead, the buttons
+  in a stacked footer (`.screen-foot.stack`: grey or outlined ones over the accent one).
+  The search is a 300px ring (`.flow-ring`, a 3px track, the accent arc) around the kind's
+  picture, a 40px badge at its top right once over (green tick, red cross). Devices as
+  tiles (`.dev-tile`: 120×115, a 32px icon at the top left, the name 14 at the bottom, a
+  blue tick when found); rooms as rows in a rounded group (`.rows.inset`) under their
+  bridge's name, "Create new room" with the accent "+".
 - **Pick tile** `.pick-tile` (a room's "+"): two columns 12px apart, 156px tall, a 72px dark
   disc with a 40px icon over the name (`--fs-body` 500); `.way` (a scene's ways) 108px, the
   picture at the top left, the name (`--fs-callout` 500) at the bottom.
@@ -309,7 +319,11 @@ Each part: its class (and helper), its measures, where it is used.
   `--shadow-row`). Never inside a scrolling element.
 - **Action sheet** `.sheet.menu.bottom` + `.action-sheet`: 12px from the edges, an optional
   note on top (`.note`, 13px grey, centered, a line under it), 56px centered rows
-  (`--fs-body`), the red one, "CANCEL" (13px capitals) under a line, over the scrim.
+  (`--fs-body`), the red one, "CANCEL" (13px capitals) under a line, over the screen
+  blurred and dimmed (`--scrim-blur`). Questions use it through `askSheet` (`base.ts`):
+  leaving with changes (`confirmLeave`) and every delete (`askDelete`: "By deleting this
+  light, it can no longer be controlled." / "Delete light"), never a button that turns into
+  "Tap again".
 - **Tall sheet** (`.sheet.bottom.tall`): fills the screen under the status bar ("Power on",
   "Device info"); the shorter choices ("Function", "Room") rise from the bottom as tall as
   their rows.
@@ -378,6 +392,8 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Light, sensor, bridge settings | a sheet 37 from the top; sub header bar 56 with "SAVE" (32, `#36383c`, grey until changed); icon, name 34 (wrapping); rows 72, values 13; info banner (1.5 accent border, `#171f2a`, "i", "INFO" 10, text 12–13); "Delete" 88×36 centered 40 under the rows, 2 red border, 13 in sentence case |
 | Motion sensitivity | a sheet: text 12–13, caps 10 over a 16 value, a stepped slider with names 11 under its stops |
 | MotionAware, Sync (empty) | an illustration, title 28–30, text, 36 pills (outlined, accent) |
+| Add devices | a picker throughout: "Where do you want to add devices?" (rooms by bridge in rounded groups, "Create new Room" with a blue "+"); "Add devices to …" (art on the blue, "Alternative method" / "Scan QR code"); "Benefits of using a QR code" ("Set up without QR code" / "Scan QR code"); "Tap the device you'd like to add" (picture tiles by kind, lights full width); "Add lights to …" (art, "Enter code" / "Next"); "Use setup code" (a field, "Search"); "Searching for lights…" (a 320 ring around the picture, the accent arc; "We found these lights" with tiles 120×115; "Next" dim until something joined); "Success!" (a green tick badge, tiles with a blue tick) or "No lights found" (a red cross; "I need help", "Skip" outlined, "Enter code", "Try again"); "Name your lights" (tiles, "Skip"; a tile opens "Edit name and type"); try scenes; zones; "These devices have been added to …" / "No devices added" ("Add more", "Done") |
+| Deleting, a room's "⋯" | action sheets over the screen blurred and dimmed (~50%): a 13px grey note ("By deleting this light, it can no longer be controlled."), the red action ("Delete light", "Delete Room"), "CANCEL" |
 | Scene gallery | a picker (deep blue top, the page a panel from 80): title 28 at 24, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
 | Settings, Explore, Sync (tabs) | Settings has no glow; Explore a blue one like Automations; Sync a violet one (`#3f296d` in the middle at the top, gone by ~280) |
 | Sync (iOS, 440pt) | header "+", "⋯", the switch; no title; the input's picture a 238 square (`#3b3d41`); "SYNC BOX" 10 capitals, the input 20, its status 16 grey; "MODE / INTENSITY / BRIGHTNESS" 10 capitals over pills 95×48 (`#47484c`, brightness white-to-grey), 24 apart; a dock 400 wide (`#0d1114`, radius ~22): "WHAT" and "WHERE" 48 round buttons over 10 capitals and a 12 value, a 76 round start in the middle |
@@ -453,3 +469,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
   bridges' "+" in the bar and a bridge's (or box's) settings as a sheet; "Power on" and
   "Device info" as tall sheets, "Power on" with pictures in the Hue app's order and words,
   device facts with the value under the title.
+- 2026-10-25, "Add devices" as the Hue app's flow (run for real on the live bridges: a light
+  deleted and found again): a picker through every step, the search ring with its badge,
+  device tiles, a stacked footer; questions (leave, delete) on action sheets over a blurred
+  screen (`--scrim-blur`), deletes no longer "tap again".

@@ -59,7 +59,6 @@ export class SensorView extends AutomationParts {
   @state() private accessor sheet: Sheet | null = null;
   @state() private accessor saving = false;
   /** "Delete" was tapped once: the next tap deletes. */
-  @state() private accessor confirmDelete = false;
   private stop?: () => void;
   /** The config id of the motion automation it stands for; null: a new one (once it has lights). */
   private automationId: string | null = null;
@@ -237,17 +236,14 @@ export class SensorView extends AutomationParts {
 
       ${info
         ? html`<div class="delete-area">
-            <button class=${classMap({ "delete-btn": true, confirm: this.confirmDelete })} ?disabled=${this.saving} @click=${() => this.deleteDevice(info)}>
-              ${t(this.confirmDelete ? "devices.delete_confirm" : "devices.delete")}
-            </button>
-            ${this.confirmDelete ? html`<p class="hint warn">${t("devices.delete_hint")}</p>` : nothing}
+            <button class="delete-btn" ?disabled=${this.saving} @click=${() =>
+              this.askDelete(t("devices.delete_note"), t("devices.delete_device"), () => void this.deleteDevice(info))}>${t("devices.delete")}</button>
           </div>`
         : nothing}`;
     // The sheets sit outside the scrolling body: a scroller (iOS) would clip them.
     return html`${this.screen(head, body, "settings-page automation-page sensor-edit")}
       ${this.sheet ? this.renderSheet(this.sheet, sensor, info, area, level) : nothing}
-      ${d ? this.partSheets(d) : nothing}
-      ${this.leaveSheet()}`;
+      ${d ? this.partSheets(d) : nothing}`;
   }
 
   /** A row like the Hue app's: picture, title and value, no chevron. */
@@ -267,7 +263,6 @@ export class SensorView extends AutomationParts {
   private open(sheet: Sheet): void {
     haptic("selection");
     this.editingName = false;
-    this.confirmDelete = false;
     this.sheet = sheet;
     if (sheet === "sensitivity") {
       this.opened = this.trying = this.info?.sensitivity?.value ?? null;
@@ -383,15 +378,9 @@ export class SensorView extends AutomationParts {
 
   private async deleteDevice(info: HueDeviceInfo): Promise<void> {
     const { ctx } = this;
-    if (!this.confirmDelete) {
-      haptic("warning");
-      this.confirmDelete = true;
-      return;
-    }
     this.saving = true;
     const ok = await ctx.ws({ type: "hue_studio/devices/delete", device: info.id });
     this.saving = false;
-    this.confirmDelete = false;
     if (!ok) return;
     haptic("success");
     ctx.toast(ctx.t("devices.deleted", { name: info.name }));
