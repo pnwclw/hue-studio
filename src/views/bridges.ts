@@ -130,8 +130,12 @@ export class BridgesView extends StudioView {
         "settings-page",
       );
     }
+    // Like the Hue app's: a new bridge is the header's "+".
+    const add = ctx.hass.user?.is_admin
+      ? html`<button class="round plus-blue" aria-label=${t("bridge_add.title")} @click=${() => ctx.go("/settings/bridges/add")}>${icon("plus")}</button>`
+      : nothing;
     return this.screen(
-      this.subHead(t("settings.bridges"), () => ctx.go("/settings")),
+      this.subHead(t("settings.bridges"), () => ctx.go("/settings"), add),
       !this.bridges ? html`<p class="empty">${t("rooms.loading")}</p>` : this.list(this.bridges),
       "settings-page",
     );
@@ -151,15 +155,8 @@ export class BridgesView extends StudioView {
     return html`<h2 class="label">${t("settings.bridges")}</h2>
       <div class="rows">
         ${Object.entries(bridges).map(([id, b]) =>
-          row(id, "mdi:router-wireless", b.name, b.connected === false ? t("bridges.offline") : this.summary(b), b.connected === false),
+          row(id, "hue-studio:bridge", b.name, b.connected === false ? t("bridges.offline") : this.summary(b), b.connected === false),
         )}
-        ${ctx.hass.user?.is_admin
-          ? html`<button class="item" @click=${() => ctx.go("/settings/bridges/add")}>
-              <ha-icon icon="mdi:plus"></ha-icon>
-              <div class="grow">${t("bridge_add.title")}<div class="dim small">${t("bridge_add.row_sub")}</div></div>
-              <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-            </button>`
-          : nothing}
       </div>
       <h2 class="label">${t("bridges.sync_boxes")}</h2>
       <div class="rows">
@@ -288,16 +285,22 @@ export class BridgesView extends StudioView {
     const areas = b.motion_areas;
     const status = online ? t(b.pro ? "bridges.connected_pro" : "bridges.connected") : t("bridges.offline");
     return this.screen(
-      this.subHead(t("bridges.bridge_settings"), () => ctx.go("/settings/bridges"), this.saveButton(b.name, (name) => ctx.ws({ type: "hue_studio/bridges/rename", hue_entry_id: id, name }))),
-      html`${this.hero("mdi:router-wireless", b.name, status, online)}
+      this.subHead(
+        t("bridges.bridge_settings"),
+        () => ctx.go("/settings/bridges"),
+        this.saveButton(b.name, (name) => ctx.ws({ type: "hue_studio/bridges/rename", hue_entry_id: id, name })),
+        nothing,
+        true,
+      ),
+      html`${this.hero("hue-studio:bridge", b.name, status, online)}
         ${online
           ? html`<div class="rows">
-              ${this.link("mdi:lightbulb-group-outline", t("settings.devices"), t("bridges.devices_count", { devices: b.devices ?? 0, lights: b.lights ?? 0 }), () =>
+              ${this.link("hue-studio:devices", t("settings.devices"), t("bridges.devices_count", { devices: b.devices ?? 0, lights: b.lights ?? 0 }), () =>
                 ctx.go(`/settings/devices?bridge=${encodeURIComponent(id)}`),
               )}
-              ${this.link("mdi:television-ambient-light", t("settings.entertainment"), "", () => ctx.go("/settings/entertainment"))}
+              ${this.link("hue-studio:sync", t("settings.entertainment"), "", () => ctx.go("/settings/entertainment"))}
               ${areas
-                ? this.link("mdi:motion-sensor", t("settings.motionaware"), t("bridges.motion_count", { count: areas.length }), () =>
+                ? this.link("hue-studio:motionaware", t("settings.motionaware"), t("bridges.motion_count", { count: areas.length }), () =>
                     ctx.go(`/settings/motionaware?bridge=${encodeURIComponent(id)}`),
                   )
                 : nothing}
@@ -328,7 +331,7 @@ export class BridgesView extends StudioView {
     // HDMI CEC by Hue Studio (sync_follow.py) rather than by the box: the box does not follow the TV.
     const studioCec = hasFeature(box, "follow") && !device.tv_power;
     return this.screen(
-      this.subHead(t("bridges.box_page"), () => ctx.go("/settings/bridges"), this.saveButton(name, (n) => configure({ name: n }))),
+      this.subHead(t("bridges.box_page"), () => ctx.go("/settings/bridges"), this.saveButton(name, (n) => configure({ name: n })), nothing, true),
       html`${this.hero("mdi:television-box", name, box.available ? t(statusKey(box)) : t("bridges.box_offline"), settings)}
         <div class="rows">
           ${this.link("hue-studio:sync", t("bridges.sync_controls"), t("bridges.sync_controls_sub"), () => ctx.go(`/sync?box=${encodeURIComponent(id)}`))}
@@ -355,7 +358,7 @@ export class BridgesView extends StudioView {
           ${!this.direct(box) ? this.link("mdi:link-plus", t("bridges.box_pair"), t("bridges.box_pair_sub"), () => ctx.openSettings(), true) : nothing}
           ${settings
             ? html`<div class="item">
-                <ha-icon icon="mdi:router-wireless"></ha-icon>
+                <ha-icon icon="hue-studio:bridge"></ha-icon>
                 <div class="grow">${t("bridges.box_bridge", { bridge: this.bridgeLabel(box.bridge) })}
                   <div class="dim small">${t("bridges.box_bridge_sub")}</div>
                 </div>
@@ -716,7 +719,7 @@ export class BridgesView extends StudioView {
                         haptic("selection");
                         this.boxTarget = bid;
                       }}>
-                        <ha-icon icon="mdi:router-wireless"></ha-icon><div class="grow">${b.name}</div>
+                        <ha-icon icon="hue-studio:bridge"></ha-icon><div class="grow">${b.name}</div>
                         ${bid === target ? html`<span class="tick">${icon("check")}</span>` : nothing}
                       </button>`,
                     )}

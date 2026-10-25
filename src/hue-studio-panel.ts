@@ -256,11 +256,13 @@ export class HueStudioPanel extends LitElement {
       route.name === "device" ||
       route.name === "automation" ||
       route.name === "automationNew" ||
+      (route.name === "bridges" && route.mode === "bridges" && !!route.item) ||
       route.name === "gallery";
     // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
     // rounded under the status bar).
     const newScene = route.name === "scene" && route.scene === NEW_SCENE;
-    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation");
+    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation" ||
+        (route.name === "bridges" && route.mode === "bridges" && !!route.item));
     // Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
     // page as a rounded panel over it.
     const picker = route.name === "automationNew" || route.name === "gallery" || newScene;

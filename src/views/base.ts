@@ -25,6 +25,8 @@ export class StudioView extends LightElement {
 
   /** The choice open over the view (views/choice.ts), shown by `withChoice`. */
   @state() protected accessor choosing: Choice | null = null;
+  /** Leaving an editor with unsaved changes: what leaving does, asked first (`leaveSheet`). */
+  @state() protected accessor leaveAsk: (() => void) | null = null;
 
   #headObserver?: ResizeObserver;
   /** Where the body was scrolled to on the pages below the one shown (`pushPage`). */
@@ -51,6 +53,31 @@ export class StudioView extends LightElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.#headObserver?.disconnect();
+  }
+
+  /** Leave an editor at once, or (the Hue app's) ask first when it has unsaved changes. */
+  protected confirmLeave(dirty: boolean, leave: () => void): void {
+    if (!dirty) return leave();
+    haptic("warning");
+    this.leaveAsk = leave;
+  }
+
+  /** "Close and don't save" over an editor (render it outside the scrolling body). */
+  protected leaveSheet(): TemplateResult | typeof nothing {
+    const leave = this.leaveAsk;
+    if (!leave) return nothing;
+    const { t } = this.ctx;
+    const stay = () => (this.leaveAsk = null);
+    return html`<div class=${classMap({ sheet: true, bottom: this.ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && stay()}>
+      <div class="box action-sheet" role="dialog" aria-label=${t("common.leave")}>
+        <p class="note">${t("common.leave_note")}</p>
+        <button class="danger" @click=${() => {
+          this.leaveAsk = null;
+          leave();
+        }}>${t("common.leave")}</button>
+        <button class="cancel" @click=${stay}>${t("common.cancel")}</button>
+      </div>
+    </div>`;
   }
 
   /** A screen: the fixed header, then the scrolling body (a `.page` with `cls`). */

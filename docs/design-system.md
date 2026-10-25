@@ -133,7 +133,7 @@ are kept soft. Pins and knobs keep their own small shadows.
 | `--round-s`, `--round-l` | 28, 40 | small round buttons (steppers, on tiles); large (play, flip) |
 | `--pill` | 36 | an action button |
 | `--switch-w`, `--knob` | 52, 24 | the switch: 52×32, a 24px knob 4px inside |
-| `--row-h`, `--row-text`, `--row-icon` | 72, 72, 24 | a list row: its height, where its text starts, its icon (at 20px; 32px in device lists) |
+| `--row-h`, `--row-text`, `--row-icon` | 72, 72, 28 | a list row: its height, where its text starts, its icon (centered 32px in: an MDI glyph at 28 fills 24 like the Hue app's; 32px in device lists) |
 | `--row-h-compact` | 52 | a row of controls inside a sheet |
 | `--card-gap`, `--tile-gap` | 12, 12 | between cards; between tiles |
 | `--light-tile` | 102 | a light or scene tile's width |
@@ -158,9 +158,11 @@ Each part: its class (and helper), its measures, where it is used.
 - **Sub screen header** (`.screen-head` with `.bar.sub`): a solid bar in `--surface-bar` with
   `--shadow-bar` under it, the Hue app's (not translucent, no hairline). The first group of
   rows starts 20px under it (a lead 32px).
-- **Editor as a sheet** (`main.as-sheet`, phones): an editor (scene, automation, a device's or
-  sensor's settings) starts 8px under the status bar with its top corners `--r-m`, the screen
-  behind it dimmed (`--scrim`), no tab bar; its bar's first button closes it (`subHead(…, close)`).
+- **Editor as a sheet** (`main.as-sheet`, phones): an editor (scene, automation, a device's,
+  sensor's, bridge's or Sync Box's settings) starts 8px under the status bar with its top
+  corners `--r-m`, the screen behind it dimmed (`--scrim`), no tab bar; its bar's first button
+  closes it (`subHead(…, close)`). Its "SAVE" stays grey until something changed; closing it
+  with changes asks "Close and don't save" (`confirmLeave` / `leaveSheet` in `base.ts`).
 - **Picker** (`main.picker`; the room's "+" `.add-picker`): the gallery, a new automation's
   types and a room's "+" — a deep blue top (`--picker-top`) with the close or back button on
   it and the page as a panel over it from 80px: corners `--r-2xl`, a 1px light edge
@@ -234,13 +236,15 @@ Each part: its class (and helper), its measures, where it is used.
 - **Group of rows** `.rows`: `--surface-row`, `--r-m`; full width on phones in settings,
   editors and device lists.
 - **List row** (`.rows .item` inside `.settings-page`, `.sensor-edit`, `.choice-sheet`, and
-  `.rows.device-list`): ≥ `--row-h`, a `--row-icon` icon at 20px (32px icons in device
-  lists), text from `--row-text`, a 500 `--fs-body` title over a 400 `--fs-caption` line,
+  `.rows.device-list`): ≥ `--row-h`, a `--row-icon` (28) icon centered 32px in, so an MDI
+  glyph is as big as the Hue app's 24px ones (32px icons at 16 in device lists), text from `--row-text`, a 500 `--fs-body` title over a 400 `--fs-caption` line,
   the value on the right in `--fs-footnote` `--text-2`, a chevron when it opens something;
   separators from the text on. In the automation editor rows have no icons and their text
   starts at 16 (its type's icon sits by the name).
 - **Compact row** (`.rows .item` elsewhere): ≥ `--row-h-compact`, for controls in a sheet.
-  Choices in a device's or sensor's sheet (`.sensor-sheet`) are list rows.
+  Choices in a device's or sensor's sheet (`.sensor-sheet`) are list rows; a choice with a
+  picture (`.row-art.pic`, 40px: its light on a disc, or its sign on a dark one) keeps its
+  text at 72. A device's facts ("Device info") are rows with the value under the title.
 - **Choice row** (`navRow`, `choiceRows`): a row with its value opens the list to pick from —
   a sheet for one value, a screen for several; the chosen one gets a tick. Its caption keeps
   to one line and its value to 42% of the row, both cut short with an ellipsis.
@@ -306,6 +310,9 @@ Each part: its class (and helper), its measures, where it is used.
 - **Action sheet** `.sheet.menu.bottom` + `.action-sheet`: 12px from the edges, an optional
   note on top (`.note`, 13px grey, centered, a line under it), 56px centered rows
   (`--fs-body`), the red one, "CANCEL" (13px capitals) under a line, over the scrim.
+- **Tall sheet** (`.sheet.bottom.tall`): fills the screen under the status bar ("Power on",
+  "Device info"); the shorter choices ("Function", "Room") rise from the bottom as tall as
+  their rows.
 - **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
   name in a 46px field with a 1.5px `--outline` border and a round clear button.
 - **Footer** `.screen-foot`: a line over the screen's one action (the accent pill), centered,
@@ -364,7 +371,9 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | "Custom scene" | a picker: the "Scene name" sheet first (close, "DONE", a 46 field with a 1.5 light border and a clear button, prefilled "New scene"); then picture 48 at 24 / 112, name 34, pencil 32; "Scene brightness" card 20 in (`#24262a`, 12 corners, 120 tall), "Lights" card 20 under it; a line at the bottom over a centered accent "Save" (36); back asks "Your settings will not be saved…" with a red "Close and don't save" and "CANCEL" (13) |
 | "+" new automation | a picker (deep blue top, the page a panel from 80): no bar title, the question 28 at 24, picture cards 371×159 (20 from the edges, 12 apart), title 16 over two lines of 14 |
 | Scene editor | a sheet 37 from the top; picture 48, name 34; the top tinted down through the brightness (label 16, value 13, slider 48 under the label), then 22 of page; "Lights" group (`#24262a`, title row 72, tiles 12 in); "Reset scene" and "Delete scene" centered 40 under it, 12 apart, 24 of room around their words (`#4b4b4b`; the red one `#371f22` with a 2 red border) |
-| Settings | large title; rows 72, 24 icons at 20, text at 72, titles 16 (500), subtitles 12, chevrons; separators from the text on; section titles 10 |
+| Settings | large title; rows 72, 24 icons at 20 (the glyph fills the 24: a bulb and a sensor for Devices, the bridge's box, a bulb sending waves for MotionAware, Sync's mark for Entertainment), text at 72, titles 16 (500), subtitles 12, chevrons; separators from the text on; section titles 10 |
+| Bridges | accent "+" in the bar; a row per bridge (its box glyph, the name); a bridge's settings a sheet ("SAVE"): its glyph, name 34, INFO (status, ID, software, IP address), SETTINGS |
+| "Power on", "Device info" | sheets filling the screen 37 from the top; "Power on": a tip, rows with a 40 picture (Default: warm light, Last on: undo, Power loss recovery: a bolt, Custom: its color), a tick; "Device info": rows with the value 12 under the title 16 |
 | Devices, a kind's list | sub header (title 16, accent "+"), the first group 20 under it; bridge chips; "FILTER BY" with a count 12, filter chips 32 (`#2f3235`, 13 grey capitals not spaced, a white chevron 12×7); rooms as section titles with counts; device rows 72 with 32 icons |
 | Light, sensor, bridge settings | a sheet 37 from the top; sub header bar 56 with "SAVE" (32, `#36383c`, grey until changed); icon, name 34 (wrapping); rows 72, values 13; info banner (1.5 accent border, `#171f2a`, "i", "INFO" 10, text 12–13); "Delete" 88×36 centered 40 under the rows, 2 red border, 13 in sentence case |
 | Motion sensitivity | a sheet: text 12–13, caps 10 over a 16 value, a stepped slider with names 11 under its stops |
@@ -438,3 +447,9 @@ effects sends nothing to the light (checked on an off light against HA's state).
 - 2026-10-24, "Custom scene" as the Hue app's: a new scene set light by light from the room's
   "+", its name asked first, "Save" in a footer, leaving confirmed on an action sheet (whose
   rows are now centered, 12px from the edges, "CANCEL" 13px).
+- 2026-10-25, the rest of the pass: editors' "SAVE" grey until something changed and "Close
+  and don't save" when leaving with changes (scene, automation, device, sensor); the Settings
+  rows' glyphs drawn as the Hue app's and every row icon at 28 (an MDI glyph fills 24); the
+  bridges' "+" in the bar and a bridge's (or box's) settings as a sheet; "Power on" and
+  "Device info" as tall sheets, "Power on" with pictures in the Hue app's order and words,
+  device facts with the value under the title.

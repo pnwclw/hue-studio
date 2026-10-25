@@ -213,4 +213,4 @@ export const allDevices = (msg: DevicesMessage | null): FoundDevice[] =>
 
 /** The function and power-on choices of a light's settings, in the Hue app's order. */
 export const LIGHT_FUNCTIONS: LightFunction[] = ["functional", "decorative", "mixed"];
-export const POWER_ON: Exclude<PowerOn, "custom">[] = ["safety", "powerfail", "last_on_state"];
+export const POWER_ON: Exclude<PowerOn, "custom">[] = ["safety", "last_on_state", "powerfail"];

@@ -72,6 +72,8 @@ export const CSS = `
   /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
   :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); padding: 0 14px; background: var(--surface-2);
                                                                        letter-spacing: 0.3px; text-transform: uppercase; }
+  /* Nothing to save yet: the pill stays, its word goes grey (the Hue app's). */
+  :is(.bar, .topbar, .cv-bar, .sheet-bar) .pill:disabled { opacity: 1; color: var(--text-3); }
   /* A bar's title after its back or close button starts where list rows' text does (72px), the Hue app's. */
   :is(.bar, .topbar) > .round:first-child + :is(.title, .grow) { margin-left: 16px; }
   .sheet-bar > .round:first-child + .grow { margin-left: 12px; }
@@ -960,6 +962,10 @@ export const CSS = `
   /* Phones: the sheet comes up from the bottom, like the Hue app's. */
   .sheet.bottom { align-items: flex-end; padding: 0; }
   .sheet.bottom .box { width: 100%; max-width: none; border-radius: var(--r-m) var(--r-m) 0 0; animation: rise 0.3s var(--ease); }
+  /* A sheet that fills the screen under the status bar (the Hue app's "Power on", "Device info"). */
+  .sheet.bottom.tall { align-items: stretch; padding-top: calc(var(--safe-top) + 8px); }
+  .sheet.bottom.tall .box { height: 100%; }
+  main.as-sheet .sheet.bottom.tall { padding-top: 0; }
   /* A scene's sheet (scene-pick.ts), the Hue app's: picture with name and pencil, colors with
      shuffle, the room or zone it goes to, "Save to my scenes" and "Set once". */
   hue-studio-scene-pick { display: contents; }
@@ -1250,13 +1256,14 @@ export const CSS = `
      MotionAware area): big rows, full width on phones, separators from the text on; a row says
      what is chosen and opens the list (views/choice.ts): a sheet for one value, a screen for
      several. */
-  /* A list row (settings, editors, devices; choices in sheets): at least 72px, a 24px icon at 20px, the text
+  /* A list row (settings, editors, devices; choices in sheets): at least 72px, its icon centered 32px in (an
+     MDI glyph at 28 fills 24 like the Hue app's), the text
      from 72px, a medium 16px title over a 12px regular line, separators from the text on. */
   :is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows .item, .rows.device-list .item {
-    min-height: var(--row-h); gap: 28px; padding: 12px 16px 12px 20px; font-size: var(--fs-body); }
+    min-height: var(--row-h); gap: 26px; padding: 12px 16px 12px 18px; font-size: var(--fs-body); }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item > ha-icon:first-child {
     flex: none; display: flex; justify-content: center; width: var(--row-icon); --mdc-icon-size: var(--row-icon); color: var(--text); }
-  .rows.device-list .item { gap: 20px; }
+  .rows.device-list .item { gap: 24px; padding-left: 16px; }
   .rows.device-list .item > ha-icon:first-child { width: 32px; --mdc-icon-size: 32px; }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item :is(.dim.small, .small) { margin-top: 2px; font-size: var(--fs-caption); }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, .rows.device-list) .item :is(.value, .value-text) { font-size: var(--fs-footnote); }
@@ -1380,6 +1387,10 @@ export const CSS = `
   .rows .item.nav .value { max-width: 42%; }
   .rows .item.nav .chevron, .settings-page .rows .item .chevron { flex: none; margin: 0 -6px 0 -8px; --mdc-icon-size: 20px; color: var(--text-2); }
   .rows .item .row-art { flex: none; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+  /* A choice's 40px picture (the Hue app's "Power on"): its text still at 72. */
+  .rows .item .row-art.pic { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: var(--bar-bottom); box-shadow: none; }
+  .rows .item .row-art.pic ha-icon { --mdc-icon-size: 24px; }
+  :is(.choice-sheet, .sensor-sheet) .rows .item:has(> .row-art.pic) { gap: 16px; padding-left: 16px; }
                             font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
   .choice-list .item .tick, .moment-list .item .tick { display: flex; flex: none; color: var(--accent); }
   .moment-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }

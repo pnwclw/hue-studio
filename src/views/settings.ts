@@ -50,10 +50,10 @@ export class SettingsView extends StudioView {
       t("settings.title"),
       html`<h2 class="label">${t("settings.home")}</h2>
         <div class="rows">
-          ${row("mdi:lightbulb-group-outline", t("settings.devices"), "/settings/devices", t("settings.devices_sub"))}
-          ${row("mdi:router-wireless", t("settings.bridges"), "/settings/bridges", bridgesSub)}
-          ${hasPro(this.bridges) ? row("mdi:motion-sensor", t("settings.motionaware"), "/settings/motionaware") : nothing}
-          ${row("mdi:television-ambient-light", t("settings.entertainment"), "/settings/entertainment")}
+          ${row("hue-studio:devices", t("settings.devices"), "/settings/devices", t("settings.devices_sub"))}
+          ${row("hue-studio:bridge", t("settings.bridges"), "/settings/bridges", bridgesSub)}
+          ${hasPro(this.bridges) ? row("hue-studio:motionaware", t("settings.motionaware"), "/settings/motionaware") : nothing}
+          ${row("hue-studio:sync", t("settings.entertainment"), "/settings/entertainment")}
         </div>
         <h2 class="label">Hue Studio</h2>
         <div class="rows">

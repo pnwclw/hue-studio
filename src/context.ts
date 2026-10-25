@@ -40,6 +40,8 @@ export interface SceneDraft {
   /** Speed step 1-12. */
   speed: number | null;
   autoplay: boolean | null;
+  /** The lights it shows were changed here (brightness, the wheel, shuffled colors). */
+  touched: boolean;
 }
 
 const TOAST_MS = 3200;

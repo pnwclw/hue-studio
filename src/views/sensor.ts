@@ -166,7 +166,7 @@ export class SensorView extends AutomationParts {
     const level = battery && Number.isFinite(parseFloat(battery.state)) ? `${Math.round(parseFloat(battery.state))}%` : "";
 
     const head = html`<div class="bar sub">
-      <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+      <button class="round close" aria-label=${t("common.close")} @click=${() => this.confirmLeave(this.dirty, close)}>${icon("close")}</button>
       <div class="title">${t("sensor.settings")}</div>
       <button class="pill save" ?disabled=${!this.dirty || this.saving || !info || !!lacking} @click=${() => this.save(info!)}>${t("scene.save")}</button>
     </div>`;
@@ -246,7 +246,8 @@ export class SensorView extends AutomationParts {
     // The sheets sit outside the scrolling body: a scroller (iOS) would clip them.
     return html`${this.screen(head, body, "settings-page automation-page sensor-edit")}
       ${this.sheet ? this.renderSheet(this.sheet, sensor, info, area, level) : nothing}
-      ${d ? this.partSheets(d) : nothing}`;
+      ${d ? this.partSheets(d) : nothing}
+      ${this.leaveSheet()}`;
   }
 
   /** A row like the Hue app's: picture, title and value, no chevron. */

@@ -132,7 +132,7 @@ export const SIZES = {
   "row-h": 72, // a list row (settings, devices, sensors, editors, choice sheets)
   "row-h-compact": 52, // a row of controls inside a sheet
   "row-text": 72, // where a list row's text starts
-  "row-icon": 24, // at 20px from the edge (device lists: 32, lights are tall)
+  "row-icon": 28, // centered 32px from the edge: an MDI glyph (drawn 2px in) as big as the Hue app's 24px ones (device lists: 32)
   "card-gap": 12,
   "tile-gap": 12,
   "light-tile": 102, // a light or scene tile's width in rows that scroll sideways

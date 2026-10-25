@@ -7,6 +7,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
 
 import { allDevices, deviceIcon, type FoundDevice, groupOf, LIGHT_FUNCTIONS, POWER_ON } from "../devices.ts";
 import { banner } from "../controls.ts";
@@ -101,7 +102,7 @@ export class DeviceView extends StudioView {
     const unreachable = d.reachable === false;
 
     const head = html`<div class="bar sub">
-      <button class="round close" aria-label=${t("common.close")} @click=${() => this.back(d)}>${icon("close")}</button>
+      <button class="round close" aria-label=${t("common.close")} @click=${() => this.confirmLeave(this.dirty(d), () => this.back(d))}>${icon("close")}</button>
       <div class="title">${t(`devices.settings_${d.kind}` as StringKey)}</div>
       <button class="pill save" ?disabled=${!this.dirty(d) || this.saving} @click=${() => this.save(d)}>${t("scene.save")}</button>
     </div>`;
@@ -174,7 +175,8 @@ export class DeviceView extends StudioView {
     // The sheet sits outside the scrolling body: a scroller (iOS) would clip it.
     return html`<div class="screen-head">${head}</div>
       <div class="screen-body">${body}</div>
-      ${this.sheet ? this.renderSheet(this.sheet, d, area, fn, power) : nothing}`;
+      ${this.sheet ? this.renderSheet(this.sheet, d, area, fn, power) : nothing}
+      ${this.leaveSheet()}`;
   }
 
   /** A setting: title and what it is about, its value on the right. */
@@ -204,13 +206,13 @@ export class DeviceView extends StudioView {
     const { ctx } = this;
     const { t } = ctx;
     const done = () => (this.sheet = null);
-    const pick = (selected: boolean, label: string, sub: string, act: () => void) =>
+    const pick = (selected: boolean, label: string, sub: string, act: () => void, art: TemplateResult | typeof nothing = nothing) =>
       html`<button class=${classMap({ item: true, on: selected })} role="radio" aria-checked=${selected} @click=${() => {
         haptic("selection");
         act();
         done();
       }}>
-        <div class="grow">${label}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
+        ${art}<div class="grow">${label}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
         ${selected ? html`<span class="tick">${icon("check")}</span>` : nothing}
       </button>`;
     let title: string;
@@ -237,10 +239,10 @@ export class DeviceView extends StudioView {
           ${choices.map((p) =>
             p === "custom"
               ? html`<div class="item on" role="radio" aria-checked="true" aria-disabled="true">
-                  <div class="grow">${t("devices.power_custom")}<div class="dim small">${t("devices.power_custom_sub")}</div></div>
+                  ${powerArt(p)}<div class="grow">${t("devices.power_custom")}<div class="dim small">${t("devices.power_custom_sub")}</div></div>
                   ${this.power === undefined ? html`<span class="tick">${icon("check")}</span>` : nothing}
                 </div>`
-              : pick(p === power, t(`devices.power_${p}` as StringKey), t(`devices.power_${p}_sub` as StringKey), () => (this.power = p)),
+              : pick(p === power, t(`devices.power_${p}` as StringKey), t(`devices.power_${p}_sub` as StringKey), () => (this.power = p), powerArt(p)),
           )}
         </div>`;
     } else {
@@ -256,11 +258,13 @@ export class DeviceView extends StudioView {
       content = html`<div class="rows facts">
         ${facts
           .filter(([, v]) => v)
-          .map(([k, v]) => html`<div class="item"><div class="grow">${k}</div><span class="value">${v}</span></div>`)}
+          .map(([k, v]) => html`<div class="item"><div class="grow">${k}<div class="dim small">${v}</div></div></div>`)}
       </div>`;
     }
     // Like the Hue app's: a sheet from the bottom (phones), close on the left.
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && done()}>
+    // "Power on" and "Device info" fill the screen (the Hue app's); the shorter choices rise from the bottom.
+    const tall = sheet === "power" || sheet === "info";
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall })} @click=${(e: Event) => e.target === e.currentTarget && done()}>
       <div class="box form sensor-sheet" role="dialog" aria-label=${title}>
         <div class="sheet-bar">
           <button class="round close" aria-label=${t("common.close")} @click=${done}>${icon("close")}</button>
@@ -314,6 +318,15 @@ export class DeviceView extends StudioView {
     ctx.toast(ctx.t("devices.deleted", { name: d.name }));
     this.back(d);
   }
+}
+
+/** A power-on behavior's picture, the Hue app's: its light, or its sign on a dark disc. */
+function powerArt(p: PowerOn): TemplateResult {
+  const disc = (background: string) => html`<span class="row-art pic" style=${styleMap({ background })}></span>`;
+  const sign = (glyph: string) => html`<span class="row-art pic"><ha-icon icon=${glyph}></ha-icon></span>`;
+  if (p === "safety") return disc("radial-gradient(circle at 40% 35%, #fff6df, #f6c56f)");
+  if (p === "custom") return disc("radial-gradient(circle at 40% 35%, #ffc08a, #ff9a52)");
+  return sign(p === "last_on_state" ? "mdi:undo" : "mdi:flash");
 }
 
 declare global {

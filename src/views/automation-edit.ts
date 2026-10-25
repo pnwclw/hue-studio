@@ -63,6 +63,13 @@ export class AutomationEditView extends AutomationParts {
   @state() private accessor editingName = false;
   /** "On certain days" switched on while every day is still chosen. */
   @state() private accessor someDays = false;
+  /** The draft as it was read, to tell whether it changed. */
+  private original = "";
+
+  /** Unsaved: a new one, or one whose draft changed (the Hue app's "Save" waits for a change). */
+  private get dirty(): boolean {
+    return this.isNew || (!!this.draft && JSON.stringify(this.draft) !== this.original);
+  }
 
   private get isNew(): boolean {
     return !this.automationId;
@@ -82,6 +89,7 @@ export class AutomationEditView extends AutomationParts {
 
   protected override willUpdate(): void {
     if (this.draft) return;
+    this.updateComplete.then(() => (this.original = JSON.stringify(this.draft)));
     const { ctx } = this;
     if (this.newType && isType(this.newType)) {
       const key = this.roomKey;
@@ -108,7 +116,7 @@ export class AutomationEditView extends AutomationParts {
     const { ctx } = this;
     const { t } = ctx;
     const d = this.draft;
-    const back = () => (this.page === "day" ? this.leaveDay() : this.leave());
+    const back = () => (this.page === "day" ? this.leaveDay() : this.confirmLeave(this.dirty, () => this.leave()));
     if (!d) {
       const entity = this.automationId ? ctx.automationEntity(this.automationId) : null;
       const loading = !ctx.automations || (entity && ctx.automationConfigsRead !== ctx.automations);
@@ -130,7 +138,7 @@ export class AutomationEditView extends AutomationParts {
     const unready = !!presence && !presenceReady(presence, inCompanionApp(ctx.hass));
     const lacking = missing(d) || (unready && this.isNew ? "presence" : null);
     // Like the Hue app's editor: what it is in the header with "Save", the name once below.
-    const save = html`<button class="pill save" ?disabled=${!!lacking || this.saving} @click=${() => this.save()}>
+    const save = html`<button class="pill save" ?disabled=${!!lacking || this.saving || !this.dirty} @click=${() => this.save()}>
       ${t(this.isNew ? "automations.create" : "zone.save")}
     </button>`;
     return html`${this.screen(
@@ -162,7 +170,8 @@ export class AutomationEditView extends AutomationParts {
               </div>`}`,
       "settings-page automation-page",
     )}
-    ${this.partSheets(d)}`;
+    ${this.partSheets(d)}
+    ${this.leaveSheet()}`;
   }
 
   /** Its picture and name (renamed in place), and its type when the name is another. */

@@ -45,8 +45,6 @@ export class SceneView extends StudioView {
   /** A new scene's name sheet: what is typed (null while it is closed). */
   @state() private accessor naming: string | null = null;
   @state() private accessor busy = false;
-  /** "Close and don't save?" over a new scene (the Hue app's). */
-  @state() private accessor leaving = false;
   private started = false;
   private resetTimer?: ReturnType<typeof setTimeout>;
   private deleteTimer?: ReturnType<typeof setTimeout>;
@@ -64,7 +62,7 @@ export class SceneView extends StudioView {
   private get draft(): SceneDraft {
     const { ctx } = this;
     const scene = this.isNew ? `${NEW_SCENE}:${this.key}` : this.scene;
-    if (ctx.sceneDraft?.scene !== scene) ctx.sceneDraft = { scene, name: null, speed: null, autoplay: null };
+    if (ctx.sceneDraft?.scene !== scene) ctx.sceneDraft = { scene, name: null, speed: null, autoplay: null, touched: false };
     return ctx.sceneDraft;
   }
 
@@ -104,10 +102,13 @@ export class SceneView extends StudioView {
     const { t } = ctx;
     const room = findGroup(ctx.home, this.key);
     const roomPath = `/room/${encodeURIComponent(this.key)}`;
-    const close = () => {
+    const leave = () => {
       ctx.sceneDraft = null;
       this.leave();
     };
+    // Unsaved: its name, speed or auto-play, or the lights it shows changed here (the Hue app asks).
+    const d0 = this.draft;
+    const close = () => this.confirmLeave(d0.touched || d0.name !== null || d0.speed !== null || d0.autoplay !== null, leave);
     if (!room || !ctx.hass.states[this.scene]) {
       return this.screen(this.subHead("", close), html`<p class="empty">${t("scene.not_found")}</p>`);
     }
@@ -160,7 +161,7 @@ export class SceneView extends StudioView {
           >${icon("pencil")}</button>
         </div>
       </div>
-      <div class="rows scene-brightness">
+      <div class="rows scene-brightness" @value-change=${() => this.edit({ touched: true })}>
         <div class="item col">
           <div class="line"><span>${t("scene.brightness")}</span><span class="dim">${state.on ? `${state.brightness}%` : ""}</span></div>
           ${groupSlider(ctx, group, state, t("scene.brightness"))}
@@ -187,7 +188,7 @@ export class SceneView extends StudioView {
         </div>
         <div class="light-row">
           ${group.lights.map((id) =>
-            lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
+            lightTile(ctx, id, () => this.toWheel(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
               busy: syncing.includes(id),
             }),
           )}
@@ -215,7 +216,8 @@ export class SceneView extends StudioView {
             this.speedStep = null;
           },
         })
-      : nothing}`;
+      : nothing}
+    ${this.leaveSheet()}`;
   }
 
   /** A new scene: what the room's lights show now, set here and on the wheel, then "Save". */
@@ -228,7 +230,7 @@ export class SceneView extends StudioView {
       ctx.sceneDraft = null;
       ctx.go(roomPath);
     };
-    const head = html`<div class="bar"><button class="round back" aria-label=${t("common.back")} @click=${() => (this.leaving = true)}>${icon("back")}</button></div>`;
+    const head = html`<div class="bar"><button class="round back" aria-label=${t("common.back")} @click=${() => this.confirmLeave(true, leave)}>${icon("back")}</button></div>`;
     if (!room) return this.screen(head, html`<p class="empty">${t("room.not_found")}</p>`);
     const state = groupState(ctx.hass, room, ctx.lightInfo);
     const name = this.draft.name ?? t("room.new_scene");
@@ -241,7 +243,7 @@ export class SceneView extends StudioView {
           <button class="round rename" aria-label=${t("scene.rename")} @click=${() => (this.naming = name)}>${icon("pencil")}</button>
         </div>
       </div>
-      <div class="rows scene-brightness">
+      <div class="rows scene-brightness" @value-change=${() => this.edit({ touched: true })}>
         <div class="item col">
           <div class="line"><span>${t("scene.brightness")}</span><span class="dim">${state.on ? `${state.brightness}%` : ""}</span></div>
           ${groupSlider(ctx, room, state, t("scene.brightness"))}
@@ -251,7 +253,7 @@ export class SceneView extends StudioView {
         <div class="item lights-head"><div class="grow">${t("room.lights")}</div></div>
         <div class="light-row">
           ${room.lights.map((id) =>
-            lightTile(ctx, id, () => ctx.go(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), { busy: syncing.includes(id) }),
+            lightTile(ctx, id, () => this.toWheel(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), { busy: syncing.includes(id) }),
           )}
         </div>
       </div>
@@ -261,15 +263,7 @@ export class SceneView extends StudioView {
         <button class="pill apply" ?disabled=${!room.group || this.busy} @click=${() => this.create(room, name)}>${t("scene.save")}</button>
       </div>
       ${this.naming !== null ? this.nameSheet() : nothing}
-      ${this.leaving
-        ? html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && (this.leaving = false)}>
-            <div class="box action-sheet" role="dialog" aria-label=${t("scene.leave")}>
-              <p class="note">${t("scene.leave_note")}</p>
-              <button class="danger" @click=${leave}>${t("scene.leave")}</button>
-              <button class="cancel" @click=${() => (this.leaving = false)}>${t("common.cancel")}</button>
-            </div>
-          </div>`
-        : nothing}`;
+      ${this.leaveSheet()}`;
   }
 
   /** The Hue app's "Scene name" sheet: the name in a field with a clear button, "Done". */
@@ -315,7 +309,8 @@ export class SceneView extends StudioView {
     </div>`;
   }
 
-  override updated(): void {
+  override updated(changed: Map<PropertyKey, unknown>): void {
+    super.updated(changed);
     // The name sheet comes up ready to type.
     const field = this.querySelector<HTMLInputElement>(".name-sheet input");
     if (field && !this.#focused) {
@@ -340,8 +335,15 @@ export class SceneView extends StudioView {
     ctx.go(`/room/${encodeURIComponent(this.key)}`);
   }
 
+  /** To the wheel to set a light (what it shows is then unsaved here). */
+  private toWheel(path: string): void {
+    this.edit({ touched: true });
+    this.ctx.go(path);
+  }
+
   /** Spread the palette over the lights in a new order (live; "Save" keeps it). */
   private shuffle(lights: string[], palette: [number, number][]): void {
+    this.edit({ touched: true });
     const points = [...palette];
     for (let i = points.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
