@@ -38,7 +38,7 @@ import {
 } from "../motion.ts";
 import type { BridgeInfo, BridgesMessage, MotionArea } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
-import { StudioView } from "./base.ts";
+import { type FlowStep, flowRing, StudioView } from "./base.ts";
 
 const NAME_MAX = 32;
 const LIST = "/settings/motionaware";
@@ -122,22 +122,17 @@ export class MotionAreaView extends StudioView {
       else if (this.step === "calibrate" && !this.created) this.step = "lights";
       else ctx.go(this.created ? `${LIST}/${encodeURIComponent(this.created)}` : LIST);
     };
-    if (!target) return this.screen(this.subHead(t("ma.new"), () => ctx.go(LIST)), html`<p class="empty">${t("motion.unsupported")}</p>`);
+    const first = this.step === "room" || !!this.created;
+    if (!target) return this.flow(true, back, { panel: html`<p class="empty">${t("motion.unsupported")}</p>` });
     const [entry, bridge] = target;
-    let body: TemplateResult;
-    if (this.step === "room") body = this.roomStep(bridge);
-    else if (this.step === "lights") body = this.lightsStep(bridge);
-    else body = this.calibrateStep(entry, bridge);
-    const steps = html`<div class="ma-steps" aria-hidden="true">
-      ${(["room", "lights", "calibrate"] as Step[]).map((s, i) => html`<span class=${classMap({ on: s === this.step })}>${i + 1}</span>`)}
-    </div>`;
-    return this.screen(this.subHead(t("ma.new"), back, steps), body, "settings-page ma-page");
+    const step = this.step === "room" ? this.roomStep(bridge) : this.step === "lights" ? this.lightsStep(bridge) : this.calibrateStep(entry, bridge);
+    return this.flow(first, back, step);
   }
 
-  private roomStep(bridge: BridgeInfo): TemplateResult {
+  private roomStep(bridge: BridgeInfo): FlowStep {
     const { ctx } = this;
     const { t } = ctx;
-    if (!bridge.motion_lights) return html`<p class="empty">${t("rooms.loading")}</p>`;
+    if (!bridge.motion_lights) return { panel: html`<p class="empty">${t("rooms.loading")}</p>` };
     const choices = groupChoices(bridge);
     const pick = (c: GroupChoice) => {
       haptic("selection");
@@ -152,22 +147,22 @@ export class MotionAreaView extends StudioView {
       <div class="grow">${c.group.name}
         <div class="dim small">${c.reason ? t("ma.room_few", { count: c.lights.length, min: MIN_LIGHTS }) : t("ma.room_lights", { count: c.lights.length })}</div>
       </div>
-      ${c.reason ? nothing : html`<ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>`}
     </button>`;
     const rooms = choices.filter((c) => c.group.type === "room");
     const zones = choices.filter((c) => c.group.type === "zone");
-    return html`<h1 class="big ma-title">${t("ma.where")}</h1>
-      <p class="lead">${t("ma.where_text", { min: MIN_LIGHTS })}</p>
-      ${rooms.length ? html`<h2 class="label">${t("ma.rooms")}</h2><div class="rows">${rooms.map(row)}</div>` : nothing}
-      ${zones.length ? html`<h2 class="label">${t("ma.zones")}</h2><div class="rows">${zones.map(row)}</div>` : nothing}
-      ${!choices.length ? html`<p class="lead small center-text">${t("ma.no_rooms")}</p>` : nothing}`;
+    return {
+      panel: html`${this.flowTitle(t("ma.where"), t("ma.where_text", { min: MIN_LIGHTS }))}
+        ${rooms.length ? html`<h2 class="label">${t("ma.rooms")}</h2><div class="rows inset">${rooms.map(row)}</div>` : nothing}
+        ${zones.length ? html`<h2 class="label">${t("ma.zones")}</h2><div class="rows inset">${zones.map(row)}</div>` : nothing}
+        ${!choices.length ? html`<p class="lead flow-lead">${t("ma.no_rooms")}</p>` : nothing}`,
+    };
   }
 
   private lightRows(bridge: BridgeInfo, choice: GroupChoice, picked: string[], flip: (id: string) => void, except: string | null): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
     const used = lightsInAreas(bridge, except);
-    return html`<div class="rows">
+    return html`<div class="rows inset">
       ${choice.lights.map((l) => {
         const id = l.entity_id!;
         const on = picked.includes(id);
@@ -192,53 +187,35 @@ export class MotionAreaView extends StudioView {
     return next;
   }
 
-  private lightsStep(bridge: BridgeInfo): TemplateResult {
+  private lightsStep(bridge: BridgeInfo): FlowStep {
     const { ctx } = this;
     const { t } = ctx;
     const choice = this.choice;
     if (!choice) return this.roomStep(bridge);
     const ok = enoughLights(this.picked) && this.name.trim().length > 0;
-    return html`<h1 class="big ma-title">${t("ma.which")}</h1>
-      <p class="lead">${t("ma.which_text", { min: MIN_LIGHTS, max: MAX_LIGHTS })}</p>
-      <h2 class="label">${t("ma.name")}</h2>
-      <div class="rows">
-        <div class="item col">
-          <input class="field" maxlength=${NAME_MAX} aria-label=${t("ma.name")} .value=${this.name}
-            @input=${(e: InputEvent) => (this.name = (e.target as HTMLInputElement).value)} />
-        </div>
-      </div>
-      <h2 class="label">${t("ma.lights_in", { room: choice.group.name })} · ${t("ma.picked", { count: this.picked.length, max: MAX_LIGHTS })}</h2>
-      ${this.lightRows(bridge, choice, this.picked, (id) => (this.picked = this.flip(bridge, this.picked, id)), null)}
-      <div class="add-actions">
-        <button class="pill go" ?disabled=${!ok} @click=${() => {
-          haptic("selection");
-          this.step = "calibrate";
-        }}>${t("ma.next")}</button>
-      </div>`;
+    return {
+      panel: html`${this.flowTitle(t("ma.which"), t("ma.which_text", { min: MIN_LIGHTS, max: MAX_LIGHTS }))}
+        <input class="field outlined" maxlength=${NAME_MAX} placeholder=${t("ma.name")} aria-label=${t("ma.name")} .value=${this.name}
+          @input=${(e: InputEvent) => (this.name = (e.target as HTMLInputElement).value)} />
+        <h2 class="label">${t("ma.lights_in", { room: choice.group.name })} · ${t("ma.picked", { count: this.picked.length, max: MAX_LIGHTS })}</h2>
+        ${this.lightRows(bridge, choice, this.picked, (id) => (this.picked = this.flip(bridge, this.picked, id)), null)}`,
+      foot: html`<button class="pill apply" ?disabled=${!ok} @click=${() => {
+        haptic("selection");
+        this.step = "calibrate";
+      }}>${t("ma.next")}</button>`,
+    };
   }
 
-  /** "Leave the room" and the steps, until "Start" makes the area. */
-  private leaveRoom(room: string): TemplateResult {
-    const { t } = this.ctx;
-    return html`<div class="link-state">
-        <ha-icon class="ma-art" icon="mdi:exit-run"></ha-icon>
-        <h2 class="link-title">${t("ma.leave_title")}</h2>
-        <p class="lead">${t("ma.leave_text", { room })}</p>
-      </div>
-      <ol class="rows steps-list">
-        ${(["ma.leave_1", "ma.leave_2", "ma.leave_3"] as StringKey[]).map(
-          (key, i) => html`<li class="item"><span class="step-no">${i + 1}</span><div class="grow">${t(key, { seconds: CALIBRATION_MS / 1000 })}</div></li>`,
-        )}
-      </ol>`;
-  }
-
-  private calibrateStep(entry: string, bridge: BridgeInfo): TemplateResult {
+  private calibrateStep(entry: string, bridge: BridgeInfo): FlowStep {
     const { ctx } = this;
     const { t } = ctx;
     const choice = this.choice;
     const area = this.found?.[2];
+    const art = (badge: "ok" | null, progress: number | "spin" | null) =>
+      flowRing(html`<ha-icon class="art-icon" icon="hue-studio:motionaware"></ha-icon>`, progress, badge);
     if (!this.created || !area) {
       if (!choice) return this.roomStep(bridge);
+      if (this.created) return { art: art(null, "spin"), panel: this.flowTitle(t("ma.starting")) };
       const start = async () => {
         this.busy = true;
         haptic("selection");
@@ -252,44 +229,32 @@ export class MotionAreaView extends StudioView {
         this.busy = false;
         if (result?.area_id) this.created = result.area_id;
       };
-      return html`${this.created ? html`${this.ring(null)}<p class="lead center-text">${t("ma.starting")}</p>` : this.leaveRoom(choice.group.name)}
-        ${this.created
-          ? nothing
-          : html`<div class="add-actions"><button class="pill go" ?disabled=${this.busy} @click=${start}>${t("ma.start")}</button></div>`}`;
+      // "Leave the room": the bridge measures it empty.
+      const steps = (["ma.leave_1", "ma.leave_2", "ma.leave_3"] as StringKey[]).map((key) => t(key, { seconds: CALIBRATION_MS / 1000 })).join(" ");
+      return {
+        art: html`<ha-icon class="art-icon" icon="mdi:exit-run"></ha-icon>`,
+        panel: html`${this.flowTitle(t("ma.leave_title"), t("ma.leave_text", { room: choice.group.name }))}<p class="lead flow-lead">${steps}</p>`,
+        foot: html`<button class="pill apply" ?disabled=${this.busy} @click=${start}>${t("ma.start")}</button>`,
+      };
     }
     const done = areaState(area) !== "calibrating" && area.lights.every((l) => l.health === "healthy");
-    if (!done) return html`${this.ring(area)}<p class="lead center-text">${t("ma.calibrating_text")}</p>${this.lightHealth(area)}`;
+    if (!done) return { art: art(null, calibrationProgress(area, this.now)), panel: html`${this.flowTitle(t("ma.calibrating_text"), this.secondsLeft(area))}${this.lightHealth(area)}` };
     const room = area.lights.map((l) => (l.entity_id ? areaOf(ctx.hass, l.entity_id) : null)).find(Boolean);
     const params = new URLSearchParams({ ...(room ? { room } : {}), ...(area.sensor ? { sensor: area.sensor } : {}) });
-    return html`<div class="link-state">
-        <ha-icon class="ma-art ok" icon="mdi:check-circle"></ha-icon>
-        <h2 class="link-title">${t("ma.ready_title")}</h2>
-        <p class="lead">${t("ma.ready_text", { name: area.name })}</p>
-      </div>
-      <div class="add-actions stack">
-        <button class="pill go" ?disabled=${!area.sensor} @click=${() => ctx.go(`/automations/new/motion?${params}`)}>${t("ma.set_lights")}</button>
-        <button class="pill" @click=${() => ctx.go(`${LIST}/${encodeURIComponent(area.id)}`)}>${t("qr.done")}</button>
-      </div>`;
+    return {
+      art: art("ok", null),
+      panel: this.flowTitle(t("ma.ready_title"), t("ma.ready_text", { name: area.name })),
+      foot: html`<button class="pill" @click=${() => ctx.go(`${LIST}/${encodeURIComponent(area.id)}`)}>${t("qr.done")}</button>
+        <button class="pill apply" ?disabled=${!area.sensor} @click=${() => ctx.go(`/automations/new/motion?${params}`)}>${t("ma.set_lights")}</button>`,
+    };
   }
 
-  /** The calibration ring: how far it got, seconds left. */
-  private ring(area: MotionArea | null): TemplateResult {
+  /** Seconds the calibration has left. */
+  private secondsLeft(area: MotionArea): string {
     const { t } = this.ctx;
-    const progress = area ? calibrationProgress(area, this.now) : 0;
-    const started = area?.calibration_started ? area.calibration_started * 1000 : this.now;
+    const started = area.calibration_started ? area.calibration_started * 1000 : this.now;
     const left = Math.max(0, Math.ceil((CALIBRATION_MS - (this.now - started)) / 1000));
-    const r = 54;
-    const c = 2 * Math.PI * r;
-    return html`<div class="search-ring" role="status" aria-live="polite">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle class="track" cx="60" cy="60" r=${r}></circle>
-        <circle class="bar" cx="60" cy="60" r=${r} stroke-dasharray=${c} stroke-dashoffset=${c * (1 - progress)}></circle>
-      </svg>
-      <div class="ring-text">
-        <ha-icon icon="mdi:motion-sensor"></ha-icon>
-        <span>${left ? t("add_device.seconds", { n: left }) : t("add_device.almost")}</span>
-      </div>
-    </div>`;
+    return left ? t("add_device.seconds", { n: left }) : t("add_device.almost");
   }
 
   /** Each light of an area and how it does. */
@@ -365,7 +330,7 @@ export class MotionAreaView extends StudioView {
           })}
         </div>
       </div>
-      ${state === "calibrating" ? html`${this.ring(area)}<p class="lead center-text">${t("ma.calibrating_text")}</p>` : nothing}
+      ${state === "calibrating" ? html`<p class="hint">${t("ma.calibrating_text")} ${this.secondsLeft(area)}</p>` : nothing}
       ${state === "working"
         ? html`<div class=${classMap({ "sens-try": true, moving: motion })} role="status"><span class="dot"></span><span>${motion ? t("sensor.motion_now") : t("ma.no_motion")}</span></div>`
         : nothing}
@@ -527,9 +492,11 @@ export class MotionAreaView extends StudioView {
       }}>${t("scene.save")}</button>`;
     } else if (sheet === "recalibrate") {
       title = t("ma.recalibrate");
-      content = html`${this.leaveRoom(area.group ?? t("ma.whole_home"))}
+      const steps = (["ma.leave_1", "ma.leave_2", "ma.leave_3"] as StringKey[]).map((key) => t(key, { seconds: CALIBRATION_MS / 1000 })).join(" ");
+      content = html`<p class="hint">${t("ma.leave_text", { room: area.group ?? t("ma.whole_home") })}</p>
+        <p class="hint">${steps}</p>
         <div class="center sheet-actions">
-          <button class="pill go" ?disabled=${this.busy} @click=${async () => {
+          <button class="pill apply" ?disabled=${this.busy} @click=${async () => {
             this.busy = true;
             haptic("selection");
             const done = await ctx.ws({ type: "hue_studio/motion_areas/recalibrate", area_id: area.id });

@@ -72,6 +72,8 @@ export const CSS = `
   /* Everything in a header is 32px tall: round buttons, switches, pills, the search field. */
   :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head, .sync-banner) .pill { height: var(--control); padding: 0 14px; background: var(--surface-2);
                                                                        letter-spacing: 0.3px; text-transform: uppercase; }
+  /* A header's pill is grey even for the main action ("SAVE"), the Hue app's. */
+  :is(.bar, .topbar, .cv-bar, .sheet-bar, .tab-head) .pill.apply { background: var(--surface-2); color: var(--text); }
   /* Nothing to save yet: the pill stays, its word goes grey (the Hue app's). */
   :is(.bar, .topbar, .cv-bar, .sheet-bar) .pill:disabled { opacity: 1; color: var(--text-3); }
   /* A bar's title after its back or close button starts where list rows' text does (72px), the Hue app's. */
@@ -125,6 +127,9 @@ export const CSS = `
           background: var(--surface-raised); transition: transform var(--t-press) var(--ease); }
   .pill:active { transform: scale(var(--press-tile)); }
   .pill:disabled { opacity: 0.4; }
+  /* The screen's main action (the Hue app's): the accent pill. */
+  .pill.apply { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--accent); color: var(--text); }
+  .pill.apply svg { width: 18px; height: 18px; }
   h1.big { margin: 6px 0 0; font-size: var(--fs-large); font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; }
   h2.label { margin: var(--section-gap) var(--text-inset) var(--title-gap); font-size: var(--fs-label); font-weight: 500; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-2); }
   .empty { margin: 24px 4px; color: var(--text-2); font-size: var(--fs-callout); line-height: 1.5; }
@@ -200,6 +205,11 @@ export const CSS = `
   nav.tabs { flex: none; display: flex; justify-content: center; gap: 4px; padding: 4px 8px max(4px, var(--safe-bottom));
              background: linear-gradient(var(--bg), var(--bar-bottom) 40px); }
   nav.tabs[hidden] { display: none; }
+  /* Under a sheet the tab bar is dimmed like the rest (an action sheet's blurred too); a sheet
+     that fills the screen covers it. */
+  main:has(.sheet) + nav.tabs { pointer-events: none; filter: brightness(0.3); }
+  main:has(.sheet.menu) + nav.tabs { filter: brightness(0.5) blur(16px); }
+  main:has(:is(.sheet.tall, .add-picker)) + nav.tabs { display: none; }
   /* The on-screen keyboard is up (fitToViewport): it covers the tab bar and the home indicator,
      and dialogs move up so their fields stay above it. */
   :host([keyboard]) { --safe-bottom: 0px; }
@@ -563,9 +573,8 @@ export const CSS = `
   .page.scene-new > .hint { margin: 16px var(--text-inset) 0; }
   .screen-foot { flex: none; display: flex; justify-content: center; padding: 15px 16px calc(16px + var(--safe-bottom));
                  border-top: 1px solid var(--separator); background: var(--bg); }
-  .screen-foot .pill.apply { background: var(--accent); color: var(--text); }
   .name-sheet .name-field { position: relative; display: flex; align-items: center; }
-  .name-sheet .name-field .field { height: 46px; padding-right: 44px; border: 1.5px solid var(--outline); border-radius: var(--r-xs); background: var(--surface); }
+  .name-sheet .name-field .field { padding-right: 44px; }
   .name-sheet .name-field .round { position: absolute; right: 8px; }
   .scene-edit > .center { margin-top: 40px; }
   .scene-edit > .center + .delete-area { margin-top: 12px; }
@@ -629,6 +638,8 @@ export const CSS = `
   .pick-tile.way .name { flex: none; text-align: left; font-size: var(--fs-callout); }
   .sheet .field, .page .field { width: 100%; box-sizing: border-box; height: 44px; padding: 0 12px; border: none; border-radius: var(--r-m); font: inherit;
                   font-size: var(--fs-headline); color: inherit; background: var(--fill-soft); outline: none; }
+  /* The Hue app's text field (a name, an address, a code): 46px, outlined, on a surface. */
+  .field.outlined { height: 46px; border: 1.5px solid var(--outline); border-radius: var(--r-xs); background: var(--surface); font-size: var(--fs-body); }
   .sheet .hint { margin: 10px 2px 0; font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
 
   /* gallery */
@@ -691,14 +702,6 @@ export const CSS = `
   .tv { width: 44px; height: 44px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
         background: var(--fill-light); }
   .tv svg { width: 24px; height: 24px; }
-  .pill.go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 180px; background: #fff; color: var(--text-dark); }
-  .pill.go svg { width: 18px; height: 18px; }
-  .pill.go.stop { background: rgba(0, 0, 0, 0.35); color: #fff; }
-  .seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: 2px; border-radius: var(--r-s);
-         background: var(--fill-soft); }
-  .seg button { height: 34px; border: none; border-radius: var(--r-s); cursor: pointer; background: transparent; font-size: var(--fs-footnote); font-weight: 500;
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 4px; transition: background 0.2s var(--ease); }
-  .seg button.on { background: var(--segment-on); font-weight: 500; box-shadow: var(--shadow-flat); }
   /* Sync (views/sync.ts), the Hue app's Sync tab: no title, what plays as a picture with its name and
      status, mode / intensity / brightness as three buttons under small capitals, a dock with what
      (the HDMI input), start / stop and where (the entertainment area). */
@@ -790,24 +793,24 @@ export const CSS = `
   .rows .item .value-text { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   .settings-page .sensor-hero { padding-bottom: 14px; }
   /* "Add devices": what is added, the steps to get it ready, the search. */
-  /* "Add devices" (the Hue app's flow): a picker whose art (a picture, or the search's ring with a
+  /* A flow ("Add devices", a new bridge, a MotionAware area; the Hue app's): a picker whose art (a picture, or the search's ring with a
      badge once it is over) sits on the blue over the rounded panel; buttons in the footer. */
-  main.picker .screen-head + .screen-body > .page.add-flow { padding: 0; background: none; box-shadow: none; border-radius: 0;
+  main.picker .screen-head + .screen-body > .page.flow { padding: 0; background: none; box-shadow: none; border-radius: 0;
                                                              display: flex; flex-direction: column; }
-  .add-flow .flow-art { flex: none; display: flex; align-items: center; justify-content: center; height: clamp(200px, 40dvh, 378px); }
-  .add-flow .flow-panel { flex: 1; padding: 20px 20px 28px; border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg);
+  .flow .flow-art { flex: none; display: flex; align-items: center; justify-content: center; height: clamp(200px, 40dvh, 378px); }
+  .flow .flow-panel { flex: 1; padding: 20px 20px 28px; border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg);
                           box-shadow: inset 0 1px 0 var(--surface-low); }
-  .add-flow .flow-title { margin: 6px var(--text-inset) 0; font-size: var(--fs-title); }
-  .add-flow .flow-lead { margin: 12px var(--text-inset) 0; font-size: var(--fs-body); color: var(--text-2); line-height: 1.35; }
-  .add-flow .flow-lead.small { font-size: var(--fs-footnote); }
-  .add-flow .flow-title + .rows, .add-flow .flow-title + h2.label { margin-top: 40px; }
-  .add-flow .flow-field { margin-top: 24px; height: 46px; border: 1.5px solid var(--outline); border-radius: var(--r-xs); background: var(--surface); font-size: var(--fs-body); }
-  .add-flow .art-icon { --mdc-icon-size: 140px; color: var(--text); filter: drop-shadow(0 0 36px var(--glow-blue)); }
-  .add-flow .rows.inset { border-radius: var(--r-m); box-shadow: var(--shadow-row); }
-  .add-flow .rows.inset .item { min-height: var(--row-h); gap: 24px; padding: 12px 16px; font-size: var(--fs-body); font-weight: 500; }
-  .add-flow .rows.inset .item > ha-icon:first-child { width: 32px; justify-content: center; --mdc-icon-size: 28px; }
-  .add-flow .rows.inset .item .plus-blue { flex: none; }
-  .add-flow .pick-tiles { margin-top: 0; }
+  .flow .flow-title { margin: 6px var(--text-inset) 0; font-size: var(--fs-title); }
+  .flow .flow-lead { margin: 12px var(--text-inset) 0; font-size: var(--fs-body); color: var(--text-2); line-height: 1.35; }
+  .flow .flow-lead.small { font-size: var(--fs-footnote); }
+  .flow .flow-title + .rows, .flow .flow-title + h2.label { margin-top: 40px; }
+  .flow .outlined { margin-top: 24px; }
+  .flow .art-icon { --mdc-icon-size: 140px; color: var(--text); filter: drop-shadow(0 0 36px var(--glow-blue)); }
+  .flow .rows.inset { border-radius: var(--r-m); box-shadow: var(--shadow-row); }
+  .flow .rows.inset .item { min-height: var(--row-h); gap: 24px; padding: 12px 16px; font-size: var(--fs-body); font-weight: 500; }
+  .flow .rows.inset .item > ha-icon:first-child { width: 32px; justify-content: center; --mdc-icon-size: 28px; }
+  .flow .rows.inset .item .plus-blue { flex: none; }
+  .flow .pick-tiles { margin-top: 0; }
   .pick-tile.plain { justify-content: center; gap: 16px; padding: 16px 12px; }
   .pick-tile.plain > ha-icon { --mdc-icon-size: 64px; }
   .pick-tile.plain .name { flex: none; }
@@ -823,7 +826,8 @@ export const CSS = `
                       border-radius: 50%; color: var(--text); box-shadow: var(--shadow-dot); }
   .flow-ring .badge svg { width: 26px; height: 26px; }
   .flow-ring .badge.ok { background: var(--ok); }
-  .flow-ring .badge.none { background: var(--danger); }
+  .flow-ring .badge.fail { background: var(--danger); }
+  .flow-ring.alarm .track { stroke: var(--danger); filter: drop-shadow(0 0 8px var(--danger)); }
   .dev-tiles { display: grid; grid-template-columns: repeat(auto-fill, 120px); gap: var(--tile-gap); margin-top: 20px; }
   h2.label + .dev-tiles { margin-top: 0; }
   .dev-tile { position: relative; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; height: 115px; padding: 12px;
@@ -843,17 +847,6 @@ export const CSS = `
   .add-steps li::before { content: counter(step); position: absolute; left: 4px; top: 8px; width: 28px; height: 28px; border-radius: 50%;
                           display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: var(--fs-callout); font-weight: 500; }
   .add-steps.tips li::before { content: "•"; background: none; font-size: var(--fs-title-3); }
-  /* MotionAware's calibration: a ring counting down, buttons under it. */
-  .add-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 6px; }
-  .add-actions .pill:not(.go) { min-width: 180px; }
-  .search-ring { position: relative; width: 180px; height: 180px; margin: 22px auto 10px; }
-  .search-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-  .search-ring circle { fill: none; stroke-width: 6; }
-  .search-ring .track { stroke: var(--surface-2); }
-  .search-ring .bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s linear; }
-  .search-ring .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
-                            font-size: var(--fs-title-3); font-weight: 500; font-variant-numeric: tabular-nums; }
-  .search-ring .ring-text ha-icon { --mdc-icon-size: 40px; animation: breathe 2s ease-in-out infinite; }
   /* A footer's buttons one over the other (the Hue app's flows), the main one last. */
   .screen-foot.stack { flex-direction: column; align-items: center; gap: 12px; }
   .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px var(--outline); }
@@ -958,8 +951,10 @@ export const CSS = `
             color: inherit; background: var(--fill); }
   .rooms-page .center { margin-top: 18px; }
   .sheet .box.zone-editor { width: min(100%, 440px); }
-  .zone-editor h2.label { margin: 18px 16px 8px; }
-  .zone-editor .rows { border-radius: 0; background: var(--surface-row); }
+  .zone-editor h2.label { margin: 24px 16px 8px; }
+  .zone-editor .rows { border-radius: 0; background: var(--surface-row); box-shadow: var(--shadow-row); }
+  .zone-editor .outlined { margin-top: 0; }
+  .zone-editor .delete-area { padding-bottom: calc(28px + var(--safe-bottom)); }
   /* A check: one round tick box everywhere (rows, choice lists, the light picker's rooms: all or some). */
   :is(.check, .pick-check) { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; box-sizing: border-box;
                              border: 1.5px solid var(--text-3); border-radius: 50%; color: #fff; transition: background 0.2s, border 0.2s; }
@@ -1111,15 +1106,6 @@ export const CSS = `
      the art of "leave the room" and "ready", each light's state. */
   .rows .item > .row-link { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: none; background: none;
                             font: inherit; color: inherit; text-align: left; cursor: pointer; }
-  .ma-steps { display: flex; gap: 6px; margin-left: auto; }
-  .ma-steps span { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
-                   background: var(--fill-strong); font-size: var(--fs-caption); font-weight: 500; color: var(--text-2); }
-  .ma-steps span.on { background: var(--accent); color: #fff; }
-  .ma-page h1.ma-title { margin: 6px 2px 8px; }
-  .ma-page .ma-art { --mdc-icon-size: 64px; color: var(--accent); }
-  .ma-page .ma-art.ok { color: var(--ok); }
-  .ma-page .add-actions.stack { flex-direction: column; align-items: center; }
-  .ma-page .add-actions.stack .pill { min-width: 200px; }
   .ma-health { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: var(--fs-footnote); color: var(--text-2); }
   .ma-health.ready { color: var(--ok); }
   .ma-health.problem { color: var(--warn); }
@@ -1156,9 +1142,7 @@ export const CSS = `
   .rows .item.wrap .grow { min-width: 140px; }
   .rows .item .plain { padding: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .lead.pad { padding: 0 16px 16px; }
-  .seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 12px; }
   .today span.pic { display: block; }
-  .seg button:disabled { opacity: 0.4; }
   .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--r-m);
            background: var(--surface); }
   .today .pic { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: var(--shadow-dot); }
@@ -1226,33 +1210,27 @@ export const CSS = `
   .height-line input { flex: 1; accent-color: #fff; }
   .center-text { text-align: center; margin-top: 12px; }
   .rows button.item:disabled { opacity: 0.5; }
-  .seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 260px); }
 
-  .bridge-add .seg.two { width: 100%; box-sizing: border-box; }
   .steps-list { margin: 10px 0 0; padding: 0; list-style: none; }
   .steps-list .item { align-items: flex-start; font-size: var(--fs-body); line-height: 1.4; }
   .step-no { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 50%;
              background: var(--fill-strong); font-size: var(--fs-caption); font-weight: 500; }
-  .scan-state { display: inline-flex; align-items: center; gap: 6px; margin-right: 2px; font-size: var(--fs-caption); color: var(--text-2); }
   .spinner { width: 12px; height: 12px; flex: none; box-sizing: border-box; border: 2px solid rgba(235, 235, 245, 0.25); border-top-color: var(--text-2);
              border-radius: 50%; animation: spin 0.9s linear infinite; }
   .spinner.big { width: 28px; height: 28px; border-width: 3px; }
-  .bridge-add .item.col .line { align-items: center; margin-top: 0; }
-  .bridge-add .item.col .field { flex: 1; min-width: 0; margin-top: 0; font-size: var(--fs-body); }
-  .bridge-add .item.col .dim.small { margin-top: 8px; }
   .link-state { display: flex; flex-direction: column; align-items: center; max-width: 420px; margin: 28px auto 0; text-align: center; }
   .link-state .lead { margin: 6px 0 0; }
   .link-title { margin: 18px 0 0; font-size: var(--fs-headline); font-weight: 500; line-height: 1.25; }
-  .link-art { width: 132px; height: 132px; }
   .bridge-art { width: 100%; height: 100%; }
   .bridge-art .body { fill: #e9e9ee; }
   .bridge-art .button { fill: #f6f6f9; stroke: rgba(0, 0, 0, 0.08); stroke-width: 1.5; }
   .bridge-art .ring { fill: none; stroke: var(--info); stroke-width: 4; opacity: 0; transform-origin: 60px 60px; }
-  .link-art.press .ring { animation: bridge-press 1.6s var(--ease) infinite; }
+  .flow-ring > span.art-icon { display: block; width: 150px; height: 150px; }
+  .flow-ring > span.art-icon.press .ring { animation: bridge-press 1.6s var(--ease) infinite; }
+  /* Searching without a known end: the accent arc goes round. */
+  .flow-ring.spin > svg { animation: spin 1.4s linear infinite; }
   @keyframes bridge-press { 0% { opacity: 0.9; transform: scale(0.75); } 100% { opacity: 0; transform: scale(1.35); } }
-  @media (prefers-reduced-motion: reduce) { .link-art.press .ring { animation: none; opacity: 0.9; } .spinner { animation-duration: 2.4s; } }
-  .countdown { width: min(100%, 260px); height: 4px; margin-top: 22px; border-radius: var(--r-full); overflow: hidden; background: var(--fill-strong); }
-  .countdown span { display: block; height: 100%; background: var(--info); transform-origin: left; transition: transform 0.5s linear; }
+  @media (prefers-reduced-motion: reduce) { .art-icon.press .ring { animation: none; opacity: 0.9; } .spinner, .flow-ring.spin > svg { animation-duration: 2.4s; } }
   .link-icon { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; }
   .link-icon.ok { background: var(--ok); color: #fff; }
   .link-icon.ok svg { width: 34px; height: 34px; fill: currentColor; }
@@ -1473,7 +1451,7 @@ export const CSS = `
   .days-row button:active { transform: scale(var(--press-round)); }
   /* Under a screen's rows: its main button, then "Open in Home Assistant" and "Delete". */
   .settings-page .save-area { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 30px; }
-  .settings-page .save-area .pill.apply { min-width: 180px; background: var(--accent); color: #fff; }
+  .settings-page .save-area .pill.apply { min-width: 180px; }
   .settings-page .save-area .lead { margin: 4px 0 0; text-align: center; }
   @container (max-width: 599px) {
     .settings-page .rows { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }

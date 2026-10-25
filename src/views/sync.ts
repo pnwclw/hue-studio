@@ -65,7 +65,6 @@ export class SyncView extends StudioView {
   /** The "save as preset" sheet: the name typed so far (null: closed). */
   @state() private accessor presetName: string | null = null;
   @state() private accessor ir: IrDraft | null = null;
-  @state() private accessor confirmDelete: string | null = null;
   private readonly bri = new BrightnessControl(this);
 
   protected override render() {
@@ -86,7 +85,8 @@ export class SyncView extends StudioView {
       ${this.open?.kind === "what" ? this.whatSheet(id, box) : nothing}
       ${this.open?.kind === "where" ? this.whereSheet(id, box) : nothing}
       ${this.open?.kind === "more" ? this.moreSheet(id, box) : nothing}
-      ${this.presetName !== null ? this.presetSheet(box) : nothing} ${this.ir ? this.irSheet(box, this.ir) : nothing}`;
+      ${this.presetName !== null ? this.presetSheet(box) : nothing} ${this.ir ? this.irSheet(box, this.ir) : nothing}
+      ${this.askSheet()}`;
   }
 
   /** The screen: the box (when there are several), what plays, the three controls, the dock. */
@@ -317,23 +317,18 @@ export class SyncView extends StudioView {
   private presets(id: string, box: SyncBoxInfo) {
     const { ctx } = this;
     const { t } = ctx;
-    const remove = (preset: string) => {
-      if (this.confirmDelete !== preset) {
-        this.confirmDelete = preset;
-        return;
-      }
-      this.confirmDelete = null;
-      ctx.call("hue_studio", "delete_sync_preset", { entity_id: box.entity_id!, preset }, { optimistic: false });
-    };
+    const remove = (preset: string, name: string) =>
+      this.askDelete(t("sync.preset_delete_note", { name }), t("sync.preset_delete"), () =>
+        void ctx.call("hue_studio", "delete_sync_preset", { entity_id: box.entity_id!, preset }, { optimistic: false }),
+      );
     return html`<h2 class="label">${t("sync.presets")}</h2>
       <div class="rows">
         ${(box.presets || []).map(
           (p) => html`<div class="item">
             <ha-icon icon="mdi:bookmark-outline"></ha-icon>
             <button class="grow plain" @click=${() => this.set(id, { preset: p.id })}>${p.name}</button>
-            <button class=${classMap({ "round mini-step": true, danger: this.confirmDelete === p.id })} aria-label=${t("sync.preset_delete")}
-              title=${this.confirmDelete === p.id ? t("sync.preset_delete_confirm") : t("sync.preset_delete")} @click=${() => remove(p.id)}>
-              <ha-icon icon=${this.confirmDelete === p.id ? "mdi:check" : "mdi:delete-outline"}></ha-icon>
+            <button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
+              <ha-icon icon="mdi:delete-outline"></ha-icon>
             </button>
           </div>`,
         )}

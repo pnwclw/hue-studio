@@ -54,12 +54,11 @@ everything else stays.
 | `--text-3` | `#818385` | outlines of checks and radios, faint text |
 | `--text-dark` | `#1c1c1e` | text on light surfaces (a lit room in a light color, white buttons) |
 | `--fill` | grey 28% | round buttons, pills, filter chips |
-| `--fill-soft` | grey 24% | fields, search, segments, the wheels' band, days off |
+| `--fill-soft` | grey 24% | fields, search, the wheels' band, days off |
 | `--fill-strong` | grey 36% | step dots |
 | `--fill-light` | 12% white | round buttons on tinted or colored surfaces, a header pill on a tinted bar |
 | `--round` | 15% white | round buttons (`#47484c` on a bar), an automation card's play |
 | `--switch-off` | `#5e5e61` | a switch's track when off |
-| `--segment-on` | `#636366` | the chosen segment |
 | `--separator` | 10% white | lines between rows, hairline borders |
 | `--hairline` | 6% white | bar borders, pressed rows |
 | `--scrim` | 70% black | under every overlay (sheets, popovers, the brightness slider): a plain dim, no blur (Hue app, measured) |
@@ -109,7 +108,7 @@ Roboto from HA (`--ha-font-family-body`), the system font in the harness. **Weig
 
 ### Radius
 
-`--r-xs` 8 · `--r-s` 10 (fields, segments, menu rows) · `--r-m` 12 (every card and tile:
+`--r-xs` 8 · `--r-s` 10 (fields, menu rows) · `--r-m` 12 (every card and tile:
 rooms, scenes, lights, automations, gallery, banners, groups of rows) · `--r-2xl` 18
 (sheets, dialogs) · `--r-3xl` 22 (a room's header on wide screens, heroes) · `--r-full`
 (pills, switches, chips, tracks). Circles are `50%`.
@@ -176,7 +175,9 @@ Each part: its class (and helper), its measures, where it is used.
   in it is 32px tall.
 - **Tab bar** (`nav.tabs`): the page fading into `--bar-bottom` over 40px (no line), icons
   26px over `--fs-tab` labels, the chosen tab in `--tab-on`, the others in `--tab-off`; on top
-  while the experimental footer is at the bottom. Hidden while the keyboard is up.
+  while the experimental footer is at the bottom. Hidden while the keyboard is up, under a
+  sheet that fills the screen and under the room's "+"; dimmed under any other sheet (and
+  blurred under an action sheet), like the screen.
 - **Page** (`.page`): max 960px, `--gutter` sides, a container for `@container` rules
   (600px: phones vs wide).
 
@@ -195,7 +196,8 @@ Each part: its class (and helper), its measures, where it is used.
 
 - **Pill** `.pill`: 36px, `--fs-footnote` 500 in sentence case, 24px of room on each side,
   `--surface-raised`; in headers and banners 32px, 14px of room, `--surface-2` and uppercase
-  ("SAVE", "DONE"; `--fill-light` on a tinted bar). Variants: `.go` (white, the screen's primary
+  ("SAVE", "DONE"; `--fill-light` on a tinted bar), grey even for the main action. `.apply`
+  is the screen's main action everywhere else (the accent); there is no white pill. Variants: `.go` (white, the screen's primary
   action on dark), `.apply` (accent, a screen's main button), `.outline`, `.danger` (red
   text), `.shuffle` (icon + text), `.reset` (min 180px wide). No other sizes.
 - **Delete** `.delete-btn`: the pill with a 2px red border and a red tint (`--danger-tint`),
@@ -212,7 +214,9 @@ Each part: its class (and helper), its measures, where it is used.
   be used.
 - **Check** `.check` / `.pick-check`: a 24px round tick box (accent when on; `.some` for part
   of a room). **Radio** `.radio`: 24px ring.
-- **Field** `.field` (44px, `--fs-headline`), **search** `.search-field` (32px),
+- **Field** `.field` (44px, `--fs-headline`); **outlined field** `.field.outlined`, the Hue
+  app's (46px, a 1.5px `--outline` border, `--r-xs`, `--surface`, 16px: names on sheets,
+  addresses and codes in flows, a zone's name); **search** `.search-field` (32px),
   `.name-input`. All at least 16px.
 - **Slider** `hue-studio-slider` / `.slider`: an 8px track, 16px knob (the Hue app's), 12px
   in from a card's edges; the room/scene brightness, sheets. **Stepped slider**
@@ -224,9 +228,6 @@ Each part: its class (and helper), its measures, where it is used.
 - **Wheels** `hue-studio-wheel` (`.wheels`, `.wheel-opt`): times are chosen on wheels, never
   the system picker (`momentChoice`, `timeChoice`, `timeWheels`).
 - **Days** `.days-row`: seven 32px round toggles spread over a row.
-- **Segments** `.seg`: up to four equal buttons (`.two`, `.three`) — used only where the Hue
-  app has them (Sync intensity, connection type); a choice inside a section is a row that
-  opens a list instead (`views/choice.ts`).
 - **Chips** `.chip` (32px, 13px, `--surface-low` with a flat shadow, grey text; the chosen one
   white on `--info-tint`, ringed 2px in the accent: a scene's room, a bridge, the Sync Box
   picker), **filter chips** `.chip.filter-chip` (32px, 13px grey capitals not spaced, a white
@@ -273,12 +274,14 @@ Each part: its class (and helper), its measures, where it is used.
   picker; its name asked first on a name sheet; picture (the lights' colors) 48 and name 34
   12px into the panel, the brightness and lights cards rounded 20px in, 20px apart; "Save"
   in the footer; leaving asks "Close and don't save" on an action sheet.
-- **Flow** (`.add-flow`, "Add devices"; the Hue app's): every step a picker; steps with a
+- **Flow** (`.flow`: `flow()`, `flowTitle()` and `flowRing()` in `base.ts`; "Add devices",
+  "Add a bridge", a new MotionAware area; the Hue app's): every step a picker; steps with a
   picture show it on the blue (`.flow-art`, up to 378px, the panel under it), the others
   start the panel at the top; a 28px title (`.flow-title`), a 16px grey lead, the buttons
   in a stacked footer (`.screen-foot.stack`: grey or outlined ones over the accent one).
-  The search is a 300px ring (`.flow-ring`, a 3px track, the accent arc) around the kind's
-  picture, a 40px badge at its top right once over (green tick, red cross). Devices as
+  The search is a 300px ring (`.flow-ring`, a 3px track, the accent arc; a short arc going
+  round while the end is not known) around the kind's picture, a 40px badge at its top right
+  once over (green tick, red cross; the ring red too when nothing was found). Devices as
   tiles (`.dev-tile`: 120×115, a 32px icon at the top left, the name 14 at the bottom, a
   blue tick when found); rooms as rows in a rounded group (`.rows.inset`) under their
   bridge's name, "Create new room" with the accent "+".
@@ -325,7 +328,7 @@ Each part: its class (and helper), its measures, where it is used.
   light, it can no longer be controlled." / "Delete light"), never a button that turns into
   "Tap again".
 - **Tall sheet** (`.sheet.bottom.tall`): fills the screen under the status bar ("Power on",
-  "Device info"); the shorter choices ("Function", "Room") rise from the bottom as tall as
+  "Device info", a zone's editor: close, title and "SAVE" in its bar, "Delete" at the bottom); the shorter choices ("Function", "Room") rise from the bottom as tall as
   their rows.
 - **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
   name in a 46px field with a 1.5px `--outline` border and a round clear button.
@@ -393,6 +396,8 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Motion sensitivity | a sheet: text 12–13, caps 10 over a 16 value, a stepped slider with names 11 under its stops |
 | MotionAware, Sync (empty) | an illustration, title 28–30, text, 36 pills (outlined, accent) |
 | Add devices | a picker throughout: "Where do you want to add devices?" (rooms by bridge in rounded groups, "Create new Room" with a blue "+"); "Add devices to …" (art on the blue, "Alternative method" / "Scan QR code"); "Benefits of using a QR code" ("Set up without QR code" / "Scan QR code"); "Tap the device you'd like to add" (picture tiles by kind, lights full width); "Add lights to …" (art, "Enter code" / "Next"); "Use setup code" (a field, "Search"); "Searching for lights…" (a 320 ring around the picture, the accent arc; "We found these lights" with tiles 120×115; "Next" dim until something joined); "Success!" (a green tick badge, tiles with a blue tick) or "No lights found" (a red cross; "I need help", "Skip" outlined, "Enter code", "Try again"); "Name your lights" (tiles, "Skip"; a tile opens "Edit name and type"); try scenes; zones; "These devices have been added to …" / "No devices added" ("Add more", "Done") |
+| Add a bridge | a picker: "How do you want to connect your Bridge?" (rows: network cable, Wi-Fi); "Connect a Bridge" (the bridge in a ring, "More options" / "Search"); "Searching for Hue Bridge…" (the arc going round); "No Hue Bridge found" (the ring red, a red cross, "Try again"); the camera's QR code first where it may |
+| New MotionAware area | the empty list a picker's art ("Create a MotionAware area", "How does it work?" / "Create area"); the bridge on an action sheet with a title; "Before you choose devices…" ×3 (art, "Next"); "Where are the lights that you want to detect motion?" (radio rows by room, "Next") |
 | Deleting, a room's "⋯" | action sheets over the screen blurred and dimmed (~50%): a 13px grey note ("By deleting this light, it can no longer be controlled."), the red action ("Delete light", "Delete Room"), "CANCEL" |
 | Scene gallery | a picker (deep blue top, the page a panel from 80): title 28 at 24, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
 | Settings, Explore, Sync (tabs) | Settings has no glow; Explore a blue one like Automations; Sync a violet one (`#3f296d` in the middle at the top, gone by ~280) |
@@ -473,3 +478,9 @@ effects sends nothing to the light (checked on an off light against HA's state).
   deleted and found again): a picker through every step, the search ring with its badge,
   device tiles, a stacked footer; questions (leave, delete) on action sheets over a blurred
   screen (`--scrim-blur`), deletes no longer "tap again".
+- 2026-10-25, everything on the system's parts: the flow as one part of `base.ts` ("Add
+  devices", "Add a bridge" and a new MotionAware area on it, their old step lists, segments
+  and rings gone); `.apply` the accent pill everywhere but headers (it was grey outside a
+  footer), the white `.go` pill gone; questions only on action sheets (a zone, a Sync preset;
+  "Reset scene" acts at once, the Hue app's); the outlined field shared; a zone's editor a
+  tall sheet; the tab bar dimmed or hidden under sheets. Segments and `--segment-on` removed.

@@ -23,7 +23,6 @@ import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { navRow } from "./choice.ts";
 
-const RESET_CONFIRM_MS = 3500;
 
 /** The scene "id" of a new one (`/room/<key>/scene/new`). */
 export const NEW_SCENE = "new";
@@ -38,14 +37,12 @@ export class SceneView extends StudioView {
   @property() accessor exitPath: string | null = null;
 
   @state() private accessor editingName = false;
-  @state() private accessor confirmReset = false;
   /** The dynamic speed sheet's step (1-12) while it is open. */
   @state() private accessor speedStep: number | null = null;
   /** A new scene's name sheet: what is typed (null while it is closed). */
   @state() private accessor naming: string | null = null;
   @state() private accessor busy = false;
   private started = false;
-  private resetTimer?: ReturnType<typeof setTimeout>;
 
   private get name(): string {
     const st = this.ctx.hass.states[this.scene];
@@ -86,11 +83,6 @@ export class SceneView extends StudioView {
         if (ok && group) this.ctx.markManual(group);
       });
     }
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    clearTimeout(this.resetTimer);
   }
 
   protected override render() {
@@ -193,8 +185,8 @@ export class SceneView extends StudioView {
       </div>
 
       ${info?.resettable
-        ? html`<div class="center"><button class=${classMap({ pill: true, reset: true, confirm: this.confirmReset })} @click=${() => this.reset()}>
-            ${this.confirmReset ? t("scene.reset_confirm") : t("scene.reset")}
+        ? html`<div class="center"><button class="pill reset" @click=${() => this.reset()}>
+            ${t("scene.reset")}
           </button></div>`
         : nothing}
       <div class="delete-area">
@@ -286,7 +278,7 @@ export class SceneView extends StudioView {
         <div class="form-body">
           <label class="name-field">
             <input
-              class="field"
+              class="field outlined"
               maxlength="32"
               aria-label=${t("room.new_scene_name")}
               .value=${this.naming ?? ""}
@@ -349,15 +341,8 @@ export class SceneView extends StudioView {
     this.ctx.call("hue_studio", "apply_palette", { entity_id: lights, points });
   }
 
+  /** Rebuild the scene from its palette at once, the Hue app's (no question). */
   private async reset(): Promise<void> {
-    if (!this.confirmReset) {
-      this.confirmReset = true;
-      clearTimeout(this.resetTimer);
-      this.resetTimer = setTimeout(() => (this.confirmReset = false), RESET_CONFIRM_MS);
-      return;
-    }
-    this.confirmReset = false;
-    clearTimeout(this.resetTimer);
     if (await this.ctx.call("hue_studio", "reset_scene", { entity_id: this.scene }, { optimistic: false })) {
       this.ctx.toast(this.ctx.t("scene.reset_done"));
     }

@@ -18,6 +18,30 @@ import { type Choice, choiceRows, isScreen, type MomentKind, type MomentValue, t
 
 type Slot = TemplateResult | typeof nothing;
 
+/** A step of a flow: art on the blue (or none), the panel, the footer's buttons (the main one last). */
+export interface FlowStep {
+  art?: Slot;
+  panel: Slot;
+  foot?: Slot;
+}
+
+/** A flow's picture in a ring (the Hue app's search): progress as an accent arc (null: none;
+ *  "spin": a short arc going round while the end is not known), once over a badge at its top
+ *  right; `alarm` turns the ring red (nothing was found). */
+export function flowRing(art: TemplateResult, progress: number | "spin" | null, badge: "ok" | "fail" | null = null, alarm = false): TemplateResult {
+  const r = 148;
+  const c = 2 * Math.PI * r;
+  const arc = progress === "spin" ? 0.22 : progress;
+  return html`<div class=${classMap({ "flow-ring": true, over: !!badge, alarm, spin: progress === "spin" })} role="status" aria-live="polite">
+    <svg viewBox="0 0 300 300" aria-hidden="true">
+      <circle class="track" cx="150" cy="150" r=${r}></circle>
+      ${arc === null ? nothing : html`<circle class="bar" cx="150" cy="150" r=${r} stroke-dasharray=${c} stroke-dashoffset=${c * (1 - arc)}></circle>`}
+    </svg>
+    ${art}
+    ${badge ? html`<span class=${`badge ${badge}`}>${icon(badge === "ok" ? "check" : "close")}</span>` : nothing}
+  </div>`;
+}
+
 export class StudioView extends LightElement {
   @property({ attribute: false }) accessor ctx!: StudioContext;
   /** Bumped by the owner whenever the context changed, so the view re-renders. */
@@ -85,6 +109,30 @@ export class StudioView extends LightElement {
         <button class="cancel" @click=${stay}>${t("common.cancel")}</button>
       </div>
     </div>`;
+  }
+
+  /** A flow's step, the Hue app's ("Add devices", a new bridge, a MotionAware area): a picker,
+   *  its art on the blue over a rounded panel, the buttons in a stacked footer; the first
+   *  step closes (✕), the others go back. */
+  protected flow(first: boolean, back: () => void, step: FlowStep): TemplateResult {
+    const { t } = this.ctx;
+    const head = html`<div class="bar">
+      <button class=${first ? "round close" : "round back"} aria-label=${t(first ? "common.close" : "common.back")} @click=${back}>
+        ${icon(first ? "close" : "back")}
+      </button>
+    </div>`;
+    const art = step.art !== undefined && step.art !== nothing;
+    return html`${this.screen(
+        head,
+        html`${art ? html`<div class="flow-art">${step.art}</div>` : nothing}<div class="flow-panel">${step.panel}</div>`,
+        art ? "flow with-art" : "flow",
+      )}
+      ${step.foot && step.foot !== nothing ? html`<div class="screen-foot stack">${step.foot}</div>` : nothing}`;
+  }
+
+  /** A flow panel's title and lead. */
+  protected flowTitle(text: string, lead?: unknown): TemplateResult {
+    return html`<h1 class="big flow-title">${text}</h1>${lead ? html`<p class="lead flow-lead">${lead}</p>` : nothing}`;
   }
 
   /** A screen: the fixed header, then the scrolling body (a `.page` with `cls`). */

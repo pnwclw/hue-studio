@@ -703,10 +703,10 @@ export class BridgesView extends StudioView {
             ${link.event.step === "done"
               ? html`<div class="link-icon ok">${icon("check")}</div>
                   <p class="lead center-text">${t("bridges.box_moved", { bridge: name, area: link.event.area ?? "" })}</p>
-                  <div class="link-actions"><button class="pill go" @click=${() => this.closeBoxSheet()}>${t("qr.done")}</button></div>`
+                  <div class="link-actions"><button class="pill apply" @click=${() => this.closeBoxSheet()}>${t("qr.done")}</button></div>`
               : link.event.step === "failed"
                 ? html`<p class="lead center-text error">${t(`bridges.box_link_${link.event.reason}` as StringKey, { bridge: name })}</p>
-                    <div class="link-actions"><button class="pill go" @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_link_again")}</button></div>`
+                    <div class="link-actions"><button class="pill apply" @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_link_again")}</button></div>`
                 : html`<span class="spinner big"></span>
                     <p class="lead center-text">${link.event.step === "press" ? t("bridges.box_press", { bridge: name, seconds: left }) : t("bridges.box_connecting", { bridge: name })}</p>
                     <div class="link-actions"><button class="pill" @click=${() => this.cancelBoxLink()}>${t("bridge_add.cancel")}</button></div>`}
@@ -725,7 +725,7 @@ export class BridgesView extends StudioView {
                     )}
                   </div>
                   <div class="center sheet-actions">
-                    <button class="pill go" ?disabled=${!target} @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_move", { bridge: name })}</button>
+                    <button class="pill apply" ?disabled=${!target} @click=${() => target && this.linkBox(id, target)}>${t("bridges.box_move", { bridge: name })}</button>
                   </div>`
               : html`<p class="hint">${t("bridges.box_no_other")}</p>`}`;
     }

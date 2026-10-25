@@ -24,7 +24,7 @@ export const COLORS = {
   "text-2": "#babbbc",
   "text-3": "#818385",
   "text-dark": "#1c1c1e",
-  // Grey fills: buttons and chips; fields, segments and the wheels' band; a switch's track.
+  // Grey fills: buttons and chips; fields and the wheels' band; a switch's track.
   fill: "rgba(120, 120, 128, 0.28)",
   "fill-soft": "rgba(120, 120, 128, 0.24)",
   "fill-strong": "rgba(120, 120, 128, 0.36)",
@@ -32,8 +32,6 @@ export const COLORS = {
   "fill-light": "rgba(255, 255, 255, 0.12)",
   // Round buttons, the Hue app's: white over whatever they sit on (#47484c on a bar).
   round: "rgba(255, 255, 255, 0.15)",
-  // The chosen button of a segmented control.
-  "segment-on": "#636366",
   separator: "rgba(255, 255, 255, 0.1)",
   // A switch's track when off.
   "switch-off": "#5e5e61",
@@ -100,7 +98,7 @@ export const FONT_SIZES = {
 /** Radii (px); "full" makes a pill or a circle of anything. */
 export const RADII = {
   xs: 8,
-  s: 10, // fields, segments, menu rows
+  s: 10, // fields, menu rows
   m: 12, // every card and tile: rooms, scenes, lights, automations, gallery, banners, groups of rows
   "2xl": 18, // sheets and dialogs
   "3xl": 22, // a room's header, big heroes

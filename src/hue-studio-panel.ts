@@ -257,6 +257,8 @@ export class HueStudioPanel extends LitElement {
       route.name === "automation" ||
       route.name === "automationNew" ||
       route.name === "deviceAdd" ||
+      route.name === "bridgeAdd" ||
+      (route.name === "motionArea" && route.area === "new") ||
       (route.name === "bridges" && route.mode === "bridges" && !!route.item) ||
       route.name === "gallery";
     // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
@@ -266,7 +268,10 @@ export class HueStudioPanel extends LitElement {
         (route.name === "bridges" && route.mode === "bridges" && !!route.item));
     // Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
     // page as a rounded panel over it.
-    const picker = route.name === "automationNew" || route.name === "gallery" || route.name === "deviceAdd" || newScene;
+    // Flows too: adding devices or a bridge, a new MotionAware area.
+    const newArea = route.name === "motionArea" && route.area === "new";
+    const picker =
+      route.name === "automationNew" || route.name === "gallery" || route.name === "deviceAdd" || route.name === "bridgeAdd" || newArea || newScene;
     const glow = this.glow(ctx, route);
     // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
     const top = !!ctx.config.footer && ctx.narrow;

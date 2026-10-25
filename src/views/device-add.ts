@@ -31,7 +31,7 @@ import { findGroup } from "../model.ts";
 import { bridgeRoomAreas } from "../rooms.ts";
 import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
-import { StudioView } from "./base.ts";
+import { type FlowStep, flowRing, StudioView } from "./base.ts";
 
 type Step = "where" | "intro" | "benefits" | "kind" | "prepare" | "code" | "search" | "result" | "name" | "summary";
 
@@ -207,35 +207,20 @@ export class DeviceAddView extends StudioView {
   protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
-    const first = !this.trail.length;
-    const head = html`<div class="bar">
-      <button class=${first ? "round close" : "round back"} aria-label=${t(first ? "common.close" : "common.back")} @click=${() => this.back()}>
-        ${icon(first ? "close" : "back")}
-      </button>
-    </div>`;
-    let art: TemplateResult | typeof nothing = nothing;
-    let panel: TemplateResult;
-    let foot: TemplateResult | typeof nothing = nothing;
-    if (!this.devices) panel = html`<p class="empty">${t("rooms.loading")}</p>`;
-    else if (!this.bridges.length) panel = html`<p class="empty">${t("add_device.no_bridge")}</p>`;
-    else {
-      const view = this.screenOf(this.step);
-      ({ art = nothing, panel, foot = nothing } = view);
-    }
+    const step: FlowStep = !this.devices
+      ? { panel: html`<p class="empty">${t("rooms.loading")}</p>` }
+      : !this.bridges.length
+        ? { panel: html`<p class="empty">${t("add_device.no_bridge")}</p>` }
+        : this.screenOf(this.step);
     // The scanner's and the name's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
-    return html`${this.screen(
-        head,
-        html`${art !== nothing ? html`<div class="flow-art">${art}</div>` : nothing}<div class="flow-panel">${panel}</div>`,
-        art !== nothing ? "add-flow with-art" : "add-flow",
-      )}
-      ${foot !== nothing ? html`<div class="screen-foot stack">${foot}</div>` : nothing}
+    return html`${this.flow(!this.trail.length, () => this.back(), step)}
       ${this.naming ? this.nameSheet(this.naming) : nothing}
       ${this.newRoom !== null ? this.roomSheet() : nothing}
       <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning} @qr-code=${(e: CustomEvent<InstallCode>) => this.scanned(e.detail)}
         @close=${() => (this.scanning = false)}></hue-studio-qr-scan>`;
   }
 
-  private screenOf(step: Step): { art?: TemplateResult; panel: TemplateResult; foot?: TemplateResult } {
+  private screenOf(step: Step): FlowStep {
     switch (step) {
       case "where":
         return this.where();
@@ -260,9 +245,7 @@ export class DeviceAddView extends StudioView {
     }
   }
 
-  private heading(text: string, lead?: TemplateResult | string): TemplateResult {
-    return html`<h1 class="big flow-title">${text}</h1>${lead ? html`<p class="lead flow-lead">${lead}</p>` : nothing}`;
-  }
+
 
   /** Where the devices go: the HA areas, by bridge, and a new one. */
   private where() {
@@ -282,7 +265,7 @@ export class DeviceAddView extends StudioView {
       this.go(this.qrBridge ? "intro" : "kind");
     };
     return {
-      panel: html`${this.heading(t("add_device.where"))}
+      panel: html`${this.flowTitle(t("add_device.where"))}
         ${this.bridges.map(
           ([id, b]) => html`<h2 class="label">${b.name}</h2>
             <div class="rows inset">
@@ -307,7 +290,7 @@ export class DeviceAddView extends StudioView {
     const { t } = this.ctx;
     return {
       art: html`<ha-icon class="art-icon" icon="hue-studio:devices"></ha-icon>`,
-      panel: this.heading(t("add_device.add_to", { room: this.roomName }), t("add_device.qr_lead")),
+      panel: this.flowTitle(t("add_device.add_to", { room: this.roomName }), t("add_device.qr_lead")),
       foot: html`<button class="pill" @click=${() => this.go("benefits")}>${t("add_device.alternative")}</button>
         <button class="pill apply" @click=${() => (this.scanning = true)}>${t("add_device.scan_qr")}</button>`,
     };
@@ -316,7 +299,7 @@ export class DeviceAddView extends StudioView {
   private benefits() {
     const { t } = this.ctx;
     return {
-      panel: html`${this.heading(t("add_device.benefits"), t("add_device.benefits_1"))}<p class="lead flow-lead">${t("add_device.benefits_2")}</p>`,
+      panel: html`${this.flowTitle(t("add_device.benefits"), t("add_device.benefits_1"))}<p class="lead flow-lead">${t("add_device.benefits_2")}</p>`,
       foot: html`<button class="pill" @click=${() => this.go("kind")}>${t("add_device.without_qr")}</button>
         <button class="pill apply" @click=${() => (this.scanning = true)}>${t("add_device.scan_qr")}</button>`,
     };
@@ -338,7 +321,7 @@ export class DeviceAddView extends StudioView {
         <ha-icon icon=${KIND_ICONS[kind]}></ha-icon><span class="name">${t(`add_device.kind_${kind}` as StringKey)}</span>
       </button>`;
     return {
-      panel: html`${this.heading(t("add_device.which"))}
+      panel: html`${this.flowTitle(t("add_device.which"))}
         ${bridge?.searching === null
           ? html`<p class="lead flow-lead">${t("devices.unsupported")}</p>`
           : html`<h2 class="label">${t("add_device.section_light")}</h2>
@@ -358,7 +341,7 @@ export class DeviceAddView extends StudioView {
     const { t } = this.ctx;
     return {
       art: html`<ha-icon class="art-icon" icon=${KIND_ICONS[this.kind]}></ha-icon>`,
-      panel: html`${this.heading(t(`add_device.add_${this.kind}` as StringKey, { room: this.roomName }), STEPS[this.kind].map((key) => t(key)).join(" "))}
+      panel: html`${this.flowTitle(t(`add_device.add_${this.kind}` as StringKey, { room: this.roomName }), STEPS[this.kind].map((key) => t(key)).join(" "))}
         ${this.kind === "other" ? html`<p class="lead flow-lead">${t("add_device.other_note")}</p>` : nothing}`,
       foot: html`${this.kind === "accessory" ? nothing : html`<button class="pill" @click=${() => this.go("code")}>${t("add_device.enter_code")}</button>`}
         <button class="pill apply" ?disabled=${this.busy} @click=${() => this.search()}>${t("add_device.next")}</button>`,
@@ -372,8 +355,8 @@ export class DeviceAddView extends StudioView {
     const bad = parsed.invalid.length > 0 || parsed.tooMany;
     const empty = !parsed.codes.length && !parsed.qr.length;
     return {
-      panel: html`${this.heading(t("add_device.code_title"), t("add_device.code_lead"))}
-        <input class="field flow-field" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder=${t("add_device.code_placeholder")}
+      panel: html`${this.flowTitle(t("add_device.code_title"), t("add_device.code_lead"))}
+        <input class="field outlined" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder=${t("add_device.code_placeholder")}
           aria-label=${t("devices.serials")} .value=${this.serials} @input=${(e: InputEvent) => (this.serials = (e.target as HTMLInputElement).value)} />
         ${bad
           ? html`<p class="hint error">${t(parsed.tooMany ? "add_device.serials_many" : "add_device.serials_bad", { codes: parsed.invalid.join(", ") })}</p>`
@@ -383,18 +366,9 @@ export class DeviceAddView extends StudioView {
   }
 
   /** The search ring around the kind's picture; a badge once it is over. */
-  private ring(badge: "ok" | "none" | null): TemplateResult {
-    const progress = badge ? 1 : searchProgress(this.started, this.now);
-    const r = 148;
-    const c = 2 * Math.PI * r;
-    return html`<div class=${classMap({ "flow-ring": true, over: !!badge })} role="status" aria-live="polite">
-      <svg viewBox="0 0 300 300" aria-hidden="true">
-        <circle class="track" cx="150" cy="150" r=${r}></circle>
-        ${badge ? nothing : html`<circle class="bar" cx="150" cy="150" r=${r} stroke-dasharray=${c} stroke-dashoffset=${c * (1 - progress)}></circle>`}
-      </svg>
-      <ha-icon class="art-icon" icon=${KIND_ICONS[this.kind]}></ha-icon>
-      ${badge ? html`<span class=${`badge ${badge}`}>${icon(badge === "ok" ? "check" : "close")}</span>` : nothing}
-    </div>`;
+  private ring(badge: "ok" | "fail" | null): TemplateResult {
+    const art = html`<ha-icon class="art-icon" icon=${KIND_ICONS[this.kind]}></ha-icon>`;
+    return flowRing(art, badge ? null : searchProgress(this.started, this.now), badge);
   }
 
   /** The bridge searches; what joined shows up as it does. */
@@ -403,7 +377,7 @@ export class DeviceAddView extends StudioView {
     const found = this.found;
     return {
       art: this.ring(null),
-      panel: html`${this.heading(t(`add_device.searching_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
+      panel: html`${this.flowTitle(t(`add_device.searching_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
         ${this.round > 1 ? html`<p class="lead flow-lead small">${t("add_device.round", { round: this.round, rounds: SEARCH_ROUNDS })}</p>` : nothing}
         ${found.length
           ? html`<p class="lead flow-lead">${t("add_device.found_these")}</p><div class="dev-tiles">${found.map((d) => this.devTile(d))}</div>`
@@ -419,13 +393,13 @@ export class DeviceAddView extends StudioView {
     if (found.length)
       return {
         art: this.ring("ok"),
-        panel: html`${this.heading(t("add_device.success"), t("add_device.success_lead", { room: this.roomName }))}
+        panel: html`${this.flowTitle(t("add_device.success"), t("add_device.success_lead", { room: this.roomName }))}
           <div class="dev-tiles">${found.map((d) => this.devTile(d, null, true))}</div>`,
         foot: html`<button class="pill apply" @click=${() => this.go("name")}>${t("add_device.next")}</button>`,
       };
     return {
-      art: this.ring("none"),
-      panel: html`${this.heading(t(`add_device.none_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
+      art: this.ring("fail"),
+      panel: html`${this.flowTitle(t(`add_device.none_${this.kind}` as StringKey), t(`add_device.ready_${this.kind}` as StringKey))}
         ${this.help
           ? html`<h2 class="label">${t("add_device.tips")}</h2>
               <ul class="add-steps tips">
@@ -445,7 +419,7 @@ export class DeviceAddView extends StudioView {
     const found = this.found;
     const renamed = found.some((d) => this.names[d.id] !== undefined);
     return {
-      panel: html`${this.heading(t(`add_device.name_${this.kind}` as StringKey), t("add_device.name_lead"))}
+      panel: html`${this.flowTitle(t(`add_device.name_${this.kind}` as StringKey), t("add_device.name_lead"))}
         <div class="dev-tiles">${found.map((d) => this.devTile(d, () => this.openName(d)))}</div>`,
       foot: html`<button class=${classMap({ pill: true, outline: !renamed, apply: renamed })} ?disabled=${this.busy} @click=${() => this.saveAll(found)}>
         ${t(renamed ? "add_device.next" : "add_device.skip")}
@@ -463,12 +437,12 @@ export class DeviceAddView extends StudioView {
       .filter(([, list]) => list.length);
     return {
       panel: done.length
-        ? html`${this.heading(t("add_device.added", { room: this.roomName }), t("add_device.added_lead"))}
+        ? html`${this.flowTitle(t("add_device.added", { room: this.roomName }), t("add_device.added_lead"))}
             ${sections.map(
               ([kind, list]) => html`<h2 class="label">${t(`add_device.section_${kind}` as StringKey)}</h2>
                 <div class="dev-tiles">${list.map(([, d]) => html`<div class="dev-tile"><ha-icon icon=${d.icon}></ha-icon><span class="name">${d.name}</span></div>`)}</div>`,
             )}`
-        : this.heading(t("add_device.none_added"), t("add_device.none_added_lead")),
+        : this.flowTitle(t("add_device.none_added"), t("add_device.none_added_lead")),
       foot: html`<button class="pill" @click=${() => this.go("kind")}>${t("add_device.add_more")}</button>
         <button class="pill apply" @click=${() => ctx.go(this.exitPath)}>${t("add_device.done")}</button>`,
     };
@@ -501,7 +475,7 @@ export class DeviceAddView extends StudioView {
         <div class="form-body">
           <div class="name-pic"><ha-icon icon=${deviceIcon(ctx.hass, d)}></ha-icon></div>
           <label class="name-field">
-            <input class="field" maxlength=${NAME_MAX} aria-label=${t("devices.name")} .value=${n.name}
+            <input class="field outlined" maxlength=${NAME_MAX} aria-label=${t("devices.name")} .value=${n.name}
               @input=${(e: InputEvent) => (this.naming = { device: d, name: (e.target as HTMLInputElement).value })}
               @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()} />
             ${n.name
@@ -536,7 +510,7 @@ export class DeviceAddView extends StudioView {
         </div>
         <div class="form-body">
           <label class="name-field">
-            <input class="field" maxlength="50" placeholder=${t("add_device.new_room_name")} aria-label=${t("add_device.new_room_name")} .value=${name}
+            <input class="field outlined" maxlength="50" placeholder=${t("add_device.new_room_name")} aria-label=${t("add_device.new_room_name")} .value=${name}
               @input=${(e: InputEvent) => (this.newRoom = (e.target as HTMLInputElement).value)}
               @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.createArea()} />
           </label>

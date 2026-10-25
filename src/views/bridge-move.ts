@@ -255,7 +255,7 @@ export class BridgeMoveView extends StudioView {
               <div class=${classMap({ "dim small": true, error: bad })}>${bad ? t("move.serial_bad") : t("move.serial_hint")}</div>
             </div>
           </div>
-          <div class="center sheet-actions"><button class="pill go" ?disabled=${bad} @click=${done}>${t("qr.done")}</button></div>
+          <div class="center sheet-actions"><button class="pill apply" ?disabled=${bad} @click=${done}>${t("qr.done")}</button></div>
         </div>
       </div>
     </div>`;
@@ -340,7 +340,7 @@ export class BridgeMoveView extends StudioView {
             </div>
             <p class="lead small">${t("move.meanwhile", params)}</p>
             <div class="center">
-              <button class="pill go" ?disabled=${this.busy} @click=${() => this.send({ type: "hue_studio/bridges/move", ...this.request, prepared: this.prepared })}>
+              <button class="pill apply" ?disabled=${this.busy} @click=${() => this.send({ type: "hue_studio/bridges/move", ...this.request, prepared: this.prepared })}>
                 ${t("move.start", { bridge: plan.target_name })}
               </button>
             </div>`
@@ -393,7 +393,7 @@ export class BridgeMoveView extends StudioView {
       <div class="rows">${s.devices.map((d) => this.deviceRow(s, d))}</div>
       ${stuck && reason !== "not_found"
         ? html`<div class="link-actions">
-            <button class="pill go" ?disabled=${this.busy || s.running} @click=${() => this.send({ type: "hue_studio/bridges/move/retry" })}>${t("move.again", { bridge: s.target_name })}</button>
+            <button class="pill apply" ?disabled=${this.busy || s.running} @click=${() => this.send({ type: "hue_studio/bridges/move/retry" })}>${t("move.again", { bridge: s.target_name })}</button>
             <button class="pill" ?disabled=${this.busy || s.running} @click=${() => this.finish()}>${t("move.stop")}</button>
           </div>`
         : nothing}
@@ -454,7 +454,7 @@ export class BridgeMoveView extends StudioView {
           </div>`
         : nothing}
       <div class="link-actions">
-        <button class="pill go" ?disabled=${this.busy || s.running} @click=${() => retry()}>${t("move.again", { bridge: s.target_name })}</button>
+        <button class="pill apply" ?disabled=${this.busy || s.running} @click=${() => retry()}>${t("move.again", { bridge: s.target_name })}</button>
         ${onSource && d.light
           ? html`<button class="pill" ?disabled=${this.busy || s.running} @click=${() => retry({ release: true })}>${t("move.release", params)}</button>`
           : nothing}
@@ -538,7 +538,7 @@ export class BridgeMoveView extends StudioView {
           </button>`,
         )}
         <div class="link-actions">
-          <button class="pill go" @click=${() => this.finish()}>${t("move.finish")}</button>
+          <button class="pill apply" @click=${() => this.finish()}>${t("move.finish")}</button>
           ${lost.length ? html`<button class="pill" @click=${() => this.finish("/settings/devices/lost")}>${t("lost.title")}</button>` : nothing}
         </div>
       </div>

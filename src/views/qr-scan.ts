@@ -197,7 +197,7 @@ export class QrScan extends LightElement {
           : html`<p class=${classMap({ hint: true, "center-text": true, ok: !!this.note?.ok, warn: !!this.note && !this.note.ok })}>
               ${this.note?.text ?? t("qr.description")}
             </p>`}
-        <div class="center"><button class="pill go" @click=${() => this.close()}>${t("qr.done")}</button></div>
+        <div class="center"><button class="pill apply" @click=${() => this.close()}>${t("qr.done")}</button></div>
       </div>
     </div>`;
   }

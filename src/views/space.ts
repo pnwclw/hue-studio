@@ -129,7 +129,7 @@ export class SpaceView extends StudioView {
             </div>`
         : nothing}
       <div class="center stack">
-        <button class="pill go" ?disabled=${!changed || this.busy || streaming} @click=${() => this.save()}>${t("space.save")}</button>
+        <button class="pill apply" ?disabled=${!changed || this.busy || streaming} @click=${() => this.save()}>${t("space.save")}</button>
         ${changed ? html`<button class="pill" @click=${() => (this.draft = {})}>${t("space.discard")}</button>` : nothing}
       </div>`,
       "space-page",

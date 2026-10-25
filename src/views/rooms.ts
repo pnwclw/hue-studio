@@ -21,7 +21,6 @@ interface ZoneDraft {
   bridge: string | null;
   name: string;
   lights: string[];
-  confirmDelete: boolean;
 }
 
 const names = (ctx: StudioContext, ids: string[]): string => ids.map((id) => friendlyName(ctx.hass, id)).join(", ");
@@ -159,7 +158,7 @@ export class RoomsView extends StudioView {
               : nothing}
           </div>`
         : nothing}
-      <div class="center"><button class="pill go" ?disabled=${this.busy} @click=${() => this.align()}>${t("rooms.align")}</button></div>
+      <div class="center"><button class="pill apply" ?disabled=${this.busy} @click=${() => this.align()}>${t("rooms.align")}</button></div>
       ${auto}`;
   }
 
@@ -227,7 +226,7 @@ export class RoomsView extends StudioView {
   private edit(zone: Zone | null): void {
     const plan = this.ctx.rooms;
     const bridge = zone ? groupBridge(plan, { lights: zone.lights, group: zone.entity_id }) : (Object.keys(plan?.bridges || {})[0] ?? null);
-    this.draft = { zone: zone?.entity_id ?? null, bridge, name: zone?.name ?? "", lights: zone ? [...zone.lights] : [], confirmDelete: false };
+    this.draft = { zone: zone?.entity_id ?? null, bridge, name: zone?.name ?? "", lights: zone ? [...zone.lights] : [] };
     this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet input")?.focus());
   }
 
@@ -250,7 +249,7 @@ export class RoomsView extends StudioView {
     const zone = draft.zone ? hueZones(ctx.hass).find((z) => z.entity_id === draft.zone) : undefined;
     const name = draft.name.trim();
     // Read the current draft, not this render's: two taps may come before the next render.
-    const set = (patch: Partial<ZoneDraft>) => (this.draft = { ...this.draft!, ...patch, confirmDelete: false });
+    const set = (patch: Partial<ZoneDraft>) => (this.draft = { ...this.draft!, ...patch });
     const flip = (light: string) => {
       const lights = this.draft!.lights;
       set({ lights: lights.includes(light) ? lights.filter((l) => l !== light) : [...lights, light] });
@@ -269,10 +268,6 @@ export class RoomsView extends StudioView {
     };
     const remove = async () => {
       if (!draft.zone || this.busy) return;
-      if (!this.draft?.confirmDelete) {
-        this.draft = { ...draft, confirmDelete: true };
-        return;
-      }
       this.busy = true;
       const ok = await ctx.call("hue_studio", "delete_zone", { entity_id: draft.zone }, { optimistic: false });
       this.busy = false;
@@ -281,14 +276,17 @@ export class RoomsView extends StudioView {
         ctx.toast(t("zone.deleted", { name: zone?.name || name }));
       }
     };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form zone-editor" role="dialog" aria-label=${draft.zone ? t("zone.title_edit") : t("zone.title_new")}>
-        <div class="sheet-bar"><div class="grow">${draft.zone ? t("zone.title_edit") : t("zone.title_new")}</div>
+    // An editor on a tall sheet (the Hue app's): close, its title and "SAVE" in the bar, "Delete" at the bottom.
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form sensor-sheet zone-editor" role="dialog" aria-label=${draft.zone ? t("zone.title_edit") : t("zone.title_new")}>
+        <div class="sheet-bar">
           <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+          <div class="grow">${draft.zone ? t("zone.title_edit") : t("zone.title_new")}</div>
+          <button class="pill save" ?disabled=${!name || !draft.lights.length || this.busy} @click=${save}>${t("zone.save")}</button>
         </div>
-        <div class="form-body">
+        <div class="form-body name-sheet">
           <input
-            class="field"
+            class="field outlined"
             maxlength="32"
             placeholder=${t("zone.name")}
             aria-label=${t("zone.name")}
@@ -314,15 +312,16 @@ export class RoomsView extends StudioView {
               )}
             </div>`,
         )}
-        <div class="actions">
-          <button class="pill apply" ?disabled=${!name || !draft.lights.length || this.busy} @click=${save}>${t("zone.save")}</button>
-          ${draft.zone
-            ? html`<button class=${classMap({ pill: true, reset: true, danger: true, confirm: draft.confirmDelete })} ?disabled=${this.busy} @click=${remove}>
-                  ${draft.confirmDelete ? t("zone.delete_confirm") : t("zone.delete")}
-                </button>
-                ${zone?.scenes ? html`<div class="target">${t("zone.delete_hint", { count: zone.scenes })}</div>` : nothing}`
-            : nothing}
-        </div>
+        ${draft.zone
+          ? html`<div class="delete-area">
+              <button class="delete-btn" ?disabled=${this.busy} @click=${() =>
+                this.askDelete(
+                  [t("zone.delete_note"), zone?.scenes ? t("zone.delete_hint", { count: zone.scenes }) : ""].filter(Boolean).join(" "),
+                  t("zone.delete"),
+                  () => void remove(),
+                )}>${t("zone.delete")}</button>
+            </div>`
+          : nothing}
       </div>
     </div>`;
   }

@@ -94,8 +94,6 @@ const CARD_CSS = css`
   .chip { flex: none; height: 30px; padding: 0 12px; border-radius: var(--r-full); border: 1.5px solid transparent; background: var(--surface);
           cursor: pointer; font-size: var(--fs-footnote); }
   .chip.on { border-color: var(--text); }
-  .seg { margin-top: 12px; }
-  .seg button.on { background: var(--surface-2); }
   .meta-line { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: var(--fs-caption); color: var(--text-2); }
   .meta-line span { display: inline-flex; align-items: center; gap: 4px; }
   .meta-line ha-icon { --mdc-icon-size: 15px; }

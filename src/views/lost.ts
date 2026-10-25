@@ -136,7 +136,7 @@ export class LostView extends StudioView {
         </div>
       </div>
       <div class="link-actions">
-        <button class="pill go" ?disabled=${!target || bad || this.busy} @click=${find}>${t("lost.find", { bridge: name })}</button>
+        <button class="pill apply" ?disabled=${!target || bad || this.busy} @click=${find}>${t("lost.find", { bridge: name })}</button>
         <button class=${classMap({ pill: true, reset: true, danger: true, confirm: this.confirmForget })} ?disabled=${this.busy} @click=${forget}>
           ${t(this.confirmForget ? "lost.forget_confirm" : "lost.forget")}
         </button>
