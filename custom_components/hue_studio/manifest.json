@@ -13,6 +13,7 @@
     "frontend",
     "http",
     "hue",
+    "image_upload",
     "panel_custom",
     "websocket_api"
   ],

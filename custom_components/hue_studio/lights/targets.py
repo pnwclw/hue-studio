@@ -86,8 +86,3 @@ def explicit_ids(call: ServiceCall) -> list[str]:
     """Entity ids listed in the call (not "all", not area/device targets)."""
     ids = call.data.get(ATTR_ENTITY_ID, [])
     return [] if isinstance(ids, str) else list(ids)
-
-
-def touched(call: ServiceCall, lights: list[HueLight]) -> list[str]:
-    """Lights we changed plus the groups the caller named (AL may list either)."""
-    return [light.entity_id for light in lights] + explicit_ids(call)

@@ -55,7 +55,11 @@ const SPOTS: XY[] = [[18, 28], [78, 22], [55, 78], [12, 85], [90, 75], [45, 40]]
 
 /** CSS background for a palette without a picture: soft blobs of its colors. */
 export function paletteArt(palette: Palette): string {
-  const colors = paletteColors(palette);
+  return colorsArt(paletteColors(palette));
+}
+
+/** Soft blobs of CSS colors over a diagonal between the first and the last (a scene's lights). */
+export function colorsArt(colors: string[]): string {
   const layers = colors.map((c, i) => {
     const [x, y] = SPOTS[i % SPOTS.length];
     return `radial-gradient(circle at ${x}% ${y}%, ${c} 0, transparent 62%)`;

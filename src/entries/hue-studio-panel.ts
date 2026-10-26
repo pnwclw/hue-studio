@@ -69,6 +69,7 @@ import "../features/rooms/views/home.ts";
 import "../features/bridges/views/motion-area.ts";
 import "../features/rooms/views/room.ts";
 import "../features/rooms/views/rooms.ts";
+import "../features/rooms/views/zone.ts";
 import "../features/settings/views/settings.ts";
 import "../features/rooms/views/space.ts";
 import { NEW_SCENE } from "../features/scenes/views/scene.ts";
@@ -98,6 +99,7 @@ type Route =
   | { name: "sync"; box: string | null }
   | { name: "syncSettings"; box: string | null }
   | { name: "rooms" }
+  | { name: "zone"; zone: string }
   | { name: "settings" }
   | { name: "experimental" }
   | { name: "gallerySettings" }
@@ -141,6 +143,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
   if (parts[0] === "sync" && parts[1] === "settings") return { name: "syncSettings", box: params.get("box") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
+  if (parts[0] === "rooms" && parts[1] === "zone" && parts[2]) return { name: "zone", zone: parts[2] };
   if (parts[0] === "rooms") return { name: "rooms" };
   if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return {
       name: "automation",
@@ -240,7 +243,7 @@ export class HueStudioPanel extends LitElement {
         ? "sync"
         : route.name === "automations" || route.name === "automationNew" || route.name === "automation"
           ? "automations"
-          : route.name === "settings" || route.name === "rooms" || route.name === "experimental" || route.name === "gallerySettings" ||
+          : route.name === "settings" || route.name === "rooms" || route.name === "zone" || route.name === "experimental" || route.name === "gallerySettings" ||
               route.name === "daylight" ||
               route.name === "devices" ||
               route.name === "device" ||
@@ -266,6 +269,7 @@ export class HueStudioPanel extends LitElement {
       route.name === "sensor" ||
       route.name === "deviceSensor" ||
       route.name === "device" ||
+      route.name === "zone" ||
       route.name === "automation" ||
       route.name === "automationNew" ||
       route.name === "deviceAdd" ||
@@ -342,7 +346,7 @@ export class HueStudioPanel extends LitElement {
     // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
     // rounded under the status bar).
     const newScene = route.name === "scene" && route.scene === NEW_SCENE;
-    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation" ||
+    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "zone" || route.name === "automation" ||
         (route.name === "bridges" && route.mode === "bridges" && !!route.item) || route.name === "syncSettings");
     const glow = this.glow(ctx, route);
     return html`<main
@@ -441,6 +445,8 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-daylight-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-daylight-settings-view>`;
       case "rooms":
         return html`<hue-studio-rooms-view .ctx=${ctx} .rev=${rev}></hue-studio-rooms-view>`;
+      case "zone":
+        return html`<hue-studio-zone-view .ctx=${ctx} .rev=${rev} .zone=${route.zone}></hue-studio-zone-view>`;
       case "gallery":
         return html`<hue-studio-gallery-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-gallery-view>`;
       default:

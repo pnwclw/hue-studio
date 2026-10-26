@@ -32,7 +32,6 @@ import voluptuous as vol
 
 from ..const import DOMAIN
 from ..space.positions import async_light_positions, spatial_colors
-from .adaptive import async_mark_manual
 from .bridge import NOT_EFFECTS, HueLight, supported_effects
 from .palettes import (
     ATTR_GALLERY_SCENE,
@@ -51,7 +50,6 @@ from .targets import (
     TRANSITION,
     XY_POINT,
     async_target_lights,
-    touched,
 )
 
 SERVICE_APPLY_PALETTE = "apply_palette"
@@ -135,7 +133,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
             if transition is not None:
                 put.dynamics = DynamicsFeaturePut(duration=round(transition * 1000))
             await _async_update(light, put)
-        await async_mark_manual(hass, touched(call, lights))
 
     async def set_gradient(call: ServiceCall) -> None:
         lights = await async_target_lights(hass, call)
@@ -151,7 +148,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
             put = _base_put(call.data.get(ATTR_BRIGHTNESS))
             put.gradient = _gradient(light, points, call.data.get(ATTR_MODE))
             await _async_update(light, put)
-        await async_mark_manual(hass, touched(call, lights))
 
     async def set_effect(call: ServiceCall) -> None:
         lights = await async_target_lights(hass, call)
@@ -169,7 +165,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     )
         for light in lights:
             await _async_update(light, _effect_put(light, effect, call.data))
-        await async_mark_manual(hass, touched(call, lights))
 
     hass.services.async_register(
         DOMAIN, SERVICE_APPLY_PALETTE, apply_palette, schema=APPLY_PALETTE_SCHEMA

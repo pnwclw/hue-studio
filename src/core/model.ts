@@ -69,15 +69,6 @@ export interface HueSensor {
   battery: string | null;
 }
 
-export interface AdaptiveSwitch {
-  switch: string;
-  on: boolean;
-  /** Lights of the group under manual control. */
-  manual: string[];
-  /** Lights of the group the switch controls. */
-  lights: string[];
-}
-
 export const isHueLight = (hass: HassData, id: string): boolean =>
   hass.entities?.[id]?.platform === "hue" && id.startsWith("light.") && !hass.states[id]?.attributes.is_hue_group;
 
@@ -347,24 +338,6 @@ export function sensitivityLevels(max: number): string[] | null {
   if (max === 2) return ["low", "medium", "high"];
   if (max === 4) return ["very_low", "low", "medium", "high", "very_high"];
   return null;
-}
-
-/**
- * Adaptive Lighting switches that control any light of the group (by light or by the Hue
- * group entity). Returns [{switch, on, manual: [light ids under manual control]}].
- */
-export function adaptiveFor(hass: HassData, group: Pick<Group, "lights" | "group">): AdaptiveSwitch[] {
-  const ids = new Set([...group.lights, ...(group.group ? [group.group] : [])]);
-  return Object.keys(hass.states)
-    .filter((id) => id.startsWith("switch.") && hass.entities?.[id]?.platform === "adaptive_lighting")
-    .map((id) => ({ id, attrs: hass.states[id].attributes, on: hass.states[id].state === "on" }))
-    .filter(({ attrs }) => (attrs.configuration?.lights || []).some((l: string) => ids.has(l)))
-    .map(({ id, attrs, on }) => ({
-      switch: id,
-      on,
-      manual: (attrs.manual_control || []).filter((l: string) => ids.has(l)),
-      lights: (attrs.configuration.lights || []).filter((l: string) => ids.has(l)),
-    }));
 }
 
 /** CSS background for a lit room card: its light colors left to right. */

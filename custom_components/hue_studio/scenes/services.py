@@ -23,7 +23,6 @@ from homeassistant.helpers.service import (
 import voluptuous as vol
 
 from ..const import DOMAIN
-from ..lights.adaptive import async_mark_manual
 from ..lights.palettes import ATTR_GALLERY_SCENE, ATTR_MIREK, ATTR_POINTS, async_palette
 from ..lights.targets import (
     ATTR_BRIGHTNESS,
@@ -44,13 +43,12 @@ from .bridge import (
     captured_actions,
     group_scene_names,
     is_resettable,
-    light_entity_ids,
     new_scene,
     palette_actions,
     palette_feature,
-    scene_lights,
     scene_post_json,
 )
+from .covers import COVERS
 
 SERVICE_CREATE_SCENE = "create_scene"
 SERVICE_DELETE_SCENE = "delete_scene"
@@ -203,6 +201,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
                     translation_key="command_failed",
                     translation_placeholders={"entity_id": scene.entity_id},
                 ) from err
+            if covers := hass.data.get(COVERS):
+                covers.async_set(scene.resource.id, None)
 
     async def export_scenes(call: ServiceCall) -> ServiceResponse:
         """Write the scenes (of the targeted Hue rooms/zones) to a file."""
@@ -266,9 +266,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
                         translation_key="command_failed",
                         translation_placeholders={"entity_id": scene.entity_id},
                     ) from err
-                await async_mark_manual(
-                    hass, light_entity_ids(hass, scene_lights(scene))
-                )
 
     async def recall_scene(call: ServiceCall) -> None:
         """Play a scene dynamically or statically, or as it is set up."""
@@ -287,7 +284,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
             if (transition := call.data.get(ATTR_TRANSITION)) is not None:
                 recall.duration = round(transition * 1000)
             await _async_update_scene(scene, ScenePut(recall=recall))
-            await async_mark_manual(hass, light_entity_ids(hass, scene_lights(scene)))
 
     hass.services.async_register(
         DOMAIN,

@@ -75,7 +75,7 @@ const GROUPS: Record<string, [string, string, string[]]> = {
 };
 
 const SCENES: Record<string, string[]> = {
-  office: ["Read", "Bright", "Dimmed", "Nature's colors", "Ocean dawn"],
+  office: ["Read", "Bright", "Dimmed", "Nature's colors", "Ocean dawn", "My evening"],
   tv_area: ["Movie", "Read"],
   balcony: ["Galaxy", "Fairy lights"],
   downstairs: ["Relax", "Ocean dawn"],
@@ -261,19 +261,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     friendly_name: "Hue Studio Mood",
     options: ["auto", "relax", "cozy", "focus", "romantic", "party", "festive"],
   });
-  // Adaptive Lighting for the office lamp.
-  entities["switch.adaptive_lighting_office"] = { platform: "adaptive_lighting" };
   states["button.wake_on_lan_pc"] = { entity_id: "button.wake_on_lan_pc", state: "unknown", attributes: { friendly_name: "Wake on LAN PC" } };
   states["binary_sensor.pc_picture"] = { entity_id: "binary_sensor.pc_picture", state: "on", attributes: { friendly_name: "PC picture" } };
   states["media_player.example_tv"] = {
     entity_id: "media_player.example_tv",
     state: "on",
     attributes: { friendly_name: "TV", source: "HDMI 3", source_list: ["HDMI 1", "HDMI 2", "HDMI 3", "HDMI 4"] },
-  };
-  states["switch.adaptive_lighting_office"] = {
-    entity_id: "switch.adaptive_lighting_office",
-    state: "on",
-    attributes: { friendly_name: "Adaptive Lighting: Office", configuration: { lights: ["light.desk_lamp"] }, manual_control: [] },
   };
 
   const gradients: Record<string, XY[]> = {
@@ -327,8 +320,13 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     { file: "scenes-0.json", created: "2026-10-24T03:00:00Z", scenes: 25, bridges: ["Hue Bridge"] },
   ];
   const sceneListeners = new Set<(msg: unknown) => void>();
+  /** Pictures of scenes (hue_studio/scenes/cover): scene -> image id; image id -> its object URL. */
+  const covers: Record<string, string> = {};
+  const uploads: Record<string, string> = {};
   /** A bridge scene of a Hue group, as the native integration and our WS API show it. */
   const sceneId = (group: string, name: string) => `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
+  // The lights' colors of scenes captured from the lights (no palette).
+  const CAPTURED: XY[][] = [[[0.6, 0.35], [0.2, 0.3]], [[0.17, 0.05], [0.45, 0.41], [0.3, 0.6]], [[0.55, 0.24]]];
   const addScene = (group: string, name: string, { palette = [], mirek }: { palette?: XY[]; mirek?: number } = {}): string => {
     const id = sceneId(group, name);
     states[id] = { entity_id: id, state: "unknown", attributes: { group_name: GROUPS[group][0], name, friendly_name: `${GROUPS[group][0]} ${name}` } };
@@ -343,7 +341,11 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       mirek: mirek ? [mirek] : [],
       lights: GROUPS[group][2].map((m) => `light.${m}`),
       image: null,
+      cover: null,
       custom: !SCENE_PALETTES[name],
+      // A scene captured from the lights: what they were set to.
+      colors: SCENE_PALETTES[name] ? [] : CAPTURED[name.length % CAPTURED.length],
+      whites: SCENE_PALETTES[name] ? [] : [366],
     };
     return id;
   };
@@ -999,20 +1001,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         const scene = gallery?.scenes.find((s) => s.id === d.gallery_scene);
         if (scene) applyPalette(ids, scene);
       }
-      if (domain === "adaptive_lighting" && service === "set_manual_control") {
-        const al = states[one];
-        const manual = new Set<string>(al.attributes.manual_control);
-        (d.lights ?? []).forEach((l) => (d.manual_control ? manual.add(l) : manual.delete(l)));
-        states[one] = { ...al, attributes: { ...al.attributes, manual_control: [...manual] } };
-      }
       if (domain === "switch") {
         const sw = states[one];
         states[one] = { ...sw, state: service === "turn_on" ? "on" : "off" };
-      }
-      if (domain === "light" && ids.includes("light.desk_lamp") && (d.xy_color || d.color_temp_kelvin)) {
-        // What Adaptive Lighting's take-over detection does for light.turn_on.
-        const al = states["switch.adaptive_lighting_office"];
-        states["switch.adaptive_lighting_office"] = { ...al, attributes: { ...al.attributes, manual_control: ["light.desk_lamp"] } };
       }
       if (domain === "hue_studio" && service === "set_gradient") {
         for (const id of ids) {
@@ -1026,6 +1017,14 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       onChange({ ...hass, states: { ...states } });
     },
     // HA's automation config API: write or delete an automation, then HA reloads it.
+    // HA's picture upload (image_upload): the picture stays in the page as an object URL.
+    async fetchWithAuth(path: string, init?: RequestInit): Promise<Response> {
+      const file = init?.body instanceof FormData ? init.body.get("file") : null;
+      if (path !== "/api/image/upload" || !(file instanceof Blob)) return new Response(null, { status: 404 });
+      const id = `img${Object.keys(uploads).length + 1}`;
+      uploads[id] = URL.createObjectURL(file);
+      return new Response(JSON.stringify({ id }), { status: 200 });
+    },
     async callApi<T>(method: "GET" | "POST" | "DELETE", path: string, data?: Record<string, unknown>): Promise<T> {
       console.info("callApi", method, path, JSON.stringify(data));
       await new Promise((r) => setTimeout(r, 120));
@@ -1060,6 +1059,22 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
       if (msg.type === "hue_studio/scenes/backups") return { backups } as T;
+      if (msg.type === "hue_studio/scenes/cover") {
+        const id = String(msg.entity_id);
+        const replaced = covers[id] ?? null;
+        if (msg.image) covers[id] = String(msg.image);
+        else delete covers[id];
+        sceneInfo[id] = { ...sceneInfo[id], cover: msg.image ? uploads[String(msg.image)] || null : null };
+        pushScenes([id]);
+        return { replaced } as T;
+      }
+      if (msg.type === "image/delete") return null as T;
+      if (msg.type === "config/entity_registry/update") {
+        const id = String(msg.entity_id);
+        entities[id] = { ...entities[id], icon: (msg.icon as string | null) ?? null };
+        onChange({ ...hass, entities: { ...entities } });
+        return { entity_entry: entities[id] } as T;
+      }
       if (msg.type === "hue_studio/preview/start") {
         const ids = expand(msg.entity_id as string | string[]);
         previews[String(msg.token)] = { target: msg.entity_id, lights: ids.map((id) => [id, structuredClone(states[id]._s!), structuredClone(lightInfo[id])]) };

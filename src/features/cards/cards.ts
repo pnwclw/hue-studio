@@ -14,7 +14,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import { cardLines, fromConfig, isType, TYPE_ICONS } from "../automations/automations.ts";
 import { paletteArt } from "../../core/color.ts";
 import { PANEL_PATH, StudioContext } from "../../core/context.ts";
-import { automationCard, groupSlider, groupToggle, sceneDot, shownState, surfaceOf } from "../../ds/controls.ts";
+import { automationCard, groupSlider, groupToggle, sceneDot, sceneGlyph, shownState, surfaceOf } from "../../ds/controls.ts";
 import { thumbUrl } from "../scenes/gallery-data.ts";
 import { currentHass, navigate } from "../../core/ha-internals.ts";
 import { localize, type StringKey } from "../../i18n/index.ts";
@@ -247,12 +247,13 @@ class HueStudioRoomCard extends StudioCard {
     const ctx = this.ctx!;
     const info = ctx.sceneInfo[s.entity_id];
     const dot = sceneDot(ctx.gallery, s.name, info);
+    const glyph = sceneGlyph(ctx.hass, ctx.gallery, s.entity_id, s.name, info);
     const active = !!info && info.active !== "inactive";
     const apply = async () => {
-      if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);
+      await ctx.call("scene", "turn_on", { entity_id: s.entity_id });
     };
     return html`<button class=${classMap({ "dot-btn": true, active })} @click=${apply}>
-      <div class="dot" style=${styleMap({ background: dot })}></div><span>${s.name}</span>
+      <div class=${classMap({ dot: true, glyph: !!glyph })} style=${styleMap({ background: dot })}>${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}</div><span>${s.name}</span>
     </button>`;
   }
 }

@@ -1,6 +1,7 @@
 // Settings → Light of the day: what natural light and the scene of the day of every automation
-// start from. The mood (HA's "Mood" select of Hue Studio), phase times, the sources (weather,
-// season, light sensor; HA integrations to add when there are none) and the scene pool: every
+// start from. Today's scene and the mood (HA's "Mood" select of Hue Studio), phase times, the
+// sources (weather and season; HA integrations to add when there are none), the daytime
+// brightness (a light sensor, else cloud cover) and the scene pool: every
 // scene's tags — the phases, seasons, weather and moods it fits — starting from Hue Studio's
 // ready-made ones. The pool is shown by phase (and season) or by mood; a tap on a scene opens
 // its tags.
@@ -8,6 +9,7 @@
 import { html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
 
 import {
   inPool,
@@ -81,7 +83,8 @@ export class DaylightSettingsView extends StudioView {
       ${this.picker ? pickerSheet(ctx, this.picker, (picker) => (this.picker = picker)) : nothing}`;
   }
 
-  /** Today's scene, then a row for each part: the mood, the phases, the sources, the pool. */
+  /** Today: the scene and the mood; then a row for each setting: the phases, the sources, the
+   *  daytime brightness, the pool. */
   private overview(day: DaylightMessage) {
     const { ctx } = this;
     const { t } = ctx;
@@ -90,8 +93,8 @@ export class DaylightSettingsView extends StudioView {
     const weather = name(day.settings.weather || day.sources.weather);
     const season = name(day.settings.season || day.sources.season) || t("daylight.season_none");
     return html`<p class="lead">${t("daylight.intro")}</p>
-      ${this.today(day)}
-      ${day.mood_entity ? html`<h2 class="label">${t("daylight.mood")}</h2>${this.moods(day)}` : nothing}
+      <h2 class="label">${t("auto.today")}</h2>
+      <div class="rows">${this.today(day)}${day.mood_entity ? this.mood(day) : nothing}</div>
       <h2 class="label">${t("daylight.settings")}</h2>
       <div class="rows">
         ${navRow(
@@ -99,6 +102,7 @@ export class DaylightSettingsView extends StudioView {
           () => this.open("phases"),
         )}
         ${navRow({ icon: "mdi:weather-partly-cloudy", title: t("daylight.sources"), sub: [weather || t("daylight.not_set"), season].join(" · ") }, () => this.open("sources"))}
+        ${this.brightness(day)}
         ${navRow({ icon: "mdi:image-multiple-outline", title: t("daylight.pool"), sub: t("daylight.pool_count", { count: Object.keys(day.tags).length }) }, () => this.open("pool"))}
       </div>`;
   }
@@ -107,23 +111,25 @@ export class DaylightSettingsView extends StudioView {
     return this.ctx.gallery?.scenes.find((s) => s.id === id)?.name || id;
   }
 
-  /** Today's scene of the global pool, and what it depends on. */
+  /** Today's scene of the global pool and what it depends on: a row with its picture on a disc,
+   *  opening the pool where it comes from. */
   private today(day: DaylightMessage) {
     const { t } = this.ctx;
     const p = day.now;
-    if (!p.scene) return html`<div class="today empty-today"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon><span>${t("daylight.empty")}</span></div>`;
-    return html`<div class="today">
-      <img class="pic" src=${thumbUrl(p.scene)} alt="" />
-      <div class="text">
-        <div class="dim small">${t("auto.today")}</div>
-        <div class="name">${p.scene_name || this.sceneName(p.scene)}</div>
+    const scene = p.scene;
+    return html`<button class="item nav" @click=${() => this.open("pool")}>
+      ${scene
+        ? html`<span class="row-art disc" style=${styleMap({ background: `url("${thumbUrl(scene)}") center / cover` })}></span>`
+        : html`<span class="row-art disc"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon></span>`}
+      <div class="grow">${scene ? p.scene_name || this.sceneName(scene) : t("daylight.empty")}
         <div class="dim small">${stateLine(t, p, false)} · ${t("daylight.pool_count", { count: p.pool.length })}</div>
       </div>
-    </div>`;
+      <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+    </button>`;
   }
 
   /** The mood: by the day, or one of the moods (HA's select, so automations can set it too). */
-  private moods(day: DaylightMessage) {
+  private mood(day: DaylightMessage) {
     const { ctx } = this;
     const { t } = ctx;
     const entity = day.mood_entity!;
@@ -131,16 +137,34 @@ export class DaylightSettingsView extends StudioView {
     const label = (m: string) => (m === "auto" ? t("daylight.mood_auto") : t(`auto.mood_${m}` as StringKey));
     const glyph = (m: string) => (m === "auto" ? "mdi:theme-light-dark" : MOOD_ICONS[m as Mood]);
     const options = ["auto", ...MOODS].map((m) => ({ value: m, label: label(m), icon: glyph(m) }));
-    return html`<div class="rows">
-        ${navRow({ icon: glyph(current), title: t("daylight.mood"), value: label(current) }, () =>
-          this.choose(
-            single(t("daylight.mood"), options, current, (option) => void ctx.call("select", "select_option", { entity_id: entity, option }, { optimistic: false }), t("daylight.mood_hint")),
-          ),
-        )}
-      </div>`;
+    return navRow({ icon: glyph(current), title: t("daylight.mood"), value: label(current) }, () =>
+      this.choose(
+        single(t("daylight.mood"), options, current, (option) => void ctx.call("select", "select_option", { entity_id: entity, option }, { optimistic: false }), t("daylight.mood_hint")),
+      ),
+    );
   }
 
-  /** Weather, season and light sensor: chosen, found, or an integration to add. */
+  /** The day's brightness: a light sensor (the brighter outside, the dimmer), else cloud cover. */
+  private brightness(day: DaylightMessage) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const states = ctx.hass.states;
+    const sensors = Object.keys(states)
+      .filter((id) => id.startsWith("sensor.") && states[id].attributes.device_class === "illuminance")
+      .sort((a, b) => friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)));
+    const current = day.settings.light_sensor || "";
+    const title = t("daylight.brightness");
+    const options = [
+      { value: "", label: t("daylight.brightness_clouds"), icon: "mdi:weather-cloudy" },
+      ...sensors.map((id) => ({ value: id, label: friendlyName(ctx.hass, id), icon: "mdi:brightness-5" })),
+    ];
+    // What it goes by, as the line under it (a sensor's name is too long for the value).
+    return navRow({ icon: "mdi:brightness-5", title, sub: current ? friendlyName(ctx.hass, current) : t("daylight.brightness_clouds") }, () =>
+      this.choose(single(title, options, current, (v) => ctx.setDaylight({ light_sensor: v || null }), t("daylight.brightness_hint"))),
+    );
+  }
+
+  /** Weather and season: chosen, found, or an integration to add. */
   private sources(day: DaylightMessage) {
     const { ctx } = this;
     const { t } = ctx;
@@ -148,12 +172,11 @@ export class DaylightSettingsView extends StudioView {
     const ids = Object.keys(states).sort((a, b) => friendlyName(ctx.hass, a).localeCompare(friendlyName(ctx.hass, b)));
     const weather = ids.filter((id) => id.startsWith("weather."));
     const seasons = ids.filter((id) => id.startsWith("sensor.") && (SEASON_STATES.includes(states[id].state) || id === day.settings.season));
-    const lux = ids.filter((id) => id.startsWith("sensor.") && states[id].attributes.device_class === "illuminance");
     const found = (key: "weather" | "season") => {
       const id = day.sources[key];
       return id ? t("daylight.found", { name: friendlyName(ctx.hass, id) }) : t(`daylight.${key}_none` as StringKey);
     };
-    const row = (key: "weather" | "season" | "light_sensor", glyph: string, options: string[], auto: string, sub: string) => {
+    const row = (key: "weather" | "season", glyph: string, options: string[], auto: string, sub: string) => {
       const title = t(`daylight.source_${key}` as StringKey);
       const current = day.settings[key] || "";
       return navRow({ icon: glyph, title, sub, value: current ? friendlyName(ctx.hass, current) : auto }, () =>
@@ -182,7 +205,6 @@ export class DaylightSettingsView extends StudioView {
         ${seasons.length
           ? row("season", "mdi:leaf", seasons, found("season"), t("daylight.source_season_sub"))
           : add("mdi:leaf", t("daylight.source_season"), t("daylight.season_add"), "season")}
-        ${row("light_sensor", "mdi:brightness-5", lux, t("auto.none"), t("daylight.source_light_sensor_sub"))}
       </div>`;
   }
 

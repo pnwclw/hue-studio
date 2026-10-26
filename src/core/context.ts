@@ -6,7 +6,7 @@ import { loadGallery } from "../features/scenes/gallery-data.ts";
 import { navigate } from "./ha-internals.ts";
 import { isLegacy, splitLegacy } from "../features/automations/daylight.ts";
 import { localize, type Translate } from "../i18n/index.ts";
-import { adaptiveFor, buildHome, findGroup, type Group, type Home } from "./model.ts";
+import { buildHome, findGroup, type Group, type Home } from "./model.ts";
 import { Optimistic, predict } from "./optimistic.ts";
 import { confirmed, predictSync, type SyncMemo, syncMemo } from "../features/sync/sync.ts";
 import type {
@@ -42,6 +42,12 @@ export interface SceneDraft {
   autoplay: boolean | null;
   /** The lights it shows were changed here (brightness, the wheel, shuffled colors). */
   touched: boolean;
+  /** Its own picture: an uploaded image id, null to show its colors; undefined: unchanged. */
+  cover?: string | null;
+  /** The icon over its colors (HA's entity settings), null for none; undefined: unchanged. */
+  icon?: string | null;
+  /** Pictures uploaded here: the ones not saved are deleted on leaving. */
+  uploads?: string[];
 }
 
 const TOAST_MS = 3200;
@@ -321,6 +327,27 @@ export class StudioContext {
     }
   }
 
+  /** A picture uploaded to Home Assistant (its image_upload, as an area's or a person's
+   *  picture): its id, or null (a toast says why). */
+  async uploadImage(file: File): Promise<string | null> {
+    if (!this.raw?.fetchWithAuth) return null;
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const response = await this.raw.fetchWithAuth("/api/image/upload", { method: "POST", body: form });
+      if (!response.ok) throw new Error(response.status === 413 ? this.t("scene.picture_too_big") : await response.text());
+      return ((await response.json()) as { id: string }).id;
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return null;
+    }
+  }
+
+  /** Forget an uploaded picture nothing shows any more. */
+  deleteImage(id: string): void {
+    void this.query({ type: "image/delete", image_id: id }, { quiet: true });
+  }
+
   /** One WebSocket command and its result; failures show a toast and give null. */
   async query<T>(msg: { type: string } & Record<string, unknown>, { quiet = false } = {}): Promise<T | null> {
     if (!this.raw?.callWS) return null;
@@ -552,19 +579,6 @@ export class StudioContext {
     }
     this.toast(this.t("gallery.zone_wait", { name: group.name }));
     return null;
-  }
-
-  /** Scenes change lights behind HA's back: tell Adaptive Lighting they are manual now. */
-  async markManual(group: Group): Promise<void> {
-    for (const al of adaptiveFor(this.hass, group)) {
-      if (!al.on) continue;
-      await this.call(
-        "adaptive_lighting",
-        "set_manual_control",
-        { entity_id: al.switch, lights: al.lights, manual_control: true },
-        { optimistic: false },
-      );
-    }
   }
 
   /** Show a short message at the bottom of the panel or dialog. */

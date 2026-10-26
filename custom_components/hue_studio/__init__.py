@@ -58,6 +58,7 @@ from .devices.identity import async_setup_identities
 from .panel import async_register_panel, async_unregister_panel
 from .rooms.areas import async_align, async_track_areas
 from .rooms.zones import ZoneMirror, async_track_zones
+from .scenes.covers import async_setup_covers
 from .scenes.organize import async_track_organize
 from .services import async_setup_services
 from .space.positions import async_setup_positions
@@ -110,6 +111,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_websocket(hass)
     await async_setup_positions(hass)
     await async_setup_identities(hass)
+    await async_setup_covers(hass)
     await async_setup_automations(hass)
     return True
 

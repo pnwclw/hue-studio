@@ -6,11 +6,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
-    async_mock_service,
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.const import DOMAIN, HUE_DOMAIN
+from custom_components.hue_studio.const import HUE_DOMAIN
 
 
 async def _ws(client, **msg) -> dict:
@@ -142,30 +141,3 @@ async def test_groups_follow_automatic_match(
     assert studio_entry.options["groups"] == {"grp-office": "zone"}
     assert (await set_group("grp-office", office.id))["success"]
     assert studio_entry.options["groups"] == {}
-
-
-async def test_adaptive_lighting_marked_manual(
-    hass: HomeAssistant, hue_lights: MagicMock
-) -> None:
-    """After a palette, Adaptive Lighting is told the lights were set by hand."""
-    calls = async_mock_service(hass, "adaptive_lighting", "set_manual_control")
-    switch = er.async_get(hass).async_get_or_create(
-        "switch", "adaptive_lighting", "al-office"
-    )
-    hass.states.async_set(
-        switch.entity_id,
-        "on",
-        {"configuration": {"lights": ["light.bulb", "light.elsewhere"]}},
-    )
-    await hass.services.async_call(
-        DOMAIN,
-        "apply_palette",
-        {"entity_id": ["light.bulb", "light.strip"], "points": [[0.6, 0.35]]},
-        blocking=True,
-    )
-    assert len(calls) == 1
-    assert calls[0].data == {
-        "entity_id": switch.entity_id,
-        "lights": ["light.bulb"],
-        "manual_control": True,
-    }

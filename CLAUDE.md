@@ -49,7 +49,8 @@ touching anything outside this repository.
      `palette` in that room's Hue room/zone (with the gallery's `public_image` id in
      `metadata.image`), so the Hue app sees and edits it; changes from either side reach
      the other through the bridge, there is no copy to sync. Only what the bridge can't
-     hold (light positions outside entertainment areas) goes to `helpers.storage.Store`;
+     hold (light positions outside entertainment areas, a scene's own photo) goes to
+     `helpers.storage.Store`;
    - **automations are HA automations**: Hue Studio ships blueprints, one per Hue app type
      (`blueprints/automation/hue_studio/`, copied into HA's blueprint folder on setup); the
      panel writes automations that use them through HA's automation config API, HA stores
@@ -118,8 +119,6 @@ touching anything outside this repository.
   event with `detail.view` go to HA's own dialog.
 - **Instant UI.** Every command shows its expected result immediately (`optimistic.ts`)
   and falls back to the real state on error or after 5 s without confirmation.
-- **Adaptive Lighting.** Our services (and scene activation from the panel) mark the
-  affected lights as manually controlled, so Adaptive Lighting doesn't overwrite them.
 - **Only intercept what is ours** (Hue lights). Never touch `/config/...` pages.
 - **Bridge rate limits:** ~10 commands/s for `light`, ~1/s for `grouped_light`. Dragging on
   the wheel is throttled; several lights at once go through group commands or a single
@@ -296,7 +295,6 @@ custom_components/hue_studio/   the integration: one package per feature, each w
     bridge.py                   HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
     targets.py                  a service call's Hue lights (entities, areas, devices, labels; syncing ones left alone), shared values
     palettes.py                 the palette a call names: gallery scene, colors, white, `gallery:<id>`, `b64:<json>`
-    adaptive.py                 Adaptive Lighting: mark lights manual after our commands
     services.py                 apply_palette, set_gradient, set_effect
     websocket.py                hue_studio/lights/subscribe
   rooms/
@@ -315,13 +313,14 @@ custom_components/hue_studio/   the integration: one package per feature, each w
     bridge.py                   HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
     gallery.py                  backend access to the bundled gallery
     pictures.py                 gallery pictures: the Hue app's, downloaded once into HA's cache; the bundled tile otherwise
+    covers.py                   a scene of your own's own photo: uploaded to HA (image_upload), kept by scene id in a Store
     backup.py                   scenes to a file in <config>/hue_studio/scenes/ and back: lights by Zigbee MAC, copies kept
                                 while they hold a deleted scene
     organize.py                 bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
                                 icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
                                 the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option
     services.py                 create_scene, delete_scene, save_scene, reset_scene, recall_scene, export_scenes, import_scenes
-    websocket.py                hue_studio/scenes/subscribe|backups
+    websocket.py                hue_studio/scenes/subscribe|backups|cover
   automations/
     blueprints.py               blueprints in place, our automations (markers) and the others on Hue lights,
                                 label/category/area of ours, setup (living light started)
@@ -381,7 +380,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   core/                         what every feature shares
     context.ts                  shared by panel and dialog: optimistic hass, WS subscriptions, calls
     optimistic.ts               pure: predicted state of a service call until HA confirms it
-    model.ts                    pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`, light icons
+    model.ts                    pure: rooms/zones/scenes/sensors from `hass`, light icons
     color.ts                    pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
     types.ts                    the subset of HA's `hass` we use + our WebSocket payloads
     ha-internals.ts             the only place that touches HA frontend internals (incl. panel sizing, icon sets,
@@ -403,7 +402,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 do not edit), matched to lights by archetype and product in core/model.ts
   features/
     rooms/                      rooms.ts (pure: mismatches, lights without area, zones), space.ts (pure: placed lights,
-                                top-view mapping); views: home, room, rooms (rooms and zones), space (arrange a room or
+                                top-view mapping); views: home, room, rooms (rooms and zones), zone (a zone's editor), space (arrange a room or
                                 an entertainment area), add-sheet (a room's "+": scene, automation or device)
     color/                      effects.ts (pure: effect catalog, 1-12 speed scale); views: color (wheel), effects,
                                 effect-sheet (an effect's "adjust")

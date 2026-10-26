@@ -57,7 +57,7 @@ export const CHOICES_CSS = `
   .settings-page .save-area .lead { margin: 4px 0 0; text-align: center; }
   @container (max-width: 599px) {
     .settings-page .rows { margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); border-radius: 0; }
-    .settings-page .scene-tiles, .settings-page .today { margin-left: 0; margin-right: 0; }
+    .settings-page .scene-tiles { margin-left: 0; margin-right: 0; }
   }
 
   @container (min-width: 600px) {

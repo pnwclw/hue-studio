@@ -2,9 +2,19 @@
 
 from unittest.mock import MagicMock
 
-from aiohue.v2.models.scene import SceneActiveStatus
+from aiohue.v2.models.feature import (
+    ColorFeatureBase,
+    ColorPoint,
+    ColorTemperatureFeatureBase,
+    GradientFeatureBase,
+    GradientPoint,
+    OnFeature,
+)
+from aiohue.v2.models.scene import Action, ActionAction, SceneActiveStatus
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
+
+from custom_components.hue_studio.scenes.bridge import light_colors
 
 from .conftest import LIGHTS, make_light, make_scene
 
@@ -71,3 +81,68 @@ async def test_subscribe_scenes(
     on_update("update", changed)
     event = (await client.receive_json())["event"]
     assert event["scenes"]["scene.sunset"]["active"] == "inactive"
+
+
+async def test_scene_colors_and_cover(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hue_lights: MagicMock
+) -> None:
+    """A scene shows its lights' colors; a picture of its own is pushed and dropped."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "hue_studio/scenes/subscribe"})
+    assert (await client.receive_json())["success"]
+    scenes = (await client.receive_json())["event"]["scenes"]
+    # The fixture's lights are only switched on: no colors, no whites, no picture.
+    assert scenes["scene.plain"]["colors"] == []
+    assert scenes["scene.plain"]["whites"] == []
+    assert scenes["scene.plain"]["cover"] is None
+
+    other = await hass_ws_client(hass)
+    await other.send_json_auto_id(
+        {"type": "hue_studio/scenes/cover", "entity_id": "scene.plain", "image": "abc"}
+    )
+    result = await other.receive_json()
+    assert result["success"]
+    assert result["result"] == {"replaced": None}
+    event = (await client.receive_json())["event"]
+    assert event["scenes"]["scene.plain"]["cover"] == "/api/image/serve/abc/512x512"
+
+    await other.send_json_auto_id(
+        {"type": "hue_studio/scenes/cover", "entity_id": "scene.plain", "image": None}
+    )
+    assert (await other.receive_json())["result"] == {"replaced": "abc"}
+    event = (await client.receive_json())["event"]
+    assert event["scenes"]["scene.plain"]["cover"] is None
+
+    await other.send_json_auto_id(
+        {"type": "hue_studio/scenes/cover", "entity_id": "scene.nope", "image": "x"}
+    )
+    assert not (await other.receive_json())["success"]
+
+
+def test_light_colors() -> None:
+    """Colors (gradient points too) and whites of the lights that are on, no repeats."""
+    scene = make_scene("res-scene", palette=False)
+    strip, bulb = scene.actions
+    strip.action.gradient = GradientFeatureBase(
+        points=[
+            GradientPoint(color=ColorFeatureBase(xy=ColorPoint(0.6, 0.35))),
+            GradientPoint(color=ColorFeatureBase(xy=ColorPoint(0.2, 0.3))),
+        ]
+    )
+    bulb.action.color = ColorFeatureBase(xy=ColorPoint(0.6, 0.35))
+    off = Action(
+        target=bulb.target,
+        action=ActionAction(
+            on=OnFeature(on=False),
+            color_temperature=ColorTemperatureFeatureBase(mirek=400),
+        ),
+    )
+    white = Action(
+        target=bulb.target,
+        action=ActionAction(
+            on=OnFeature(on=True),
+            color_temperature=ColorTemperatureFeatureBase(mirek=366),
+        ),
+    )
+    scene.actions = [strip, bulb, off, white]
+    assert light_colors(scene) == ([[0.6, 0.35], [0.2, 0.3]], [366])

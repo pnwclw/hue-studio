@@ -15,6 +15,11 @@ export const EDITORS_CSS = `
   .scene-top .round.rename { background: rgba(255, 255, 255, 0.14); color: var(--text); }
   .scene-edit .dot.big { width: 48px; height: 48px; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                          box-shadow: var(--shadow-dot); }
+  .scene-edit button.dot.big { padding: 0; border: none; cursor: pointer; }
+  /* A scene's picture (its own scenes): colors, a photo (a file input in its row), an icon grid. */
+  .picture-sheet input.file { display: none; }
+  .picture-sheet label.item { cursor: pointer; }
+  .picture-sheet .item.busy { opacity: 0.6; pointer-events: none; }
   .rows.scene-brightness { background: rgba(255, 255, 255, 0.09); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   .scene-brightness .item.col { display: block; padding: 30px 16px 32px; }
   .scene-brightness .line { display: flex; justify-content: space-between; font-size: var(--fs-body); font-weight: 500; }
@@ -53,7 +58,7 @@ export const EDITORS_CSS = `
   .pill.shuffle { display: inline-flex; align-items: center; gap: 8px; }
   .pill.shuffle svg { width: 18px; height: 18px; }
   .section-head + .grid { margin-top: 10px; }
-  .center { display: flex; justify-content: center; margin-top: 28px; }
+  .center { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
   .pill.reset.confirm { background: var(--danger-fill); }
   .center.stack { flex-direction: column; align-items: center; gap: 12px; }
   .pill.reset.danger { color: var(--danger); }

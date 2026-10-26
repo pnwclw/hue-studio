@@ -7,14 +7,6 @@ export const DAYLIGHT_CSS = `
   .rows .item.wrap .grow { min-width: 140px; }
   .rows .item .plain { padding: 0; border: none; background: none; cursor: pointer; text-align: left; font: inherit; color: inherit; }
   .lead.pad { padding: 0 16px 16px; }
-  .today span.pic { display: block; }
-  .today { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 14px; padding: 14px; border-radius: var(--r-m);
-           background: var(--surface); }
-  .today .pic { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: var(--shadow-dot); }
-  .today .text { flex: 1; min-width: 160px; }
-  .today .name { font-size: var(--fs-body); font-weight: 500; margin: 2px 0; }
-  .today-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
-  .empty-today { color: var(--text-2); font-size: var(--fs-callout); }
   .scene-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
   .scene-tiles.small { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   /* Height from an in-flow 16:9 spacer, not aspect-ratio: iOS WebKit sizes these grid rows without the ratio (rows one line

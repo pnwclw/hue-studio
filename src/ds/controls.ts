@@ -6,7 +6,7 @@ import { customElement, property } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { paletteArt, paletteColors } from "../core/color.ts";
+import { colorsArt, paletteArt, paletteColors } from "../core/color.ts";
 import type { StudioContext } from "../core/context.ts";
 import { SPEED_STEPS, speedWord } from "../features/color/effects.ts";
 import { galleryMatch, thumbUrl } from "../features/scenes/gallery-data.ts";
@@ -14,7 +14,7 @@ import { colorsCss, friendlyName, type Group, groupState, type GroupState, light
 import { haptic } from "../core/ha-internals.ts";
 import type { StringKey } from "../i18n/index.ts";
 import { syncingIn } from "../features/sync/sync.ts";
-import type { Gallery, SceneInfo, SyncBoxInfo } from "../core/types.ts";
+import type { Gallery, HassData, SceneInfo, SyncBoxInfo, XY } from "../core/types.ts";
 import { icon, LightElement, lockedToggle, refuse, type Throttled, toggle } from "./ui.ts";
 
 /**
@@ -295,25 +295,42 @@ export function surfaceOf(state: Pick<GroupState, "on" | "colors"> & { available
 const FALLBACK_DOT = "radial-gradient(circle at 30% 30%, #ffe7b8, #f2a65a)";
 const FALLBACK_COLORS = ["rgb(255,231,184)", "rgb(242,166,90)"];
 
-/** Soft palette colors of a scene (or a warm fallback). */
+/** The colors a scene is made of: its palette, else what its lights are set to (colors, then whites). */
+function sceneXy(info: SceneInfo | undefined): { points: XY[]; whites: number[] } {
+  if (!info) return { points: [], whites: [] };
+  if (info.palette.length || info.mirek.length) return { points: info.palette, whites: info.mirek };
+  return { points: info.colors ?? [], whites: info.whites ?? [] };
+}
+
+/** Soft colors of a scene (or a warm fallback). */
 export function sceneColors(info: SceneInfo | undefined): string[] {
-  if (!info) return FALLBACK_COLORS;
-  if (info.palette.length) return paletteColors({ kind: "gradient", points: info.palette });
-  if (info.mirek.length) return info.mirek.flatMap((mirek) => paletteColors({ kind: "white", mirek }));
-  return FALLBACK_COLORS;
+  const { points, whites } = sceneXy(info);
+  const colors = [
+    ...(points.length ? paletteColors({ kind: "gradient", points }) : []),
+    ...whites.flatMap((mirek) => paletteColors({ kind: "white", mirek })),
+  ];
+  return colors.length ? colors : FALLBACK_COLORS;
 }
 
-/** Background of a scene's round picture without a gallery match. */
+/** Background of a scene's round picture without a picture: blobs of its colors. */
 export function sceneArt(info: SceneInfo | undefined): string {
-  if (info?.palette.length) return paletteArt({ kind: "gradient", points: info.palette });
-  if (info?.mirek.length) return paletteArt({ kind: "white", mirek: info.mirek[0] });
-  return FALLBACK_DOT;
+  const { points, whites } = sceneXy(info);
+  return points.length || whites.length ? colorsArt(sceneColors(info)) : FALLBACK_DOT;
 }
 
-/** A scene's round picture: its gallery picture (bridge scenes usually come from the gallery), else its palette. */
+/** A scene's round picture: its own photo, its gallery picture (bridge scenes usually come
+ *  from the gallery), else its colors. */
 export function sceneDot(gallery: Gallery | null, name: string, info: SceneInfo | undefined): string {
+  if (info?.cover) return `url("${info.cover}") center / cover, ${sceneArt(info)}`;
   const match = galleryMatch(gallery, name, info?.image);
   return match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
+}
+
+/** The icon over a scene's colors: the one set in HA's entity settings (none over a picture). */
+export function sceneGlyph(hass: Pick<HassData, "entities">, gallery: Gallery | null, entityId: string, name: string, info: SceneInfo | undefined): string | null {
+  const glyph = hass.entities?.[entityId]?.icon;
+  if (!glyph || info?.cover || galleryMatch(gallery, name, info?.image)) return null;
+  return glyph;
 }
 
 /**

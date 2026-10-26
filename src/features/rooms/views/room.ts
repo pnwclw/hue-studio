@@ -1,4 +1,4 @@
-// Room: header with toggle, brightness, Adaptive Lighting and "+" (add a scene, an automation
+// Room: header with toggle, brightness and "+" (add a scene, an automation
 // or a device: add-sheet.ts); the room's readings (temperature, light level, motion of
 // sensors that are not Hue's); its Hue scenes, the scene gallery and a suggested scene of
 // it; its lights; its Hue sensors ("Controls", a card each, opening the sensor's
@@ -12,14 +12,12 @@ import { repeat } from "lit/directives/repeat.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../../../core/color.ts";
-import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../../../ds/controls.ts";
+import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, sceneGlyph, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../../../ds/controls.ts";
 import { speedToStep, stepToSpeed } from "../../color/effects.ts";
 import { galleryMatch, thumbUrl } from "../../scenes/gallery-data.ts";
 
 import { haptic, openStockMoreInfo } from "../../../core/ha-internals.ts";
 import {
-  type AdaptiveSwitch,
-  adaptiveFor,
   findGroup,
   friendlyName,
   type Group,
@@ -85,7 +83,6 @@ export class RoomView extends StudioView {
             ${groupToggle(ctx, g, state)}
           </div>
           ${groupSlider(ctx, g, state, t("common.brightness"))}
-          <div class="badges">${adaptiveFor(ctx.hass, g).map((al) => this.adaptiveBadge(al))}</div>
         </div>
       </div>
     </div>
@@ -219,28 +216,6 @@ export class RoomView extends StudioView {
     </div>`;
   }
 
-  /** Adaptive Lighting badge: toggle the switch, or hand manual lights back to it. */
-  private adaptiveBadge(al: AdaptiveSwitch) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const label = !al.on ? t("adaptive.off") : al.manual.length ? t("adaptive.resume") : t("adaptive.on");
-    const click = () => {
-      if (al.on && al.manual.length) {
-        ctx.call(
-          "adaptive_lighting",
-          "set_manual_control",
-          { entity_id: al.switch, lights: al.manual, manual_control: false },
-          { optimistic: false },
-        );
-      } else {
-        ctx.call("switch", al.on ? "turn_off" : "turn_on", { entity_id: al.switch }, { optimistic: false });
-      }
-    };
-    return html`<button class=${classMap({ badge: true, on: al.on && !al.manual.length })} @click=${click}>
-      ${icon("sun")}${label}
-    </button>`;
-  }
-
   /**
    * The scenes like the Hue app's: two rows that scroll sideways, the active one's edit and
    * "⋯" buttons beside it (the cards after it in its row move along to make room), then the
@@ -320,6 +295,7 @@ export class RoomView extends StudioView {
     const { t } = ctx;
     const info = ctx.sceneInfo[s.entity_id];
     const dot = sceneDot(ctx.gallery, s.name, info);
+    const glyph = sceneGlyph(ctx.hass, ctx.gallery, s.entity_id, s.name, info);
     const active = !!info && info.active !== "inactive";
     const playing = info?.active === "dynamic_palette";
     const colors = info ? sceneColors(info) : [];
@@ -327,17 +303,19 @@ export class RoomView extends StudioView {
     const apply = async (e: Event) => {
       // The Sync Box would overwrite the scene right away.
       if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
-      if (await ctx.call("scene", "turn_on", { entity_id: s.entity_id })) ctx.markManual(g);
+      await ctx.call("scene", "turn_on", { entity_id: s.entity_id });
     };
     const play = async (e: Event) => {
       e.stopPropagation();
-      if (await ctx.call("hue_studio", "recall_scene", { entity_id: s.entity_id, dynamic: !playing }, { optimistic: false })) ctx.markManual(g);
+      await ctx.call("hue_studio", "recall_scene", { entity_id: s.entity_id, dynamic: !playing }, { optimistic: false });
     };
     return tileCard({
       art:
         active && info.dynamic
           ? html`<button class="scene-play" aria-label=${playing ? t("scene.pause") : t("scene.play")} @click=${play}>${icon(playing ? "stop" : "play")}</button>`
-          : html`<div class="dot" style=${styleMap({ background: ctx.gallery || info ? dot : null })}></div>`,
+          : html`<div class=${classMap({ dot: true, glyph: !!glyph })} style=${styleMap({ background: ctx.gallery || info ? dot : null })}>
+              ${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}
+            </div>`,
       name: s.name,
       sub: [s.group !== g.group ? friendlyName(ctx.hass, s.group) : ""],
       classes: { scene: true, ...surface.classes, active },
@@ -390,7 +368,7 @@ export class RoomView extends StudioView {
     };
     const shuffle = async () => {
       const data = { entity_id: entityId, shuffle: true, recall: true };
-      if (await ctx.call("hue_studio", "reset_scene", data, { optimistic: false })) ctx.markManual(g);
+      await ctx.call("hue_studio", "reset_scene", data, { optimistic: false });
     };
     // Deleting asks on its own action sheet (the Hue app's).
     const remove = () => {
@@ -421,7 +399,7 @@ export class RoomView extends StudioView {
       done: async () => {
         this.speed = null;
         const data = { entity_id: entityId, speed: Math.round(stepToSpeed(sheet.step) * 100), capture: false };
-        if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) ctx.markManual(g);
+        await ctx.call("hue_studio", "save_scene", data, { optimistic: false });
       },
     });
   }
@@ -489,7 +467,7 @@ export class RoomView extends StudioView {
       if (syncingIn(ctx.boxes, g).length) return refuse(e.currentTarget);
       const spatial = scene.kind === "gradient" && canSpread(ctx.positions, g.lights);
       const data = { entity_id: g.target, gallery_scene: scene.id, ...(spatial ? { layout: "spatial" } : {}) };
-      if (await ctx.call("hue_studio", "apply_palette", data, { optimistic: false })) ctx.markManual(g);
+      await ctx.call("hue_studio", "apply_palette", data, { optimistic: false });
     };
     return tileCard({
       art: html`<div class="dot" style=${styleMap({ background: `url("${thumbUrl(scene.id)}") center / cover, ${paletteArt(scene)}` })}></div>`,

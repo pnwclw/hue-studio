@@ -20,13 +20,6 @@ export const ROOM_CSS = `
   .sensor-chip ha-icon { --mdc-icon-size: 18px; opacity: 0.75; }
   .sensor-chip.on ha-icon { color: var(--ok); opacity: 1; }
   .hero.dark-text .round { background: rgba(0, 0, 0, 0.1); }
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  .badges:empty { display: none; }
-  .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: none; border-radius: var(--r-m); cursor: pointer;
-           font-size: var(--fs-caption); font-weight: 500; background: rgba(0, 0, 0, 0.22); transition: background 0.2s, transform var(--t-press) var(--ease); }
-  .badge:active { transform: scale(var(--press-tile)); }
-  .badge svg { width: 16px; height: 16px; }
-  .badge.on { background: var(--sun); color: var(--text-dark); }
   .grid { display: grid; gap: var(--tile-gap); grid-template-columns: repeat(3, minmax(0, 1fr)); }
   /* Cards (scenes, lights, sensors; tileCard): the picture at a fixed distance from the top, a text
      block of fixed height with the name (and lines under it) centered in it, and an optional
@@ -43,6 +36,9 @@ export const ROOM_CSS = `
   .tile-card > .art .dot { width: var(--art); height: var(--art); border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                            box-shadow: var(--shadow-dot); transition: transform 0.25s var(--spring); }
   .tile-card:active > .art .dot { transform: scale(var(--press-round)); }
+  /* A scene's icon over its colors (HA's entity settings), white like the Hue app's glyphs on pictures. */
+  .dot.glyph { display: flex; align-items: center; justify-content: center; color: #fff; }
+  .tile-card > .art .dot.glyph ha-icon, .dot.glyph ha-icon { --mdc-icon-size: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
   .tile-card > .text { flex: none; box-sizing: border-box; width: 100%; height: var(--text-h); margin-top: var(--gap); display: flex;
                        flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;

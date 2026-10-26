@@ -36,7 +36,6 @@ from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
 from ..const import DOMAIN, SIGNAL_CONFIG_UPDATED
-from ..lights.adaptive import async_mark_manual
 from ..lights.bridge import LIGHT_DOMAIN
 from ..lights.targets import BRIGHTNESS, TRANSITION, async_target_lights
 from ..scenes.bridge import (
@@ -426,10 +425,7 @@ async def async_apply_light(hass: HomeAssistant, call: ServiceCall) -> None:
             if set(light_entity_ids(hass, scene_lights(scene))) <= set(lights):
                 whole.append(scene.entity_id)
                 continue
-            shown = await async_show_on_lights(
-                hass, scene, lights, brightness, transition
-            )
-            await async_mark_manual(hass, shown)
+            await async_show_on_lights(hass, scene, lights, brightness, transition)
         if not whole:
             return
         recall: dict[str, Any] = {"entity_id": whole}

@@ -209,8 +209,7 @@ export class ScenePick extends LightElement {
     const i = this.current;
     if (!g) return;
     haptic("success");
-    if (await this.ctx.call("hue_studio", "apply_palette", { entity_id: g.target, ...this.palette(i) }, { optimistic: false }))
-      this.ctx.markManual(g);
+    await this.ctx.call("hue_studio", "apply_palette", { entity_id: g.target, ...this.palette(i) }, { optimistic: false });
     await this.endPreview(true);
     this.close();
   }

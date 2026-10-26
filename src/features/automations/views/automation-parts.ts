@@ -6,6 +6,7 @@
 import { html, nothing } from "lit";
 import { state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { styleMap } from "lit/directives/style-map.js";
 import {
   type AutomationDraft,
   type AutomationInput,
@@ -819,31 +820,29 @@ export class AutomationParts extends StudioView {
         { area_id: d.input.rooms, entity_id: d.input.zones || [], light: natural ? "natural" : "auto", scene_of_the_day: this.day, transition: 2 },
         { optimistic: false },
       );
-    if (p?.kelvin) {
-      return html`<div class="today">
-        <span class="pic" style="background:${whiteArt(p.kelvin)}"></span>
-        <div class="text">
-          <div class="dim small">${t("auto.now")}</div>
-          <div class="name">${t("auto.style_natural")} · ${p.kelvin} K</div>
-          <div class="dim small">${stateLine(t, p)}</div>
-        </div>
-        <div class="today-actions"><button class="pill" ?disabled=${!placesOf(d.input).length} @click=${show}>${t("auto.show_now")}</button></div>
-      </div>`;
-    }
-    if (!p?.scene) return html`<div class="today empty-today"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon><span>${t("auto.no_scene")}</span></div>`;
-    const scene = p.scene;
-    return html`<div class="today">
-      <img class="pic" src=${thumbUrl(scene)} alt="" />
-      <div class="text">
-        <div class="dim small">${t("auto.today")}</div>
-        <div class="name">${p.scene_name || this.sceneName(scene)}</div>
-        <div class="dim small">${stateLine(t, p)}</div>
-      </div>
-      <div class="today-actions">
-        <button class="pill" ?disabled=${!placesOf(d.input).length} @click=${show}>${t("auto.show_now")}</button>
-        <button class="pill" @click=${() => this.setDay(withExcluded(this.day, scene, true))}>${t("auto.never")}</button>
+    const can = placesOf(d.input).length > 0;
+    // A row with its picture on a disc (white light, or the scene's), the actions as pills under it.
+    const row = (art: string | null, title: string, sub: string) => html`<div class="rows">
+      <div class="item">
+        ${art !== null
+          ? html`<span class="row-art disc" style=${styleMap({ background: art })}></span>`
+          : html`<span class="row-art disc"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon></span>`}
+        <div class="grow">${title}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
       </div>
     </div>`;
+    if (p?.kelvin) {
+      return html`<h2 class="label">${t("auto.now")}</h2>
+        ${row(whiteArt(p.kelvin), `${t("auto.style_natural")} · ${p.kelvin} K`, stateLine(t, p))}
+        <div class="center"><button class="pill" ?disabled=${!can} @click=${show}>${t("auto.show_now")}</button></div>`;
+    }
+    if (!p?.scene) return html`<h2 class="label">${t("auto.today")}</h2>${row(null, t("auto.no_scene"), "")}`;
+    const scene = p.scene;
+    return html`<h2 class="label">${t("auto.today")}</h2>
+      ${row(`url("${thumbUrl(scene)}") center / cover`, p.scene_name || this.sceneName(scene), stateLine(t, p))}
+      <div class="center">
+        <button class="pill" ?disabled=${!can} @click=${show}>${t("auto.show_now")}</button>
+        <button class="pill" @click=${() => this.setDay(withExcluded(this.day, scene, true))}>${t("auto.never")}</button>
+      </div>`;
   }
 
   protected sceneName(id: string): string {

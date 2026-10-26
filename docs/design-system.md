@@ -177,8 +177,8 @@ Each part: its class (and helper), its measures, where it is used.
 - **Sub screen header** (`.screen-head` with `.bar.sub`): a solid bar in `--surface-bar` with
   `--shadow-bar` under it, the Hue app's (not translucent, no hairline). The first group of
   rows starts 20px under it (a lead 32px).
-- **Editor as a sheet** (`main.as-sheet`, phones): an editor (scene, automation, a device's,
-  sensor's, bridge's or Sync Box's settings) starts 8px under the status bar with its top
+- **Editor as a sheet** (`main.as-sheet`, phones): an editor (scene, automation, zone, a
+  device's, sensor's, bridge's or Sync Box's settings) starts 8px under the status bar with its top
   corners `--r-m`, the screen behind it dimmed (`--scrim`), no tab bar; its bar's first button
   closes it (`subHead(…, close)`). Its "SAVE" stays grey until something changed; closing it
   with changes asks "Close and don't save" (`confirmLeave` / `leaveSheet` in `base.ts`).
@@ -258,7 +258,9 @@ Each part: its class (and helper), its measures, where it is used.
 
 - **Group of rows** `.rows`: `--surface-row`, `--r-m`; full width on phones in settings,
   editors and device lists; the first one 20 under a sub screen's bar, one after a hint 20
-  under it. **Row disc** `.row-art.disc`: a 48px disc at 12 (`--surface-raised`), text at 72.
+  under it. **Row disc** `.row-art.disc`: a 48px disc at 12 (`--surface-raised`), text at 72;
+  a picture on it (today's scene of the light of the day and of an automation, its actions
+  as pills under the group).
 - **List row** (`.rows .item` inside `.settings-page`, `.sensor-edit`, `.choice-sheet`, and
   `.rows.device-list`): ≥ `--row-h`, a `--row-icon` (28) icon centered 32px in, so an MDI
   glyph is as big as the Hue app's 24px ones (32px icons at 16 in device lists), text from `--row-text`, a 500 `--fs-body` title over a 400 `--fs-caption` line,
@@ -354,7 +356,7 @@ Each part: its class (and helper), its measures, where it is used.
   light, it can no longer be controlled." / "Delete light"), never a button that turns into
   "Tap again".
 - **Tall sheet** (`.sheet.bottom.tall`): fills the screen under the status bar ("Power on",
-  "Device info", a zone's editor: close, title and "SAVE" in its bar, "Delete" at the bottom); the shorter choices ("Function", "Room") rise from the bottom as tall as
+  "Device info", a scene's picture); the shorter choices ("Function", "Room") rise from the bottom as tall as
   their rows.
 - **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
   name in a 46px field with a 1.5px `--outline` border and a round clear button.
@@ -614,3 +616,12 @@ effects sends nothing to the light (checked on an off light against HA's state).
   belong to; a scene's card slides in and out at an even speed under a fading dim, and the
   gallery's scenes swipe as a row of cards. Tokens `--decelerate`, `--accelerate` and the
   `--t-sheet-*`, `--t-card-*`, `--t-dim-*` durations.
+- 2026-10-26, off-system parts brought onto it: a zone's editor is an editor screen like a
+  device's (a sheet on phones, the name as a hero with its pencil, lights as list rows by
+  room with checks, "SAVE" grey until changed, "Delete" at the bottom) instead of a modal
+  card; today's scene (Light of the day, an automation's scene of the day) is a row with its
+  picture on a disc instead of a card of its own; the light sensor left "Weather and
+  season" for its own row ("Daytime brightness"). A scene of your own shows its lights'
+  colors (a captured scene has no palette), or a picture of its own: a photo or an icon on
+  its colors, picked on a tall sheet from the editor's picture (rows with pictures, the icon
+  grid). Adaptive Lighting's badges are gone with its support.

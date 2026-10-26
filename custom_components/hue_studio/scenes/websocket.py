@@ -15,7 +15,14 @@ import voluptuous as vol
 
 from ..lights.bridge import HUE_DOMAIN, async_bridges
 from .backup import async_list as async_list_scene_backups
-from .bridge import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
+from .bridge import (
+    SCENE_DOMAIN,
+    HueScene,
+    async_all_scenes,
+    async_resolve_scenes,
+    scene_info,
+)
+from .covers import COVERS
 from .preview import async_end as async_end_preview, async_show, async_start
 
 
@@ -25,6 +32,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     for command in (
         ws_subscribe_scenes,
         ws_scene_backups,
+        ws_scene_cover,
         ws_preview_start,
         ws_preview_show,
         ws_preview_end,
@@ -71,6 +79,27 @@ def ws_subscribe_scenes(
         return handle
 
     @callback
+    def on_cover(scene_id: str) -> None:
+        """A scene got a picture of its own (or lost it)."""
+        for scene in async_all_scenes(hass):
+            if scene.resource.id == scene_id:
+                info = scene_info(hass, scene)
+                sent[scene.entity_id] = info
+                connection.send_message(
+                    websocket_api.event_message(
+                        msg["id"], {"scenes": {scene.entity_id: info}}
+                    )
+                )
+
+    unsubscribers: list[Callable[[], None]] = [
+        bridge.scenes.scene.subscribe(
+            on_scene_update(key), event_filter=EventType.RESOURCE_UPDATED
+        )
+        for key, bridge in bridges.items()
+    ]
+    unsubscribers.append(hass.data[COVERS].async_listen(on_cover))
+
+    @callback
     def unsubscribe() -> None:
         for unsub in unsubscribers:
             unsub()
@@ -95,6 +124,35 @@ async def ws_scene_backups(
     """
     backups = await async_list_scene_backups(hass)
     connection.send_result(msg["id"], {"backups": backups})
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/scenes/cover",
+        vol.Required("entity_id"): cv.entity_id,
+        # An image uploaded to Home Assistant (/api/image/upload); None: its colors.
+        vol.Required("image"): vol.Any(None, vol.All(cv.string, vol.Length(max=64))),
+    }
+)
+@callback
+def ws_scene_cover(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Give a scene a picture of its own (covers.py).
+
+    Result: {"replaced": the image it had, or None} — the caller deletes it
+    (image/delete), as Home Assistant's own picture pickers do.
+    """
+    try:
+        (scene,) = async_resolve_scenes(hass, [msg["entity_id"]])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, str(err))
+        return
+    replaced = hass.data[COVERS].async_set(scene.resource.id, msg["image"])
+    connection.send_result(msg["id"], {"replaced": replaced})
 
 
 TOKEN = vol.All(cv.string, vol.Length(min=1, max=64))

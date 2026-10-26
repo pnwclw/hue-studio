@@ -11,7 +11,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { SHEET_CSS } from "../../automations/views/automation-sheet.ts";
 import { StudioContext } from "../../../core/context.ts";
-import { sceneColors, sceneDot, surfaceOf } from "../../../ds/controls.ts";
+import { sceneColors, sceneDot, sceneGlyph, surfaceOf } from "../../../ds/controls.ts";
 import { currentHass, haptic, navigate, openPanelFrom, openStockMoreInfo, watchHass } from "../../../core/ha-internals.ts";
 import { allGroups, friendlyName, type Group, type Home } from "../../../core/model.ts";
 import { CSS } from "../../../ds/styles/index.ts";
@@ -25,7 +25,8 @@ const EXPECT_MS = 5000;
 const SCENE_CSS = css`
   .ss-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px; border-radius: var(--r-m); }
   .ss-dot { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
-            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); }
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25); display: flex; align-items: center; justify-content: center; color: #fff; }
+  .ss-dot ha-icon { --mdc-icon-size: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
   .ss-card .grow { flex: 1; min-width: 0; }
   .ss-room { opacity: 0.75; font-size: var(--fs-footnote); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ss-check { width: 28px; height: 28px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -91,7 +92,7 @@ export class HueStudioSceneSheet extends LitElement {
     if (e.key === "Escape") this.close();
   };
 
-  /** The lights the scene sets, as a group (Adaptive Lighting, Sync Box). */
+  /** The lights the scene sets, as a group (Sync Box). */
   private lightsGroup(ctx: StudioContext, room: Group | null): Group {
     const lights = (ctx.sceneInfo[this.entityId]?.lights ?? []).filter((id) => ctx.hass.states[id]);
     if (room && (!lights.length || lights.every((id) => room.lights.includes(id)))) return room;
@@ -108,7 +109,7 @@ export class HueStudioSceneSheet extends LitElement {
     };
   }
 
-  private async activate(group: Group): Promise<void> {
+  private async activate(): Promise<void> {
     const ctx = this.ctx;
     if (!ctx) return;
     haptic("light");
@@ -119,18 +120,17 @@ export class HueStudioSceneSheet extends LitElement {
       this.requestUpdate();
     }, EXPECT_MS);
     this.requestUpdate();
-    if (await ctx.call("scene", "turn_on", { entity_id: this.entityId })) void ctx.markManual(group);
-    else {
+    if (!(await ctx.call("scene", "turn_on", { entity_id: this.entityId }))) {
       this.expected = false;
       this.requestUpdate();
     }
   }
 
-  private async recall(group: Group, data: Record<string, unknown>, service: "recall_scene" | "reset_scene"): Promise<void> {
+  private async recall(data: Record<string, unknown>, service: "recall_scene" | "reset_scene"): Promise<void> {
     const ctx = this.ctx;
     if (!ctx) return;
     haptic("light");
-    if (await ctx.call("hue_studio", service, { entity_id: this.entityId, ...data }, { optimistic: false })) void ctx.markManual(group);
+    await ctx.call("hue_studio", service, { entity_id: this.entityId, ...data }, { optimistic: false });
   }
 
   /** The panel's scene editor; outside the panel, closing it returns to this page. */
@@ -163,13 +163,16 @@ export class HueStudioSceneSheet extends LitElement {
     const active = this.expected || (!!info && info.active !== "inactive");
     const playing = info?.active === "dynamic_palette";
     const surface = surfaceOf({ on: true, colors: sceneColors(info) });
+    const glyph = sceneGlyph(hass, ctx.gallery, entityId, name, info);
     const synced = syncingIn(ctx.boxes, group);
     const box = synced.length ? boxesForGroup(ctx.boxes, { lights: synced })[0]?.[1].name || "" : "";
 
     return html`<div class="dlg" role="dialog" aria-modal="true" aria-label=${name}>
         <div class="grabber"></div>
         <div class=${classMap({ "ss-card": true, ...surface.classes })} style=${styleMap(surface.style)}>
-          <div class="ss-dot" style=${styleMap({ background: sceneDot(ctx.gallery, name, info) })}></div>
+          <div class="ss-dot" style=${styleMap({ background: sceneDot(ctx.gallery, name, info) })}>
+            ${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}
+          </div>
           <div class="grow">
             <div class="as-title">${name}</div>
             ${where ? html`<div class="ss-room">${where}</div>` : nothing}
@@ -178,16 +181,16 @@ export class HueStudioSceneSheet extends LitElement {
         </div>
         ${synced.length ? html`<p class="ss-note">${t("color.sync_all", { name: box })}</p>` : nothing}
         <div class="as-actions">
-          <button class="pill primary" ?disabled=${synced.length > 0} @click=${() => this.activate(group)}>
+          <button class="pill primary" ?disabled=${synced.length > 0} @click=${() => this.activate()}>
             ${t("scene.activate")}
           </button>
           ${active && info?.dynamic
-            ? html`<button class="pill" ?disabled=${synced.length > 0} @click=${() => this.recall(group, { dynamic: !playing }, "recall_scene")}>
+            ? html`<button class="pill" ?disabled=${synced.length > 0} @click=${() => this.recall({ dynamic: !playing }, "recall_scene")}>
                 ${icon(playing ? "pause" : "play")}${playing ? t("scene.pause") : t("scene.play")}
               </button>`
             : nothing}
           ${active && info?.resettable && (info.palette.length > 1 || info.mirek.length > 1)
-            ? html`<button class="pill" ?disabled=${synced.length > 0} @click=${() => this.recall(group, { shuffle: true, recall: true }, "reset_scene")}>
+            ? html`<button class="pill" ?disabled=${synced.length > 0} @click=${() => this.recall({ shuffle: true, recall: true }, "reset_scene")}>
                 ${icon("shuffle")}${t("scene.shuffle_colors")}
               </button>`
             : nothing}

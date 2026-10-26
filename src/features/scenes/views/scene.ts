@@ -2,7 +2,8 @@
 // are adjusted live (brightness here, colors on the wheel); "Save" stores what they show
 // now plus the name, dynamic speed and auto-play. "Colors" shuffles the palette over the
 // lights, "Reset scene" rebuilds the scene from its palette, "Delete scene" removes it from
-// the bridge (and so from the Hue app).
+// the bridge (and so from the Hue app). A scene of your own gets a picture of its own: a
+// photo (uploaded to Home Assistant) or an icon over its colors (HA's entity settings).
 // A new scene ("Custom scene" of a room's "+", the scene `new`) is the Hue app's: a picker
 // starting from what the lights show now, its name asked first; the lights are set the same
 // way (brightness here, colors on the wheel) and "Save" at the bottom creates it.
@@ -13,9 +14,10 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import type { SceneDraft } from "../../../core/context.ts";
-import { groupSlider, lightTile, sceneColors, sceneDot, speedSheet } from "../../../ds/controls.ts";
+import { groupSlider, lightTile, sceneArt, sceneColors, sceneDot, sceneGlyph, speedSheet } from "../../../ds/controls.ts";
 import { speedToStep, speedWord, stepToSpeed } from "../../color/effects.ts";
-import { leavePanel } from "../../../core/ha-internals.ts";
+import { haptic, leavePanel } from "../../../core/ha-internals.ts";
+import type { SceneInfo } from "../../../core/types.ts";
 import type { StringKey } from "../../../i18n/index.ts";
 import { colorsCss, findGroup, friendlyName, type Group, groupState } from "../../../core/model.ts";
 import { syncingIn } from "../../sync/sync.ts";
@@ -26,6 +28,25 @@ import { navRow } from "../../../ds/choice.ts";
 
 /** The scene "id" of a new one (`/room/<key>/scene/new`). */
 export const NEW_SCENE = "new";
+
+/** Icons a scene of your own can show over its colors, with their names. */
+const SCENE_ICONS: [string, StringKey][] = [
+  ["mdi:book-open-variant", "scene.icon_read"],
+  ["mdi:sofa", "scene.icon_relax"],
+  ["mdi:silverware-fork-knife", "scene.icon_dinner"],
+  ["mdi:movie-open", "scene.icon_movie"],
+  ["mdi:party-popper", "scene.icon_party"],
+  ["mdi:candle", "scene.icon_candles"],
+  ["mdi:coffee", "scene.icon_morning"],
+  ["mdi:laptop", "scene.icon_work"],
+  ["mdi:weather-night", "scene.icon_night"],
+  ["mdi:heart", "scene.icon_romance"],
+  ["mdi:leaf", "scene.icon_nature"],
+  ["mdi:music", "scene.icon_music"],
+];
+
+/** Where Home Assistant serves an uploaded picture (covers.py on the backend). */
+const coverUrl = (image: string): string => `/api/image/serve/${image}/512x512`;
 
 @customElement("hue-studio-scene-view")
 export class SceneView extends StudioView {
@@ -42,6 +63,8 @@ export class SceneView extends StudioView {
   /** A new scene's name sheet: what is typed (null while it is closed). */
   @state() private accessor naming: string | null = null;
   @state() private accessor busy = false;
+  /** The picture sheet of a scene of your own is open. */
+  @state() private accessor picturing = false;
   private started = false;
 
   private get name(): string {
@@ -78,10 +101,7 @@ export class SceneView extends StudioView {
     this.started = true;
     const info = this.ctx.sceneInfo[this.scene];
     if (!info || info.active === "inactive") {
-      const group = findGroup(this.ctx.home, this.key);
-      this.ctx.call("scene", "turn_on", { entity_id: this.scene }).then((ok) => {
-        if (ok && group) this.ctx.markManual(group);
-      });
+      void this.ctx.call("scene", "turn_on", { entity_id: this.scene });
     }
   }
 
@@ -92,12 +112,15 @@ export class SceneView extends StudioView {
     const room = findGroup(ctx.home, this.key);
     const roomPath = `/room/${encodeURIComponent(this.key)}`;
     const leave = () => {
+      // Pictures uploaded here and not saved are not kept.
+      for (const id of this.draft.uploads ?? []) ctx.deleteImage(id);
       ctx.sceneDraft = null;
       this.leave();
     };
-    // Unsaved: its name, speed or auto-play, or the lights it shows changed here (the Hue app asks).
+    // Unsaved: its name, speed, auto-play or picture, or the lights it shows changed here (the Hue app asks).
     const d0 = this.draft;
-    const close = () => this.confirmLeave(d0.touched || d0.name !== null || d0.speed !== null || d0.autoplay !== null, leave);
+    const dirty = d0.touched || d0.name !== null || d0.speed !== null || d0.autoplay !== null || d0.cover !== undefined || d0.icon !== undefined;
+    const close = () => this.confirmLeave(dirty, leave);
     if (!room || !ctx.hass.states[this.scene]) {
       return this.screen(this.subHead("", close), html`<p class="empty">${t("scene.not_found")}</p>`);
     }
@@ -109,7 +132,14 @@ export class SceneView extends StudioView {
       ? { ...room, key: `scene:${this.scene}`, lights, target: sameSet(lights, room.lights) ? room.target : lights }
       : room;
     const state = groupState(ctx.hass, group, ctx.lightInfo);
-    const dot = sceneDot(ctx.gallery, this.name, info);
+    // Its picture as it will be saved: a photo or an icon picked here, else as it is.
+    const shown = info && draft.cover !== undefined ? { ...info, cover: draft.cover ? coverUrl(draft.cover) : null } : info;
+    const dot = sceneDot(ctx.gallery, this.name, shown);
+    const glyph =
+      draft.icon !== undefined
+        ? !shown?.cover && draft.icon
+        : sceneGlyph(ctx.hass, ctx.gallery, this.scene, this.name, shown);
+    const own = !!info?.custom && !!ctx.hass.user?.is_admin;
     const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}${this.exitPath ? `?from=${encodeURIComponent(this.exitPath)}` : ""}`;
     const syncing = syncingIn(ctx.boxes, group);
     const name = draft.name ?? this.name;
@@ -128,7 +158,10 @@ export class SceneView extends StudioView {
     return html`<div class="scene-tint" style=${styleMap(tintStyle)}></div>
       <div class="screen-head scene-head">${head}</div><div class="screen-body"><div class="page scene-edit">
       <div class="scene-top">
-        <div class="dot big" style=${styleMap({ background: dot })}></div>
+        ${own
+          ? html`<button class=${classMap({ dot: true, big: true, glyph: !!glyph })} style=${styleMap({ background: dot })}
+              aria-label=${t("scene.picture")} @click=${() => (this.picturing = true)}>${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}</button>`
+          : html`<div class=${classMap({ dot: true, big: true, glyph: !!glyph })} style=${styleMap({ background: dot })}>${glyph ? html`<ha-icon icon=${glyph}></ha-icon>` : nothing}</div>`}
         <div class="name-row">
           ${this.editingName
             ? html`<input
@@ -208,7 +241,76 @@ export class SceneView extends StudioView {
           },
         })
       : nothing}
+    ${this.picturing && info ? this.pictureSheet(info, shown, glyph || null) : nothing}
     ${this.askSheet()}`;
+  }
+
+  /**
+   * A scene of your own's picture: its colors, a photo from this device, or an icon over its
+   * colors. Picked here, kept with "Save".
+   */
+  private pictureSheet(info: SceneInfo, shown: SceneInfo | undefined, glyph: string | null) {
+    const { ctx } = this;
+    const { t } = ctx;
+    const close = () => (this.picturing = false);
+    const cover = shown?.cover ?? null;
+    const pick = (patch: Partial<SceneDraft>) => {
+      haptic("selection");
+      this.edit(patch);
+    };
+    const upload = async (e: Event) => {
+      const input = e.target as HTMLInputElement;
+      const file = input.files?.[0];
+      input.value = "";
+      if (!file) return;
+      this.busy = true;
+      const id = await ctx.uploadImage(file);
+      this.busy = false;
+      if (!id) return;
+      haptic("success");
+      this.edit({ cover: id, icon: null, uploads: [...(this.draft.uploads ?? []), id] });
+    };
+    const tick = (on: boolean) => (on ? html`<span class="tick">${icon("check")}</span>` : nothing);
+    const colors = sceneArt(info);
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+      <div class="box form sensor-sheet picture-sheet" role="dialog" aria-label=${t("scene.picture")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
+          <div class="grow">${t("scene.picture")}</div>
+          <button class="pill save" @click=${close}>${t("common.done")}</button>
+        </div>
+        <div class="form-body">
+          <p class="hint">${t("scene.picture_hint")}</p>
+          <div class="rows" role="radiogroup">
+            <button class=${classMap({ item: true, on: !cover && !glyph })} role="radio" aria-checked=${!cover && !glyph}
+              @click=${() => pick({ cover: info.cover ? null : undefined, icon: null })}>
+              <span class="row-art pic" style=${styleMap({ background: colors })}></span>
+              <div class="grow">${t("scene.picture_colors")}<div class="dim small">${t("scene.picture_colors_sub")}</div></div>
+              ${tick(!cover && !glyph)}
+            </button>
+            <label class=${classMap({ item: true, on: !!cover, busy: this.busy })} role="radio" aria-checked=${!!cover}>
+              ${cover
+                ? html`<span class="row-art pic" style=${styleMap({ background: `url("${cover}") center / cover` })}></span>`
+                : html`<span class="row-art pic"><ha-icon icon="mdi:image-plus-outline"></ha-icon></span>`}
+              <div class="grow">${t("scene.picture_photo")}<div class="dim small">${t(cover ? "scene.picture_photo_change" : "scene.picture_photo_sub")}</div></div>
+              ${tick(!!cover)}
+              <input class="file" type="file" accept="image/jpeg,image/png,image/gif" ?disabled=${this.busy} @change=${upload} />
+            </label>
+          </div>
+          <h2 class="label">${t("scene.picture_icon")}</h2>
+          <div class="icon-grid" role="radiogroup" aria-label=${t("scene.picture_icon")}>
+            ${SCENE_ICONS.map(([glyphName, label]) => {
+              const on = !cover && glyph === glyphName;
+              return html`<button class=${classMap({ "icon-opt": true, on })} role="radio" aria-checked=${on}
+                @click=${() => pick({ icon: glyphName, cover: info.cover ? null : undefined })}>
+                <span class="disc"><ha-icon icon=${glyphName}></ha-icon></span>
+                <span>${t(label)}</span>
+              </button>`;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>`;
   }
 
   /** A new scene: what the room's lights show now, set here and on the wheel, then "Save". */
@@ -369,11 +471,21 @@ export class SceneView extends StudioView {
     if (name && name !== this.name) data.name = name;
     if (info && draft.speed !== null && draft.speed !== speedToStep(info.speed)) data.speed = Math.round(stepToSpeed(draft.speed) * 100);
     if (info && draft.autoplay !== null && draft.autoplay !== info.auto_dynamic) data.auto_dynamic = draft.autoplay;
-    if (await ctx.call("hue_studio", "save_scene", data, { optimistic: false })) {
-      ctx.sceneDraft = null;
-      ctx.toast(ctx.t("scene.saved"));
-      this.leave();
+    if (!(await ctx.call("hue_studio", "save_scene", data, { optimistic: false }))) return;
+    // Its picture: a photo (the one it had is deleted), and the icon in HA's entity settings.
+    let kept: string | null = null;
+    if (draft.cover !== undefined) {
+      const result = await ctx.query<{ replaced: string | null }>({ type: "hue_studio/scenes/cover", entity_id: this.scene, image: draft.cover });
+      if (result) kept = draft.cover;
+      if (result?.replaced) ctx.deleteImage(result.replaced);
     }
+    if (draft.icon !== undefined && (draft.icon ?? null) !== (ctx.hass.entities?.[this.scene]?.icon ?? null)) {
+      await ctx.query({ type: "config/entity_registry/update", entity_id: this.scene, icon: draft.icon });
+    }
+    for (const id of draft.uploads ?? []) if (id !== kept) ctx.deleteImage(id);
+    ctx.sceneDraft = null;
+    ctx.toast(ctx.t("scene.saved"));
+    this.leave();
   }
 
   /** Back to the room, or to the page outside the panel the editor was opened from. */

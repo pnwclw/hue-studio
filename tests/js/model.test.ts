@@ -77,7 +77,6 @@ test("group state averages lit lights", () => {
   assert.equal(state.colors.length, 1);
 });
 
-import { adaptiveFor } from "../../src/core/model.ts";
 import { resample, smoothPath } from "../../src/core/color.ts";
 
 test("options map a Hue group onto an area and mark another as a zone", () => {
@@ -182,17 +181,6 @@ test("motion sensitivity levels are named like the Hue app's", () => {
   assert.deepEqual(sensitivityLevels(2), ["low", "medium", "high"]);
   assert.equal(sensitivityLevels(4)?.length, 5);
   assert.equal(sensitivityLevels(7), null);
-});
-
-test("adaptive lighting switches covering a room", () => {
-  const h = structuredClone(hass) as Required<HassData>;
-  h.entities["switch.al"] = { platform: "adaptive_lighting" };
-  h.states["switch.al"] = {
-    state: "on",
-    attributes: { configuration: { lights: ["light.office", "light.other"] }, manual_control: ["light.office"] },
-  };
-  const office = buildHome(h).rooms[0];
-  assert.deepEqual(adaptiveFor(h, office), [{ switch: "switch.al", on: true, manual: ["light.office"], lights: ["light.office"] }]);
 });
 
 test("gradient points fit the fixed point count of a light", () => {

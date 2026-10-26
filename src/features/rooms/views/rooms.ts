@@ -1,35 +1,24 @@
 // Rooms and zones (opened from Settings): how the Hue rooms on the bridge differ from the HA areas (and aligning
-// them), the Hue zones with an editor, and Hue lights that have no area yet.
+// them), the Hue zones (each opens its editor, zone.ts), and Hue lights that have no area yet.
 // Areas are Home Assistant's truth; rooms on the bridge follow them (hue_studio.align_rooms).
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
 
 import type { StudioContext } from "../../../core/context.ts";
 import { friendlyName, hueGroupIcon, lightIcon } from "../../../core/model.ts";
-import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, lightsByBridge, lightsWithoutArea, severalBridges, type Zone } from "../rooms.ts";
+import { bridgeName, groupBridge, hueZones, lightsByBridge, lightsWithoutArea, severalBridges, type Zone } from "../rooms.ts";
 import { banner } from "../../../ds/controls.ts";
 import type { RoomsPlan, ZoneNote } from "../../../core/types.ts";
-import { icon, toggle } from "../../../ds/ui.ts";
+import { toggle } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
-import { bridgeRow, type Choice, navRow, single } from "../../../ds/choice.ts";
-
-/** The zone editor: an existing zone (entity id) or a new one (null). */
-interface ZoneDraft {
-  zone: string | null;
-  /** The bridge whose lights the zone holds (null: not known, every light is offered). */
-  bridge: string | null;
-  name: string;
-  lights: string[];
-}
+import { type Choice, navRow, single } from "../../../ds/choice.ts";
+import { NEW_ZONE, scenesCount } from "./zone.ts";
 
 const names = (ctx: StudioContext, ids: string[]): string => ids.map((id) => friendlyName(ctx.hass, id)).join(", ");
 const areaName = (ctx: StudioContext, id: string | null): string => (id && ctx.hass.areas?.[id]?.name) || id || "";
 const lightsCount = (ctx: StudioContext, n: number): string =>
   n === 1 ? ctx.t("rooms.one_light") : ctx.t("rooms.lights_count", { count: n });
-export const scenesCount = (ctx: StudioContext, n: number): string =>
-  n === 1 ? ctx.t("rooms.one_scene") : ctx.t("rooms.scenes_count", { count: n });
 
 const row = (iconName: string, text: string | TemplateResult, sub?: string | TemplateResult | typeof nothing, end?: TemplateResult) =>
   html`<div class="item"><ha-icon icon=${iconName}></ha-icon><div class="grow">${text}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>${end ?? nothing}</div>`;
@@ -66,7 +55,6 @@ export class RoomsView extends StudioView {
   @state() private accessor deleteEmpty = false;
   @state() private accessor keepSplit = false;
   @state() private accessor busy = false;
-  @state() private accessor draft: ZoneDraft | null = null;
   @state() private accessor notes: ZoneNote[] = [];
   private stopNotes?: () => void;
 
@@ -95,7 +83,7 @@ export class RoomsView extends StudioView {
         ${this.notes.map((n) => this.zoneNote(n))}
         <div class="rows zones">
           ${zones.map((z) => this.zoneRow(z))}
-          <button class="item" @click=${() => this.edit(null)}>
+          <button class="item" @click=${() => ctx.go(`/rooms/zone/${NEW_ZONE}`)}>
             <ha-icon icon="mdi:plus"></ha-icon><div class="grow">${t("rooms.new_zone")}</div>
           </button>
         </div>
@@ -105,8 +93,7 @@ export class RoomsView extends StudioView {
               <p class="lead">${t("rooms.no_room_hint")}</p>
               ${loose}`}`,
         "rooms-page",
-      )}
-      ${this.draft ? this.editor(this.draft) : nothing}`;
+      )}`;
   }
 
   /** A zone whose label was deleted in HA, or lights with its label that cannot join it. */
@@ -253,114 +240,11 @@ export class RoomsView extends StudioView {
       ctx.t("rooms.zone_meta", { lights: lightsCount(ctx, z.lights.length), scenes: scenesCount(ctx, z.scenes) }),
       groupBridge(ctx.rooms, { lights: z.lights, group: z.entity_id }),
     );
-    return html`<button class="item" @click=${() => this.edit(z)}>
+    return html`<button class="item" @click=${() => ctx.go(`/rooms/zone/${encodeURIComponent(z.entity_id)}`)}>
       <ha-icon icon=${hueGroupIcon(ctx.hass, ctx.config, z.entity_id)}></ha-icon>
       <div class="grow">${z.name}<div class="dim small">${meta}</div></div>
       <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
     </button>`;
-  }
-
-  private edit(zone: Zone | null): void {
-    const plan = this.ctx.rooms;
-    const bridge = zone ? groupBridge(plan, { lights: zone.lights, group: zone.entity_id }) : (Object.keys(plan?.bridges || {})[0] ?? null);
-    this.draft = { zone: zone?.entity_id ?? null, bridge, name: zone?.name ?? "", lights: zone ? [...zone.lights] : [] };
-    this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet input")?.focus());
-  }
-
-  /** With several bridges: the bridge of a new zone (its lights start over), or the zone's. */
-  private zoneBridge(draft: ZoneDraft, set: (patch: Partial<ZoneDraft>) => void) {
-    const { ctx } = this;
-    const plan = ctx.rooms;
-    if (!severalBridges(plan)) return nothing;
-    if (draft.zone) return html`<p class="lead small">${ctx.t("zone.on_bridge", { bridge: bridgeName(plan, draft.bridge) ?? "" })}</p>`;
-    return html`<div class="rows zone-bridges">
-      ${bridgeRow(ctx.t("add_device.bridge"), Object.entries(plan!.bridges!), draft.bridge, (c) => this.choose(c), (id) => id !== draft.bridge && set({ bridge: id, lights: [] }))}
-    </div>`;
-  }
-
-  /** Name and lights of a zone; saved to the bridge at once (create_zone / update_zone). */
-  private editor(draft: ZoneDraft) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const close = () => (this.draft = null);
-    const zone = draft.zone ? hueZones(ctx.hass).find((z) => z.entity_id === draft.zone) : undefined;
-    const name = draft.name.trim();
-    // Read the current draft, not this render's: two taps may come before the next render.
-    const set = (patch: Partial<ZoneDraft>) => (this.draft = { ...this.draft!, ...patch });
-    const flip = (light: string) => {
-      const lights = this.draft!.lights;
-      set({ lights: lights.includes(light) ? lights.filter((l) => l !== light) : [...lights, light] });
-    };
-    const save = async () => {
-      if (!name || !draft.lights.length || this.busy) return;
-      this.busy = true;
-      const ok = draft.zone
-        ? await ctx.call("hue_studio", "update_zone", { entity_id: draft.zone, name, lights: draft.lights }, { optimistic: false })
-        : await ctx.call("hue_studio", "create_zone", { entity_id: draft.lights, name }, { optimistic: false });
-      this.busy = false;
-      if (ok) {
-        close();
-        ctx.toast(t("zone.saved", { name }));
-      }
-    };
-    const remove = async () => {
-      if (!draft.zone || this.busy) return;
-      this.busy = true;
-      const ok = await ctx.call("hue_studio", "delete_zone", { entity_id: draft.zone }, { optimistic: false });
-      this.busy = false;
-      if (ok) {
-        close();
-        ctx.toast(t("zone.deleted", { name: zone?.name || name }));
-      }
-    };
-    // An editor on a tall sheet (the Hue app's): close, its title and "SAVE" in the bar, "Delete" at the bottom.
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form sensor-sheet zone-editor" role="dialog" aria-label=${draft.zone ? t("zone.title_edit") : t("zone.title_new")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-          <div class="grow">${draft.zone ? t("zone.title_edit") : t("zone.title_new")}</div>
-          <button class="pill save" ?disabled=${!name || !draft.lights.length || this.busy} @click=${save}>${t("zone.save")}</button>
-        </div>
-        <div class="form-body name-sheet">
-          <input
-            class="field outlined"
-            maxlength="32"
-            placeholder=${t("zone.name")}
-            aria-label=${t("zone.name")}
-            .value=${draft.name}
-            @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })}
-          />
-        </div>
-        ${this.zoneBridge(draft, set)}
-        ${lightsByArea(ctx.hass)
-          // A zone holds one bridge's lights.
-          .map(([area, lights]): [string | null, string[]] => [area, lights.filter((l) => !draft.bridge || !bridgeOf(ctx.rooms, l) || bridgeOf(ctx.rooms, l) === draft.bridge)])
-          .filter(([, lights]) => lights.length)
-          .map(
-          ([area, lights]) => html`<h2 class="label">${area ? areaName(ctx, area) : t("home.no_room")}</h2>
-            <div class="rows pick">
-              ${lights.map(
-                (light) => html`<button class=${classMap({ item: true, on: draft.lights.includes(light) })} role="checkbox"
-                  aria-checked=${draft.lights.includes(light)} @click=${() => flip(light)}>
-                  <ha-icon icon=${lightIcon(ctx.hass, light, ctx.lightInfo[light])}></ha-icon>
-                  <div class="grow">${friendlyName(ctx.hass, light)}</div>
-                  <span class="check">${icon("check")}</span>
-                </button>`,
-              )}
-            </div>`,
-        )}
-        ${draft.zone
-          ? html`<div class="delete-area">
-              <button class="delete-btn" ?disabled=${this.busy} @click=${() =>
-                this.askDelete(
-                  [t("zone.delete_note"), zone?.scenes ? t("zone.delete_hint", { count: zone.scenes }) : ""].filter(Boolean).join(" "),
-                  t("zone.delete"),
-                  () => void remove(),
-                )}>${t("zone.delete")}</button>
-            </div>`
-          : nothing}
-      </div>
-    </div>`;
   }
 }
 

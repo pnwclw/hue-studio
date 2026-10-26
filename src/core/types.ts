@@ -223,6 +223,8 @@ export interface Hass extends HassData {
   callService(domain: string, service: string, data?: ServiceData): Promise<unknown>;
   /** One WebSocket command (HA's frontend API). */
   callWS?<T>(msg: { type: string } & Record<string, unknown>): Promise<T>;
+  /** A request to HA's HTTP API with the user's token (the picture upload). */
+  fetchWithAuth?(path: string, init?: RequestInit): Promise<Response>;
   /** HA's REST API (e.g. the automation config API its editor uses). */
   callApi?<T>(method: "GET" | "POST" | "DELETE", path: string, data?: Record<string, unknown>): Promise<T>;
 }
@@ -278,8 +280,13 @@ export interface SceneInfo {
   lights: string[];
   /** Id of the scene's picture in the Hue app (`public_image` of a gallery scene). */
   image: string | null;
+  /** A picture of its own: where Home Assistant serves the photo uploaded for it. */
+  cover: string | null;
   /** A scene of your own (captured or from your colors), not a preset of the Hue app. */
   custom: boolean;
+  /** What its lights are set to (a scene captured from the lights has no palette): colors, whites. */
+  colors: XY[];
+  whites: number[];
 }
 
 /** What the zone labels need from the user (`hue_studio/zones/subscribe`). */

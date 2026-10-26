@@ -48,6 +48,7 @@ from homeassistant.helpers import entity_registry as er
 
 from ..const import DOMAIN, HUE_DOMAIN
 from ..lights.bridge import LIGHT_DOMAIN, NOT_EFFECTS, async_bridges, supported_effects
+from .covers import cover_url
 
 SCENE_DOMAIN = "scene"
 # `metadata.appdata` of a scene made from your own colors or lights: kept on the bridge,
@@ -196,16 +197,52 @@ def is_custom(resource: Scene) -> bool:
     )
 
 
+# At most this many of a scene's light colors are sent (its picture shows a handful).
+MAX_LIGHT_COLORS = 6
+
+
+def light_colors(resource: Scene) -> tuple[list[list[float]], list[int]]:
+    """What a scene's lights are set to: colors (gradients' points too), and whites.
+
+    A scene captured from the lights has no palette; its picture is drawn from these.
+    """
+    colors: list[list[float]] = []
+    whites: list[int] = []
+    for item in resource.actions:
+        action = item.action
+        if action.on is not None and not action.on.on:
+            continue
+        if action.gradient and action.gradient.points:
+            points = [point.color.xy for point in action.gradient.points]
+        elif action.color and action.color.xy:
+            points = [action.color.xy]
+        else:
+            points = []
+        for xy in points:
+            pair = [round(xy.x, 4), round(xy.y, 4)]
+            if pair not in colors:
+                colors.append(pair)
+        mirek = action.color_temperature.mirek if action.color_temperature else None
+        if not points and mirek and mirek not in whites:
+            whites.append(mirek)
+    return colors[:MAX_LIGHT_COLORS], whites[:MAX_LIGHT_COLORS]
+
+
 def scene_info(hass: HomeAssistant, scene: HueScene) -> dict[str, Any]:
     """Describe a scene for the frontend (what HA's scene entity does not expose)."""
     resource = scene.resource
     palette = resource.palette
     status = resource.status.active.value if resource.status else "inactive"
+    colors, whites = light_colors(resource)
     return {
         "active": status,
         # Id of the scene's picture in the Hue app (the gallery's `public_image`).
         "image": resource.metadata.image.rid if resource.metadata.image else None,
+        # A picture of your own (covers.py): its address, or None.
+        "cover": cover_url(hass, resource.id),
         "custom": is_custom(resource),
+        "colors": colors,
+        "whites": whites,
         "dynamic": is_dynamic(resource),
         "resettable": is_resettable(resource),
         "speed": resource.speed,

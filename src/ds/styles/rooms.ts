@@ -37,11 +37,6 @@ export const ROOMS_CSS = `
   .select { flex: none; max-width: 46%; height: 34px; padding: 0 10px; border: none; border-radius: var(--r-s); font: inherit; font-size: var(--fs-callout);
             color: inherit; background: var(--fill); }
   .rooms-page .center { margin-top: 18px; }
-  .sheet .box.zone-editor { width: min(100%, 440px); }
-  .zone-editor h2.label { margin: 24px 16px 8px; }
-  .zone-editor .rows { border-radius: 0; background: var(--surface-row); box-shadow: var(--shadow-row); }
-  .zone-editor .outlined { margin-top: 0; }
-  .zone-editor .delete-area { padding-bottom: calc(28px + var(--safe-bottom)); }
   /* A check: one round tick box everywhere (rows, choice lists, the light picker's rooms: all or some). */
   :is(.check, .pick-check) { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex: none; box-sizing: border-box;
                              border: 1.5px solid var(--text-3); border-radius: 50%; color: #fff; transition: background 0.2s, border 0.2s; }
