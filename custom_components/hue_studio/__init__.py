@@ -28,7 +28,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
 from .automations.blueprints import async_setup_automations
-from .automations.pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
+from .automations.pool import DEVICE_ID as POOL_DEVICE_ID
 from .bridges.motion_areas import async_stop_watching as async_stop_motion_areas
 from .const import (
     CONF_AUTO_ALIGN,
@@ -107,7 +107,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await _async_merge_bridge_entries(hass)
     async_setup_services(hass)
     async_setup_websocket(hass)
-    async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
     await async_setup_identities(hass)
     await async_setup_automations(hass)
