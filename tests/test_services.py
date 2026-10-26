@@ -198,19 +198,30 @@ async def test_save_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
         },
         blocking=True,
     )
-    scene_id, put = hue_lights.scenes.scene.update.call_args.args
-    assert scene_id == "res-scene"
-    assert put.metadata.name == "Dusk"
-    assert put.speed == 0.25
-    assert put.auto_dynamic is True
-    strip, bulb = (a.action for a in put.actions)
+    # A scene of your own: sent with the palette of what it shows (raw, see below).
+    method, path = hue_lights.request.call_args.args
+    assert (method, path) == ("put", "clip/v2/resource/scene/res-scene")
+    body = hue_lights.request.call_args.kwargs["json"]
+    assert body["metadata"] == {"name": "Dusk"}
+    assert body["speed"] == 0.25
+    assert body["auto_dynamic"] is True
+    strip, bulb = (a["action"] for a in body["actions"])
     # The strip shows a 2-point gradient, the bulb a color (mirek is not valid).
-    assert [(p.color.xy.x, p.color.xy.y) for p in strip.gradient.points] == [
-        (0.6, 0.35),
-        (0.2, 0.3),
+    assert [p["color"]["xy"] for p in strip["gradient"]["points"]] == [
+        {"x": 0.6, "y": 0.35},
+        {"x": 0.2, "y": 0.3},
     ]
-    assert (bulb.color.xy.x, bulb.color.xy.y) == (0.5, 0.4)
-    assert bulb.dimming.brightness == 50
+    assert bulb["color"]["xy"] == {"x": 0.5, "y": 0.4}
+    assert bulb["dimming"] == {"brightness": 50}
+    # Its palette: every color once, at its light's brightness; only effects_v2.
+    palette = body["palette"]
+    assert [c["color"]["xy"] for c in palette["color"]] == [
+        {"x": 0.6, "y": 0.35},
+        {"x": 0.2, "y": 0.3},
+        {"x": 0.5, "y": 0.4},
+    ]
+    assert palette["color"][2]["dimming"] == {"brightness": 50}
+    assert "effects" not in palette
 
     # Only the speed (a playing dynamic scene would be caught mid-way): the lights stay.
     await hass.services.async_call(
@@ -361,7 +372,13 @@ async def test_create_scene_captures_lights(
         blocking=True,
     )
     body = hue_room.request.call_args.kwargs["json"]
-    assert "palette" not in body
+    # Their colors as its palette (the Hue app's on saving): dynamic from the start.
+    assert [c["color"]["xy"] for c in body["palette"]["color"]] == [
+        {"x": 0.6, "y": 0.35},
+        {"x": 0.2, "y": 0.3},
+        {"x": 0.5, "y": 0.4},
+    ]
+    assert "effects" not in body["palette"]
     assert len(body["actions"]) == 2
     assert body["metadata"] == {"name": "Now", "appdata": "hs:custom"}
 

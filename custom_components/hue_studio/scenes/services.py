@@ -42,12 +42,15 @@ from .bridge import (
     async_resolve_group,
     async_resolve_scenes,
     captured_actions,
+    captured_palette,
     group_scene_names,
+    is_custom,
     is_resettable,
     new_scene,
     palette_actions,
     palette_feature,
     scene_post_json,
+    scene_put_json,
 )
 from .covers import COVERS
 
@@ -256,6 +259,10 @@ def async_setup_services(hass: HomeAssistant) -> None:
             put = ScenePut()
             if call.data[ATTR_CAPTURE]:
                 put.actions = captured_actions(scene)
+                # A scene of your own keeps the palette of what it shows, as the Hue
+                # app does on saving (its dynamic play and shuffle come from it).
+                if is_custom(scene.resource):
+                    put.palette = captured_palette(put.actions)
             if ATTR_NAME in call.data:
                 put.metadata = SceneMetadataPut(name=call.data[ATTR_NAME])
             if ATTR_SPEED in call.data:
@@ -353,7 +360,16 @@ async def _async_target_scenes(
 
 async def _async_update_scene(scene: HueScene, put: ScenePut) -> None:
     try:
-        await scene.bridge.scenes.scene.update(scene.resource.id, put)
+        if put.palette is not None:
+            # aiohue would send the palette with both effects lists, which the bridge
+            # refuses as mutually exclusive.
+            await scene.bridge.request(
+                "put",
+                f"clip/v2/resource/scene/{scene.resource.id}",
+                json=scene_put_json(put),
+            )
+        else:
+            await scene.bridge.scenes.scene.update(scene.resource.id, put)
     except (AiohueException, ClientError, TimeoutError) as err:
         raise HomeAssistantError(
             translation_domain=DOMAIN,

@@ -319,7 +319,7 @@
     },
     "create_scene": {
       "name": "Utwórz scenę",
-      "description": "Tworzy scenę w pomieszczeniu lub strefie Hue, widoczną w aplikacji Hue. Z kolorów sceny z galerii lub palety (rozłożonych na światła i zapisanych do odtwarzania dynamicznego i mieszania), w przeciwnym razie z tego, co światła pokazują teraz.",
+      "description": "Tworzy scenę w pomieszczeniu lub strefie Hue, widoczną w aplikacji Hue. Z kolorów sceny z galerii lub palety (rozłożonych na światła i zapisanych do odtwarzania dynamicznego i mieszania), w przeciwnym razie z tego, co światła pokazują teraz, z ich kolorami jako paletą (dynamiczna przy dwóch lub więcej).",
       "fields": {
         "name": {
           "name": "Nazwa",
@@ -395,7 +395,7 @@
     },
     "save_scene": {
       "name": "Zapisz scenę",
-      "description": "Zapisuje w scenie Hue to, co teraz pokazują jej światła; opcjonalnie zmienia nazwę, szybkość dynamiki i autoodtwarzanie.",
+      "description": "Zapisuje w scenie Hue to, co teraz pokazują jej światła (we własnej scenie także jako jej paletę); opcjonalnie zmienia nazwę, szybkość dynamiki i autoodtwarzanie.",
       "fields": {
         "name": {
           "name": "Nazwa",

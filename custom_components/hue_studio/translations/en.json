@@ -319,7 +319,7 @@
     },
     "create_scene": {
       "name": "Create scene",
-      "description": "Creates a scene in a Hue room or zone, visible in the Hue app. From a gallery scene or palette (spread over the lights and stored for dynamic play and shuffle), otherwise from what the lights show now.",
+      "description": "Creates a scene in a Hue room or zone, visible in the Hue app. From a gallery scene or palette (spread over the lights and stored for dynamic play and shuffle), otherwise from what the lights show now, their colors kept as its palette (dynamic with two or more).",
       "fields": {
         "name": {
           "name": "Name",
@@ -395,7 +395,7 @@
     },
     "save_scene": {
       "name": "Save scene",
-      "description": "Stores what the scene's lights show now in the Hue scene; optionally renames it and sets its dynamic speed and auto-play.",
+      "description": "Stores what the scene's lights show now in the Hue scene (a scene of your own also as its palette); optionally renames it and sets its dynamic speed and auto-play.",
       "fields": {
         "name": {
           "name": "Name",

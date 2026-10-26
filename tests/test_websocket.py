@@ -16,7 +16,7 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.scenes.bridge import light_colors
+from custom_components.hue_studio.scenes.bridge import captured_palette, light_colors
 
 from .conftest import LIGHTS, SCENES, make_light, make_scene
 
@@ -187,3 +187,33 @@ def test_light_colors() -> None:
     )
     scene.actions = [strip, bulb, off, white]
     assert light_colors(scene) == ([[0.6, 0.35], [0.2, 0.3]], [366])
+
+
+def test_captured_palette() -> None:
+    """Lights' colors once each at their brightness; a white only without colors."""
+    scene = make_scene("res-scene", palette=False)
+    strip, bulb = scene.actions
+    strip.action.gradient = GradientFeatureBase(
+        points=[
+            GradientPoint(color=ColorFeatureBase(xy=ColorPoint(0.6, 0.35))),
+            GradientPoint(color=ColorFeatureBase(xy=ColorPoint(0.6, 0.35))),
+            GradientPoint(color=ColorFeatureBase(xy=ColorPoint(0.2, 0.3))),
+        ]
+    )
+    bulb.action.color_temperature = ColorTemperatureFeatureBase(mirek=366)
+    palette = captured_palette(scene.actions)
+    assert palette is not None
+    assert [(c.color.xy.x, c.color.xy.y) for c in palette.color] == [
+        (0.6, 0.35),
+        (0.2, 0.3),
+    ]
+    assert palette.color_temperature == []
+
+    strip.action.gradient = None
+    palette = captured_palette(scene.actions)
+    assert palette is not None
+    assert palette.color == []
+    assert palette.color_temperature[0].color_temperature.mirek == 366
+
+    bulb.action.on = OnFeature(on=False)
+    assert captured_palette(scene.actions) is None

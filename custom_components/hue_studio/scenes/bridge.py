@@ -41,6 +41,7 @@ from aiohue.v2.models.scene import (
     Scene,
     SceneMetadata,
     ScenePost,
+    ScenePut,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
@@ -313,6 +314,55 @@ def captured_actions(scene: HueScene) -> list[Action]:
         else action
         for action in scene.resource.actions
     ]
+
+
+# The most colors a palette holds (CLIP v2).
+MAX_PALETTE_COLORS = 9
+
+
+def captured_palette(actions: Iterable[Action]) -> PaletteFeature | None:
+    """A palette of what the lights are set to, as the Hue app stores with a scene it
+    saves: their colors (a gradient's points too, each once) at their brightness, else
+    their white. Two colors or more make the scene dynamic. None: nothing to play.
+    """
+    colors: list[PaletteFeatureColor] = []
+    seen: set[tuple[float, float]] = set()
+    white: PaletteFeatureColorTemperature | None = None
+    for item in actions:
+        action = item.action
+        if action.on is not None and not action.on.on:
+            continue
+        dimming = DimmingFeatureBase(
+            brightness=action.dimming.brightness if action.dimming else 100.0
+        )
+        if action.gradient and action.gradient.points:
+            points = [point.color.xy for point in action.gradient.points]
+        elif action.color and action.color.xy:
+            points = [action.color.xy]
+        else:
+            points = []
+        for xy in points:
+            if (key := (round(xy.x, 4), round(xy.y, 4))) not in seen:
+                seen.add(key)
+                colors.append(
+                    PaletteFeatureColor(
+                        color=ColorFeatureBase(xy=ColorPoint(xy.x, xy.y)),
+                        dimming=dimming,
+                    )
+                )
+        mirek = action.color_temperature.mirek if action.color_temperature else None
+        if not points and mirek and white is None:
+            white = PaletteFeatureColorTemperature(
+                color_temperature=ColorTemperatureFeatureBase(mirek=mirek),
+                dimming=dimming,
+            )
+    if colors:
+        return PaletteFeature(
+            color=colors[:MAX_PALETTE_COLORS], dimming=[], color_temperature=[]
+        )
+    if white is not None:
+        return PaletteFeature(color=[], dimming=[], color_temperature=[white])
+    return None
 
 
 # ---------- reset: palette -> scene actions ----------
@@ -596,8 +646,9 @@ def new_scene(
     """A scene for every light of the group.
 
     With a palette, it is spread over the lights (and stored, so the Hue app can play
-    and shuffle it); without one, the scene stores what the lights show now. A scene
-    of your own (`custom`, not a gallery scene as it is) is marked so on the bridge.
+    and shuffle it); without one, the scene stores what the lights show now and a
+    palette of their colors. A scene of your own (`custom`, not a gallery scene as it
+    is) is marked so on the bridge.
     """
     if palette is not None:
         spread = spread_palette(palette, group.lights)
@@ -610,6 +661,7 @@ def new_scene(
             Action(target=_light_ref(light), action=capture_action(light))
             for light in group.lights
         ]
+        palette = captured_palette(actions)
     return ScenePost(
         metadata=SceneMetadata(
             name=name,
@@ -631,6 +683,14 @@ def scene_post_json(post: ScenePost) -> dict[str, Any]:
     bridge rejects a palette with both ("mutually exclusive"): send only effects_v2.
     """
     body = dataclass_to_dict(post, skip_none=True)
+    if (palette := body.get("palette")) is not None:
+        palette.pop("effects", None)
+    return body
+
+
+def scene_put_json(put: ScenePut) -> dict[str, Any]:
+    """The PUT body of a scene change (only `effects_v2` in a palette, as on POST)."""
+    body = dataclass_to_dict(put, skip_none=True)
     if (palette := body.get("palette")) is not None:
         palette.pop("effects", None)
     return body
