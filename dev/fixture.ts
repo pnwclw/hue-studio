@@ -542,7 +542,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }
       pool = narrow(pool, [["seasons", "autumn"], ["weather", "gloomy"]]);
     }
-    const scene = pool.length ? pool[new Date().getDate() % pool.length] : null;
+    // "Another scene of the day" steps on through today's pool.
+    const scene = pool.length ? pool[(new Date().getDate() + skipToday) % pool.length] : null;
     const fixed = config.settings?.brightness?.[poolPhase];
     return {
       ...base, mood: from, pool_phase: poolPhase, scene, pool, kelvin: null,
@@ -550,6 +551,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       brightness: Math.min(100, Math.max(1, (fixed ?? 70) + (config.offsets?.[poolPhase] || 0))),
     };
   };
+  let skipToday = 0;
   const daylightMessage = (): DaylightMessage => ({
     settings: { ...day.settings },
     user_tags: { ...day.user },
@@ -1106,6 +1108,12 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       if (msg.type === "call_service" && msg.service === "import_scenes") {
         const one = { scene: "Ocean dawn", group: "Office" };
         return { response: { file: "", created: [one, one], replaced: [], skipped: [{ ...one, reason: "exists" }], missing_lights: [] } } as T;
+      }
+      if (msg.type === "hue_studio/daylight/next") {
+        skipToday += 1;
+        (day.settings as unknown as Record<string, unknown>).skip = { day: new Date().toISOString().slice(0, 10), count: skipToday };
+        pushDaylight();
+        return null as T;
       }
       if (msg.type === "hue_studio/daylight/set") {
         const { type: _type, ...change } = msg;

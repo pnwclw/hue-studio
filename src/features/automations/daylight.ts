@@ -169,17 +169,17 @@ export interface LegacySplit {
   local: DayConfig;
   pools: NonNullable<DayConfig["pools"]>;
   holidays: Holiday[];
-  sources: { weather?: string; season?: string; light_sensor?: string };
+  sources: { weather?: string; season?: string };
 }
 
 /** An automation's old settings split: pools and sources go global, the rest stays. */
 export function splitLegacy(config: Partial<DayConfig>): LegacySplit {
   const { pools = {}, holidays = [], excluded = [], ...rest } = config;
-  const { weather, season, light_sensor, ...settings } = rest.settings || {};
+  // A light sensor stays the automation's own (daytime brightness by its sensor).
+  const { weather, season, ...settings } = rest.settings || {};
   const local = dayConfig({ ...rest, settings });
   const sources: LegacySplit["sources"] = {};
   if (weather) sources.weather = weather;
   if (season) sources.season = season;
-  if (light_sensor) sources.light_sensor = light_sensor;
   return { local: { ...local, exclude: [...new Set([...local.exclude, ...excluded])] }, pools, holidays, sources };
 }

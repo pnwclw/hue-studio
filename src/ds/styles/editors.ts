@@ -38,11 +38,18 @@ export const EDITORS_CSS = `
   .page.scene-new > .hint { margin: 16px var(--text-inset) 0; }
   .screen-foot { flex: none; display: flex; justify-content: center; padding: 15px 16px calc(16px + var(--safe-bottom));
                  border-top: 1px solid var(--separator); background: var(--bg); }
-  .name-sheet .name-field { position: relative; display: flex; align-items: center; }
-  .name-sheet .name-field .field { padding-right: 44px; }
-  .name-sheet .name-field .round { position: absolute; right: 8px; }
-  /* A hint under the field (a scene link's), with the sheet's room under it. */
-  .name-sheet .name-field + .hint { margin: 10px 2px calc(8px + var(--safe-bottom)); }
+  /* A name's field (the Hue app's): outlined, a round clear button inside it at the end. */
+  .name-field { position: relative; display: flex; align-items: center; }
+  .name-field .field { flex: 1; min-width: 0; padding-right: 44px; }
+  .name-field .round { position: absolute; right: 8px; }
+  /* A name page (base.ts nameScreen): the glyph centered over the field, 20 under the bar. */
+  .name-page .name-pic { display: flex; justify-content: center; padding: 8px 0 16px; }
+  .name-page .name-pic ha-icon { --mdc-icon-size: 48px; }
+  .name-page > .name-field:first-child { margin-top: 20px; }
+  .name-page .name-field + .hint { margin: 10px 2px 0; }
+  .name-page .hint + .rows, .name-page .name-field + .rows { margin-top: 20px; }
+  .add-panel .lead.warn { color: var(--warn); }
+  .add-panel .name-field { margin-top: 20px; }
   .scene-edit > .center { margin-top: 40px; }
   .scene-edit > .center + .delete-area { margin-top: 12px; }
   .name-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 18px; }
@@ -71,8 +78,6 @@ export const EDITORS_CSS = `
   main > :has(.add-picker) { position: static; }
   .add-picker { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column;
                 background: linear-gradient(100deg, var(--picker-top), var(--picker-top-2) 60%); }
-  /* A sheet the picker opens (a scene link) lies over it. */
-  .add-picker ~ .sheet { z-index: 31; }
   .add-picker > .bar { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; }
   .add-panel { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 20px 20px calc(28px + var(--safe-bottom));
                border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg); box-shadow: inset 0 1px 0 var(--surface-low); }

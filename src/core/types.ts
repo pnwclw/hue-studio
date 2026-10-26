@@ -622,8 +622,9 @@ export interface DaySettings extends PhaseTimes {
   kelvin?: Partial<Record<Phase, number>>;
   /** Before 0.10: sources of its own (now global). */
   weather?: string | null;
-  light_sensor?: string | null;
   season?: string | null;
+  /** Daytime brightness by this light sensor (a motion sensor automation's own sensor). */
+  light_sensor?: string | null;
 }
 
 /** Before 0.10: a holiday of an automation's own pools. */

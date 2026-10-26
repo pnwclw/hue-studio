@@ -28,6 +28,8 @@ export const ROWS_CSS = `
     content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--separator); }
   :is(:is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows, :is(.rows.device-list, .rows.list)) .item + .item:has(> :is(ha-icon, .row-art, .thumb, .tag-pic):first-child)::before {
     left: var(--row-text); }
+  /* A row's own actions at its end (today's scene: show, another, never): round icon buttons 8 apart. */
+  .rows .item .row-actions { display: flex; flex: none; gap: 8px; }
   .settings-page .section-head h2.label { margin: 0 var(--text-inset); }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label, .sheet .form-body > h2.label:first-child { margin-top: 18px; }
   .settings-page .lead { font-size: var(--fs-callout); }

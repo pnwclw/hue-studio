@@ -58,11 +58,13 @@ export class AddSheet extends StudioView {
     return html`<div class="add-picker" role="dialog" aria-label=${scene ? t("add.scene_title") : t("add.title")}>
       <div class="bar">
         ${scene
-          ? html`<button class="round back" aria-label=${t("common.back")} @click=${() => next("menu")}>${icon("back")}</button>`
+          ? html`<button class="round back" aria-label=${t("common.back")} @click=${() => next(this.step === "link" ? "scene" : "menu")}>${icon("back")}</button>`
           : html`<button class="round close" aria-label=${t("common.close")} @click=${this.close}>${icon("close")}</button>`}
       </div>
       <div class="add-panel">
-        ${scene
+        ${this.step === "link"
+          ? this.linkPage()
+          : scene
           ? html`<h1 class="big">${t("add.scene_title")}</h1>
               <p class="lead">${t("add.scene_lead")}</p>
               <div class="pick-tiles">
@@ -87,16 +89,15 @@ export class AddSheet extends StudioView {
                 ${big("mdi:lightning-bolt", "add.add_automation", () => go(`/automations/new?room=${room}`))}
               </div>`}
       </div>
-    </div>
-    ${this.step === "link" ? this.linkSheet() : nothing}`;
+    </div>`;
   }
 
-  /** "Scene link": a link someone shared from the Hue app (or Hue Studio), pasted; "Done" opens its card. */
-  private linkSheet() {
+  /** "Scene link", a page of the picker (never a dialog): a link someone shared from the Hue
+   *  app (or Hue Studio), pasted; "Open" opens its card. */
+  private linkPage() {
     const { ctx } = this;
     const { t } = ctx;
-    const cancel = () => (this.step = "scene");
-    const done = async () => {
+    const open = async () => {
       const scene = await readShareLink(this.link);
       if (!scene) {
         haptic("warning");
@@ -107,48 +108,39 @@ export class AddSheet extends StudioView {
       this.dispatchEvent(new CustomEvent("shared", { detail: scene }));
       this.close();
     };
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && cancel()}>
-      <div class="box form name-sheet" role="dialog" aria-label=${t("share.link")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${cancel}>${icon("close")}</button>
-          <div class="grow">${t("share.link")}</div>
-          <button class="pill" ?disabled=${!this.link.trim()} @click=${() => void done()}>${t("common.done")}</button>
-        </div>
-        <div class="form-body">
-          <label class="name-field">
-            <input
-              class="field outlined"
-              type="url"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://scenesharing.meethue.com/…"
-              aria-label=${t("share.link")}
-              .value=${this.link}
-              @input=${(e: InputEvent) => {
-                this.link = (e.target as HTMLInputElement).value;
-                this.badLink = false;
-              }}
-              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.link.trim() && void done()}
-            />
-            ${this.link
-              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
-                  e.preventDefault();
-                  this.link = "";
-                  this.badLink = false;
-                  this.querySelector<HTMLInputElement>(".name-field input")?.focus();
-                }}>${icon("close")}</button>`
-              : nothing}
-          </label>
-          <p class=${classMap({ hint: true, warn: this.badLink })}>${t(this.badLink ? "share.bad_link" : "share.link_hint")}</p>
-        </div>
-      </div>
-    </div>`;
+    return html`<h1 class="big">${t("share.link")}</h1>
+      <p class=${classMap({ lead: true, warn: this.badLink })}>${t(this.badLink ? "share.bad_link" : "share.link_hint")}</p>
+      <label class="name-field">
+        <input
+          class="field outlined"
+          type="url"
+          inputmode="url"
+          autocomplete="off"
+          placeholder="https://scenesharing.meethue.com/…"
+          aria-label=${t("share.link")}
+          .value=${this.link}
+          @input=${(e: InputEvent) => {
+            this.link = (e.target as HTMLInputElement).value;
+            this.badLink = false;
+          }}
+          @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.link.trim() && void open()}
+        />
+        ${this.link
+          ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+              e.preventDefault();
+              this.link = "";
+              this.badLink = false;
+              this.querySelector<HTMLInputElement>(".name-field input")?.focus();
+            }}>${icon("close")}</button>`
+          : nothing}
+      </label>
+      <div class="center"><button class="pill apply" ?disabled=${!this.link.trim()} @click=${() => void open()}>${t("share.open")}</button></div>`;
   }
 
   protected override updated(changed: Map<PropertyKey, unknown>): void {
     super.updated(changed);
-    // The link sheet comes up ready to paste into.
-    if (changed.has("step") && this.step === "link") this.querySelector<HTMLInputElement>(".name-sheet input")?.focus();
+    // The link page comes up ready to paste into.
+    if (changed.has("step") && this.step === "link") this.querySelector<HTMLInputElement>(".add-panel .name-field input")?.focus();
   }
 }
 

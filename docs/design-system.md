@@ -313,7 +313,8 @@ Each part: its class (and helper), its measures, where it is used.
   its name `--fs-body` 500 at 72, the count (13px) and a round button that folds its cards;
   48px tall, 24px under the cards before it.
 - **New scene** (`scene.ts`, `/room/<key>/scene/new`, the Hue app's "Custom scene"): a
-  picker; its name asked first on a name sheet; picture (the lights' colors) 48 and name 34
+  picker; its name open in place first (selected, ready to type; no name sheet, ours);
+  picture (the lights' colors) 48 and name 34
   12px into the panel, the brightness and lights cards rounded 20px in, 20px apart; "Save"
   in the footer; leaving asks "Close and don't save" on an action sheet.
 - **Flow** (`.flow`: `flow()`, `flowTitle()` and `flowRing()` in `base.ts`; "Add devices",
@@ -375,9 +376,13 @@ Each part: its class (and helper), its measures, where it is used.
 - **Tall sheet** (`.sheet.bottom.tall`): fills the screen under the status bar ("Power on",
   "Device info", a scene's picture); the shorter choices ("Function", "Room") rise from the bottom as tall as
   their rows.
-- **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
-  name in a 46px field with a 1.5px `--outline` border and a round clear button; "Scene link"
-  the same, a hint (or its warning) under the field.
+- **No dialogs for names.** A name is typed in place (a hero's name with its pencil:
+  `.name-input`) or on a **name page** (`nameScreen` in `base.ts`, `.name-page`: the bar with
+  back, the title and the action pill, the glyph of what is named, the name in a 46px field with
+  a 1.5px `--outline` border (filled for a Sync Box input's) and a round clear button
+  (`.name-field`), a hint or its warning, more below); in a flow it is a step of the flow ("Add
+  devices": a light's name, a new room), in a picker a page of it (a scene link). Several
+  values (a scene's tags) are a page too, never a sheet.
 - **Footer** `.screen-foot`: a line over the screen's one action (the accent pill), centered,
   the safe area under it (a new scene's "Save").
 - **Menu** `.menu`: a dropdown from a "⋯" button.
@@ -454,7 +459,7 @@ to pair it.
   Advanced, Software updates; then ours, Presets. (Voice assistants is the Hue cloud's:
   not here.)
 - **Device**: the hero (the box's glyph, its name `--fs-large` with the round pencil:
-  the name sheet), rows: LED indicator brightness (a choice sheet: Normal, Off, Dimmed),
+  renamed in place), rows: LED indicator brightness (a choice sheet: Normal, Off, Dimmed),
   Automatic updates (a switch, a hint under it), Network info and Device info (tall
   sheets of facts, the value under the title; ours: how the box is connected and its
   device in Home Assistant); "Restart sync box" (`.pill`) over "Remove sync box"
@@ -484,7 +489,7 @@ to pair it.
 - **Change Hue Bridge** (the bridges as rows with a tick, the move under them) and
   **Change Wi-Fi network** (the box's Bluetooth for the Hue app) are sheets: the Wi-Fi
   itself is changed by the Hue app.
-- **Presets** (ours): rows (start one), "Save current" (the name sheet), delete on an
+- **Presets** (ours): rows (start one), "Save current" (a name page), delete on an
   action sheet.
 
 ### Color screen
@@ -649,7 +654,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
   grid). Adaptive Lighting's badges are gone with its support.
 - 2026-10-26, scenes shared as the Hue app's links (scenesharing.meethue.com): a round share
   button on a scene's card, "Share" on a scene's "⋯", and "From a link" among a room's ways
-  to add a scene (a name sheet with the link, its warning under the field; the scene's card
+  to add a scene (a page of the picker with the link, its warning in the lead; the scene's card
   then). Sheets a picker opens lie over it.
 - 2026-10-26, the scene editor against the Hue app's (iOS and Android, same scene): its
   "Dynamic scene" rows were compact (52 and 58 instead of 72, separators across, titles not
@@ -665,3 +670,9 @@ effects sends nothing to the light (checked on an off light against HA's state).
   checks on the cards (`ds/lights.ts`); a zone's and an entertainment area's editors use them
   instead of lists of rows, the entertainment area's editor is now an editor sheet like the
   others. A sheet body's first section title sits 34 under its bar, as a settings page's.
+- 2026-10-26, no dialogs for names anywhere (the user: edit in place, never a modal): a new
+  scene's name in place, "Save current settings", a Sync Box preset's, input's and remote
+  button's names on name pages (`nameScreen`), the box's name in its hero, "Add devices"' light
+  name and new room as steps of the flow, a scene link as a page of the "+" picker, a scene's
+  tags (several values) as a page. Scene of the day's actions as round icon buttons at the end
+  of its row (show now, another scene of the day, never this scene; `.row-actions`).

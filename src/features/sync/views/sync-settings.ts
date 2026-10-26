@@ -77,7 +77,6 @@ type Page =
 /** A sheet over the page. */
 type Sheet =
   | { kind: "network" | "info" | "bridge" | "wifi" }
-  | { kind: "name"; name: string }
   | { kind: "input"; id: string; name: string; type: string }
   | { kind: "preset"; name: string }
   | { kind: "ir"; code: string; name: string; action: string; known: boolean };
@@ -94,6 +93,8 @@ export class SyncSettingsView extends StudioView {
   /** The pages over the list, the last one shown. */
   @state() private accessor pages: Page[] = [];
   @state() private accessor sheet: Sheet | null = null;
+  /** The box's name being typed in its hero (null: not renaming). */
+  @state() private accessor renaming: string | null = null;
   @state() private accessor bridges: BridgesMessage | null = null;
   /** The bridge the box goes to, and how linking it goes (`until`: the button's deadline, ms). */
   @state() private accessor target: string | null = null;
@@ -138,8 +139,12 @@ export class SyncSettingsView extends StudioView {
     else if (page === "presets") body = this.presetsPage(box);
     else if (page === "screen") body = this.screenPage(box);
     else body = this.followPage(box, page.slice("follow:".length));
+    // A name (a preset's, an input's, a remote button's) is typed on a page of its own, over
+    // the one it was opened from; never on a dialog.
+    const sheet = this.sheet;
+    if (sheet?.kind === "preset" || sheet?.kind === "input" || sheet?.kind === "ir") return this.namePage(box, sheet);
     // The sheets sit outside the scrolling body: a scroller (iOS) would clip them.
-    return html`${body}${this.sheet ? this.renderSheet(box, this.sheet) : nothing}`;
+    return html`${body}${sheet ? this.renderSheet(box, sheet) : nothing}`;
   }
 
   // ---- frame ----
@@ -298,8 +303,17 @@ export class SyncSettingsView extends StudioView {
       html`<div class="sensor-hero">
           <ha-icon class="pic" icon="hue-studio:syncbox"></ha-icon>
           <div class="name-row">
-            <h1 class="big">${name}</h1>
-            <button class="round rename" aria-label=${t("bridges.rename")} @click=${() => this.openSheet({ kind: "name", name }, box)}>${icon("pencil")}</button>
+            ${this.renaming !== null
+              ? html`<input class="name-input" maxlength=${NAME_MAX} aria-label=${t("bridges.rename")} .value=${this.renaming}
+                  @input=${(e: InputEvent) => (this.renaming = (e.target as HTMLInputElement).value)}
+                  @keydown=${(e: KeyboardEvent) => e.key === "Enter" && void this.rename(box)} />`
+              : html`<h1 class="big">${name}</h1>`}
+            <button class="round rename" aria-label=${t("bridges.rename")} @click=${() => {
+              if (this.renaming !== null) return void this.rename(box);
+              haptic("selection");
+              this.renaming = name;
+              void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sensor-hero .name-input")?.focus());
+            }}>${icon("pencil")}</button>
           </div>
         </div>
         <div class="rows">
@@ -749,15 +763,23 @@ export class SyncSettingsView extends StudioView {
       this.cancelLink();
       this.target = Object.keys(this.bridges ?? {}).find((id) => id !== box.bridge) ?? null;
     }
+    // A name page comes up ready to type on its own (nameScreen).
+    if (sheet.kind === "preset" || sheet.kind === "input" || sheet.kind === "ir") this.pushPage();
     this.sheet = sheet;
-    if (sheet.kind === "name" || sheet.kind === "preset" || sheet.kind === "ir") {
-      void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".sheet .field")?.focus());
-    }
   }
 
   private closeSheet(): void {
     this.cancelLink();
+    const page = this.sheet?.kind === "preset" || this.sheet?.kind === "input" || this.sheet?.kind === "ir";
     this.sheet = null;
+    this.nameClosed();
+    if (page) this.popPage();
+  }
+
+  /** The name typed in the hero, kept on the box (Enter or the pencil again). */
+  private async rename(box: SyncBoxInfo): Promise<void> {
+    const name = (this.renaming ?? "").trim();
+    if (!name || name === box.name || (await this.configure({ name }))) this.renaming = null;
   }
 
   /** A sheet: its bar (close, title, an action) over the body; `tall` fills the screen. */
@@ -804,38 +826,10 @@ export class SyncSettingsView extends StudioView {
           </div>`,
           { tall: true },
         );
-      case "name": {
-        const name = sheet.name.trim();
-        const save = async () => {
-          if (!name || name === box.name) return this.closeSheet();
-          if (await this.configure({ name })) this.closeSheet();
-        };
-        return this.frame(
-          t("bridges.rename"),
-          this.nameField(sheet.name, NAME_MAX, t("bridges.rename"), (v) => (this.sheet = { ...sheet, name: v }), save),
-          { end: html`<button class="pill save" ?disabled=${!name} @click=${save}>${t("color.done")}</button>`, cls: "name-sheet" },
-        );
-      }
       case "input":
-        return this.inputSheet(box, sheet);
-      case "preset": {
-        const name = sheet.name.trim();
-        const save = async () => {
-          if (!name) return;
-          if (await ctx.call("hue_studio", "save_sync_preset", { entity_id: box.entity_id!, name }, { optimistic: false })) {
-            this.closeSheet();
-            ctx.toast(t("sync.preset_saved", { name }));
-          }
-        };
-        return this.frame(
-          t("sync.preset_save"),
-          html`${this.nameField(sheet.name, PRESET_NAME_MAX, t("sync.preset_name"), (v) => (this.sheet = { ...sheet, name: v }), save)}
-            <p class="hint">${t("sync.preset_save_sub")}</p>`,
-          { end: html`<button class="pill save" ?disabled=${!name} @click=${save}>${t("scene.save")}</button>`, cls: "name-sheet" },
-        );
-      }
+      case "preset":
       case "ir":
-        return this.irSheet(box, sheet);
+        return this.namePage(box, sheet);
       case "wifi":
         return this.frame(
           t("bridges.box_wifi_title"),
@@ -850,35 +844,63 @@ export class SyncSettingsView extends StudioView {
     }
   }
 
-  /** A name in the filled field, "Enter" keeps it. */
-  private nameField(value: string, max: number, label: string, change: (v: string) => void, done: () => void): TemplateResult {
-    return html`<input class="field filled" maxlength=${max} placeholder=${label} aria-label=${label} .value=${value}
-      @input=${(e: InputEvent) => change((e.target as HTMLInputElement).value)} @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()} />`;
-  }
-
-  /** "Edit name and icon", the Hue app's: the glyph, the name, the types as an icon grid. */
-  private inputSheet(box: SyncBoxInfo, sheet: Extract<Sheet, { kind: "input" }>): TemplateResult {
+  /**
+   * A name on a page of its own: a preset's ("Save preset"), an input's ("Edit name and icon":
+   * its glyph, the name, the types as an icon grid, the Hue app's), a remote button's (the name
+   * and what it does; "Forget" for one learned before).
+   */
+  private namePage(box: SyncBoxInfo, sheet: Extract<Sheet, { kind: "preset" | "input" | "ir" }>): TemplateResult {
     const { ctx } = this;
     const { t } = ctx;
-    const input = box.inputs?.find((i) => i.id === sheet.id);
     const name = sheet.name.trim();
-    const save = async () => {
-      if (!input || !name) return;
-      const change: Record<string, unknown> = {};
-      if (name !== input.name) change.name = name;
-      if (sheet.type !== (input.type || "generic")) change.port_type = sheet.type;
-      if (Object.keys(change).length && !(await ctx.ws({ type: "hue_studio/sync/input", entry_id: this.box, input: sheet.id, ...change }))) return;
-      haptic("success");
-      this.closeSheet();
-    };
-    const types: string[] = GRID_TYPES.includes(sheet.type as PortType) ? [...GRID_TYPES] : [...GRID_TYPES, sheet.type];
-    return this.frame(
-      t("box.edit_input"),
-      html`<div class="input-edit">
-          <ha-icon icon=${PORT_ICONS[sheet.type as PortType] || "mdi:hdmi-port"}></ha-icon>
-          ${this.nameField(sheet.name, INPUT_NAME_MAX, t("box.input_name"), (v) => (this.sheet = { ...sheet, name: v }), save)}
-        </div>
-        <div class="icon-grid" role="radiogroup" aria-label=${t("bridges.port_type")}>
+    const back = () => this.closeSheet();
+    if (sheet.kind === "preset") {
+      const save = async () => {
+        if (!name) return;
+        if (await ctx.call("hue_studio", "save_sync_preset", { entity_id: box.entity_id!, name }, { optimistic: false })) {
+          this.closeSheet();
+          ctx.toast(t("sync.preset_saved", { name }));
+        }
+      };
+      return this.nameScreen({
+        title: t("sync.preset_save"),
+        value: sheet.name,
+        max: PRESET_NAME_MAX,
+        label: t("sync.preset_name"),
+        placeholder: t("sync.preset_name"),
+        input: (v) => (this.sheet = { ...sheet, name: v }),
+        done: () => void save(),
+        doneLabel: t("scene.save"),
+        back,
+        hint: t("sync.preset_save_sub"),
+      });
+    }
+    if (sheet.kind === "input") {
+      const input = box.inputs?.find((i) => i.id === sheet.id);
+      const save = async () => {
+        if (!input || !name) return;
+        const change: Record<string, unknown> = {};
+        if (name !== input.name) change.name = name;
+        if (sheet.type !== (input.type || "generic")) change.port_type = sheet.type;
+        if (Object.keys(change).length && !(await ctx.ws({ type: "hue_studio/sync/input", entry_id: this.box, input: sheet.id, ...change }))) return;
+        haptic("success");
+        this.closeSheet();
+      };
+      const types: string[] = GRID_TYPES.includes(sheet.type as PortType) ? [...GRID_TYPES] : [...GRID_TYPES, sheet.type];
+      return this.nameScreen({
+        title: t("box.edit_input"),
+        value: sheet.name,
+        max: INPUT_NAME_MAX,
+        label: t("box.input_name"),
+        placeholder: t("box.input_name"),
+        input: (v) => (this.sheet = { ...sheet, name: v }),
+        done: () => void save(),
+        doneLabel: t("color.done"),
+        back,
+        glyph: PORT_ICONS[sheet.type as PortType] || "mdi:hdmi-port",
+        filled: true,
+        cls: "input-page",
+        more: html`<div class="icon-grid" role="radiogroup" aria-label=${t("bridges.port_type")}>
           ${types.map((type) => {
             const on = type === sheet.type;
             return html`<button class=${classMap({ "icon-opt": true, on })} role="radio" aria-checked=${on} @click=${() => {
@@ -890,43 +912,42 @@ export class SyncSettingsView extends StudioView {
             </button>`;
           })}
         </div>`,
-      { end: html`<button class="pill save" ?disabled=${!name} @click=${save}>${t("color.done")}</button>`, tall: true, cls: "input-sheet" },
-    );
-  }
-
-  /** A remote button: its name and what it does; "Forget" for one learned before. */
-  private irSheet(box: SyncBoxInfo, draft: Extract<Sheet, { kind: "ir" }>): TemplateResult {
-    const { ctx } = this;
-    const { t } = ctx;
+      });
+    }
     const actions = [...IR_ACTIONS, ...(box.inputs || []).map((i) => `input:${i.id}`), ...(box.presets || []).map((p) => `preset:${p.id}`)];
-    const name = draft.name.trim();
     const save = async () => {
       if (!name) return;
-      const data = { entity_id: box.entity_id!, code: draft.code, name, action: draft.action };
+      const data = { entity_id: box.entity_id!, code: sheet.code, name, action: sheet.action };
       if (await ctx.call("hue_studio", "set_sync_ir_code", data, { optimistic: false })) this.closeSheet();
     };
     const forget = async () => {
-      if (await ctx.call("hue_studio", "delete_sync_ir_code", { entity_id: box.entity_id!, code: draft.code }, { optimistic: false })) this.closeSheet();
+      if (await ctx.call("hue_studio", "delete_sync_ir_code", { entity_id: box.entity_id!, code: sheet.code }, { optimistic: false })) this.closeSheet();
     };
-    return this.frame(
-      draft.known ? draft.name : t("sync.remote_new", { code: draft.code }),
-      html`${this.nameField(draft.name, PRESET_NAME_MAX, t("sync.remote_name"), (v) => (this.sheet = { ...draft, name: v }), save)}
-        <div class="rows">
-          ${navRow({ title: t("sync.remote_action"), value: this.actionLabel(box, draft) }, () =>
+    return this.nameScreen({
+      title: sheet.known ? sheet.name : t("sync.remote_new", { code: sheet.code }),
+      value: sheet.name,
+      max: PRESET_NAME_MAX,
+      label: t("sync.remote_name"),
+      placeholder: t("sync.remote_name"),
+      input: (v) => (this.sheet = { ...sheet, name: v }),
+      done: () => void save(),
+      doneLabel: t("scene.save"),
+      back,
+      more: html`<div class="rows">
+          ${navRow({ title: t("sync.remote_action"), value: this.actionLabel(box, sheet) }, () =>
             this.choose(
               single(
                 t("sync.remote_action"),
                 actions.map((a) => ({ value: a, label: this.actionLabel(box, { action: a }) })),
-                draft.action,
-                (action) => (this.sheet = { ...draft, action }),
+                sheet.action,
+                (action) => (this.sheet = { ...sheet, action }),
               ),
             ),
           )}
         </div>
-        <p class="hint">${t("sync.remote_code", { code: draft.code })}</p>
-        ${draft.known ? html`<div class="delete-area"><button class="delete-btn" @click=${forget}>${t("sync.remote_forget")}</button></div>` : nothing}`,
-      { end: html`<button class="pill save" ?disabled=${!name} @click=${save}>${t("scene.save")}</button>`, cls: "name-sheet" },
-    );
+        <p class="hint">${t("sync.remote_code", { code: sheet.code })}</p>
+        ${sheet.known ? html`<div class="delete-area"><button class="delete-btn" @click=${forget}>${t("sync.remote_forget")}</button></div>` : nothing}`,
+    });
   }
 
   private bridgeName(id: string | null | undefined): string {

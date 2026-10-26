@@ -30,6 +30,7 @@ from .pool import (
     SETTINGS,
     TAGS,
     async_merge_pools,
+    async_next_scene,
     async_payload,
     async_set_tags,
     async_track_light_of_the_day,
@@ -49,6 +50,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_set,
         ws_set_tags,
         ws_merge,
+        ws_next_scene,
     ):
         websocket_api.async_register_command(hass, command)
 
@@ -239,6 +241,23 @@ def ws_set(
     changes = {k: v for k, v in msg.items() if k not in ("type", "id")}
     try:
         async_update_settings(hass, changes)
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "not_set_up", str(err))
+        return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/daylight/next"})
+@websocket_api.async_response
+async def ws_next_scene(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Another scene of the day, until the day ends (every pool steps on)."""
+    try:
+        await async_next_scene(hass)
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "not_set_up", str(err))
         return

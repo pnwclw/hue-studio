@@ -305,6 +305,67 @@ export class StudioView extends LightElement {
     void this.updateComplete.then(() => this.querySelector<HTMLElement>(":scope > .screen-body")?.scrollTo(0, top));
   }
 
+  /**
+   * A name typed on a page of its own, never on a dialog: the bar (back, its title, the action
+   * pill), the glyph of what is named (if any), the outlined field with its clear button, a hint
+   * (or `warn` instead), more below (rows, an icon grid). Comes up ready to type.
+   */
+  protected nameScreen(o: {
+    title: string;
+    value: string;
+    max: number;
+    label: string;
+    input: (value: string) => void;
+    done: () => void;
+    doneLabel: string;
+    back: () => void;
+    canDone?: boolean;
+    glyph?: string;
+    placeholder?: string;
+    inputmode?: string;
+    hint?: string;
+    warn?: string;
+    more?: unknown;
+    cls?: string;
+    /** The filled field (a Sync Box input's name, the Hue app's) instead of the outlined one. */
+    filled?: boolean;
+  }): TemplateResult {
+    const { t } = this.ctx;
+    const ok = o.canDone ?? !!o.value.trim();
+    const pill = html`<button class="pill save" ?disabled=${!ok} @click=${() => ok && o.done()}>${o.doneLabel}</button>`;
+    const body = html`${o.glyph ? html`<div class="name-pic"><ha-icon icon=${o.glyph}></ha-icon></div>` : nothing}
+      <label class="name-field">
+        <input class=${o.filled ? "field filled" : "field outlined"} maxlength=${o.max} aria-label=${o.label} placeholder=${o.placeholder ?? ""} inputmode=${o.inputmode ?? "text"}
+          .value=${o.value} @input=${(e: InputEvent) => o.input((e.target as HTMLInputElement).value)}
+          @keydown=${(e: KeyboardEvent) => e.key === "Enter" && ok && o.done()} />
+        ${o.value
+          ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+              e.preventDefault();
+              o.input("");
+              this.querySelector<HTMLInputElement>(".name-field input")?.focus();
+            }}>${icon("close")}</button>`
+          : nothing}
+      </label>
+      ${o.warn ? html`<p class="hint warn">${o.warn}</p>` : o.hint ? html`<p class="hint">${o.hint}</p>` : nothing}
+      ${o.more ?? nothing}`;
+    if (!this.#nameFocused) {
+      this.#nameFocused = true;
+      void this.updateComplete.then(() => {
+        const field = this.querySelector<HTMLInputElement>(".name-page .name-field input");
+        field?.focus();
+        field?.select();
+      });
+    }
+    return this.screen(this.subHead(o.title, o.back, pill), body, `settings-page name-page ${o.cls ?? ""}`);
+  }
+
+  /** The next name page comes up ready to type again (call when one closes). */
+  protected nameClosed(): void {
+    this.#nameFocused = false;
+  }
+
+  #nameFocused = false;
+
   /** Header of a screen opened from another one: back (close for an editor that comes up as a
    *  sheet), the title (or `center` instead), actions. */
   protected subHead(title: string, back: () => void, end: Slot = nothing, center: Slot = nothing, close = false): TemplateResult {

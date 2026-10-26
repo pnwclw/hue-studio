@@ -42,7 +42,7 @@ import type { StringKey } from "../../../i18n/index.ts";
 import { allGroups, findGroup, friendlyName, type Group, lightIcon } from "../../../core/model.ts";
 import type { DayConfig, DayPreview, DaySettings, Phase } from "../../../core/types.ts";
 import { tileCard } from "../../../ds/controls.ts";
-import { icon, toggle } from "../../../ds/ui.ts";
+import { icon, type IconName, toggle } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
 import { navRow, single } from "../../../ds/choice.ts";
 import { PHASE_ICONS, type Picker, phaseRows, pickerSheet, stateLine } from "./day-parts.ts";
@@ -597,7 +597,10 @@ export class AutomationParts extends StudioView {
       setOpen: (open) => (this.sensorsSheet = { ...sheet, open }),
       close: () => (this.sensorsSheet = null),
       done: () => {
-        this.set({ motion: sheet.chosen, lux_sensor: this.luxFor(sheet.chosen) });
+        const lux = this.luxFor(sheet.chosen);
+        this.set({ motion: sheet.chosen, lux_sensor: lux });
+        // Daytime brightness follows the sensors' own light sensor.
+        if (this.day.settings.light_sensor) this.settings({ light_sensor: lux || null });
         this.sensorsSheet = null;
       },
     });
@@ -821,28 +824,38 @@ export class AutomationParts extends StudioView {
         { optimistic: false },
       );
     const can = placesOf(d.input).length > 0;
-    // A row with its picture on a disc (white light, or the scene's), the actions as pills under it.
-    const row = (art: string | null, title: string, sub: string) => html`<div class="rows">
+    const another = async () => {
+      haptic("selection");
+      await ctx.query({ type: "hue_studio/daylight/next" });
+    };
+    // A row with its picture on a disc (white light, or the scene's), its actions as round icon
+    // buttons at its end: show it now, another scene of the day, never this scene.
+    const action = (glyph: IconName, label: string, run: () => void, disabled = false) =>
+      html`<button class="round" ?disabled=${disabled} aria-label=${label} title=${label} @click=${run}>${icon(glyph)}</button>`;
+    const row = (art: string | null, title: string, sub: string, actions: unknown = nothing) => html`<div class="rows">
       <div class="item">
         ${art !== null
           ? html`<span class="row-art disc" style=${styleMap({ background: art })}></span>`
           : html`<span class="row-art disc"><ha-icon icon="mdi:palette-swatch-variant"></ha-icon></span>`}
         <div class="grow">${title}${sub ? html`<div class="dim small">${sub}</div>` : nothing}</div>
+        ${actions === nothing ? nothing : html`<div class="row-actions">${actions}</div>`}
       </div>
     </div>`;
     if (p?.kelvin) {
       return html`<h2 class="label">${t("auto.now")}</h2>
-        ${row(whiteArt(p.kelvin), `${t("auto.style_natural")} · ${p.kelvin} K`, stateLine(t, p))}
-        <div class="center"><button class="pill" ?disabled=${!can} @click=${show}>${t("auto.show_now")}</button></div>`;
+        ${row(whiteArt(p.kelvin), `${t("auto.style_natural")} · ${p.kelvin} K`, stateLine(t, p), action("play", t("auto.show_now"), () => void show(), !can))}`;
     }
     if (!p?.scene) return html`<h2 class="label">${t("auto.today")}</h2>${row(null, t("auto.no_scene"), "")}`;
     const scene = p.scene;
     return html`<h2 class="label">${t("auto.today")}</h2>
-      ${row(`url("${thumbUrl(scene)}") center / cover`, p.scene_name || this.sceneName(scene), stateLine(t, p))}
-      <div class="center">
-        <button class="pill" ?disabled=${!can} @click=${show}>${t("auto.show_now")}</button>
-        <button class="pill" @click=${() => this.setDay(withExcluded(this.day, scene, true))}>${t("auto.never")}</button>
-      </div>`;
+      ${row(
+        `url("${thumbUrl(scene)}") center / cover`,
+        p.scene_name || this.sceneName(scene),
+        stateLine(t, p),
+        html`${action("play", t("auto.show_now"), () => void show(), !can)}
+          ${action("shuffle", t("auto.another"), () => void another(), (p.pool?.length ?? 0) < 2)}
+          ${action("hide", t("auto.never"), () => this.setDay(withExcluded(this.day, scene, true)))}`,
+      )}`;
   }
 
   protected sceneName(id: string): string {
@@ -963,7 +976,23 @@ export class AutomationParts extends StudioView {
         ],
       });
     };
+    // A motion sensor's automation: the day's brightness by the sensor's own light sensor.
+    const d = this.draft!;
+    const lux = d.type === "motion" ? d.input.lux_sensor || this.luxFor(d.input.motion || []) : "";
+    const bySensor = !!config.settings.light_sensor;
     return html`<p class="lead">${t("auto.brightness_hint")}</p>
+      ${lux
+        ? html`<div class="rows">
+            <div class="item">
+              <ha-icon icon="mdi:brightness-5"></ha-icon>
+              <div class="grow">${t("auto.daytime_brightness")}<div class="dim small">${t("auto.daytime_brightness_sub")}</div></div>
+              ${toggle(bySensor, t("auto.daytime_brightness"), () => {
+                haptic("selection");
+                this.settings({ light_sensor: bySensor ? null : lux });
+              })}
+            </div>
+          </div>`
+        : nothing}
       <div class="rows">
         ${PHASES.map((phase) => {
           const offset = config.offsets[phase] || 0;

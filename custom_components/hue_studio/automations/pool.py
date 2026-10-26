@@ -19,7 +19,7 @@ weather everybody works with. Both change living lights at once (automations.py)
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import json
 from pathlib import Path
 from typing import Any
@@ -179,7 +179,26 @@ def daylight_inputs(
         cloud=_number(weather.attributes.get("cloud_coverage")) if weather else None,
         lux=_number(_state(hass, sources["light_sensor"])),
         mood=async_mood(hass),
+        **_skip(async_settings(hass)),
     )
+
+
+def _skip(settings: dict[str, Any]) -> dict[str, Any]:
+    """Today's "another scene" count (the global `skip`) for `daylight.Inputs`."""
+    skip = settings.get("skip") or {}
+    try:
+        return {"skip_day": date.fromisoformat(skip["day"]), "skip": int(skip["count"])}
+    except KeyError, TypeError, ValueError:
+        return {}
+
+
+async def async_next_scene(hass: HomeAssistant) -> None:
+    """Another scene of the day, today only: every pool's next scene."""
+    selection = await async_selection(hass)
+    day = selection.light_day.isoformat()
+    skip = async_settings(hass).get("skip") or {}
+    count = (skip.get("count", 0) if skip.get("day") == day else 0) + 1
+    async_update_settings(hass, {"skip": {"day": day, "count": count}})
 
 
 def _state(hass: HomeAssistant, entity_id: str | None) -> str | None:

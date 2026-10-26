@@ -48,9 +48,10 @@ export const FLOWS_CSS = `
   .dev-tile .tick { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;
                     border-radius: 50%; background: var(--accent); }
   .dev-tile .tick svg { width: 14px; height: 14px; }
-  .name-sheet .name-pic { display: flex; justify-content: center; padding: 4px 0 16px; }
-  .name-sheet .name-pic ha-icon { --mdc-icon-size: 48px; }
-  .name-sheet > .rows { margin-top: 20px; }
+  /* A name step of a flow (a device's, a new room's): the glyph over the field, rows 20 under it. */
+  .flow-panel .name-pic { display: flex; justify-content: center; padding: 4px 0 16px; }
+  .flow-panel .name-pic ha-icon { --mdc-icon-size: 48px; }
+  .flow-panel .name-field + .rows { margin-top: 20px; }
   .add-steps { margin: 6px 0 16px; padding: 0; list-style: none; counter-reset: step; }
   .add-steps li { position: relative; padding: 10px 4px 10px 44px; font-size: var(--fs-body); line-height: 1.45; counter-increment: step; }
   .add-steps li::before { content: counter(step); position: absolute; left: 4px; top: 8px; width: 28px; height: 28px; border-radius: 50%;

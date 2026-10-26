@@ -58,7 +58,7 @@ touching anything outside this repository.
      day start from the global **light of the day** (`pool.py`, the entry's options): one
      scene pool as tags of scenes (phases, seasons, weather, moods; ready-made tags of the
      gallery in `scene_tags.json`, the user's replace them), phase times and sources
-     (weather, season, light sensor; missing core integrations are offered), and the mood
+     (weather, season; missing core integrations are offered), and the mood
      (`select.hue_studio_mood`; `sensor.hue_studio_phase` shows the phase). An automation's
      input only adds its own (extra/skipped scenes, own phase times, brightness);
      `hue_studio.apply_light` shows them and keeps them up with the day — and with the
@@ -176,7 +176,7 @@ touching anything outside this repository.
   its Hue buttons, "Controlled by"), its fade on a sheet with a slider and the time it
   leads to. A motion sensor's "Turn off after" is a slider too, its minutes may differ by
   part of the light of the day (`off_after_phases`), and its light level comes from the
-  sensor's own light sensor (no choice of one). Coming and leaving home are HA-first: a new one shows only a checklist (home
+  sensor's own light sensor (no choice of one), and so does its daytime brightness when it is on (never a global setting). Coming and leaving home are HA-first: a new one shows only a checklist (home
   zone, people whose phone shares its location "Always"; in the companion app this
   person's own phone, with a button to the app's settings) until HA can know who is home.
 - **Banners** are `banner()` (controls.ts), the Hue app's: a 1.5px blue border (amber for a

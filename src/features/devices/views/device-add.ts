@@ -196,7 +196,8 @@ export class DeviceAddView extends StudioView {
   protected override updated(changed: Map<PropertyKey, unknown>): void {
     super.updated(changed);
     if (changed.has("now")) this.watchSearch();
-    const field = this.querySelector<HTMLInputElement>(".name-sheet input");
+    // A name step comes up ready to type.
+    const field = this.querySelector<HTMLInputElement>(".flow-panel .name-field input");
     if (field && field.dataset.focused !== "1") {
       field.dataset.focused = "1";
       field.focus();
@@ -212,10 +213,14 @@ export class DeviceAddView extends StudioView {
       : !this.bridges.length
         ? { panel: html`<p class="empty">${t("add_device.no_bridge")}</p>` }
         : this.screenOf(this.step);
-    // The scanner's and the name's sheets sit outside the scrolling body: a scroller (iOS) would clip them.
-    return html`${this.flow(!this.trail.length, () => this.back(), step)}
-      ${this.naming ? this.nameSheet(this.naming) : nothing}
-      ${this.newRoom !== null ? this.roomSheet() : nothing}
+    // A name (a device's, a new room's) is a step of the flow over the one it came from, never a
+    // dialog; the scanner's sheet sits outside the scrolling body (iOS would clip it).
+    const page = this.naming
+      ? this.flow(false, () => (this.naming = null), this.deviceNameStep(this.naming))
+      : this.newRoom !== null
+        ? this.flow(false, () => (this.newRoom = null), this.roomStep())
+        : this.flow(!this.trail.length, () => this.back(), step);
+    return html`${page}
       <hue-studio-qr-scan .ctx=${ctx} .open=${this.scanning} @qr-code=${(e: CustomEvent<InstallCode>) => this.scanned(e.detail)}
         @close=${() => (this.scanning = false)}></hue-studio-qr-scan>`;
   }
@@ -455,8 +460,24 @@ export class DeviceAddView extends StudioView {
     return open ? html`<button class="dev-tile" @click=${open}>${content}</button>` : html`<div class="dev-tile">${content}</div>`;
   }
 
+  /** A name's field (the Hue app's: outlined, a round clear button), "Enter" keeps it. */
+  private nameInput(value: string, max: number, label: string, set: (v: string) => void, done: () => void, placeholder = "") {
+    const { t } = this.ctx;
+    return html`<label class="name-field">
+      <input class="field outlined" maxlength=${max} aria-label=${label} placeholder=${placeholder} .value=${value}
+        @input=${(e: InputEvent) => set((e.target as HTMLInputElement).value)}
+        @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()} />
+      ${value
+        ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+            e.preventDefault();
+            set("");
+          }}>${icon("close")}</button>`
+        : nothing}
+    </label>`;
+  }
+
   /** "Edit name": the device's name, and a way to tell which one it is. */
-  private nameSheet(n: { device: FoundDevice; name: string }): TemplateResult {
+  private deviceNameStep(n: { device: FoundDevice; name: string }): FlowStep {
     const { ctx } = this;
     const { t } = ctx;
     const d = n.device;
@@ -465,58 +486,30 @@ export class DeviceAddView extends StudioView {
       this.names = { ...this.names, [d.id]: name || d.name };
       this.naming = null;
     };
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && (this.naming = null)}>
-      <div class="box form name-sheet" role="dialog" aria-label=${t("add_device.edit_name")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${() => (this.naming = null)}>${icon("close")}</button>
-          <div class="grow">${t("add_device.edit_name")}</div>
-          <button class="pill" @click=${done}>${t("common.done")}</button>
-        </div>
-        <div class="form-body">
-          <div class="name-pic"><ha-icon icon=${deviceIcon(ctx.hass, d)}></ha-icon></div>
-          <label class="name-field">
-            <input class="field outlined" maxlength=${NAME_MAX} aria-label=${t("devices.name")} .value=${n.name}
-              @input=${(e: InputEvent) => (this.naming = { device: d, name: (e.target as HTMLInputElement).value })}
-              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()} />
-            ${n.name
-              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
-                  e.preventDefault();
-                  this.naming = { device: d, name: "" };
-                }}>${icon("close")}</button>`
-              : nothing}
-          </label>
-        </div>
-        <div class="rows">
+    return {
+      panel: html`${this.flowTitle(t("add_device.edit_name"))}
+        <div class="name-pic"><ha-icon icon=${deviceIcon(ctx.hass, d)}></ha-icon></div>
+        ${this.nameInput(n.name, NAME_MAX, t("devices.name"), (v) => (this.naming = { device: d, name: v }), done)}
+        <div class="rows inset">
           <button class="item" @click=${() => this.identify(d)}>
             <ha-icon icon="mdi:lightbulb-alert-outline"></ha-icon>
             <div class="grow">${t("devices.identify")}<div class="dim small">${t(d.kind === "light" ? "add_device.identify_light" : "add_device.identify_other")}</div></div>
           </button>
-        </div>
-      </div>
-    </div>`;
+        </div>`,
+      foot: html`<button class="pill apply" @click=${done}>${t("common.done")}</button>`,
+    };
   }
 
   /** "Create new room": an HA area of that name (the light's Hue room follows it). */
-  private roomSheet(): TemplateResult {
+  private roomStep(): FlowStep {
     const { ctx } = this;
     const { t } = ctx;
     const name = this.newRoom ?? "";
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && (this.newRoom = null)}>
-      <div class="box form name-sheet" role="dialog" aria-label=${t("add_device.new_room")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${() => (this.newRoom = null)}>${icon("close")}</button>
-          <div class="grow">${t("add_device.new_room")}</div>
-          <button class="pill" ?disabled=${!name.trim() || this.busy} @click=${() => this.createArea()}>${t("common.done")}</button>
-        </div>
-        <div class="form-body">
-          <label class="name-field">
-            <input class="field outlined" maxlength="50" placeholder=${t("add_device.new_room_name")} aria-label=${t("add_device.new_room_name")} .value=${name}
-              @input=${(e: InputEvent) => (this.newRoom = (e.target as HTMLInputElement).value)}
-              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.createArea()} />
-          </label>
-        </div>
-      </div>
-    </div>`;
+    return {
+      panel: html`${this.flowTitle(t("add_device.new_room"))}
+        ${this.nameInput(name, 50, t("add_device.new_room_name"), (v) => (this.newRoom = v), () => void this.createArea(), t("add_device.new_room_name"))}`,
+      foot: html`<button class="pill apply" ?disabled=${!name.trim() || this.busy} @click=${() => this.createArea()}>${t("common.done")}</button>`,
+    };
   }
 
   private areaName(id: string | null): string | null {

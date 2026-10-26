@@ -6,7 +6,7 @@
 // the bridge (and so from the Hue app). A scene of your own gets a picture of its own: a
 // photo (uploaded to Home Assistant) or an icon over its colors (HA's entity settings).
 // A new scene ("Custom scene" of a room's "+", the scene `new`) is the Hue app's: a picker
-// starting from what the lights show now, its name asked first; the lights are set the same
+// starting from what the lights show now, its name open in place first; the lights are set the same
 // way (brightness here, colors on the wheel) and "Save" at the bottom creates it.
 
 import { html, nothing } from "lit";
@@ -61,8 +61,6 @@ export class SceneView extends StudioView {
   @state() private accessor editingName = false;
   /** The dynamic speed sheet's step (1-12) while it is open. */
   @state() private accessor speedStep: number | null = null;
-  /** A new scene's name sheet: what is typed (null while it is closed). */
-  @state() private accessor naming: string | null = null;
   @state() private accessor busy = false;
   /** The picture sheet of a scene of your own is open. */
   @state() private accessor picturing = false;
@@ -93,7 +91,16 @@ export class SceneView extends StudioView {
   protected override willUpdate(): void {
     // A new scene asks for its name first (once: a visit to the wheel keeps it).
     if (this.isNew) {
-      if (!this.started && this.ctx.ready && this.draft.name === null) this.naming = this.ctx.t("room.new_scene");
+      // Its name is edited in place, the field open and selected (never a dialog).
+      if (!this.started && this.ctx.ready && this.draft.name === null) {
+        this.edit({ name: this.ctx.t("room.new_scene") });
+        this.editingName = true;
+        void this.updateComplete.then(() => {
+          const field = this.querySelector<HTMLInputElement>(".scene-new .name-input");
+          field?.focus();
+          field?.select();
+        });
+      }
       this.started = true;
       return;
     }
@@ -333,8 +340,21 @@ export class SceneView extends StudioView {
     const body = html`<div class="scene-top">
         <div class="dot big" style=${styleMap({ background: colorsCss(state.colors, "var(--surface-raised)") })}></div>
         <div class="name-row">
-          <h1 class="big">${name}</h1>
-          <button class="round rename" aria-label=${t("scene.rename")} @click=${() => (this.naming = name)}>${icon("pencil")}</button>
+          ${this.editingName
+            ? html`<input
+                class="name-input"
+                .value=${name}
+                maxlength="32"
+                aria-label=${t("room.new_scene_name")}
+                @input=${(e: InputEvent) => this.edit({ name: (e.target as HTMLInputElement).value })}
+                @keydown=${(e: KeyboardEvent) => e.key === "Enter" && name.trim() && (this.editingName = false)}
+              />`
+            : html`<h1 class="big">${name}</h1>`}
+          <button class="round rename" aria-label=${t("scene.rename")} @click=${() => {
+            if (this.editingName && !name.trim()) this.edit({ name: t("room.new_scene") });
+            this.editingName = !this.editingName;
+            if (this.editingName) void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
+          }}>${icon("pencil")}</button>
         </div>
       </div>
       <div class="rows scene-brightness" @value-change=${() => this.edit({ touched: true })}>
@@ -354,68 +374,10 @@ export class SceneView extends StudioView {
       ${room.group ? nothing : html`<p class="hint">${t("room.no_group", { room: room.name })}</p>`}`;
     return html`${this.screen(head, body, "scene-edit scene-new")}
       <div class="screen-foot">
-        <button class="pill apply" ?disabled=${!room.group || this.busy} @click=${() => this.create(room, name)}>${t("scene.save")}</button>
+        <button class="pill apply" ?disabled=${!room.group || !name.trim() || this.busy} @click=${() => this.create(room, name.trim())}>${t("scene.save")}</button>
       </div>
-      ${this.naming !== null ? this.nameSheet() : nothing}
       ${this.askSheet()}`;
   }
-
-  /** The Hue app's "Scene name" sheet: the name in a field with a clear button, "Done". */
-  private nameSheet() {
-    const { ctx } = this;
-    const { t } = ctx;
-    const done = () => {
-      const name = this.naming?.trim();
-      this.edit({ name: name || this.draft.name || t("room.new_scene") });
-      this.naming = null;
-    };
-    const cancel = () => {
-      if (this.draft.name === null) this.edit({ name: t("room.new_scene") });
-      this.naming = null;
-    };
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && cancel()}>
-      <div class="box form name-sheet" role="dialog" aria-label=${t("room.new_scene_name")}>
-        <div class="sheet-bar">
-          <button class="round close" aria-label=${t("common.close")} @click=${cancel}>${icon("close")}</button>
-          <div class="grow">${t("room.new_scene_name")}</div>
-          <button class="pill" @click=${done}>${t("common.done")}</button>
-        </div>
-        <div class="form-body">
-          <label class="name-field">
-            <input
-              class="field outlined"
-              maxlength="32"
-              aria-label=${t("room.new_scene_name")}
-              .value=${this.naming ?? ""}
-              @input=${(e: InputEvent) => (this.naming = (e.target as HTMLInputElement).value)}
-              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && done()}
-            />
-            ${this.naming
-              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
-                  e.preventDefault();
-                  this.naming = "";
-                  this.querySelector<HTMLInputElement>(".name-field input")?.focus();
-                }}>${icon("close")}</button>`
-              : nothing}
-          </label>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  override updated(changed: Map<PropertyKey, unknown>): void {
-    super.updated(changed);
-    // The name sheet comes up ready to type.
-    const field = this.querySelector<HTMLInputElement>(".name-sheet input");
-    if (field && !this.#focused) {
-      this.#focused = true;
-      field.focus();
-      field.select();
-    }
-    if (!field) this.#focused = false;
-  }
-
-  #focused = false;
 
   private async create(room: Group, name: string): Promise<void> {
     const { ctx } = this;

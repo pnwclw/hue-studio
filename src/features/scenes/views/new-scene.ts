@@ -1,77 +1,73 @@
-// "New scene" sheet (a room, the color screen's "Save"): a name, saved from what the lights
-// show now as a scene of the group's Hue room/zone on the bridge, so the Hue app has it too.
-// A group without one is offered a zone of its lights on the bridge. Fires `close`.
+// "Save current settings" (a room's "+", the color screen's "Save"): a name page over the
+// screen it was opened from (never a dialog), saved from what the lights show now as a scene of
+// the group's Hue room/zone on the bridge, so the Hue app has it too. A group without one is
+// offered a zone of its lights on the bridge. Fires `close`.
 
 import { html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { friendlyName, type Group } from "../../../core/model.ts";
-import { icon } from "../../../ds/ui.ts";
+import { haptic } from "../../../core/ha-internals.ts";
 import { StudioView } from "../../../ds/base.ts";
 
 @customElement("hue-studio-new-scene")
 export class NewSceneSheet extends StudioView {
   @property({ attribute: false }) accessor group: Group | null = null;
 
-  @state() private accessor name = "";
+  @state() private accessor name: string | null = null;
   @state() private accessor busy = false;
-
-  override firstUpdated(): void {
-    this.querySelector<HTMLInputElement>("input")?.focus();
-  }
 
   private close = (): void => {
     this.dispatchEvent(new Event("close"));
   };
 
-  protected override render() {
+  protected override renderPage() {
     const { ctx, group: g } = this;
     const { t } = ctx;
     if (!g) return html``;
-    const name = this.name.trim();
+    const name = this.name ?? t("room.new_scene");
+    if (!g.group) {
+      // No Hue room or zone to hold it: a zone of these lights first.
+      const createZone = async () => {
+        if (this.busy) return;
+        this.busy = true;
+        const ok = await ctx.call("hue_studio", "create_zone", { entity_id: g.lights, name: g.name }, { optimistic: false });
+        this.busy = false;
+        if (ok) ctx.toast(t("room.zone_created", { name: g.name }));
+      };
+      return this.screen(
+        this.subHead(t("add.current"), this.close),
+        html`<p class="lead">${t("room.no_group", { room: g.name })}</p>
+          <div class="center">
+            <button class="pill apply" ?disabled=${this.busy} @click=${createZone}>${t("room.create_zone")}</button>
+            <button class="pill" @click=${() => ctx.go("/settings/integration")}>${t("room.mapping")}</button>
+          </div>`,
+        "settings-page name-page",
+      );
+    }
     const save = async () => {
-      if (!g.group || !name || this.busy) return;
+      const value = name.trim();
+      if (!value || this.busy) return;
       this.busy = true;
-      const ok = await ctx.call("hue_studio", "create_scene", { entity_id: g.group, name }, { optimistic: false });
+      const ok = await ctx.call("hue_studio", "create_scene", { entity_id: g.group!, name: value }, { optimistic: false });
       this.busy = false;
-      if (ok) {
-        this.close();
-        ctx.toast(t("room.scene_created", { name }));
-      }
+      if (!ok) return;
+      haptic("success");
+      this.close();
+      ctx.toast(t("room.scene_created", { name: value }));
     };
-    const createZone = async () => {
-      if (this.busy) return;
-      this.busy = true;
-      const ok = await ctx.call("hue_studio", "create_zone", { entity_id: g.lights, name: g.name }, { optimistic: false });
-      this.busy = false;
-      if (ok) ctx.toast(t("room.zone_created", { name: g.name }));
-    };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && this.close()}>
-      <div class="box form" role="dialog" aria-label=${t("room.new_scene")}>
-        <div class="sheet-bar"><div class="grow">${t("room.new_scene")}</div>
-          <button class="round close" aria-label=${t("common.close")} @click=${this.close}>${icon("close")}</button>
-        </div>
-        ${g.group
-          ? html`<div class="form-body">
-                <input
-                  class="field"
-                  maxlength="32"
-                  placeholder=${t("room.new_scene_name")}
-                  aria-label=${t("room.new_scene_name")}
-                  .value=${this.name}
-                  @input=${(e: InputEvent) => (this.name = (e.target as HTMLInputElement).value)}
-                  @keydown=${(e: KeyboardEvent) => e.key === "Enter" && save()}
-                />
-                <p class="hint">${t("room.new_scene_hint", { room: friendlyName(ctx.hass, g.group) })}</p>
-              </div>
-              <div class="actions"><button class="pill apply" ?disabled=${!name || this.busy} @click=${save}>${t("scene.save")}</button></div>`
-          : html`<div class="form-body"><p class="hint">${t("room.no_group", { room: g.name })}</p></div>
-              <div class="actions">
-                <button class="pill apply" ?disabled=${this.busy} @click=${createZone}>${t("room.create_zone")}</button>
-                <button class="pill" @click=${() => ctx.go("/settings/integration")}>${t("room.mapping")}</button>
-              </div>`}
-      </div>
-    </div>`;
+    return this.nameScreen({
+      title: t("add.current"),
+      value: name,
+      max: 32,
+      label: t("room.new_scene_name"),
+      input: (value) => (this.name = value),
+      done: () => void save(),
+      doneLabel: t("scene.save"),
+      canDone: !!name.trim() && !this.busy,
+      back: this.close,
+      hint: t("room.new_scene_hint", { room: friendlyName(ctx.hass, g.group!) }),
+    });
   }
 }
 

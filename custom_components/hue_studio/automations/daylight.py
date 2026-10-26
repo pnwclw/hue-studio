@@ -84,6 +84,9 @@ NOON = 12 * 60
 # own phase times).
 PHASE_SETTINGS = ("night_from", "shifts")
 SOURCES = ("weather", "season", "light_sensor")
+# What the global light of the day gives every automation; a light sensor is an
+# automation's own (a motion sensor's: the brighter there, the dimmer by day).
+GLOBAL_SOURCES = ("weather", "season")
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +102,9 @@ class Inputs:
     cloud: float | None = None
     lux: float | None = None
     mood: str | None = None
+    # "Another scene" asked this many times on this light day (the next ones).
+    skip_day: date | None = None
+    skip: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,7 +310,7 @@ def resolve(
     local_settings = dict(local.get("settings") or {})
     settings: dict[str, Any] = {
         key: global_settings[key]
-        for key in (*PHASE_SETTINGS, *SOURCES)
+        for key in (*PHASE_SETTINGS, *GLOBAL_SOURCES)
         if global_settings.get(key) is not None
     }
     settings |= {k: v for k, v in local_settings.items() if v is not None}
@@ -389,6 +395,8 @@ def select(config: dict[str, Any], inputs: Inputs) -> Selection:
         config.get("tags") or {}, phase, season, weather, inputs.mood
     )
     number = day.year * 366 + day.timetuple().tm_yday
+    if inputs.skip_day == day:
+        number += inputs.skip
     scene = pool[number % len(pool)] if pool else None
 
     return Selection(

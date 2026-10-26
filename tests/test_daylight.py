@@ -250,3 +250,23 @@ def test_natural_light() -> None:
     assert select(natural, _inputs(20)).kelvin == 2400
     assert select(natural, _inputs(0, 30)).kelvin == 2000
     assert select(CONFIG, _inputs(12)).kelvin is None
+
+
+def test_light_sensor_is_an_automations_own() -> None:
+    """A global light sensor no longer applies; an automation's own one does."""
+    glob = {"weather": "weather.home", "light_sensor": "sensor.global_lux"}
+    assert "light_sensor" not in resolve(glob, {}, {})["settings"]
+    own = {"settings": {"light_sensor": "sensor.motion_lux"}}
+    assert resolve(glob, own, {})["settings"]["light_sensor"] == "sensor.motion_lux"
+
+
+def test_another_scene_today_only() -> None:
+    """ "Another scene" steps through today's pool; another day ignores it."""
+    tags = {s: {"phases": list(PHASES)} for s in ("s1", "s2", "s3")}
+    config = {"tags": tags, "settings": {}}
+    base = select(config, _inputs(12))
+    nxt = select(config, _inputs(12, skip_day=base.light_day, skip=1))
+    pool = list(base.pool)
+    assert nxt.scene == pool[(pool.index(base.scene) + 1) % len(pool)]
+    other = select(config, _inputs(12, skip_day=date(2026, 3, 9), skip=1))
+    assert other.scene == base.scene

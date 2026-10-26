@@ -103,9 +103,8 @@ export const SYNC_CSS = `
   :is(.settings-page, .sensor-edit, .choice-sheet, .sensor-sheet) .rows .item:has(> .row-art.disc) { gap: 12px; padding-left: 12px; }
   /* A filled field (the Hue app's "Edit name and icon"): 48 tall, no border. */
   .field.filled { height: 48px; border: none; border-radius: var(--r-xs); background: var(--surface); font-size: var(--fs-body); }
-  .input-sheet .form-body { padding-top: 2px; }
-  .input-edit { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 0 0 40px; }
-  .input-edit ha-icon { --mdc-icon-size: 32px; }
+  /* An input's name page ("Edit name and icon"): the types' grid across the page under the field. */
+  .name-page .icon-grid { margin: 24px calc(-1 * var(--gutter)) 0; }
   /* An icon grid: three columns of a 40px disc over its name; the chosen one in the accent. */
   .icon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 -16px; padding: 8px 0 calc(16px + var(--safe-bottom));
                background: var(--surface-row); box-shadow: var(--shadow-row); }

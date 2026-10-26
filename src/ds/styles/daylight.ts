@@ -20,14 +20,6 @@ export const DAYLIGHT_CSS = `
   /* Settings → Light of the day */
   .now-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--r-xs); vertical-align: 1px; font-size: var(--fs-tab); font-weight: 500;
              background: var(--sun); color: var(--text-dark); }
-  .sheet .box.tag-editor { width: min(100%, 560px); }
-  .tag-editor .sheet-bar { gap: 12px; }
-  .tag-editor .tag-pic { width: 36px; height: 36px; flex: none; border-radius: 50%; object-fit: cover; }
-  .tag-editor h3.sublabel { margin: 14px 2px 8px; font-size: var(--fs-footnote); font-weight: 500; color: var(--text-2); }
-  .tag-editor h3.sublabel:first-child { margin-top: 4px; }
-  .tag-editor .chips { padding: 0; }
-  .tag-editor .chip:not(.on) { background: var(--fill-soft); }
-  .tag-editor .hint { margin: 6px 2px 0; }
   .add-tile { display: grid; grid-template-rows: 1fr auto auto 1fr; justify-items: center; row-gap: 4px; background: transparent !important;
               box-shadow: inset 0 0 0 1.5px var(--outline) !important; color: var(--text-2); }
   .add-tile::before { grid-area: 1 / 1 / 5 / 2; justify-self: stretch; }

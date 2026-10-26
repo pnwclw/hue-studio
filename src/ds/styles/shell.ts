@@ -89,6 +89,8 @@ export const SHELL_CSS = `
      title (iOS): clear at the top; once the title went under the bar, the bar shows it (the
      room header's size) and blurs what scrolls below. A search field takes the title's place. */
   main > * { position: relative; }
+  /* A name page opened over a screen ("Save current settings"): it covers that screen. */
+  hue-studio-new-scene { position: absolute; inset: 0; z-index: 31; display: flex; flex-direction: column; background: var(--bg); }
   .screen-head:has(> .tab-head) { position: absolute; top: 0; left: 0; right: 0; }
   .screen-head:has(> .tab-head) + .screen-body > .page { padding-top: calc(var(--head-h, calc(var(--safe-top, 0px) + var(--header-height, 56px))) + 10px); }
   .screen-head:has(> .tab-head:not(.wide)) { transition: background-color 0.2s, border-color 0.2s; }
