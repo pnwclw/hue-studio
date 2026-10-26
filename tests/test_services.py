@@ -13,6 +13,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 
+from custom_components.hue_studio import zones
 from custom_components.hue_studio.const import DOMAIN
 
 from .conftest import LIGHTS, SCENES
@@ -451,9 +452,13 @@ async def test_apply_palette_area_skips_other_lights(
     assert list(_sent(hue_lights)) == ["res-bulb"]
 
 
-async def test_create_zone(hass: HomeAssistant, hue_room: MagicMock) -> None:
+async def test_create_zone(
+    hass: HomeAssistant, hue_room: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A zone of the targeted lights is created on the bridge."""
     hue_room.request.return_value = [{"rid": "res-zone", "rtype": "zone"}]
+    # Its light never shows up here: the answer comes without it.
+    monkeypatch.setattr(zones, "ZONE_ENTITY_TIMEOUT", 0.01)
     result = await hass.services.async_call(
         DOMAIN,
         "create_zone",
@@ -461,7 +466,7 @@ async def test_create_zone(hass: HomeAssistant, hue_room: MagicMock) -> None:
         blocking=True,
         return_response=True,
     )
-    assert result == {"zone_id": "res-zone"}
+    assert result == {"zone_id": "res-zone", "entity_id": None}
     method, path = hue_room.request.call_args.args
     body = hue_room.request.call_args.kwargs["json"]
     assert (method, path) == ("post", "clip/v2/resource/zone")

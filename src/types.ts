@@ -389,6 +389,17 @@ export interface SceneInfo {
   custom: boolean;
 }
 
+/** What the zone labels need from the user (`hue_studio/zones/subscribe`). */
+export interface ZoneNote {
+  /** unlinked: its label was deleted in HA; foreign: lights with the label that cannot join. */
+  kind: "unlinked" | "foreign";
+  zone: string;
+  name: string;
+  /** The zone's grouped light (null: not added by `hue` yet). */
+  entity_id: string | null;
+  lights?: string[];
+}
+
 export interface ScenesMessage {
   scenes: Record<string, SceneInfo>;
 }
@@ -409,6 +420,8 @@ export interface StudioConfig {
   auto_align?: boolean;
   /** Label, category and area for Hue scenes and our automations in HA (on unless false). */
   organize?: boolean;
+  /** Hue zones mirrored as HA labels "Hue zone: <name>", both ways (off unless true). */
+  zone_labels?: boolean;
   /** Not an option: Hue group entity id -> the icon of its archetype (picked in the Hue app). */
   icons?: Record<string, string>;
   /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */

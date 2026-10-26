@@ -38,7 +38,7 @@ its device in the Philips Hue integration), with a link into the panel.
 | `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
 | `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. A scene of your own (not a gallery scene as it is) is marked so on the bridge (`metadata.appdata`), whatever picture it carries. |
 | `hue_studio.delete_scene` | Delete Hue scenes from the bridge. |
-| `hue_studio.create_zone` | Create a Hue zone of the targeted lights (e.g. an area's Hue lights), so the area gets scenes of its own. Returns the new `zone_id`. |
+| `hue_studio.create_zone` | Create a Hue zone of the targeted lights (e.g. an area's Hue lights), so the area gets scenes of its own. Returns the new `zone_id` and, once the Philips Hue integration has added it, the zone's light `entity_id`. |
 | `hue_studio.update_zone` | Rename a Hue zone (`name`) or give it other `lights`. |
 | `hue_studio.delete_zone` | Delete Hue zones (with their scenes) from the bridge. |
 | `hue_studio.align_rooms` | Bring the Hue rooms on the bridge in line with your HA areas: each area with Hue lights gets a Hue room of its name with exactly those lights (created, renamed or refilled as needed). `dry_run` only returns the plan; `complete_scenes` (default on) gives a room's scenes settings for lights that joined it; `delete_empty_rooms` removes rooms left without lights; `keep_split_scenes` first copies the scenes of a room split over several areas into a new zone over all of the room's lights, so they keep every light. With a target, only the targeted lights are moved. Returns the plan. |
@@ -52,6 +52,25 @@ its device in the Philips Hue integration), with a link into the panel.
 
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
+
+## Zones as labels
+
+With "Zones as labels" on (Settings → Integration settings, off by default), every Hue
+zone is also a Home Assistant label `Hue zone: <name>` on its lights, kept alike both
+ways. The zone stays on the bridge, so the Hue app always shows it right, and it appears
+in Home Assistant only once, as its Hue light group; the label lets automations, scripts
+and templates (`label_entities()`) use it.
+
+- A zone made, renamed or given other lights in the Hue app or the panel changes its
+  label; the label renamed or put on other Hue lights in Home Assistant changes the zone.
+  A new label `Hue zone: <name>` on Hue lights makes that zone. When both sides changed
+  at once, the bridge wins.
+- Nothing is deleted behind your back: deleting the label leaves the zone (and its
+  scenes) on the bridge, and the "Rooms and zones" screen offers to delete it or label it
+  again; a label taken off every light keeps its zone. A zone deleted on the bridge takes
+  its label with it.
+- Lights that cannot join (not Hue lights, or on another bridge) keep the label and are
+  listed on the "Rooms and zones" screen. Only labels on entities count, not on devices.
 
 ## Automations
 

@@ -30,6 +30,7 @@ import type {
   RoomsPlan,
   StudioConfig,
   SceneInfo,
+  ZoneNote,
   ServiceData,
   SyncBoxDevice,
   SyncBoxInfo,
@@ -563,7 +564,15 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
-  let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
+  // &zones=1: "Zones as labels" on, with one zone unlinked and one light that cannot join.
+  const zoneLabels = new URLSearchParams(location.search).get("zones") === "1";
+  let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false, zone_labels: zoneLabels };
+  const zoneNotes: ZoneNote[] = zoneLabels
+    ? [
+        { kind: "unlinked", zone: "zone-reading", name: "Reading nook", entity_id: "light.tv_area" },
+        { kind: "foreign", zone: "zone-tv", name: "TV area", entity_id: "light.tv_area", lights: ["light.desk_lamp"] },
+      ]
+    : [];
   // The icons of the Hue rooms' and zones' archetypes, as the backend sends them with the config.
   const ARCHETYPE_ICONS: Record<string, string> = {
     office: "mdi:desk",
@@ -1461,6 +1470,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           return () => {
             automationListeners.delete(send);
           };
+        }
+        if (msg.type === "hue_studio/zones/subscribe") {
+          setTimeout(() => send({ notes: zoneNotes }), 40);
+          return () => undefined;
         }
         if (msg.type === "hue_studio/rooms/subscribe") {
           roomListeners.add(send);
