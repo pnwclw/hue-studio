@@ -1,18 +1,19 @@
-// A Hue zone's editor (Settings → Rooms and zones), like a device's settings: its icon and name
-// (renamed in place with the pencil), the lights it holds by room, "Delete" at the bottom.
-// "SAVE" stores the name and lights on the bridge (create_zone / update_zone) and goes back.
+// A Hue zone's editor (Settings → Rooms and zones), like the Hue app's entertainment area
+// editor: its icon and name (renamed in place with the pencil), its lights as a "Lights" card
+// ("+" opens "Add lights to …", a card's "−" takes one out; ds/lights.ts), "Delete" at the
+// bottom. "SAVE" stores the name and lights on the bridge (create_zone / update_zone) and goes back.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
 
 import type { StudioContext } from "../../../core/context.ts";
-import { friendlyName, hueGroupIcon, lightIcon } from "../../../core/model.ts";
+import { hueGroupIcon } from "../../../core/model.ts";
 import { haptic } from "../../../core/ha-internals.ts";
 import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, severalBridges, type Zone } from "../rooms.ts";
 import { icon } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
 import { bridgeRow } from "../../../ds/choice.ts";
+import { addLightsSheet, type LightRoom, lightsCard } from "../../../ds/lights.ts";
 
 /** The path of a zone's editor; `new` for a new zone. */
 export const NEW_ZONE = "new";
@@ -32,6 +33,8 @@ export class ZoneView extends StudioView {
   @state() private accessor bridge: string | null = null;
   @state() private accessor editingName = false;
   @state() private accessor saving = false;
+  /** "Add lights to …" is open: what is checked there, the rooms open. */
+  @state() private accessor adding: { picked: string[]; open: string[] } | null = null;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -72,15 +75,7 @@ export class ZoneView extends StudioView {
     const valid = !!name.trim() && lights.length > 0;
     const title = t(isNew ? "zone.title_new" : "zone.title_edit");
     const save = html`<button class="pill save" ?disabled=${!valid || !this.dirty(zone) || this.saving} @click=${() => this.save(zone, name.trim(), lights)}>${t("scene.save")}</button>`;
-    const flip = (light: string) => {
-      haptic("selection");
-      const now = this.lights ?? zone?.lights ?? [];
-      this.lights = now.includes(light) ? now.filter((l) => l !== light) : [...now, light];
-    };
-    // A zone holds the lights of one bridge.
-    const areas = lightsByArea(ctx.hass)
-      .map(([area, ids]): [string | null, string[]] => [area, ids.filter((l) => !bridge || !bridgeOf(ctx.rooms, l) || bridgeOf(ctx.rooms, l) === bridge)])
-      .filter(([, ids]) => ids.length);
+    const rooms = this.rooms(bridge, lights);
     const body = html`<div class="sensor-hero">
         <ha-icon class="pic" icon=${zone ? hueGroupIcon(ctx.hass, ctx.config, zone.entity_id) : "mdi:texture-box"}></ha-icon>
         <div class="name-row">
@@ -117,19 +112,11 @@ export class ZoneView extends StudioView {
             </div>`
           : html`<p class="hint">${t("zone.on_bridge", { bridge: bridgeName(ctx.rooms, bridge) ?? "" })}</p>`
         : nothing}
-      ${areas.map(
-        ([area, ids]) => html`<h2 class="label">${area ? ctx.hass.areas?.[area]?.name || area : t("home.no_room")}</h2>
-          <div class="rows">
-            ${ids.map((light) => {
-              const on = lights.includes(light);
-              return html`<button class=${classMap({ item: true, on })} role="checkbox" aria-checked=${on} @click=${() => flip(light)}>
-                <ha-icon icon=${lightIcon(ctx.hass, light, ctx.lightInfo[light])}></ha-icon>
-                <div class="grow">${friendlyName(ctx.hass, light)}</div>
-                <span class="check">${icon("check")}</span>
-              </button>`;
-            })}
-          </div>`,
-      )}
+      ${lightsCard(ctx, {
+        lights,
+        add: () => (this.adding = { picked: [], open: rooms.map((r) => r.key) }),
+        remove: (id) => (this.lights = (this.lights ?? zone?.lights ?? []).filter((l) => l !== id)),
+      })}
       ${zone
         ? html`<div class="delete-area">
             <button class="delete-btn" ?disabled=${this.saving} @click=${() =>
@@ -140,11 +127,43 @@ export class ZoneView extends StudioView {
               )}>${t("zone.delete")}</button>
           </div>`
         : nothing}`;
-    return this.screen(
-      this.subHead(title, () => this.confirmLeave(this.dirty(zone), () => this.back()), save, nothing, true),
-      body,
-      "sensor-edit zone-edit",
-    );
+    return html`${this.screen(
+        this.subHead(title, () => this.confirmLeave(this.dirty(zone), () => this.back()), save, nothing, true),
+        body,
+        "sensor-edit zone-edit",
+      )}
+      ${this.adding ? this.addSheet(name || title, rooms) : nothing}`;
+  }
+
+  /** The rooms (HA areas) with lights that may join: the zone's bridge's, not in it yet. */
+  private rooms(bridge: string | null, lights: string[]): LightRoom[] {
+    const { ctx } = this;
+    return lightsByArea(ctx.hass)
+      .map(([area, ids]): LightRoom => ({
+        key: area ?? "",
+        name: area ? ctx.hass.areas?.[area]?.name || area : ctx.t("home.no_room"),
+        icon: (area && ctx.hass.areas?.[area]?.icon) || (area ? "mdi:sofa-outline" : "mdi:home-off-outline"),
+        lights: ids.filter((l) => !lights.includes(l) && (!bridge || !bridgeOf(ctx.rooms, l) || bridgeOf(ctx.rooms, l) === bridge)),
+      }))
+      .filter((r) => r.lights.length);
+  }
+
+  private addSheet(name: string, rooms: LightRoom[]) {
+    const { ctx } = this;
+    const adding = this.adding!;
+    return addLightsSheet(ctx, {
+      title: ctx.t("lights.add_to", { name }),
+      rooms,
+      picked: adding.picked,
+      open: adding.open,
+      flip: (id) => (this.adding = { ...adding, picked: adding.picked.includes(id) ? adding.picked.filter((l) => l !== id) : [...adding.picked, id] }),
+      fold: (key) => (this.adding = { ...adding, open: adding.open.includes(key) ? adding.open.filter((k) => k !== key) : [...adding.open, key] }),
+      close: () => (this.adding = null),
+      done: () => {
+        this.lights = [...(this.lights ?? this.current?.lights ?? []), ...adding.picked];
+        this.adding = null;
+      },
+    });
   }
 
   private async save(zone: Zone | null, name: string, lights: string[]): Promise<void> {

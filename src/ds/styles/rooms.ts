@@ -1,6 +1,27 @@
 // Part of the stylesheet (joined in index.ts): rooms and zones, the Sync bar, the gallery's rules, the check.
 
 export const ROOMS_CSS = `
+  /* A set's lights (ds/lights.ts; measured on the Hue app's entertainment area editor): the
+     card's lights from 16, 12 apart, 20 under them; a 24 red "−" in a card's zone. */
+  .set-lights .light-row { margin: 0; padding: 0 16px 20px; scroll-padding: 0 16px; }
+  .tile-card .minus { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none;
+                      border-radius: 50%; background: var(--danger); cursor: pointer; transition: transform var(--t-press) var(--ease); }
+  .tile-card .minus i { width: 10px; height: 2px; border-radius: var(--r-full); background: #fff; }
+  .tile-card .minus:active { transform: scale(var(--press-round)); }
+  .tile-card .minus:disabled { opacity: 0.4; cursor: default; }
+  .tile-card.member { cursor: default; }
+  .add-room-lights .tile-card.member { cursor: pointer; }
+  /* "Add lights to …": rooms as list rows (a 32 fold button 16 from the right), separators from
+     72 between them; an open one's lights as cards of 110×160 from 72, 12 apart, 20 under them. */
+  .add-lights .add-room + .add-room { position: relative; }
+  .add-lights .add-room + .add-room::before { content: ""; position: absolute; top: 0; left: var(--row-text); right: 0; height: 1px;
+                                              background: var(--separator); }
+  .add-lights .add-room > .item { cursor: pointer; }
+  .add-room .round.expand { background: var(--round); color: var(--text); }
+  .add-room .round.expand ha-icon { --mdc-icon-size: 22px; justify-content: center; transition: transform 0.2s var(--ease); }
+  .add-room .round.expand.open ha-icon { transform: rotate(180deg); }
+  .add-room-lights { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 16px 20px var(--row-text); }
+  .add-room-lights .tile-card { flex: none; width: 110px; }
   /* rooms and zones */
   .notice { display: flex; align-items: center; gap: 10px; width: 100%; margin: 14px 0 0; padding: 12px 14px; border: none;
             border-radius: var(--r-m); cursor: pointer; text-align: left; font-size: var(--fs-callout); line-height: 1.35;

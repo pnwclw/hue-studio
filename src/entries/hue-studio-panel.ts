@@ -270,6 +270,7 @@ export class HueStudioPanel extends LitElement {
       route.name === "deviceSensor" ||
       route.name === "device" ||
       route.name === "zone" ||
+      (route.name === "entertainment" && !!route.area && !route.arrange) ||
       route.name === "automation" ||
       route.name === "automationNew" ||
       route.name === "deviceAdd" ||
@@ -347,6 +348,7 @@ export class HueStudioPanel extends LitElement {
     // rounded under the status bar).
     const newScene = route.name === "scene" && route.scene === NEW_SCENE;
     const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "zone" || route.name === "automation" ||
+        (route.name === "entertainment" && !!route.area && !route.arrange) ||
         (route.name === "bridges" && route.mode === "bridges" && !!route.item) || route.name === "syncSettings");
     const glow = this.glow(ctx, route);
     return html`<main

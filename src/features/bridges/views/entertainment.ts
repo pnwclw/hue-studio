@@ -1,17 +1,20 @@
 // Settings → Entertainment areas: the bridge's entertainment areas (what the Sync Box, the
 // Hue app's sync or a game streams to). They are not rooms or zones: their own sets of
-// lights with places. List, create, rename, change type and lights, arrange, delete.
+// lights with places. List, create, rename, change type and lights, arrange, delete; an
+// area's editor is the Hue app's (a sheet on phones).
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
 
+import { haptic } from "../../../core/ha-internals.ts";
 import type { StringKey } from "../../../i18n/index.ts";
-import { friendlyName, lightIcon } from "../../../core/model.ts";
+import { banner } from "../../../ds/controls.ts";
+import { addLightsSheet, type LightRoom, lightsCard } from "../../../ds/lights.ts";
+import { lightsByArea } from "../../rooms/rooms.ts";
 import type { EntertainmentArea, EntertainmentMessage } from "../../../core/types.ts";
 import { icon } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
-import { bridgeRow, navRow, single } from "../../../ds/choice.ts";
+import { navRow, single } from "../../../ds/choice.ts";
 
 const TYPES: EntertainmentArea["type"][] = ["screen", "monitor", "music", "3dspace", "other"];
 const TYPE_ICONS: Record<EntertainmentArea["type"], string> = {
@@ -38,6 +41,9 @@ export class EntertainmentView extends StudioView {
   @state() private accessor data: EntertainmentMessage | null = null;
   @state() private accessor draft: Draft | null = null;
   @state() private accessor busy = false;
+  @state() private accessor editingName = false;
+  /** "Add lights to …" is open: what is checked there, the rooms open. */
+  @state() private accessor adding: { picked: string[]; open: string[] } | null = null;
   private stop?: () => void;
 
   override connectedCallback(): void {
@@ -92,7 +98,7 @@ export class EntertainmentView extends StudioView {
             const boxes = syncedBy(a.id);
             const sub = [
               t(`ent.type_${a.type}` as StringKey),
-              t("ent.lights_count", { count: Object.keys(a.lights).length }),
+              Object.keys(a.lights).length === 1 ? t("rooms.one_light") : t("ent.lights_count", { count: Object.keys(a.lights).length }),
               a.bridgeName,
               a.streaming ? t("ent.streaming") : "",
               boxes.length ? t("ent.used_by", { name: boxes.join(", ") }) : "",
@@ -120,85 +126,135 @@ export class EntertainmentView extends StudioView {
     const { t } = this.ctx;
     const bridges = Object.entries(this.data || {});
     if (bridges.length < 2) return nothing;
+    const current = this.data?.[draft.bridge ?? ""]?.name ?? "";
     if (draft.id)
       return html`<div class="item">
-        <ha-icon icon="mdi:router-wireless"></ha-icon><div class="grow">${t("add_device.bridge")}</div>
-        <span class="value">${this.data?.[draft.bridge ?? ""]?.name ?? ""}</span>
+        <div class="grow">${t("add_device.bridge")}</div>
+        <span class="value">${current}</span>
       </div>`;
-    return bridgeRow(t("add_device.bridge"), bridges.map(([id, b]) => [id, b.name]), draft.bridge, (c) => this.choose(c), (id) => id !== draft.bridge && set({ bridge: id, lights: [] }));
+    const options = bridges.map(([id, b]) => ({ value: id, label: b.name, icon: "mdi:router-wireless" }));
+    return navRow({ title: t("add_device.bridge"), value: current, bare: true }, () =>
+      this.choose(single(t("add_device.bridge"), options, draft.bridge ?? "", (id) => id !== draft.bridge && set({ bridge: id, lights: [] }))),
+    );
   }
 
+  /** The rooms (HA areas) with lights of the area's bridge that can stream and are not in it. */
+  private rooms(draft: Draft): LightRoom[] {
+    const { ctx } = this;
+    const candidates = new Set(draft.bridge ? this.data?.[draft.bridge]?.lights || [] : []);
+    return lightsByArea(ctx.hass)
+      .map(([area, ids]): LightRoom => ({
+        key: area ?? "",
+        name: area ? ctx.hass.areas?.[area]?.name || area : ctx.t("home.no_room"),
+        icon: (area && ctx.hass.areas?.[area]?.icon) || (area ? "mdi:sofa-outline" : "mdi:home-off-outline"),
+        lights: ids.filter((id) => candidates.has(id) && !draft.lights.includes(id)),
+      }))
+      .filter((r) => r.lights.length);
+  }
+
+  /**
+   * An area's editor, the Hue app's: its type's glyph and its name (the pencil renames it in
+   * place), its lights as a "Lights" card ("+" opens "Add lights to …", a card's "−" takes one
+   * out; ds/lights.ts), its type and where its lights stand, "Delete" at the bottom. "SAVE"
+   * stays grey until something changed.
+   */
   private editor(draft: Draft, area: EntertainmentArea | null) {
     const { ctx } = this;
     const { t } = ctx;
     const set = (patch: Partial<Draft>) => (this.draft = { ...(this.draft ?? draft), ...patch });
     const streaming = !!area?.streaming;
-    const candidates = draft.bridge ? this.data?.[draft.bridge]?.lights || [] : [];
-    const flip = (id: string) => {
-      const current = (this.draft ?? draft).lights;
-      set({ lights: current.includes(id) ? current.filter((l) => l !== id) : [...current, id] });
-    };
     const valid = draft.name.trim().length > 0 && draft.lights.length > 0;
+    const changed = !area || this.draft !== null;
+    const back = () => ctx.go("/settings/entertainment");
     const save = async () => {
       if (!valid || this.busy) return;
       this.busy = true;
       const d = this.draft ?? draft;
       const ok = d.id
-        ? await ctx.ws({ type: "hue_studio/entertainment/update", area_id: d.id, name: d.name, area_type: d.type, lights: d.lights })
-        : await ctx.ws({ type: "hue_studio/entertainment/create", hue_entry_id: d.bridge, name: d.name, area_type: d.type, lights: d.lights });
+        ? await ctx.ws({ type: "hue_studio/entertainment/update", area_id: d.id, name: d.name.trim(), area_type: d.type, lights: d.lights })
+        : await ctx.ws({ type: "hue_studio/entertainment/create", hue_entry_id: d.bridge, name: d.name.trim(), area_type: d.type, lights: d.lights });
       this.busy = false;
-      if (ok) {
-        this.draft = null;
-        ctx.toast(t("ent.saved", { name: d.name }));
-        if (!d.id) ctx.go("/settings/entertainment");
-      }
+      if (!ok) return;
+      haptic("success");
+      this.draft = null;
+      this.editingName = false;
+      ctx.toast(t("ent.saved", { name: d.name.trim() }));
+      back();
     };
     const remove = async () => {
-      if (await ctx.ws({ type: "hue_studio/entertainment/delete", area_id: draft.id })) ctx.go("/settings/entertainment");
+      if (await ctx.ws({ type: "hue_studio/entertainment/delete", area_id: draft.id })) back();
     };
-    const changed = !area || this.draft !== null;
-    return this.screen(
-      this.subHead(area ? area.name : t("ent.new"), () => ctx.go("/settings/entertainment"),
-        html`<button class="pill apply" ?disabled=${!valid || !changed || streaming || this.busy} @click=${save}>${t("zone.save")}</button>`),
-      html`${streaming ? html`<p class="sync-note">${icon("sync")}<span>${t("space.streaming", { name: area!.name })}</span></p>` : nothing}
-        <div class="rows">
-          <div class="item col">
-            <input class="field" maxlength="32" placeholder=${t("ent.name")} aria-label=${t("ent.name")} .value=${draft.name}
-              ?disabled=${streaming} @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })} />
-          </div>
-        </div>
-        <div class="rows">
-          ${this.bridgePick(draft, set)}
-          ${navRow({ icon: TYPE_ICONS[draft.type], title: t("ent.type"), value: t(`ent.type_${draft.type}` as StringKey), disabled: streaming }, () =>
-            this.choose(single(t("ent.type"), TYPES.map((type) => ({ value: type, label: t(`ent.type_${type}` as StringKey), icon: TYPE_ICONS[type] })), draft.type, (type) => set({ type: type as Draft["type"] }))),
-          )}
-        </div>
-        <h2 class="label">${t("ent.lights")}</h2>
-        <p class="lead small">${t("ent.lights_hint")}</p>
-        <div class="rows">
-          ${candidates.map(
-            (id) => html`<button class="item" role="checkbox" aria-checked=${draft.lights.includes(id)} ?disabled=${streaming} @click=${() => flip(id)}>
-              <ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>
-              <div class="grow">${friendlyName(ctx.hass, id)}</div>
-              <span class=${classMap({ check: true, on: draft.lights.includes(id) })}>${draft.lights.includes(id) ? icon("check") : nothing}</span>
-            </button>`,
-          )}
-        </div>
-        ${area
-          ? html`<div class="rows" style="margin-top:16px">
-                <button class="item" ?disabled=${streaming || this.draft !== null} @click=${() => ctx.go(`/settings/entertainment/${encodeURIComponent(area.id)}/arrange`)}>
-                  <ha-icon icon="mdi:floor-plan"></ha-icon><div class="grow">${t("space.arrange")}<div class="dim small">${t("ent.arrange_sub")}</div></div>
-                  <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-                </button>
-              </div>
-              <div class="delete-area">
-                <button class="delete-btn" ?disabled=${streaming} @click=${() => this.askDelete(t("ent.delete_note"), t("ent.delete"), () => void remove())}>
-                  ${t("ent.delete")}
-                </button>
-              </div>`
-          : nothing}`,
-      "settings-page",
+    const rooms = this.rooms(draft);
+    const head = this.subHead(
+      t(area ? "ent.edit" : "ent.new"),
+      () => this.confirmLeave(area ? this.draft !== null : !!(draft.name.trim() || draft.lights.length), back),
+      html`<button class="pill save" ?disabled=${!valid || !changed || streaming || this.busy} @click=${save}>${t("scene.save")}</button>`,
+      nothing,
+      true,
     );
+    const editing = this.editingName || !area;
+    const body = html`<div class="sensor-hero">
+        <ha-icon class="pic" icon=${TYPE_ICONS[draft.type] || TYPE_ICONS.other}></ha-icon>
+        <div class="name-row">
+          ${editing
+            ? html`<input class="name-input" maxlength="32" .value=${draft.name} placeholder=${t("ent.name")} aria-label=${t("ent.name")}
+                ?disabled=${streaming} @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })}
+                @keydown=${(e: KeyboardEvent) => e.key === "Enter" && draft.name.trim() && (this.editingName = false)} />`
+            : html`<h1 class="big">${draft.name}</h1>`}
+          ${area
+            ? html`<button class="round rename" ?disabled=${streaming} aria-label=${t("ent.name")} @click=${() => {
+                this.editingName = !this.editingName;
+                if (this.editingName) void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
+              }}>${icon("pencil")}</button>`
+            : nothing}
+        </div>
+      </div>
+      ${streaming ? banner({ title: t("ent.streaming"), text: t("space.streaming", { name: area!.name }), warn: true }) : nothing}
+      ${lightsCard(ctx, {
+        lights: draft.lights,
+        locked: streaming,
+        add: () => (this.adding = { picked: [], open: rooms.map((r) => r.key) }),
+        remove: (id) => set({ lights: (this.draft ?? draft).lights.filter((l) => l !== id) }),
+      })}
+      <p class="hint">${t("ent.lights_hint")}</p>
+      <div class="rows list">
+        ${this.bridgePick(draft, set)}
+        ${navRow({ title: t("ent.type"), value: t(`ent.type_${draft.type}` as StringKey), disabled: streaming, bare: true }, () =>
+          this.choose(single(t("ent.type"), TYPES.map((type) => ({ value: type, label: t(`ent.type_${type}` as StringKey), icon: TYPE_ICONS[type] })), draft.type, (type) => set({ type: type as Draft["type"] }))),
+        )}
+        ${area
+          ? navRow({ title: t("space.arrange"), sub: t("ent.arrange_sub"), disabled: streaming || this.draft !== null, bare: true }, () =>
+              ctx.go(`/settings/entertainment/${encodeURIComponent(area.id)}/arrange`),
+            )
+          : nothing}
+      </div>
+      ${area
+        ? html`<div class="delete-area">
+            <button class="delete-btn" ?disabled=${streaming} @click=${() => this.askDelete(t("ent.delete_note"), t("ent.delete"), () => void remove())}>
+              ${t("devices.delete")}
+            </button>
+          </div>`
+        : nothing}`;
+    return html`${this.screen(head, body, "sensor-edit ent-edit")}
+      ${this.adding ? this.addSheet(draft, rooms, set) : nothing}`;
+  }
+
+  private addSheet(draft: Draft, rooms: LightRoom[], set: (patch: Partial<Draft>) => void) {
+    const { ctx } = this;
+    const adding = this.adding!;
+    return addLightsSheet(ctx, {
+      title: ctx.t("lights.add_to", { name: draft.name.trim() || ctx.t("ent.new") }),
+      rooms,
+      picked: adding.picked,
+      open: adding.open,
+      flip: (id) => (this.adding = { ...adding, picked: adding.picked.includes(id) ? adding.picked.filter((l) => l !== id) : [...adding.picked, id] }),
+      fold: (key) => (this.adding = { ...adding, open: adding.open.includes(key) ? adding.open.filter((k) => k !== key) : [...adding.open, key] }),
+      close: () => (this.adding = null),
+      done: () => {
+        set({ lights: [...(this.draft ?? draft).lights, ...adding.picked] });
+        this.adding = null;
+      },
+    });
   }
 }
 

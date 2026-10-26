@@ -394,6 +394,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
     controls.ts                 hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard
                                 (the one card layout), banner
     ui.ts                       icons, toggle, throttle, LightElement
+    lights.ts                   a set's lights (zone, entertainment area): the "Lights" card and "Add lights to …"
     base.ts                     StudioView: fixed header + scrolling body, tab/sub headers, sheets, flows
     choice.ts                   a row with its value opens the list to pick from (a sheet for one value, a screen
                                 for several), time screens — no <select>, segments or chips inside a section

@@ -296,6 +296,14 @@ Each part: its class (and helper), its measures, where it is used.
   of a light; every tile as tall as any other. A light's (`.tile-card.light`, measured): its
   glyph 32 at 16 from the top, the text centered in the 56 above the zone, two lines of name
   and one under them ("Dynamics", not in the scene editor) at a 16px pitch.
+- **A set's lights** (`lightsCard`, `ds/lights.ts`; a zone's and an entertainment area's
+  editors, measured on the Hue app's entertainment area editor): a group with a 72 title row
+  "Lights" and the accent "+" (32), the lights as a light's cards (102×160) in a row that
+  scrolls sideways from 16, 12 apart, 20 under them, a 24 red "−" (`.minus`) in each card's
+  zone. **Add lights** (`addLightsSheet`): a tall sheet "Add lights to …" with "DONE"; the
+  rooms as list rows (glyph, name, "All lights selected" / "2 selected" under it, a 32 fold
+  button on `--round` 16 from the right), separators from 72; an open room's lights not in the
+  set yet as cards of 110×160 from 72, 12 apart, 20 under them, a round check in each zone.
 - **Control card** `.control-card` (150×108, a room's "Controls": sensors): a 24px icon 20px
   in and the switch 16px from the top, the name `--fs-callout` 500 over a `--fs-caption` line.
 - **Automation card** `automationCard()` / `.auto-card`: ≥72px, `--surface-low`, a 32px
@@ -525,6 +533,7 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Scene gallery | a picker (deep blue top, the page a panel from 80): title 28 at 24, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
 | Settings, Explore, Sync (tabs) | Settings has no glow; Explore a blue one like Automations; Sync without a box (onboarding) a violet one (`#3f296d` in the middle at the top, gone by ~280), none with a box |
 | Sync (411dp, a box on; iOS 440pt the same scaled) | header "+", "⋯", the switch; no title, no glow (violet only on the empty tab); the input's picture a 223 square (54% of the width), square corners, `#3b3d41` → `#2f3235`; "SYNC BOX" 10 capitals 20 under it, the input 20, its status 16 grey; "MODE / INTENSITY / BRIGHTNESS" 10 capitals 8 over pills 88×48 (`#46494c`, brightness white-to-grey), 24 apart; a dock 20 from the edges (371×114, `#0e1115`, radius 18) 20 under the pills and 22 over the tab bar: "WHAT" and "WHERE" 48 round buttons (`#3e4144`) over 10 capitals and a 12 value, a 76 round start in the middle (box on: a 4px ring `#0549a8`, the accent at 65%, over `#0c1e38`, at 16%; box off: grey) |
+| Entertainment area editor, "Add lights to …" | a sheet ("Edit", "SAVE" grey until changed): the type's glyph, name 34, pencil; "Lights" group from 222 (title row 72, "+" 32 accent at 363), cards 102×160 from 16, 12 apart, 20 under them, a red "−" 24 (`#e63535`) in each zone; rows (Light placement with a picture, Brightness balancer, When sync stops, Performance); "Delete". "+" opens a tall sheet: "ROOMS" 34 under the bar, rooms as rows 72 (glyph, name; "All lights selected" under it once picked), a fold button 32 (`#434549`), the lights not in the area as cards 110×160 from 72 right under their row, 20 under them, a 24 round check in the zone (accent when picked); separators from 72. A Hue zone has no lights screen (its lights come from a room's "+"); its name and type are on "Edit name and type" (an icon grid) |
 | Sync popovers | over the dimmed screen and tab bar, 20 from the edges, `#24262a`, radius ~13: "Mode" 16 at 20, three tiles 105×99 (`#3a3c3f`, 24 icon, 10 capitals) 12 apart, 16 in; "Intensity", four pills 76×48 (`#505155`) with waves; the chosen one white with dark ink; brightness: the color screen's slider from the button (88×200) with "100%" in a badge over it |
 | Sync sheets | "Sync options" (tall): the accent "+" in the bar, section "TV", a group titled by the box with its inputs as light tiles (102×160) and a round check in the switch zone; "Entertainment area": a hint, rows with a tick, "Create an Entertainment area" with a blue "+"; "⋯" → "Settings" (tall): rows 72 (Device, Change Hue Bridge, Change Wi-Fi network, HDMI inputs, TV remote control, Voice assistants, Automatic control, Advanced, Software updates) |
 | Sync Box: Device | hero: the box's glyph, its name 34 (wide), a round pencil; rows LED indicator brightness (Normal / Off / Dimmed on a sheet), Automatic updates (switch, hint under it), Network info (SSID, IP address, Signal quality, Network "Local + Internet"), Device info (Model "HSB2", Manufacturer, Identifier, Firmware): tall sheets with the value under the title; "Restart sync box" (grey pill `#4b4b4b`) over "Remove sync box" (red outlined), 12 apart |
@@ -650,3 +659,8 @@ effects sends nothing to the light (checked on an off light against HA's state).
   the app's words (very slow, slow, medium, medium (default), fast, very fast, extreme); the
   speed sheet as the app's. A row audit over every screen in the harness found one more page
   off the system (Rooms and zones: compact rows), now a settings page.
+- 2026-10-26, a set's lights as the Hue app's (its entertainment area editor, measured): the
+  "Lights" card with "+" and cards with a red "−", and "Add lights to …" with rooms as rows and
+  checks on the cards (`ds/lights.ts`); a zone's and an entertainment area's editors use them
+  instead of lists of rows, the entertainment area's editor is now an editor sheet like the
+  others. A sheet body's first section title sits 34 under its bar, as a settings page's.
