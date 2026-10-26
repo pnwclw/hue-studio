@@ -6,13 +6,14 @@ app itself (6.3, Android, in an emulator: sizes in dp, which are px here); the s
 built on Home Assistant's model and its own needs where the Hue app has no counterpart.
 
 - **Tokens** live in `src/ds/tokens.ts` (pure, so tests and a future dashboard theme can read
-  them). `styles.ts` turns them into CSS variables on every shadow root (`tokensCss()`).
-- **Components** are CSS classes in `src/ds/styles/index.ts` plus the template helpers that
-  render them (`controls.ts`, `ui.ts`, `base.ts`, `choice.ts`, `wheel.ts`, all in `src/ds/`).
+  them). The stylesheet turns them into CSS variables on every shadow root (`tokensCss()`).
+- **Components** are CSS classes in the stylesheet, `src/ds/styles/` (one sheet split by area,
+  joined in order by `index.ts`: the cascade depends on that order), plus the template helpers
+  that render them (`controls.ts`, `ui.ts`, `base.ts`, `choice.ts`, `wheel.ts`, all in `src/ds/`).
 - **The rule:** a new screen is made of these parts. A part that is missing is added here
   (token or component, with where it is used) before the screen uses it. One-off sizes,
   colors and fonts don't go into views or styles.
-- **Enforced** by `tests/js/styles.test.ts` for `styles.ts` and the CSS of cards, sheets
+- **Enforced** by `tests/js/styles.test.ts` for the stylesheet and the CSS of cards, sheets
   and the dialog: type sizes only from the scale, weights 400/500/700 only, radii only from
   the scale (circles and a pin's drop aside), the named colors only through tokens, and
   every token a stylesheet uses must exist.

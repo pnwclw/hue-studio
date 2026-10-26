@@ -1,7 +1,7 @@
 // The design system (docs/design-system.md): stylesheets take their colors, type sizes, radii,
 // shadows and weights from the tokens only.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { CSS } from "../../src/ds/styles/index.ts";
@@ -17,6 +17,15 @@ const EXTRA = [
 ].map((f) => readFileSync(f, "utf8"));
 const OWN = CSS.replace(tokensCss(), "");
 const ALL = [OWN, ...EXTRA];
+
+test("every part of the stylesheet is in it", async () => {
+  // The panel's stylesheet is split by area (src/ds/styles/); the checks below read the joined one.
+  for (const file of readdirSync("src/ds/styles").filter((f) => f !== "index.ts")) {
+    const parts = Object.values(await import(`../../src/ds/styles/${file}`)) as string[];
+    assert.ok(parts.length > 0, file);
+    for (const part of parts) assert.ok(CSS.includes(part), `${file} is not joined in index.ts`);
+  }
+});
 
 const values = (css: string, prop: string) => [...css.matchAll(new RegExp(`(?<![\\w-])${prop}:\\s*([^;}]+)`, "g"))].map((m) => m[1].trim());
 
