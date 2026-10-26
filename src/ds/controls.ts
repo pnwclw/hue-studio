@@ -8,7 +8,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { colorsArt, paletteArt, paletteColors } from "../core/color.ts";
 import type { StudioContext } from "../core/context.ts";
-import { SPEED_STEPS, speedWord } from "../features/color/effects.ts";
+import { SCENE_SPEED_DEFAULT, sceneSpeedWord, SPEED_STEPS } from "../features/color/effects.ts";
 import { galleryMatch, thumbUrl } from "../features/scenes/gallery-data.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "../core/model.ts";
 import { haptic } from "../core/ha-internals.ts";
@@ -449,15 +449,21 @@ export function tileCard(card: TileCard): TemplateResult {
   </div>`;
 }
 
+/** A scene's speed step as the Hue app writes it: "12 - Extreme", "7 - Medium (Default)". */
+export function sceneSpeedLabel(t: StudioContext["t"], step: number): string {
+  const word = t(`effects.speed_${sceneSpeedWord(step)}` as StringKey);
+  return `${step} - ${word}${step === SCENE_SPEED_DEFAULT ? ` (${t("scene.speed_default")})` : ""}`;
+}
+
 /**
- * A scene's dynamic speed on a sheet, the Hue app's 1-12 with its word ("9 - Fast"): the
- * room's "⋯" and the scene editor's "Dynamic speed" row open it; "Done" keeps the step.
+ * A scene's dynamic speed on a sheet, the Hue app's: "SPEED" over its step and word, the
+ * slider with its steps under it (the default one marked), a hint under the group. The room's
+ * "⋯" and the scene editor's "Dynamic speed" row open it; "Done" keeps the step.
  */
 export function speedSheet(ctx: StudioContext, o: { step: number; set: (step: number) => void; close: () => void; done: () => void }): TemplateResult {
   const { t } = ctx;
-  const word = t(`effects.speed_${speedWord(o.step)}` as StringKey);
   return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && o.close()}>
-    <div class="box form sensor-sheet fade-sheet" role="dialog" aria-label=${t("scene.speed")}>
+    <div class="box form sensor-sheet fade-sheet speed-sheet" role="dialog" aria-label=${t("scene.speed")}>
       <div class="sheet-bar">
         <button class="round close" aria-label=${t("common.close")} @click=${o.close}>${icon("close")}</button>
         <div class="grow">${t("scene.speed")}</div>
@@ -467,12 +473,14 @@ export function speedSheet(ctx: StudioContext, o: { step: number; set: (step: nu
         }}>${t("color.done")}</button>
       </div>
       <div class="fade-body">
-        <div class="fade-values"><div><div class="caps">${t("scene.speed")}</div><div class="big-value">${o.step} - ${word}</div></div></div>
+        <div class="fade-values"><div><div class="caps">${t("effects.speed")}</div><div class="big-value">${sceneSpeedLabel(t, o.step)}</div></div></div>
         <hue-studio-slider class="fade-slider" .min=${1} .max=${SPEED_STEPS} .value=${o.step} .label=${t("scene.speed")}
           @value-input=${(e: CustomEvent<number>) => o.set(Math.round(e.detail))}
           @value-change=${(e: CustomEvent<number>) => o.set(Math.round(e.detail))}></hue-studio-slider>
-        <div class="fade-ticks">${Array.from({ length: SPEED_STEPS }, (_, i) => html`<span>${i + 1}</span>`)}</div>
+        <div class="fade-ticks">${Array.from({ length: SPEED_STEPS }, (_, i) =>
+          html`<span class=${classMap({ on: i + 1 === SCENE_SPEED_DEFAULT })}>${i + 1}</span>`)}</div>
       </div>
+      <p class="hint fade-hint">${t("scene.speed_hint")}</p>
     </div>
   </div>`;
 }

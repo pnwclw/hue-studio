@@ -70,6 +70,18 @@ const categoryOf = (effect: EffectId): CategoryId => CATEGORIES.find((c) => c.ef
 // ---------- speed: the Hue app's 1-12 scale over the bridge's 0-1 ----------
 
 export const SPEED_STEPS = 12;
+
+/**
+ * A scene's dynamic speed as the Hue app shows it, 1-12 (measured: the bridge keeps a scene's
+ * speed in 126ths; the app's default, 7, is 76/126 and its 12 is 111/126, 7/126 a step, so 1
+ * is 34/126). Below or above that range the nearest end.
+ */
+export const SCENE_SPEED_DEFAULT = 7;
+export const sceneSpeedToStep = (speed: number): number => Math.min(SPEED_STEPS, Math.max(1, Math.round((speed * 126 - 34) / 7) + 1));
+export const sceneStepToSpeed = (step: number): number => (34 + 7 * (Math.min(SPEED_STEPS, Math.max(1, Math.round(step))) - 1)) / 126;
+/** The Hue app's word for a scene's speed step ("12 - Extreme"). */
+export const sceneSpeedWord = (step: number): "very_slow" | "slow" | "medium" | "fast" | "very_fast" | "extreme" =>
+  step <= 2 ? "very_slow" : step <= 4 ? "slow" : step <= 7 ? "medium" : step <= 9 ? "fast" : step <= 11 ? "very_fast" : "extreme";
 export const speedToStep = (speed: number): number => Math.round(Math.min(1, Math.max(0, speed)) * (SPEED_STEPS - 1)) + 1;
 export const stepToSpeed = (step: number): number => (Math.min(SPEED_STEPS, Math.max(1, step)) - 1) / (SPEED_STEPS - 1);
 /** Word for a speed step, as the Hue app labels it ("7 - Medium", "8 - Fast"). */

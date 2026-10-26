@@ -52,6 +52,13 @@ export const AUTOMATION_EDITOR_CSS = `
   .fade-sheet .fade-slider .knob { width: 18px; height: 18px; }
   .fade-ticks { display: flex; justify-content: space-between; margin: 14px 0 0; font-size: var(--fs-caption); color: var(--text-2); font-variant-numeric: tabular-nums; }
   .fade-ticks span { width: 16px; text-align: center; }
+  /* A scene's speed (measured on the Hue app's): the group on the rows' grey with the page under
+     it, one grey track (no fill), the default step's number white and bold, the hint on the page. */
+  .speed-sheet { background: var(--bg); }
+  .speed-sheet .fade-body { padding-bottom: 22px; background: var(--surface-row); box-shadow: var(--shadow-row); }
+  .speed-sheet .fade-slider .fill { background: none; }
+  .fade-ticks span.on { color: var(--text); font-weight: 700; }
+  .speed-sheet .fade-hint { margin: 20px 16px calc(24px + var(--safe-bottom)); font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
   /* "Turn off after": the slider sets the row with the tick (every part of the day, or one of them). */
   .off-sheet .fade-body { max-height: min(70dvh, 620px); overflow-y: auto; overscroll-behavior: contain; }
   .off-sheet .off-phases { margin-top: 10px; border-radius: var(--r-m); background: var(--surface-row); }

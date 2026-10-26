@@ -2,10 +2,11 @@
 
 export const EDITORS_CSS = `
   /* Scene editor, the Hue app's: the top (header, picture, name, brightness) tinted with the
-     scene's colors, fading into the page; the rows below on their own. */
+     scene's colors, gone by the rows (measured: the band over them is the plain page there);
+     the rows below on their own. */
   .scene-edit { padding-bottom: calc(28px + var(--safe-bottom)); }
-  .scene-tint { position: absolute; top: 0; left: 0; right: 0; height: 460px; z-index: 0; pointer-events: none; background: var(--scene-tint);
-                -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+  .scene-tint { position: absolute; top: 0; left: 0; right: 0; height: 390px; z-index: 0; pointer-events: none; background: var(--scene-tint);
+                -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
   hue-studio-scene-view > .screen-body { position: relative; z-index: 1; }
   .screen-head.scene-head, .screen-head.scene-head:has(> .bar.sub) { background: rgba(255, 255, 255, 0.07); border-bottom-color: var(--hairline); }
   .scene-head .bar .pill { background: var(--fill-light); }

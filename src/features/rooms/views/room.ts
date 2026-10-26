@@ -13,7 +13,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../../../core/color.ts";
 import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, sceneGlyph, scenePalette, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../../../ds/controls.ts";
-import { speedToStep, stepToSpeed } from "../../color/effects.ts";
+import { sceneSpeedToStep, sceneStepToSpeed } from "../../color/effects.ts";
 import { galleryMatch, thumbUrl } from "../../scenes/gallery-data.ts";
 
 import { haptic, openStockMoreInfo } from "../../../core/ha-internals.ts";
@@ -396,7 +396,7 @@ export class RoomView extends StudioView {
       <div class="box action-sheet" role="dialog" aria-label=${s.name}>
         <button @click=${act(copy)}>${t("scene.copy_to")}</button>
         <button @click=${act(() => void share())}>${t("share.share")}</button>
-        ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
+        ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: sceneSpeedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
         ${info?.resettable && (info.palette.length > 1 || info.mirek.length > 1) ? html`<button @click=${act(shuffle)}>${t("scene.shuffle_colors")}</button>` : nothing}
         ${ctx.hass.user?.is_admin ? html`<button class="danger" @click=${remove}>${t("scene.delete")}</button>` : nothing}
         <button class="cancel" @click=${close}>${t("common.cancel")}</button>
@@ -414,7 +414,7 @@ export class RoomView extends StudioView {
       close: () => (this.speed = null),
       done: async () => {
         this.speed = null;
-        const data = { entity_id: entityId, speed: Math.round(stepToSpeed(sheet.step) * 100), capture: false };
+        const data = { entity_id: entityId, speed: sceneStepToSpeed(sheet.step) * 100, capture: false };
         await ctx.call("hue_studio", "save_scene", data, { optimistic: false });
       },
     });

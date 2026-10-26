@@ -1,7 +1,8 @@
 // Scene editor, like the Hue app's "Edit scene": the scene is shown on its lights, which
 // are adjusted live (brightness here, colors on the wheel); "Save" stores what they show
 // now plus the name, dynamic speed and auto-play. "Colors" shuffles the palette over the
-// lights, "Reset scene" rebuilds the scene from its palette, "Delete scene" removes it from
+// lights (two or more), "Reset scene" rebuilds a gallery scene from its palette (the Hue
+// app has none for scenes of your own), "Delete scene" removes it from
 // the bridge (and so from the Hue app). A scene of your own gets a picture of its own: a
 // photo (uploaded to Home Assistant) or an icon over its colors (HA's entity settings).
 // A new scene ("Custom scene" of a room's "+", the scene `new`) is the Hue app's: a picker
@@ -14,8 +15,8 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import type { SceneDraft } from "../../../core/context.ts";
-import { groupSlider, lightTile, sceneArt, sceneColors, sceneDot, sceneGlyph, speedSheet } from "../../../ds/controls.ts";
-import { speedToStep, speedWord, stepToSpeed } from "../../color/effects.ts";
+import { groupSlider, lightTile, sceneArt, sceneColors, sceneDot, sceneGlyph, sceneSpeedLabel, speedSheet } from "../../../ds/controls.ts";
+import { sceneSpeedToStep, sceneStepToSpeed } from "../../color/effects.ts";
 import { haptic, leavePanel } from "../../../core/ha-internals.ts";
 import type { SceneInfo } from "../../../core/types.ts";
 import type { StringKey } from "../../../i18n/index.ts";
@@ -143,9 +144,8 @@ export class SceneView extends StudioView {
     const here = `${roomPath}/scene/${encodeURIComponent(this.scene)}${this.exitPath ? `?from=${encodeURIComponent(this.exitPath)}` : ""}`;
     const syncing = syncingIn(ctx.boxes, group);
     const name = draft.name ?? this.name;
-    const speed = draft.speed ?? speedToStep(info?.speed ?? 0.5);
+    const speed = draft.speed ?? sceneSpeedToStep(info?.speed ?? sceneStepToSpeed(7));
     const autoplay = draft.autoplay ?? !!info?.auto_dynamic;
-    const word = t(`effects.speed_${speedWord(speed)}` as StringKey);
 
     const head = html`<div class="bar sub">
       <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
@@ -153,7 +153,7 @@ export class SceneView extends StudioView {
       <button class="pill save" @click=${() => this.save()}>${t("scene.save")}</button>
     </div>`;
     // Like the Hue app's: the top (header, name, brightness) tinted with the scene's colors.
-    const tint = sceneColors(info).map((c) => `color-mix(in srgb, ${c} 58%, #141416)`);
+    const tint = sceneColors(info).map((c) => `color-mix(in srgb, ${c} 44%, #141416)`);
     const tintStyle = { "--scene-tint": `linear-gradient(115deg, ${(tint.length > 1 ? tint : [tint[0], tint[0]]).join(", ")})` };
     return html`<div class="scene-tint" style=${styleMap(tintStyle)}></div>
       <div class="screen-head scene-head">${head}</div><div class="screen-body"><div class="page scene-edit">
@@ -192,8 +192,8 @@ export class SceneView extends StudioView {
 
       ${info?.dynamic
         ? html`<h2 class="label">${t("scene.dynamic")}</h2>
-            <div class="rows">
-              ${navRow({ title: t("scene.speed"), value: `${speed} - ${word}` }, () => (this.speedStep = speed))}
+            <div class="rows list">
+              ${navRow({ title: t("scene.speed"), value: sceneSpeedLabel(t, speed), bare: true }, () => (this.speedStep = speed))}
               <div class="item">
                 <div class="grow"><div>${t("scene.autoplay")}</div><div class="dim small">${t("scene.autoplay_sub")}</div></div>
                 ${toggle(autoplay, t("scene.autoplay"), () => this.edit({ autoplay: !autoplay }))}
@@ -204,7 +204,7 @@ export class SceneView extends StudioView {
       <div class="rows lights-card scene-lights">
         <div class="item lights-head">
           <div class="grow">${t("room.lights")}</div>
-          ${info && info.palette.length > 1
+          ${info && info.palette.length > 1 && lights.length > 1
             ? html`<button class="pill shuffle" @click=${() => this.shuffle(lights, info.palette)}>${icon("shuffle")}${t("scene.shuffle")}</button>`
             : nothing}
         </div>
@@ -217,7 +217,7 @@ export class SceneView extends StudioView {
         </div>
       </div>
 
-      ${info?.resettable
+      ${info?.resettable && !info.custom
         ? html`<div class="center"><button class="pill reset" @click=${() => this.reset()}>
             ${t("scene.reset")}
           </button></div>`
@@ -469,7 +469,7 @@ export class SceneView extends StudioView {
     const data: Record<string, unknown> = { entity_id: this.scene };
     const name = draft.name?.trim();
     if (name && name !== this.name) data.name = name;
-    if (info && draft.speed !== null && draft.speed !== speedToStep(info.speed)) data.speed = Math.round(stepToSpeed(draft.speed) * 100);
+    if (info && draft.speed !== null && draft.speed !== sceneSpeedToStep(info.speed)) data.speed = sceneStepToSpeed(draft.speed) * 100;
     if (info && draft.autoplay !== null && draft.autoplay !== info.auto_dynamic) data.auto_dynamic = draft.autoplay;
     if (!(await ctx.call("hue_studio", "save_scene", data, { optimistic: false }))) return;
     // Its picture: a photo (the one it had is deleted), and the icon in HA's entity settings.

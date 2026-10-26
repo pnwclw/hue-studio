@@ -245,7 +245,10 @@ Each part: its class (and helper), its measures, where it is used.
 - **Slider** `hue-studio-slider` / `.slider`: an 8px track, 16px knob (the Hue app's), 12px
   in from a card's edges; the room/scene brightness, sheets. **Stepped slider**
   `.sens-slider` with names under its stops; **fade slider** on the fade and "Turn off
-  after" sheets.
+  after" sheets; a scene's **speed sheet** (`speedSheet`, `.speed-sheet`): the group on the
+  rows' grey, one grey track without a fill, steps 1-12 under it with the default (7) white
+  and bold, the hint on the page; its label is the Hue app's ("12 - Extreme",
+  `sceneSpeedLabel`).
 - **Brightness button** `BrightnessControl` (controls.ts) / `.bri`: a pill you drag, its value
   (or a caption) over it, opening `.bri-track` over a dimmed screen; the color screen (a group
   of lights) and the Sync screen (the box) feed it a `BrightnessSource`.
@@ -265,7 +268,8 @@ Each part: its class (and helper), its measures, where it is used.
   a picture on it (today's scene of the light of the day and of an automation, its actions
   as pills under the group).
 - **List row** (`.rows .item` inside `.settings-page`, `.sensor-edit`, `.choice-sheet`, and
-  `.rows.device-list`): ≥ `--row-h`, a `--row-icon` (28) icon centered 32px in, so an MDI
+  `.rows.device-list`; any other group opts in with `.rows.list`, e.g. the scene editor's
+  "Dynamic scene"; a row without a picture has its text at 16): ≥ `--row-h`, a `--row-icon` (28) icon centered 32px in, so an MDI
   glyph is as big as the Hue app's 24px ones (32px icons at 16 in device lists), text from `--row-text`, a 500 `--fs-body` title over a 400 `--fs-caption` line,
   the value on the right in `--fs-footnote` `--text-2`, a chevron when it opens something;
   separators from the text on. In the automation editor rows have no icons and their text
@@ -636,3 +640,11 @@ effects sends nothing to the light (checked on an off light against HA's state).
   button on a scene's card, "Share" on a scene's "⋯", and "From a link" among a room's ways
   to add a scene (a name sheet with the link, its warning under the field; the scene's card
   then). Sheets a picker opens lie over it.
+- 2026-10-26, the scene editor against the Hue app's (iOS and Android, same scene): its
+  "Dynamic scene" rows were compact (52 and 58 instead of 72, separators across, titles not
+  medium) — not list rows; now `.rows.list`, the speed row without a chevron, "Reset scene"
+  only for gallery scenes, "Colors" only with two lights or more, the tint gone by the rows
+  and darker. The speed scale measured on the bridge (126ths; 7 = 76, 12 = 111, 7 a step) and
+  the app's words (very slow, slow, medium, medium (default), fast, very fast, extreme); the
+  speed sheet as the app's. A row audit over every screen in the harness found one more page
+  off the system (Rooms and zones: compact rows), now a settings page.

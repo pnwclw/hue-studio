@@ -92,7 +92,7 @@ export class RoomsView extends StudioView {
           : html`<h2 class="label">${t("home.no_room")}</h2>
               <p class="lead">${t("rooms.no_room_hint")}</p>
               ${loose}`}`,
-        "rooms-page",
+        "settings-page rooms-page",
       )}`;
   }
 

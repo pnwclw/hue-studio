@@ -52,3 +52,16 @@ test("service data: color or white, speed in percent", () => {
   });
   assert.deepEqual(effectData("candle", { mirek: 453.6 }), { effect: "candle", mirek: 454 });
 });
+
+test("a scene's speed reads as the Hue app's steps (measured on the bridge)", async () => {
+  const { sceneSpeedToStep, sceneStepToSpeed, sceneSpeedWord } = await import("../../src/features/color/effects.ts");
+  // The bridge's default (76/126) is the app's 7, its 111/126 the app's 12.
+  assert.equal(sceneSpeedToStep(0.603), 7);
+  assert.equal(sceneSpeedToStep(0.8809523), 12);
+  assert.equal(sceneSpeedToStep(0), 1);
+  assert.equal(sceneSpeedToStep(1), 12);
+  for (let step = 1; step <= 12; step++) assert.equal(sceneSpeedToStep(sceneStepToSpeed(step)), step);
+  // What the service gets survives the bridge's 126ths.
+  for (let step = 1; step <= 12; step++) assert.equal(sceneSpeedToStep(Math.round(sceneStepToSpeed(step) * 126) / 126), step);
+  assert.deepEqual([1, 3, 5, 7, 8, 10, 12].map(sceneSpeedWord), ["very_slow", "slow", "medium", "medium", "fast", "very_fast", "extreme"]);
+});
