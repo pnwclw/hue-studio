@@ -1258,7 +1258,7 @@ export const CSS = `
   .banner-text p + p { margin-top: 6px; }
   .banner .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .banner .round.banner-go { color: var(--text); --mdc-icon-size: 22px; }
-  .page > .banner:first-child, .rows + .banner { margin-top: 14px; }
+  .page > .banner:first-child, .rows + .banner, .banner + .rows { margin-top: 14px; }
   .mismatch { margin: 0 0 10px; padding: 12px 14px; border-radius: var(--r-m); background: var(--warn-tint); }
   .mismatch p { margin: 0; font-size: var(--fs-callout); line-height: 1.4; }
   .mismatch .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

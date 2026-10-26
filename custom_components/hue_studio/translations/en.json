@@ -361,7 +361,7 @@
     },
     "create_zone": {
       "name": "Create zone",
-      "description": "Creates a Hue zone of the targeted lights (for example all Hue lights of an area), so the area gets scenes of its own. Returns the new zone_id.",
+      "description": "Creates a Hue zone of the targeted lights (for example all Hue lights of an area), so the area gets scenes of its own. Returns the new zone_id and, once the Philips Hue integration has added it, the zone's light entity_id.",
       "fields": {
         "name": {
           "name": "Name",

@@ -338,6 +338,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
   scene_backup.py               scenes to a file in <config>/hue_studio/scenes/ and back (export_scenes, import_scenes,
                                 hue_studio/scenes/backups): lights by Zigbee MAC, copies kept while they hold a deleted scene
+  zones.py                      "Zones as labels": each Hue zone mirrored as an HA label "Hue zone: <name>", both ways
+                                (the side that changed wins, the bridge on a tie; no automatic deletes); pairs in a Store;
+                                hue_studio/zones/subscribe|relink; create_zone waits for the zone's entity
   organize.py                   bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
                                 icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
                                 the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option

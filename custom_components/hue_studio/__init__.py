@@ -67,6 +67,7 @@ from .sync import SyncBoxCoordinator, async_track_entertainment
 from .sync_follow import PictureFollower
 from .sync_link import SyncBoxLink
 from .websocket import async_setup_websocket
+from .zones import ZoneMirror, async_track_zones
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ class HueStudioData:
     """Runtime data of a Hue Studio config entry (the bridges, or a Sync Box)."""
 
     connections: BridgeConnections | None = None
+    zones: ZoneMirror | None = None
     sync: SyncBoxCoordinator | None = None
     link: SyncBoxLink | None = None
 
@@ -190,6 +192,8 @@ async def _async_setup_studio(hass: HomeAssistant, entry: HueStudioConfigEntry) 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     entry.async_on_unload(_async_track_auto_align(hass, entry))
     entry.async_on_unload(await async_track_organize(hass))
+    entry.runtime_data.zones, stop_zones = await async_track_zones(hass)
+    entry.async_on_unload(stop_zones)
     await async_register_panel(hass)
     await hass.config_entries.async_forward_entry_setups(entry, STUDIO_PLATFORMS)
     return True

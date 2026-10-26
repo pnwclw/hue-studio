@@ -301,8 +301,8 @@ Each part: its class (and helper), its measures, where it is used.
 
 - **Banner** `banner()` / `.banner`: the Hue app's — a 1.5px border (the accent, amber
   `.warn`), a round "i" and a spaced capital title (`--fs-label`), `--fs-footnote` grey text,
-  own buttons, a round chevron when it leads somewhere. A Sync Box's is `syncBanner`
-  (`.sync-banner`).
+  own buttons, a round chevron when it leads somewhere; 14px from the banners and rows
+  around it. A Sync Box's is `syncBanner` (`.sync-banner`).
 - **Note** `.sync-note` (info tint, 13px; `.all` centered for a screen that is locked),
   `.mismatch` (warn tint), `.power-cycle` (a step's art and text, info tint). Prefer a banner
   for anything new.

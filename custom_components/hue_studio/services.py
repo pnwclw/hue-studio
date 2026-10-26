@@ -105,6 +105,7 @@ from .sync import (
 )
 from .sync_follow import async_wake_source
 from .sync_link import SyncBoxLink
+from .zones import async_wait_zone_entity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -459,16 +460,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_placeholders={"name": name},
             )
         palette = image = None
+        # Captured from the lights or made from colors: a scene of your own.
+        own = ATTR_GALLERY_SCENE not in call.data or bool(
+            call.data.keys() & {ATTR_POINTS, ATTR_MIREK}
+        )
         if call.data.keys() & {ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK}:
             colors = {k: v for k, v in call.data.items() if k != ATTR_GALLERY_SCENE}
-            own = ATTR_POINTS in call.data or ATTR_MIREK in call.data
             source = await _async_palette(hass, colors if own else call.data)
             palette = palette_feature(source, call.data.get(ATTR_BRIGHTNESS))
             image = source.get("public_image")
             if own and ATTR_GALLERY_SCENE in call.data:
                 gallery = {ATTR_GALLERY_SCENE: call.data[ATTR_GALLERY_SCENE]}
                 image = (await _async_palette(hass, gallery)).get("public_image")
-        post = new_scene(group, name, palette, image)
+        post = new_scene(group, name, palette, image, custom=own)
         try:
             created = await group.bridge.request(
                 "post",
@@ -525,7 +529,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="command_failed",
                 translation_placeholders={"entity_id": lights[0].entity_id},
             ) from err
-        return {"zone_id": created[0]["rid"] if created else None}
+        zone_id = created[0]["rid"] if created else None
+        # Its grouped light, once the native integration has added it.
+        entity_id = (
+            await async_wait_zone_entity(hass, bridge, zone_id) if zone_id else None
+        )
+        return {"zone_id": zone_id, "entity_id": entity_id}
 
     async def update_zone(call: ServiceCall) -> None:
         """Rename a Hue zone or give it other lights (rooms are aligned instead)."""
@@ -740,7 +749,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         (SERVICE_SET_SYNC_IR_CODE, set_sync_ir_code, SET_SYNC_IR_CODE_SCHEMA),
         (SERVICE_DELETE_SYNC_IR_CODE, delete_sync_ir_code, DELETE_SYNC_IR_CODE_SCHEMA),
     ):
-        hass.services.async_register(DOMAIN, name, handler, schema=schema)
+        async_register_admin_service(hass, DOMAIN, name, handler, schema=schema)
     hass.services.async_register(
         DOMAIN, SERVICE_RECALL_SCENE, recall_scene, schema=RECALL_SCENE_SCHEMA
     )
@@ -757,23 +766,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=CREATE_SCENE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_CREATE_ZONE,
         create_zone,
         schema=CREATE_ZONE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_ALIGN_ROOMS,
         align_rooms,
