@@ -153,8 +153,15 @@ lights:
 - lights in several areas: on the home screen under "Zones" (e.g. an open-plan living
   room plus kitchen).
 
-HA labels are not used for zones for now; "zone = HA label" may come later as an option
-for automations by zone.
+With "Zones as labels" on (`zones.py`), each zone is also an HA label `Hue zone: <name>`
+on its lights, kept alike both ways: the zone stays on the bridge (the Hue app's truth),
+the label follows it, and a change to the label (its name, the Hue lights carrying it, a
+new label of that form) is written to the bridge. The side that changed since the last
+pass wins, the bridge when both did; a change we sent waits for the bridge to report it
+back before the bridge's side counts again. No automatic deletes: a deleted label leaves
+its zone unlinked for the panel to delete or label again, a label on no light keeps its
+zone. Light groups of HA were the other candidate and were left out: a zone would show up
+twice in HA, and a group whose lights are all off at the wall cannot tell its members.
 
 ### Scenes
 

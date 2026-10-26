@@ -10,15 +10,19 @@ from unittest.mock import MagicMock, patch
 
 from aiohuesyncbox import InvalidState, RequestError, Unauthorized
 from aiohuesyncbox.huesyncbox import HueSyncDevice
+from homeassistant.auth.models import User
 from homeassistant.config_entries import (
     SOURCE_USER,
     SOURCE_ZEROCONF,
     ConfigEntryState,
 )
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_HOST
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import (
+    ServiceValidationError,
+    Unauthorized as HassUnauthorized,
+)
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
@@ -589,6 +593,25 @@ async def test_presets(hass: HomeAssistant, sync_box: FakeBox) -> None:
         await hass.services.async_call(
             DOMAIN, "set_sync", {**target, "preset": "Gone"}, blocking=True
         )
+
+
+async def test_box_settings_admin_only(
+    hass: HomeAssistant, sync_box: FakeBox, hass_read_only_user: User
+) -> None:
+    """Deleting presets and changing remote buttons needs an admin."""
+    target = {"entity_id": "switch.sync_box_light_sync"}
+    context = Context(user_id=hass_read_only_user.id)
+    for service, data in (
+        ("delete_sync_preset", {"preset": "p1"}),
+        ("learn_sync_ir_code", {}),
+        ("set_sync_ir_code", {"code": "AB", "name": "Red", "action": "toggle_sync"}),
+        ("delete_sync_ir_code", {"code": "AB"}),
+    ):
+        with pytest.raises(HassUnauthorized):
+            await hass.services.async_call(
+                DOMAIN, service, {**target, **data}, blocking=True, context=context
+            )
+    assert sync_box.sent("delete", "/presets/p1") == []
 
 
 async def test_ir_codes(hass: HomeAssistant, sync_box: FakeBox) -> None:

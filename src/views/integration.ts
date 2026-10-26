@@ -4,14 +4,15 @@
 // on HA's integration page (a link); bridges come from the Philips Hue integration by
 // themselves.
 
-import { html } from "lit";
-import { customElement } from "lit/decorators.js";
+import { html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
 
 import { allGroups, friendlyName, type Group, hueGroupIcon, isHueGroup } from "../model.ts";
 import type { StringKey } from "../i18n.ts";
-import type { RoomSensors } from "../types.ts";
+import type { RoomSensors, SceneBackup, SceneRestore } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
+import { lastSeen } from "./room.ts";
 import { navRow, single } from "./choice.ts";
 
 const MOTION_CLASSES = ["motion", "occupancy", "presence"];
@@ -24,11 +25,32 @@ const KINDS: [SensorKind, string, (id: string, cls: string | undefined) => boole
 
 @customElement("hue-studio-integration-view")
 export class IntegrationView extends StudioView {
+  @state() private accessor backups: SceneBackup[] | null = null;
+  @state() private accessor busy = false;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    void this.loadBackups();
+  }
+
+  private async loadBackups(): Promise<void> {
+    if (!this.ctx.hass.user?.is_admin) return;
+    const result = await this.ctx.query<{ backups: SceneBackup[] }>({ type: "hue_studio/scenes/backups" }, { quiet: true });
+    this.backups = result?.backups ?? null;
+  }
+
+  /** `hue_studio.<service>` with its response (null on failure, a toast says why). */
+  private async service<T>(service: string, data: Record<string, unknown>): Promise<T | null> {
+    const result = await this.ctx.query<{ response: T }>({ type: "call_service", domain: "hue_studio", service, service_data: data, return_response: true });
+    return result?.response ?? null;
+  }
+
   protected override renderPage() {
     const { ctx } = this;
     const { t } = ctx;
     const autoAlign = !!ctx.config.auto_align;
     const organize = ctx.config.organize !== false;
+    const zoneLabels = !!ctx.config.zone_labels;
     return this.screen(
       this.subHead(t("settings.integration"), () => ctx.go("/settings")),
       html`<div class="rows">
@@ -42,6 +64,11 @@ export class IntegrationView extends StudioView {
             <div class="grow">${t("settings.organize")}<div class="dim small">${t("settings.organize_sub")}</div></div>
             ${toggle(organize, t("settings.organize"), () => ctx.setConfig({ organize: !organize }))}
           </div>
+          <div class="item">
+            <ha-icon icon="mdi:texture-box"></ha-icon>
+            <div class="grow">${t("settings.zone_labels")}<div class="dim small">${t("settings.zone_labels_sub")}</div></div>
+            ${toggle(zoneLabels, t("settings.zone_labels"), () => ctx.setConfig({ zone_labels: !zoneLabels }))}
+          </div>
         </div>
         <h2 class="label">${t("integ.groups")}</h2>
         <p class="lead">${t("integ.groups_hint")}</p>
@@ -49,6 +76,7 @@ export class IntegrationView extends StudioView {
         <h2 class="label">${t("integ.sensors")}</h2>
         <p class="lead">${t("integ.sensors_hint")}</p>
         <div class="rows">${allGroups(ctx.home).map((g) => this.roomSensors(g))}</div>
+        ${this.sceneBackups()}
         <h2 class="label">${t("integ.more")}</h2>
         <div class="rows">
           <button class="item" @click=${() => ctx.openSettings()}>
@@ -59,6 +87,49 @@ export class IntegrationView extends StudioView {
         </div>`,
       "settings-page",
     );
+  }
+
+  /** Scene backups (administrators): copy the scenes now; restore a copy after its plan. */
+  private sceneBackups() {
+    const { ctx } = this;
+    const { t } = ctx;
+    if (!ctx.hass.user?.is_admin || this.backups === null) return nothing;
+    const when = (iso: string | null) => (iso ? lastSeen(iso, ctx.hass.locale, ctx.hass.locale?.language || ctx.hass.language || "en") : "");
+    const latest = this.backups[0];
+    const backUp = async () => {
+      if (this.busy) return;
+      this.busy = true;
+      const done = await this.service<{ scenes: number }>("export_scenes", {});
+      this.busy = false;
+      if (!done) return;
+      ctx.toast(t("backup.done", { count: done.scenes }));
+      await this.loadBackups();
+    };
+    const restore = async (b: SceneBackup) => {
+      if (this.busy) return;
+      this.busy = true;
+      const plan = await this.service<SceneRestore>("import_scenes", { file: b.file, dry_run: true });
+      this.busy = false;
+      if (!plan) return;
+      const exists = plan.skipped.filter((s) => s.reason === "exists").length;
+      if (!plan.created.length) return ctx.toast(t("backup.nothing"));
+      const note = t("backup.plan", { count: plan.created.length, existing: exists, skipped: plan.skipped.length - exists });
+      this.askAction(note, t("backup.restore"), async () => {
+        const done = await this.service<SceneRestore>("import_scenes", { file: b.file });
+        if (done) ctx.toast(t("backup.restored", { count: done.created.length }));
+      });
+    };
+    return html`<h2 class="label">${t("backup.title")}</h2>
+      <p class="lead">${t("backup.hint")}</p>
+      <div class="rows">
+        <button class="item" ?disabled=${this.busy} @click=${backUp}>
+          <ha-icon icon="mdi:content-save-outline"></ha-icon>
+          <div class="grow">${t("backup.now")}<div class="dim small">${latest ? t("backup.latest", { date: when(latest.created) }) : t("backup.none")}</div></div>
+        </button>
+        ${this.backups.map((b) =>
+          navRow({ icon: "mdi:history", title: when(b.created) || b.file, sub: t("backup.scenes", { count: b.scenes }) }, () => void restore(b)),
+        )}
+      </div>`;
   }
 
   /** Each Hue room or zone with the area it belongs to (automatic, an area, or a zone of its own). */

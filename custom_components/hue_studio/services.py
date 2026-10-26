@@ -46,7 +46,10 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
-from homeassistant.helpers.service import async_extract_entity_ids
+from homeassistant.helpers.service import (
+    async_extract_entity_ids,
+    async_register_admin_service,
+)
 from homeassistant.helpers.target import (
     TargetSelection,
     async_extract_referenced_entity_ids,
@@ -72,6 +75,7 @@ from .lights import (
 )
 from .positions import async_light_positions, spatial_colors
 from .rooms import async_align
+from .scene_backup import KEEP, async_export, async_import
 from .scenes import (
     SCENE_DOMAIN,
     HueGroup,
@@ -101,6 +105,7 @@ from .sync import (
 )
 from .sync_follow import async_wake_source
 from .sync_link import SyncBoxLink
+from .zones import async_wait_zone_entity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -122,6 +127,8 @@ SERVICE_DELETE_SYNC_IR_CODE = "delete_sync_ir_code"
 SERVICE_ALIGN_ROOMS = "align_rooms"
 SERVICE_UPDATE_ZONE = "update_zone"
 SERVICE_DELETE_ZONE = "delete_zone"
+SERVICE_EXPORT_SCENES = "export_scenes"
+SERVICE_IMPORT_SCENES = "import_scenes"
 
 ATTR_GALLERY_SCENE = "gallery_scene"
 ATTR_PALETTE = "palette"
@@ -154,6 +161,9 @@ ATTR_DELETE_EMPTY_ROOMS = "delete_empty_rooms"
 ATTR_KEEP_SPLIT_SCENES = "keep_split_scenes"
 ATTR_LIGHTS = "lights"
 ATTR_LAYOUT = "layout"
+ATTR_KEEP = "keep"
+ATTR_FILE = "file"
+ATTR_REPLACE = "replace"
 LAYOUTS = ("classic", "spatial")
 
 XY_POINT = vol.All(
@@ -256,6 +266,23 @@ ALIGN_ROOMS_SCHEMA = vol.Schema(
         vol.Optional(ATTR_COMPLETE_SCENES, default=True): cv.boolean,
         vol.Optional(ATTR_DELETE_EMPTY_ROOMS, default=False): cv.boolean,
         vol.Optional(ATTR_KEEP_SPLIT_SCENES, default=False): cv.boolean,
+    }
+)
+
+EXPORT_SCENES_SCHEMA = vol.Schema(
+    {
+        **cv.ENTITY_SERVICE_FIELDS,
+        vol.Optional(ATTR_KEEP, default=KEEP): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=100)
+        ),
+    }
+)
+
+IMPORT_SCENES_SCHEMA = vol.Schema(
+    {
+        vol.Optional(ATTR_FILE): cv.string,
+        vol.Optional(ATTR_DRY_RUN, default=False): cv.boolean,
+        vol.Optional(ATTR_REPLACE, default=False): cv.boolean,
     }
 )
 
@@ -433,16 +460,19 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_placeholders={"name": name},
             )
         palette = image = None
+        # Captured from the lights or made from colors: a scene of your own.
+        own = ATTR_GALLERY_SCENE not in call.data or bool(
+            call.data.keys() & {ATTR_POINTS, ATTR_MIREK}
+        )
         if call.data.keys() & {ATTR_GALLERY_SCENE, ATTR_POINTS, ATTR_MIREK}:
             colors = {k: v for k, v in call.data.items() if k != ATTR_GALLERY_SCENE}
-            own = ATTR_POINTS in call.data or ATTR_MIREK in call.data
             source = await _async_palette(hass, colors if own else call.data)
             palette = palette_feature(source, call.data.get(ATTR_BRIGHTNESS))
             image = source.get("public_image")
             if own and ATTR_GALLERY_SCENE in call.data:
                 gallery = {ATTR_GALLERY_SCENE: call.data[ATTR_GALLERY_SCENE]}
                 image = (await _async_palette(hass, gallery)).get("public_image")
-        post = new_scene(group, name, palette, image)
+        post = new_scene(group, name, palette, image, custom=own)
         try:
             created = await group.bridge.request(
                 "post",
@@ -499,7 +529,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="command_failed",
                 translation_placeholders={"entity_id": lights[0].entity_id},
             ) from err
-        return {"zone_id": created[0]["rid"] if created else None}
+        zone_id = created[0]["rid"] if created else None
+        # Its grouped light, once the native integration has added it.
+        entity_id = (
+            await async_wait_zone_entity(hass, bridge, zone_id) if zone_id else None
+        )
+        return {"zone_id": zone_id, "entity_id": entity_id}
 
     async def update_zone(call: ServiceCall) -> None:
         """Rename a Hue zone or give it other lights (rooms are aligned instead)."""
@@ -551,6 +586,28 @@ def async_setup_services(hass: HomeAssistant) -> None:
             complete_scenes=call.data[ATTR_COMPLETE_SCENES],
             delete_empty=call.data[ATTR_DELETE_EMPTY_ROOMS],
             keep_split_scenes=call.data[ATTR_KEEP_SPLIT_SCENES],
+        )
+
+    async def export_scenes(call: ServiceCall) -> ServiceResponse:
+        """Write the scenes (of the targeted Hue rooms/zones) to a file."""
+        groups: set[str] | None = None
+        if set(call.data) & set(cv.ENTITY_SERVICE_FIELDS):
+            registry = er.async_get(hass)
+            groups = set()
+            for entity_id in await async_extract_entity_ids(call, expand_group=False):
+                # A Hue room or zone, else an error.
+                async_resolve_group(hass, entity_id)
+                if (grouped := registry.async_get(entity_id)) is not None:
+                    groups.add(grouped.unique_id)
+        return await async_export(hass, groups, call.data[ATTR_KEEP])
+
+    async def import_scenes(call: ServiceCall) -> ServiceResponse:
+        """Make the scenes of a file again (or show what would happen)."""
+        return await async_import(
+            hass,
+            call.data.get(ATTR_FILE),
+            dry_run=call.data[ATTR_DRY_RUN],
+            replace=call.data[ATTR_REPLACE],
         )
 
     async def save_scene(call: ServiceCall) -> None:
@@ -692,7 +749,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         (SERVICE_SET_SYNC_IR_CODE, set_sync_ir_code, SET_SYNC_IR_CODE_SCHEMA),
         (SERVICE_DELETE_SYNC_IR_CODE, delete_sync_ir_code, DELETE_SYNC_IR_CODE_SCHEMA),
     ):
-        hass.services.async_register(DOMAIN, name, handler, schema=schema)
+        async_register_admin_service(hass, DOMAIN, name, handler, schema=schema)
     hass.services.async_register(
         DOMAIN, SERVICE_RECALL_SCENE, recall_scene, schema=RECALL_SCENE_SCHEMA
     )
@@ -709,29 +766,43 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=CREATE_SCENE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_CREATE_ZONE,
         create_zone,
         schema=CREATE_ZONE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_ALIGN_ROOMS,
         align_rooms,
         schema=ALIGN_ROOMS_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
+    for name, handler, schema in (
+        (SERVICE_EXPORT_SCENES, export_scenes, EXPORT_SCENES_SCHEMA),
+        (SERVICE_IMPORT_SCENES, import_scenes, IMPORT_SCENES_SCHEMA),
+    ):
+        async_register_admin_service(
+            hass,
+            DOMAIN,
+            name,
+            handler,
+            schema=schema,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
     hass.services.async_register(
         DOMAIN, SERVICE_SAVE_SCENE, save_scene, schema=SAVE_SCENE_SCHEMA
     )

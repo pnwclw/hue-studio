@@ -29,7 +29,9 @@ import type {
   SceneTags,
   RoomsPlan,
   StudioConfig,
+  SceneBackup,
   SceneInfo,
+  ZoneNote,
   ServiceData,
   SyncBoxDevice,
   SyncBoxInfo,
@@ -324,6 +326,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   }
 
   const sceneInfo: Record<string, SceneInfo> = {};
+  const backups: SceneBackup[] = [
+    { file: "scenes-1.json", created: "2026-10-25T03:00:00Z", scenes: 24, bridges: ["Hue Bridge"] },
+    { file: "scenes-0.json", created: "2026-10-24T03:00:00Z", scenes: 25, bridges: ["Hue Bridge"] },
+  ];
   const sceneListeners = new Set<(msg: unknown) => void>();
   /** A bridge scene of a Hue group, as the native integration and our WS API show it. */
   const sceneId = (group: string, name: string) => `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
@@ -341,6 +347,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       mirek: mirek ? [mirek] : [],
       lights: GROUPS[group][2].map((m) => `light.${m}`),
       image: null,
+      custom: !SCENE_PALETTES[name],
     };
     return id;
   };
@@ -576,7 +583,15 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   };
   const roomListeners = new Set<(msg: unknown) => void>();
   const configListeners = new Set<(msg: unknown) => void>();
-  let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false };
+  // &zones=1: "Zones as labels" on, with one zone unlinked and one light that cannot join.
+  const zoneLabels = new URLSearchParams(location.search).get("zones") === "1";
+  let config: StudioConfig = { groups: {}, rooms: {}, auto_align: false, zone_labels: zoneLabels };
+  const zoneNotes: ZoneNote[] = zoneLabels
+    ? [
+        { kind: "unlinked", zone: "zone-reading", name: "Reading nook", entity_id: "light.tv_area" },
+        { kind: "foreign", zone: "zone-tv", name: "TV area", entity_id: "light.tv_area", lights: ["light.desk_lamp"] },
+      ]
+    : [];
   // The icons of the Hue rooms' and zones' archetypes, as the backend sends them with the config.
   const ARCHETYPE_ICONS: Record<string, string> = {
     office: "mdi:desk",
@@ -1172,6 +1187,16 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         return { config: { id: config.id, alias: config.alias, triggers: [], actions: [] } } as T;
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
+      if (msg.type === "hue_studio/scenes/backups") return { backups } as T;
+      if (msg.type === "call_service" && msg.service === "export_scenes") {
+        const count = Object.keys(sceneInfo).length;
+        backups.unshift({ file: `scenes-${backups.length}.json`, created: new Date().toISOString(), scenes: count, bridges: ["Hue Bridge"] });
+        return { response: { file: backups[0].file, scenes: count, removed: [] } } as T;
+      }
+      if (msg.type === "call_service" && msg.service === "import_scenes") {
+        const one = { scene: "Ocean dawn", group: "Office" };
+        return { response: { file: "", created: [one, one], replaced: [], skipped: [{ ...one, reason: "exists" }], missing_lights: [] } } as T;
+      }
       if (msg.type === "hue_studio/daylight/set") {
         const { type: _type, ...change } = msg;
         const settings = day.settings as unknown as Record<string, unknown>;
@@ -1484,6 +1509,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
           return () => {
             automationListeners.delete(send);
           };
+        }
+        if (msg.type === "hue_studio/zones/subscribe") {
+          setTimeout(() => send({ notes: zoneNotes }), 40);
+          return () => undefined;
         }
         if (msg.type === "hue_studio/rooms/subscribe") {
           roomListeners.add(send);

@@ -385,6 +385,36 @@ export interface SceneInfo {
   lights: string[];
   /** Id of the scene's picture in the Hue app (`public_image` of a gallery scene). */
   image: string | null;
+  /** A scene of your own (captured or from your colors), not a preset of the Hue app. */
+  custom: boolean;
+}
+
+/** What the zone labels need from the user (`hue_studio/zones/subscribe`). */
+export interface ZoneNote {
+  /** unlinked: its label was deleted in HA; foreign: lights with the label that cannot join. */
+  kind: "unlinked" | "foreign";
+  zone: string;
+  name: string;
+  /** The zone's grouped light (null: not added by `hue` yet). */
+  entity_id: string | null;
+  lights?: string[];
+}
+
+/** A copy of the bridge scenes (`hue_studio/scenes/backups`). */
+export interface SceneBackup {
+  file: string;
+  created: string | null;
+  scenes: number;
+  bridges: string[];
+}
+
+/** What `hue_studio.import_scenes` did (or would do). */
+export interface SceneRestore {
+  file: string;
+  created: { scene: string; group: string }[];
+  replaced: { scene: string; group: string }[];
+  skipped: { scene: string; group: string; reason: string }[];
+  missing_lights: { scene: string; group: string; lights: string[] }[];
 }
 
 export interface ScenesMessage {
@@ -407,6 +437,8 @@ export interface StudioConfig {
   auto_align?: boolean;
   /** Label, category and area for Hue scenes and our automations in HA (on unless false). */
   organize?: boolean;
+  /** Hue zones mirrored as HA labels "Hue zone: <name>", both ways (off unless true). */
+  zone_labels?: boolean;
   /** Not an option: Hue group entity id -> the icon of its archetype (picked in the Hue app). */
   icons?: Record<string, string>;
   /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */

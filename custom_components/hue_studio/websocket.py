@@ -27,6 +27,7 @@ from .bridges import (
     async_bridges_payload,
     async_rename_bridge,
 )
+from .connections import async_studio_entry
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
@@ -34,6 +35,7 @@ from .const import (
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
     CONF_ORGANIZE,
+    CONF_ZONE_LABELS,
     FOOTER_MAX_TABS,
     GALLERY_SEASONS,
     SIGNAL_BRIDGES_UPDATED,
@@ -112,6 +114,7 @@ from .rooms import (
     async_track_areas,
     async_track_rooms,
 )
+from .scene_backup import async_list as async_list_scene_backups
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
     DEVICE_ACTIONS as SYNC_DEVICE_ACTIONS,
@@ -132,6 +135,7 @@ from .sync_follow import (
     WAKE_DOMAINS as FOLLOW_WAKE_DOMAINS,
     async_set_follow,
 )
+from .zones import SIGNAL_ZONES_UPDATED, ZoneMirror
 
 
 @callback
@@ -184,6 +188,9 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_link_sync_box_bridge,
         ws_set_group_area,
         ws_set_room_sensors,
+        ws_subscribe_zones,
+        ws_relink_zone,
+        ws_scene_backups,
     ):
         websocket_api.async_register_command(hass, command)
 
@@ -460,6 +467,7 @@ MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
         vol.Required("type"): "hue_studio/config/set",
         vol.Optional(CONF_AUTO_ALIGN): bool,
         vol.Optional(CONF_ORGANIZE): bool,
+        vol.Optional(CONF_ZONE_LABELS): bool,
         vol.Optional(CONF_FOOTER): bool,
         vol.Optional(CONF_FOOTER_TABS): vol.All(
             [cv.string], vol.Length(max=FOOTER_MAX_TABS)
@@ -494,6 +502,7 @@ def ws_set_config(
         in (
             CONF_AUTO_ALIGN,
             CONF_ORGANIZE,
+            CONF_ZONE_LABELS,
             CONF_FOOTER,
             CONF_FOOTER_TABS,
             CONF_GALLERY_SEASONAL,
@@ -614,6 +623,72 @@ def ws_subscribe_devices(
     connection.subscriptions[msg["id"]] = unsubscribe
     connection.send_result(msg["id"])
     send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/scenes/backups"})
+@websocket_api.async_response
+async def ws_scene_backups(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The scene backups, newest first.
+
+    Result: {"backups": [{"file", "created", "scenes", "bridges": [names]}]}
+    (made and restored with the export_scenes and import_scenes services).
+    """
+    backups = await async_list_scene_backups(hass)
+    connection.send_result(msg["id"], {"backups": backups})
+
+
+def _zone_mirror(hass: HomeAssistant) -> ZoneMirror | None:
+    entry = async_studio_entry(hass)
+    return getattr(getattr(entry, "runtime_data", None), "zones", None)
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/zones/subscribe"})
+@callback
+def ws_subscribe_zones(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send what the zone labels need from the user, now and whenever it changes.
+
+    Event payload: {"notes": [{"kind": "unlinked" | "foreign", "zone": zone id,
+    "name", "entity_id": the zone's light or None, "lights": [entity ids] (foreign)}]}
+    """
+
+    @callback
+    def send() -> None:
+        mirror = _zone_mirror(hass)
+        notes = mirror.notes if mirror else []
+        connection.send_message(
+            websocket_api.event_message(msg["id"], {"notes": notes})
+        )
+
+    connection.subscriptions[msg["id"]] = async_dispatcher_connect(
+        hass, SIGNAL_ZONES_UPDATED, send
+    )
+    connection.send_result(msg["id"])
+    send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {vol.Required("type"): "hue_studio/zones/relink", vol.Required("zone"): str}
+)
+@callback
+def ws_relink_zone(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Mirror a zone whose label was deleted again (it gets a label of its name)."""
+    if (mirror := _zone_mirror(hass)) is not None:
+        mirror.async_relink(msg["zone"])
+    connection.send_result(msg["id"])
 
 
 async def _ws_call(

@@ -50,7 +50,7 @@ export class StudioView extends LightElement {
   /** The choice open over the view (views/choice.ts), shown by `withChoice`. */
   @state() protected accessor choosing: Choice | null = null;
   /** A question on an action sheet (the Hue app's): leaving with changes, deleting (`askSheet`). */
-  @state() protected accessor ask: { note: string; action: string; run: () => void } | null = null;
+  @state() protected accessor ask: { note: string; action: string; run: () => void; safe?: boolean } | null = null;
 
   #headObserver?: ResizeObserver;
   /** Where the body was scrolled to on the pages below the one shown (`pushPage`). */
@@ -93,6 +93,11 @@ export class StudioView extends LightElement {
     this.ask = { note, action, run };
   }
 
+  /** Do something only once the action sheet asked (its note, the action, not red). */
+  protected askAction(note: string, action: string, run: () => void): void {
+    this.ask = { note, action, run, safe: true };
+  }
+
   /** The action sheet of `ask` (render it outside the scrolling body). */
   protected askSheet(): TemplateResult | typeof nothing {
     const ask = this.ask;
@@ -102,7 +107,7 @@ export class StudioView extends LightElement {
     return html`<div class=${classMap({ sheet: true, bottom: this.ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && stay()}>
       <div class="box action-sheet" role="dialog" aria-label=${ask.action}>
         <p class="note">${ask.note}</p>
-        <button class="danger" @click=${() => {
+        <button class=${ask.safe ? "" : "danger"} @click=${() => {
           this.ask = null;
           ask.run();
         }}>${ask.action}</button>

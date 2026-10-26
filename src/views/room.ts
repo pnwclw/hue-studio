@@ -403,7 +403,7 @@ export class RoomView extends StudioView {
         <button @click=${act(copy)}>${t("scene.copy_to")}</button>
         ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
         ${info?.resettable && (info.palette.length > 1 || info.mirek.length > 1) ? html`<button @click=${act(shuffle)}>${t("scene.shuffle_colors")}</button>` : nothing}
-        <button class="danger" @click=${remove}>${t("scene.delete")}</button>
+        ${ctx.hass.user?.is_admin ? html`<button class="danger" @click=${remove}>${t("scene.delete")}</button>` : nothing}
         <button class="cancel" @click=${close}>${t("common.cancel")}</button>
       </div>
     </div>`;
@@ -543,7 +543,7 @@ export class RoomView extends StudioView {
       warn: true,
       text: t("mismatch.note", { light: friendlyName(ctx.hass, m.light), room: m.hueRoom }),
       buttons: html`<button class="pill" @click=${accept}>${t("mismatch.accept", { area })}</button>
-        <button class="pill" @click=${restore}>${t("mismatch.restore")}</button>`,
+        ${ctx.hass.user?.is_admin ? html`<button class="pill" @click=${restore}>${t("mismatch.restore")}</button>` : nothing}`,
     });
   }
 

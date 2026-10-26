@@ -38,7 +38,8 @@ armed/disarmed modes, alarms with lights and sirens, recordings in the cloud. Ou
 it all runs through the Hue cloud (H, dropped).
 
 **Out of scope for us** (Home Assistant's job or hardware-bound): MotionAware, the AI
-assistant, Sports Live, doorbell, bridge backup. Sync is in scope for the Hue Play HDMI
+assistant, Sports Live, doorbell, bridge backup (except the scenes: `export_scenes` /
+`import_scenes` put them where Home Assistant's backups reach). Sync is in scope for the Hue Play HDMI
 Sync Box (done); TV and PC sync apps stay outside.
 
 ## Already in Hue Studio

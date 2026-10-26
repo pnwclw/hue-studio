@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
 from aiohue.v2.models.room import RoomArchetype
+from aiohue.v2.models.scene import SceneMetadata
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     area_registry as ar,
@@ -27,7 +28,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 from custom_components.hue_studio.automations import async_organize
 from custom_components.hue_studio.const import HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
 
-from .conftest import ROOMS
+from .conftest import ROOMS, SCENES, make_scene
 
 
 async def _organize(hass: HomeAssistant) -> None:
@@ -83,6 +84,44 @@ async def test_scenes_organized(hass: HomeAssistant, living_room: str) -> None:
         assert entry.area_id == living_room
     (category,) = cr.async_get(hass).async_list_categories(scope="scene")
     assert category.icon == "mdi:sofa-outline"
+
+
+def _with_metadata(resource_id: str, **metadata: object) -> object:
+    scene = make_scene(resource_id)
+    scene.metadata = SceneMetadata(name="Sunset", **metadata)
+    return scene
+
+
+@pytest.fixture
+def preset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`scene.sunset` is a preset: it carries a picture of the Hue app's gallery."""
+    picture = ResourceIdentifier(rid="img-1", rtype=ResourceTypes.PUBLIC_IMAGE)
+    monkeypatch.setitem(SCENES, "res-scene", _with_metadata("res-scene", image=picture))
+
+
+async def test_custom_scenes_labelled(
+    hass: HomeAssistant,
+    preset: None,
+    living_room: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Scenes of your own get the custom label once; presets do not."""
+    entities = er.async_get(hass)
+    custom = lr.async_get(hass).async_get_label_by_name("Hue custom scene")
+    assert custom is not None
+    assert custom.label_id in entities.async_get("scene.plain").labels
+    assert custom.label_id not in entities.async_get("scene.sunset").labels
+
+    # Made from your own colors with a gallery picture: marked on the bridge.
+    picture = ResourceIdentifier(rid="img-1", rtype=ResourceTypes.PUBLIC_IMAGE)
+    marked = _with_metadata("res-scene", image=picture, appdata="hs:custom")
+    monkeypatch.setitem(SCENES, "res-scene", marked)
+    labels = entities.async_get("scene.plain").labels - {custom.label_id}
+    entities.async_update_entity("scene.plain", labels=labels)
+    await _organize(hass)
+    assert custom.label_id in entities.async_get("scene.sunset").labels
+    # Removed by the user: stays removed.
+    assert custom.label_id not in entities.async_get("scene.plain").labels
 
 
 async def test_smart_scene(
