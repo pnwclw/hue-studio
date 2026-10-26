@@ -29,6 +29,7 @@ export class IntegrationView extends StudioView {
     const { t } = ctx;
     const autoAlign = !!ctx.config.auto_align;
     const organize = ctx.config.organize !== false;
+    const zoneLabels = !!ctx.config.zone_labels;
     return this.screen(
       this.subHead(t("settings.integration"), () => ctx.go("/settings")),
       html`<div class="rows">
@@ -41,6 +42,11 @@ export class IntegrationView extends StudioView {
             <ha-icon icon="mdi:label-outline"></ha-icon>
             <div class="grow">${t("settings.organize")}<div class="dim small">${t("settings.organize_sub")}</div></div>
             ${toggle(organize, t("settings.organize"), () => ctx.setConfig({ organize: !organize }))}
+          </div>
+          <div class="item">
+            <ha-icon icon="mdi:texture-box"></ha-icon>
+            <div class="grow">${t("settings.zone_labels")}<div class="dim small">${t("settings.zone_labels_sub")}</div></div>
+            ${toggle(zoneLabels, t("settings.zone_labels"), () => ctx.setConfig({ zone_labels: !zoneLabels }))}
           </div>
         </div>
         <h2 class="label">${t("integ.groups")}</h2>

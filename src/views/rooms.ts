@@ -9,7 +9,8 @@ import { classMap } from "lit/directives/class-map.js";
 import type { StudioContext } from "../context.ts";
 import { friendlyName, hueGroupIcon, lightIcon } from "../model.ts";
 import { bridgeName, bridgeOf, groupBridge, hueZones, lightsByArea, lightsByBridge, lightsWithoutArea, severalBridges, type Zone } from "../rooms.ts";
-import type { RoomsPlan } from "../types.ts";
+import { banner } from "../controls.ts";
+import type { RoomsPlan, ZoneNote } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 import { bridgeRow, type Choice, navRow, single } from "./choice.ts";
@@ -66,6 +67,18 @@ export class RoomsView extends StudioView {
   @state() private accessor keepSplit = false;
   @state() private accessor busy = false;
   @state() private accessor draft: ZoneDraft | null = null;
+  @state() private accessor notes: ZoneNote[] = [];
+  private stopNotes?: () => void;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.stopNotes = this.ctx.watch<{ notes: ZoneNote[] }>("hue_studio/zones/subscribe", (m) => (this.notes = m.notes));
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stopNotes?.();
+  }
 
   protected override renderPage() {
     const { ctx } = this;
@@ -78,7 +91,8 @@ export class RoomsView extends StudioView {
         ${this.plan(ctx.rooms)}
         ${this.splitAreas(ctx.rooms)}
         <h2 class="label">${t("rooms.zones")}</h2>
-        <p class="lead">${t("rooms.zones_hint")}</p>
+        <p class="lead">${t(ctx.config.zone_labels ? "rooms.zones_hint_labels" : "rooms.zones_hint")}</p>
+        ${this.notes.map((n) => this.zoneNote(n))}
         <div class="rows zones">
           ${zones.map((z) => this.zoneRow(z))}
           <button class="item" @click=${() => this.edit(null)}>
@@ -93,6 +107,27 @@ export class RoomsView extends StudioView {
         "rooms-page",
       )}
       ${this.draft ? this.editor(this.draft) : nothing}`;
+  }
+
+  /** A zone whose label was deleted in HA, or lights with its label that cannot join it. */
+  private zoneNote(n: ZoneNote) {
+    const { ctx } = this;
+    const { t } = ctx;
+    if (n.kind === "foreign") {
+      return banner({ title: t("zones.foreign_title", { zone: n.name }), text: t("zones.foreign", { lights: names(ctx, n.lights ?? []) }), warn: true });
+    }
+    const relink = () => ctx.ws({ type: "hue_studio/zones/relink", zone: n.zone });
+    const remove = () =>
+      this.askDelete(t("zones.delete_note", { zone: n.name }), t("zone.delete"), () => {
+        if (n.entity_id) void ctx.call("hue_studio", "delete_zone", { entity_id: n.entity_id }, { optimistic: false });
+      });
+    return banner({
+      title: t("zones.unlinked_title", { zone: n.name }),
+      text: t("zones.unlinked"),
+      warn: true,
+      buttons: html`<button class="pill" @click=${relink}>${t("zones.relink")}</button>
+        ${n.entity_id ? html`<button class="pill" @click=${remove}>${t("zone.delete")}</button>` : nothing}`,
+    });
   }
 
   /** The alignment preview, its options and the button that applies it. */

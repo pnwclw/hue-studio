@@ -46,6 +46,7 @@ async def test_config_pushed_to_panel(
         "rooms": {},
         "auto_align": False,
         "organize": True,
+        "zone_labels": False,
         "footer": False,
         "footer_tabs": [],
         "gallery_seasonal": False,
