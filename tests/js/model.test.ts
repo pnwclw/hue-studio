@@ -91,7 +91,7 @@ test("options map a Hue group onto an area and mark another as a zone", () => {
   assert.ok(zones.some((z) => z.key === "hue.light.office"));
 });
 
-test("a zone given to an area that has its room: a zone in that room", () => {
+test("a zone given to an area that has its room: a zone in that room, and on Home still", () => {
   const h = structuredClone(hass) as Required<HassData>;
   h.states["light.tv_zone"].attributes.entity_id = ["light.desk"];
   h.states["scene.tv_movie"] = { state: "unknown", attributes: { group_name: "TV", name: "Movie" } };
@@ -101,7 +101,11 @@ test("a zone given to an area that has its room: a zone in that room", () => {
   assert.equal(office.group, "light.office");
   assert.deepEqual(office.target, ["light.office"]);
   assert.deepEqual(office.scenes.map((s) => s.entity_id), ["scene.office_read", "scene.tv_movie"]);
-  assert.ok(!zones.some((z) => z.key === "hue.light.tv_zone"));
+  // Still a zone on Home (put in the room for other reasons), and one of the room's zones.
+  assert.ok(zones.some((z) => z.key === "hue.light.tv_zone"));
+  assert.deepEqual(office.zones, ["hue.light.tv_zone"]);
+  // A room's own group is not a zone.
+  assert.ok(!zones.some((z) => z.group === "light.office"));
 });
 
 test("room sensors: defaults from the area, overridable by options", () => {

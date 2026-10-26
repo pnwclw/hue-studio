@@ -30,6 +30,8 @@ export interface Group {
   target: string[];
   scenes: Scene[];
   sensors: RoomSensors;
+  /** A room's zones: Hue groups lying inside it (or put in its area), by key; they are on Home too. */
+  zones?: string[];
 }
 
 export interface Home {
@@ -145,6 +147,8 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
 
   const used = new Set<string>();
   const rooms: Group[] = [];
+  /** Each room's other groups (put in its area), for its zones. */
+  const inner = new Map<string, string[]>();
   for (const [areaId, area] of Object.entries(hass.areas || {})) {
     const inArea = lights.filter((id) => areaOf(hass, id) === areaId);
     const mapped = groups.filter((g) => mapping[g] === areaId);
@@ -152,7 +156,7 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
     const auto = groups.find((g) => !used.has(g) && !mapping[g] && sameSet(members(g), inArea)) || null;
     // An area may hold several Hue groups (as an entity's area in HA): its own (the commands'
     // target) is the one with exactly its lights, else a Hue room, else the first; the others
-    // are zones in the room (their scenes show here, not as zones on Home).
+    // are zones in the room (their scenes show here, and they are zones on Home all the same).
     const own = unique([...mapped, ...(auto ? [auto] : [])]);
     const exact = (g: string): boolean => inArea.length > 0 && sameSet(members(g), inArea);
     const group =
@@ -165,6 +169,7 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
       ? [group, ...inside]
       : groups.filter((g) => !mapping[g] && members(g).length && members(g).every((id) => inArea.includes(id)));
     const key = `area.${areaId}`;
+    inner.set(key, inside);
     rooms.push({
       key,
       kind: "area",
@@ -178,8 +183,11 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
     });
   }
 
+  // Every Hue group but a room's own is a zone on Home, also one put in a room's area: that is
+  // done for other reasons (its scenes in the room, HA's area of its entity), it stays a zone.
+  const own = new Set(rooms.map((r) => r.group).filter(Boolean));
   const zones = groups
-    .filter((g) => !used.has(g) && members(g).length)
+    .filter((g) => !own.has(g) && members(g).length)
     .map((g): Group => {
       const key = `hue.${g}`;
       return {
@@ -195,6 +203,13 @@ export function buildHome(hass: HassData, config: Partial<StudioConfig> = {}): H
       };
     });
 
+  // A room's zones: those put in its area and those whose lights all are in it.
+  for (const room of rooms) {
+    const inside = inner.get(room.key) || [];
+    room.zones = zones
+      .filter((z) => inside.includes(z.group!) || z.lights.every((id) => room.lights.includes(id)))
+      .map((z) => z.key);
+  }
   return { rooms, zones };
 }
 

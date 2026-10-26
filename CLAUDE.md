@@ -84,7 +84,9 @@ touching anything outside this repository.
        command target (one bridge command instead of one per light) and its scenes are the
        room's scenes; otherwise commands go to the lights and scenes of Hue groups lying
        inside the area are offered.
-     - **Zones = Hue rooms/zones** (light entities with `is_hue_group`) that match no area.
+     - **Zones = Hue rooms/zones** (light entities with `is_hue_group`) that are no room's own
+       command target: every Hue zone is on Home, also one put in a room's area (that is done
+       for other reasons); a room lists the zones lying in it after its lights.
      - Everyday control goes through stock HA services (`light.turn_on`, `scene.turn_on`);
        only what HA can't do goes through ours (`hue_studio.set_gradient`,
        `hue_studio.apply_palette`) and `hue_studio/lights/subscribe` (gamut, gradients);

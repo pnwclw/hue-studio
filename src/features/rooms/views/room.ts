@@ -1,8 +1,9 @@
 // Room: header with toggle, brightness and "+" (add a scene, an automation
 // or a device: add-sheet.ts); the room's readings (temperature, light level, motion of
 // sensors that are not Hue's); its Hue scenes, the scene gallery and a suggested scene of
-// it; its lights; its Hue sensors ("Controls", a card each, opening the sensor's
-// settings); its automations, like the Hue app.
+// it; its lights; the zones lying in it (a card each, as on Home: its switch, opening the zone;
+// ours); its Hue sensors ("Controls", a card each, opening the sensor's settings); its
+// automations, like the Hue app.
 
 import { html, nothing } from "lit";
 import type { PropertyValues } from "lit";
@@ -67,6 +68,7 @@ export class RoomView extends StudioView {
     const surface = surfaceOf(state);
     const syncing = syncingIn(ctx.boxes, g);
     const sensors = splitSensors(ctx.hass, g.sensors);
+    const zones = (g.zones ?? []).map((key) => ctx.home.zones.find((z) => z.key === key)).filter((z): z is Group => !!z);
 
     // The room's colored header stays; scenes and lights scroll below it.
     return html`<div class="screen-head hero-head">
@@ -96,6 +98,10 @@ export class RoomView extends StudioView {
       ${this.splitNote(g)}
       ${mismatchesIn(ctx.rooms, g).map((m) => this.mismatch(m))}
       <div class="light-row">${g.lights.map((id) => this.light(id, syncing.includes(id)))}</div>
+      ${zones.length
+        ? html`<h2 class="label">${t("home.zones")}</h2>
+            <div class="light-row">${zones.map((z) => this.zone(z))}</div>`
+        : nothing}
       ${sensors.devices.length
         ? html`<h2 class="label">${t("room.controls")}</h2>
             <div class="control-row">${sensors.devices.map((d) => this.sensor(g, d))}</div>`
@@ -546,6 +552,22 @@ export class RoomView extends StudioView {
    * A light card, the same as in the color screen; a tap opens the light's dialog (the color
    * screen). A light a Sync Box drives is not opened: the tap is refused.
    */
+  /** A zone lying in the room: a card like a light's, its switch for the whole zone, a tap opens it. */
+  private zone(z: Group) {
+    const { ctx } = this;
+    const state = shownState(ctx, z);
+    const surface = surfaceOf(state);
+    return tileCard({
+      art: html`<ha-icon icon=${z.icon}></ha-icon>`,
+      name: z.name,
+      sub: [z.lights.length === 1 ? ctx.t("rooms.one_light") : ctx.t("rooms.lights_count", { count: z.lights.length })],
+      toggle: groupToggle(ctx, z, state),
+      classes: { light: true, zone: true, ...surface.classes },
+      style: surface.style,
+      click: () => ctx.go(`/room/${encodeURIComponent(z.key)}`),
+    });
+  }
+
   private light(id: string, busy: boolean) {
     const open = () => this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true }));
     return lightTile(this.ctx, id, open, { busy });

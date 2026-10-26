@@ -553,7 +553,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Screen (view) | Parts | Against the Hue app |
 |---|---|---|
 | Home (`home`) | tab header, room cards, banner, zones | matches |
-| Room (`room`, `add-sheet`) | room header, tile cards (scenes, lights), control cards, chips, Sync card, banner, the "+" picker with pick tiles | matches; sensor chips and the Sync card are ours; "+" offers what Hue Studio adds (no MotionAware or SpatialAware tiles, no "Color palette from photo") |
+| Room (`room`, `add-sheet`) | room header, tile cards (scenes, lights, zones), control cards, chips, Sync card, banner, the "+" picker with pick tiles | matches; sensor chips, the Sync card and the zones lying in the room (after its lights, a light's card each with the zone's switch) are ours; "+" offers what Hue Studio adds (no MotionAware or SpatialAware tiles, no "Color palette from photo") |
 | Color (`color`, `effects`, `effect-sheet`) | wheel, pins, modes, brightness, effect tiles, style sheet | matches; gradient style sheet is ours |
 | Scene editor, new scene, scene sheet (`scene`, `new-scene`, `scene-pick`) | hero, rows, tile cards, sheets, footer, action sheet | matches; "Custom scene" as the Hue app's (a picker, the name first, "Save" at the bottom) |
 | Gallery (`gallery`, `gallery-settings`) | tiles, search, list rows | gallery matches; seasonal rules are ours |
