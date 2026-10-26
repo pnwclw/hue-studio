@@ -4,6 +4,8 @@ Every bridge scene (a `scene` of the native `hue`, smart scenes too, recognized 
 platform and bridge scene id, so one made in the Hue app counts too) gets the "Hue
 Studio" label, a category named after its Hue room or zone with the icon of its
 archetype (HA's scene list grouped by room, like the Hue app) and the area of its room;
+a scene of your own (not a preset of the Hue app or its gallery, `scenes.is_custom`)
+also gets the "Hue custom scene" label;
 our automations get the label, the "Hue Studio" category and the area of their one room
 (automations.py). Everything goes through HA's registries.
 
@@ -42,7 +44,7 @@ from .const import CONF_ORGANIZE, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
 from .lights import async_bridges
 from .options import async_group_areas, async_options
 from .rooms import async_track_rooms
-from .scenes import SCENE_DOMAIN
+from .scenes import SCENE_DOMAIN, is_custom
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +56,8 @@ COOLDOWN = 2.0
 
 LABEL_NAME = "Hue Studio"
 LABEL_ICON = "mdi:lightbulb-group"
+CUSTOM_LABEL_NAME = "Hue custom scene"
+CUSTOM_LABEL_ICON = "mdi:palette-outline"
 
 
 @callback
@@ -63,12 +67,12 @@ def async_enabled(hass: HomeAssistant) -> bool:
 
 
 @callback
-def async_label(hass: HomeAssistant) -> lr.LabelEntry:
-    """The "Hue Studio" label (made when first needed)."""
+def async_label(
+    hass: HomeAssistant, name: str = LABEL_NAME, icon: str = LABEL_ICON
+) -> lr.LabelEntry:
+    """The "Hue Studio" label, or another of ours (made when first needed)."""
     labels = lr.async_get(hass)
-    return labels.async_get_label_by_name(LABEL_NAME) or labels.async_create(
-        LABEL_NAME, icon=LABEL_ICON
-    )
+    return labels.async_get_label_by_name(name) or labels.async_create(name, icon=icon)
 
 
 @callback
@@ -121,7 +125,8 @@ class Organizer:
         """Initialize (call `async_load` before use)."""
         self.hass = hass
         self.store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        # Scene unique id -> {"area": the area we set, or None}.
+        # Scene unique id -> {"area": the area we set, or None; "custom": whether it was
+        # a scene of your own when we last looked (the custom label added then)}.
         self.scenes: dict[str, dict[str, Any]] = {}
         # Category id (scope "scene") -> the name we gave it.
         self.categories: dict[str, str] = {}
@@ -175,15 +180,27 @@ class Organizer:
 
         group_areas = async_group_areas(hass)
         label: lr.LabelEntry | None = None
+        custom_label: lr.LabelEntry | None = None
         for entry, bridge, resource in _async_bridge_scenes(hass):
             known = self.scenes.get(entry.unique_id)
             group = _scene_group(bridge, resource)
             changes: dict[str, Any] = {}
+            labels = set(entry.labels)
 
             if known is None:
                 label = label or async_label(hass)
-                if label.label_id not in entry.labels:
-                    changes["labels"] = {*entry.labels, label.label_id}
+                labels.add(label.label_id)
+
+            # Added once, when the scene becomes one of your own (or is first seen as
+            # one): a label the user removes stays removed.
+            custom = isinstance(resource, Scene) and is_custom(resource)
+            if custom and not (known or {}).get("custom"):
+                custom_label = custom_label or async_label(
+                    hass, CUSTOM_LABEL_NAME, CUSTOM_LABEL_ICON
+                )
+                labels.add(custom_label.label_id)
+            if labels != entry.labels:
+                changes["labels"] = labels
 
             category_id = entry.categories.get(SCENE_DOMAIN)
             if group is not None and (
@@ -207,7 +224,7 @@ class Organizer:
             if ours:
                 area = wanted_area
 
-            self.scenes[entry.unique_id] = {"area": area}
+            self.scenes[entry.unique_id] = {"area": area, "custom": custom}
             if changes:
                 entities.async_update_entity(entry.entity_id, **changes)
 

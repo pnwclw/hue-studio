@@ -355,7 +355,7 @@
     },
     "create_zone": {
       "name": "Utwórz strefę",
-      "description": "Tworzy strefę Hue z wybranych świateł (np. wszystkich świateł Hue obszaru), aby obszar miał własne sceny. Zwraca zone_id nowej strefy.",
+      "description": "Tworzy strefę Hue z wybranych świateł (np. wszystkich świateł Hue obszaru), aby obszar miał własne sceny. Zwraca zone_id nowej strefy oraz, gdy integracja Philips Hue ją doda, entity_id jej światła.",
       "fields": {
         "name": {
           "name": "Nazwa",
