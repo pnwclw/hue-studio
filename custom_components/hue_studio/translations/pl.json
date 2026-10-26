@@ -238,6 +238,12 @@
     },
     "unknown_motion_response": {
       "message": "Brak reakcji z aplikacji Hue {id} na mostkach."
+    },
+    "unknown_scene_backup": {
+      "message": "Nie ma kopii scen {file}."
+    },
+    "scene_restore_failed": {
+      "message": "Mostek nie przyjął sceny {name}."
     }
   },
   "services": {
@@ -360,6 +366,34 @@
         "name": {
           "name": "Nazwa",
           "description": "Nazwa strefy."
+        }
+      }
+    },
+    "export_scenes": {
+      "name": "Eksportuj sceny",
+      "description": "Zapisuje sceny mostka (albo tylko wskazanych pomieszczeń i stref Hue) do pliku w folderze konfiguracji Home Assistant (hue_studio/scenes/), dzięki czemu obejmują je kopie zapasowe Home Assistant. Światła są zapisywane po adresie MAC Zigbee i nazwie. Zwraca nazwę pliku.",
+      "fields": {
+        "keep": {
+          "name": "Liczba kopii",
+          "description": "Ile najnowszych kopii zachować. Starsza kopia, która zawiera scenę, której nie ma w żadnej nowszej, też zostaje, więc usunięta scena nie znika z kopii."
+        }
+      }
+    },
+    "import_scenes": {
+      "name": "Importuj sceny",
+      "description": "Odtwarza sceny z wyeksportowanego pliku w pomieszczeniu lub strefie Hue o tej samej nazwie, odnajdując światła po adresie MAC Zigbee, a w drugiej kolejności po nazwie. Zwraca, co zostało utworzone, zastąpione lub pominięte.",
+      "fields": {
+        "file": {
+          "name": "Plik",
+          "description": "Nazwa wyeksportowanego pliku w hue_studio/scenes/. Puste: najnowszy."
+        },
+        "dry_run": {
+          "name": "Próba",
+          "description": "Tylko pokaż, co by się stało, niczego nie zmieniaj."
+        },
+        "replace": {
+          "name": "Zastąp",
+          "description": "Scena o tej samej nazwie w tym pomieszczeniu lub strefie zostanie nadpisana zamiast pominięta."
         }
       }
     },

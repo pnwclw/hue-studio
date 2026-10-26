@@ -238,6 +238,12 @@
     },
     "unknown_motion_response": {
       "message": "No Hue app response {id} on the bridges."
+    },
+    "unknown_scene_backup": {
+      "message": "There is no scene backup {file}."
+    },
+    "scene_restore_failed": {
+      "message": "The bridge did not take the scene {name}."
     }
   },
   "services": {
@@ -360,6 +366,34 @@
         "name": {
           "name": "Name",
           "description": "Name of the zone."
+        }
+      }
+    },
+    "export_scenes": {
+      "name": "Export scenes",
+      "description": "Writes the bridge scenes (or those of the targeted Hue rooms and zones) to a file in the Home Assistant config folder (hue_studio/scenes/), so Home Assistant's backups hold them. Lights are saved by Zigbee MAC and name. Returns the file's name.",
+      "fields": {
+        "keep": {
+          "name": "Copies to keep",
+          "description": "How many of the newest copies are kept. An older copy that still holds a scene no newer copy has is kept too, so a deleted scene stays in the backup."
+        }
+      }
+    },
+    "import_scenes": {
+      "name": "Import scenes",
+      "description": "Makes the scenes of an exported file again in the Hue room or zone of the same name, finding the lights by Zigbee MAC, else by name. Returns what was created, replaced or skipped.",
+      "fields": {
+        "file": {
+          "name": "File",
+          "description": "The name of an exported file in hue_studio/scenes/. Empty: the newest one."
+        },
+        "dry_run": {
+          "name": "Dry run",
+          "description": "Only return what would happen, change nothing."
+        },
+        "replace": {
+          "name": "Replace",
+          "description": "A scene of the same name in that room or zone is overwritten instead of left alone."
         }
       }
     },

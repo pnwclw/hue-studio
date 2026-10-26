@@ -178,6 +178,34 @@ create_zone:
       selector:
         text:
 
+export_scenes:
+  target:
+    entity:
+      integration: hue
+      domain: light
+  fields:
+    keep:
+      default: 7
+      selector:
+        number:
+          min: 1
+          max: 100
+
+import_scenes:
+  fields:
+    file:
+      example: scenes-20261026-030000.json
+      selector:
+        text:
+    dry_run:
+      default: false
+      selector:
+        boolean:
+    replace:
+      default: false
+      selector:
+        boolean:
+
 save_scene:
   target:
     entity:

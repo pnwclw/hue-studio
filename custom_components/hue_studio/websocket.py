@@ -112,6 +112,7 @@ from .rooms import (
     async_track_areas,
     async_track_rooms,
 )
+from .scene_backup import async_list as async_list_scene_backups
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
     INPUT_NAME_MAX as SYNC_INPUT_NAME_MAX,
@@ -182,6 +183,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_link_sync_box_bridge,
         ws_set_group_area,
         ws_set_room_sensors,
+        ws_scene_backups,
     ):
         websocket_api.async_register_command(hass, command)
 
@@ -612,6 +614,23 @@ def ws_subscribe_devices(
     connection.subscriptions[msg["id"]] = unsubscribe
     connection.send_result(msg["id"])
     send()
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command({vol.Required("type"): "hue_studio/scenes/backups"})
+@websocket_api.async_response
+async def ws_scene_backups(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The scene backups, newest first.
+
+    Result: {"backups": [{"file", "created", "scenes", "bridges": [names]}]}
+    (made and restored with the export_scenes and import_scenes services).
+    """
+    backups = await async_list_scene_backups(hass)
+    connection.send_result(msg["id"], {"backups": backups})
 
 
 async def _ws_call(
