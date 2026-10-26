@@ -24,15 +24,16 @@ export const OVERLAYS_CSS = `
      screen's sides; the picture 16:9 with the name and close; the colors on a lighter strip (72)
      with shuffle and the pencil; "Save to my scenes" and "Set once" on the rows' grey, 32px
      pills in capitals as wide as the wider one. "Copy to…" adds the room or zone between them.
-     The gallery's scenes sit in a row, 12 apart, the next one showing at the side: a swipe
+     The gallery's scenes sit in a row, 12 apart, the neighbours showing at the sides (as on a
+     phone on any screen: the row is the card and 26 on each side): a swipe
      brings the next to the middle. The card slides up from the bottom at an even speed while
      the dim fades in, and back down before the dim fades out. */
   hue-studio-scene-pick { display: contents; }
   .sheet.scene-pick { --card-w: min(calc(100cqw - 52px), 420px); container-type: inline-size; padding: 16px 0; background: none; animation: none; }
   .sheet.scene-pick::before { content: ""; position: absolute; inset: 0; background: var(--scrim); animation: fade var(--t-dim-in) var(--decelerate) both; }
   .sheet.scene-pick.closing::before { animation: fade-out var(--t-dim-out) var(--accelerate) both; }
-  .scene-pick .track { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; max-height: 100%; box-sizing: border-box;
-                       padding: 0 calc((100% - var(--card-w)) / 2); overflow-x: auto; overflow-y: hidden; outline: none;
+  .scene-pick .track { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; max-width: calc(var(--card-w) + 52px); max-height: 100%; box-sizing: border-box;
+                       padding: 0 26px; overflow-x: auto; overflow-y: hidden; outline: none;
                        scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none;
                        animation: card-in var(--t-card-in) linear both; }
   .scene-pick .track::-webkit-scrollbar { display: none; }
