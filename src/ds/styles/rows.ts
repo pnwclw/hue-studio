@@ -28,8 +28,8 @@ export const ROWS_CSS = `
   .settings-page .section-head h2.label { margin: 0 var(--text-inset); }
   .settings-page > h2.label:first-child, .settings-page .tab-title + h2.label { margin-top: 18px; }
   .settings-page .lead { font-size: var(--fs-callout); }
-  .settings-page .hint { margin: 10px 2px 0; font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
-  .settings-page .hint.warn { color: var(--warn); }
+  :is(.settings-page, .sensor-edit) .hint { margin: 10px 2px 0; font-size: var(--fs-footnote); line-height: 1.45; color: var(--text-2); }
+  :is(.settings-page, .sensor-edit) .hint.warn { color: var(--warn); }
   /* The automation editor's rows have no icons, like the Hue app's; its type's icon sits by the name. */
   .automation-page .rows .item > ha-icon:first-child { display: none; }
   .automation-page .rows:not(.device-list) .item { gap: 16px; padding-left: 16px; }
