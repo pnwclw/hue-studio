@@ -228,7 +228,7 @@ export class SyncSettingsView extends StudioView {
           ${navRow({ icon: "hue-studio:bridge", title: t("box.change_bridge"), bare: true }, () => this.openSheet({ kind: "bridge" }, box))}
           ${navRow({ icon: "mdi:wifi", title: t("box.change_wifi"), bare: true }, () => this.openSheet({ kind: "wifi" }, box))}
           ${navRow({ icon: "mdi:video-input-hdmi", title: t("box.inputs"), bare: true }, () => this.open("inputs"))}
-          ${hasFeature(box, "ir") ? navRow({ icon: "mdi:remote-tv", title: t("box.remote"), bare: true }, () => this.open("remote")) : nothing}
+          ${hasFeature(box, "ir") && ctx.hass.user?.is_admin ? navRow({ icon: "mdi:remote-tv", title: t("box.remote"), bare: true }, () => this.open("remote")) : nothing}
           ${box.behavior ? navRow({ icon: "hue-studio:bolt", title: t("box.auto"), bare: true }, () => this.open("auto")) : nothing}
           ${navRow({ icon: "mdi:cog", title: t("box.advanced"), bare: true }, () => this.open("advanced"))}
           ${navRow({ icon: "mdi:restore", title: t("box.updates"), value: update ? t("box.update_ready") : "", bare: true }, () => this.open("updates"))}
@@ -726,9 +726,11 @@ export class SyncSettingsView extends StudioView {
             (p) => html`<div class="item">
               <ha-icon icon="mdi:bookmark-outline"></ha-icon>
               <button class="grow plain" @click=${() => ctx.setSync(this.box, { preset: p.id })}>${p.name}</button>
-              <button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
-                <ha-icon icon="mdi:delete-outline"></ha-icon>
-              </button>
+              ${ctx.hass.user?.is_admin
+                ? html`<button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
+                    <ha-icon icon="mdi:delete-outline"></ha-icon>
+                  </button>`
+                : nothing}
             </div>`,
           )}
           <button class="item" @click=${() => this.openSheet({ kind: "preset", name: "" }, box)}>
