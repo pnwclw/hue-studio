@@ -330,6 +330,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       mirek: mirek ? [mirek] : [],
       lights: GROUPS[group][2].map((m) => `light.${m}`),
       image: null,
+      custom: !SCENE_PALETTES[name],
     };
     return id;
   };

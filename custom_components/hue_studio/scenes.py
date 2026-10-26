@@ -50,6 +50,9 @@ from .const import DOMAIN, HUE_DOMAIN
 from .lights import LIGHT_DOMAIN, NOT_EFFECTS, async_bridges, supported_effects
 
 SCENE_DOMAIN = "scene"
+# `metadata.appdata` of a scene made from your own colors or lights: kept on the bridge,
+# so it is known whoever looks (the bridge allows at most 16 characters).
+APPDATA_CUSTOM = "hs:custom"
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +184,18 @@ def is_resettable(resource: Scene) -> bool:
 
 
 @callback
+def is_custom(resource: Scene) -> bool:
+    """A scene of your own, not one the Hue app ships or adds from its gallery.
+
+    Presets carry a picture (`metadata.image`); a scene captured from the lights or made
+    from colors has none. A scene Hue Studio makes from your own colors may borrow a
+    gallery picture, so it is marked on the bridge (`metadata.appdata`).
+    """
+    return (
+        resource.metadata.appdata == APPDATA_CUSTOM or resource.metadata.image is None
+    )
+
+
 def scene_info(hass: HomeAssistant, scene: HueScene) -> dict[str, Any]:
     """Describe a scene for the frontend (what HA's scene entity does not expose)."""
     resource = scene.resource
@@ -190,6 +205,7 @@ def scene_info(hass: HomeAssistant, scene: HueScene) -> dict[str, Any]:
         "active": status,
         # Id of the scene's picture in the Hue app (the gallery's `public_image`).
         "image": resource.metadata.image.rid if resource.metadata.image else None,
+        "custom": is_custom(resource),
         "dynamic": is_dynamic(resource),
         "resettable": is_resettable(resource),
         "speed": resource.speed,
@@ -537,11 +553,14 @@ def new_scene(
     name: str,
     palette: PaletteFeature | None,
     image: str | None = None,
+    *,
+    custom: bool = True,
 ) -> ScenePost:
     """A scene for every light of the group.
 
     With a palette, it is spread over the lights (and stored, so the Hue app can play
-    and shuffle it); without one, the scene stores what the lights show now.
+    and shuffle it); without one, the scene stores what the lights show now. A scene
+    of your own (`custom`, not a gallery scene as it is) is marked so on the bridge.
     """
     if palette is not None:
         spread = spread_palette(palette, group.lights)
@@ -560,6 +579,7 @@ def new_scene(
             image=ResourceIdentifier(rid=image, rtype=ResourceTypes.PUBLIC_IMAGE)
             if image
             else None,
+            appdata=APPDATA_CUSTOM if custom else None,
         ),
         group=group.group,
         actions=actions,

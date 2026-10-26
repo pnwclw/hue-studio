@@ -58,6 +58,7 @@ async def test_subscribe_scenes(
     sunset = scenes["scene.sunset"]
     assert sunset["active"] == "static"
     assert sunset["image"] is None
+    assert sunset["custom"] is True
     assert sunset["dynamic"] is True
     assert sunset["resettable"] is True
     assert sunset["palette"][0] == [0.6, 0.35]
