@@ -30,6 +30,14 @@ export const ROOM_CSS = `
                background: var(--surface); box-shadow: var(--shadow-raised);
                transition: transform var(--t-press) var(--ease), color 0.3s var(--ease); }
   .tile-card.switchable { padding-bottom: var(--zone); }
+  /* A light's card (measured on the Hue app's, 102×160): its glyph 32 at 16 from the top, the
+     text centered in the 56 between it and the switch zone, two lines of name and one under them
+     at a 16px pitch ("Dynamics"). As tall as any other card. */
+  .tile-card.light { --top: 16px; --art: 32px; --gap: 0px; --text-h: 56px; }
+  .tile-card.light > .art ha-icon { --mdc-icon-size: 32px; }
+  .tile-card.light .name { line-height: 16px; }
+  .tile-card.light .sub { margin-top: 0; line-height: 16px; }
+  .tile-card.light :is(.subs-1, .subs-2) .name { -webkit-line-clamp: 2; }
   .tile-card:active { transform: scale(var(--press-tile)); }
   .tile-card > .art { flex: none; width: 100%; height: var(--art); display: flex; align-items: center; justify-content: center; }
   .tile-card > .art ha-icon { --mdc-icon-size: var(--art); }
@@ -85,6 +93,8 @@ export const ROOM_CSS = `
   /* Short screens (small phones, landscape): compact cards and spacing, so the wheel keeps its size. */
   @media (max-height: 760px) {
     .tile-card { --top: 10px; --art: 42px; --gap: 2px; --text-h: 40px; --zone: 50px; }
+    .tile-card.light { --top: 12px; --art: 30px; --gap: 0px; --text-h: 52px; }
+    .tile-card.light > .art ha-icon { --mdc-icon-size: 30px; }
     .tile-card .name { font-size: var(--fs-callout); }
     .colorview .wheel-wrap { padding: 12px 0 20px; min-height: 180px; }
     .controls { margin-bottom: 12px; }

@@ -293,7 +293,9 @@ Each part: its class (and helper), its measures, where it is used.
 - **Tile card** `tileCard()` / `.tile-card`: the one card layout for lights, scenes and
   sensors — 102px wide, a 48px picture 12px from the top, a text block of fixed height
   (`--fs-callout` name, `--fs-caption` lines), 110px tall, 160px with the switch zone (56px)
-  of a light; every tile as tall as any other.
+  of a light; every tile as tall as any other. A light's (`.tile-card.light`, measured): its
+  glyph 32 at 16 from the top, the text centered in the 56 above the zone, two lines of name
+  and one under them ("Dynamics", not in the scene editor) at a 16px pitch.
 - **Control card** `.control-card` (150×108, a room's "Controls": sensors): a 24px icon 20px
   in and the switch 16px from the top, the name `--fs-callout` 500 over a `--fs-caption` line.
 - **Automation card** `automationCard()` / `.auto-card`: ≥72px, `--surface-low`, a 32px

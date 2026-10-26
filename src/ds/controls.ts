@@ -489,7 +489,12 @@ export function speedSheet(ctx: StudioContext, o: { step: number; set: (step: nu
 export const dynamicPeriod = (speed: number): number => Math.round((24 - 20 * Math.min(1, Math.max(0, speed))) * 10) / 10;
 
 /** A light card (room, scene editor, color view): icon, name, toggle; colored like the light. */
-export function lightTile(ctx: StudioContext, id: string, open: () => void, { selected = false, busy = false, sub = "" } = {}): TemplateResult {
+export function lightTile(
+  ctx: StudioContext,
+  id: string,
+  open: () => void,
+  { selected = false, busy = false, sub = "", dynamicsLine = true } = {},
+): TemplateResult {
   const state = ctx.hass.states[id];
   const colors = busy ? [] : lightColors(ctx.hass, id, ctx.lightInfo[id]);
   const unreachable = !state || state.state === "unavailable";
@@ -505,7 +510,8 @@ export function lightTile(ctx: StudioContext, id: string, open: () => void, { se
   return tileCard({
     art: html`<ha-icon icon=${lightIcon(ctx.hass, id, ctx.lightInfo[id])}></ha-icon>`,
     name: friendlyName(ctx.hass, id),
-    sub: [status || (dynamic ? ctx.t("light.dynamics") : sub)],
+    // The scene editor's cards don't say it (the Hue app's): the scene is what plays.
+    sub: [status || (dynamic && dynamicsLine ? ctx.t("light.dynamics") : sub)],
     toggle: toggle(!busy && state?.state === "on", ctx.t("common.toggle"), () => ctx.call("light", "toggle", { entity_id: id })),
     inert: busy || unreachable,
     overlay: busy ? html`<div class="sync-glow" aria-hidden="true"></div>` : nothing,

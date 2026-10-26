@@ -212,6 +212,7 @@ export class SceneView extends StudioView {
           ${group.lights.map((id) =>
             lightTile(ctx, id, () => this.toWheel(`${roomPath}/color?light=${encodeURIComponent(id)}&back=${encodeURIComponent(here)}`), {
               busy: syncing.includes(id),
+              dynamicsLine: false,
             }),
           )}
         </div>
