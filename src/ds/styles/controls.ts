@@ -6,6 +6,8 @@ export const CONTROLS_CSS = `
           background: var(--surface-raised); transition: transform var(--t-press) var(--ease); }
   .pill:active { transform: scale(var(--press-tile)); }
   .pill:disabled { opacity: 0.4; }
+  /* A round button out of reach (a streaming area's "+" and pencil): faded like a pill. */
+  .round:disabled { opacity: 0.4; cursor: default; }
   /* The screen's main action (the Hue app's): the accent pill. */
   .pill.apply { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--accent); color: var(--text); }
   .pill.apply svg { width: 18px; height: 18px; }
