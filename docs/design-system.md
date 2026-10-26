@@ -147,6 +147,24 @@ are kept soft. Pins and knobs keep their own small shadows.
 `--press-row` (0.99, rows and banners). Everything that loops (dynamic scenes, sync glow,
 spinners) stops or slows under `prefers-reduced-motion`.
 
+Measured on the Hue app from 60 fps screen recordings (frame by frame, the edge of the
+moving part against time):
+
+- **A picker comes and goes as a sheet** (`main.rise`, `main.fall`): up from the bottom over
+  the screen it was opened from in `--t-sheet-up` (0.22s), back down over the screen it
+  returns to in `--t-sheet-down` (0.24s), both on `--decelerate` (an ease-out cubic: half
+  the way in a fifth of the time). The screen under it stays as it was (the same element,
+  its scroll too); nothing dims.
+- **A scene's card** slides up from 55% of the screen's height at an even speed
+  (`--t-card-in`, 0.17s, linear) while the dim fades in (`--t-dim-in`, 0.17s,
+  `--decelerate`); it goes down off the screen at the same speed (`--t-card-out`, 0.2s)
+  while the dim fades out after it (`--t-dim-out`, 0.28s, `--accelerate`). The cards swipe
+  sideways one at a time (scroll snapping, the browser's own settling); a card beside the
+  middle one brings itself to the middle when tapped.
+- Shuffle does not move the dots in the Hue app (it deals the colors to the lights anew);
+  here the dots take the new order, since the card does not show on the lights.
+- Under `prefers-reduced-motion` the sheets and cards appear and go without sliding.
+
 ## Components
 
 Each part: its class (and helper), its measures, where it is used.
@@ -350,6 +368,8 @@ Each part: its class (and helper), its measures, where it is used.
   (outlined, a 2px `--separator` ring) over "Set once" (`--round`) on `--surface-row`, 12
   apart and 12 in: 32px pills in capitals, both as wide as the wider. The gallery's room is
   fixed; "Copy to…" (ours) adds the room or zone as a row between the strip and the pills.
+  The gallery's scenes are a row of such cards, 12 apart, the neighbours showing at the
+  sides; a swipe brings the next one to the middle (Motion).
 - **Dialog** (`hue-studio-more-info.ts`) and **more-info sheets** (`automation-sheet.ts`,
   `scene-sheet.ts`): full screen from the bottom on phones, a card on wide screens.
 
@@ -589,3 +609,8 @@ effects sends nothing to the light (checked on an off light against HA's state).
   strip, the strip lighter and 72 tall, the pills 32 in capitals on the rows' grey, the name
   24; the room row only for "Copy to…". A stray line left from the old time field's rule
   (it hid the ticks' rule of choice lists) removed. With it the inventory is complete.
+- 2026-10-26, motion measured from screen recordings of the Hue app: pickers come up and
+  go down as sheets (an ease-out cubic, about a quarter of a second) over the screen they
+  belong to; a scene's card slides in and out at an even speed under a fading dim, and the
+  gallery's scenes swipe as a row of cards. Tokens `--decelerate`, `--accelerate` and the
+  `--t-sheet-*`, `--t-card-*`, `--t-dim-*` durations.

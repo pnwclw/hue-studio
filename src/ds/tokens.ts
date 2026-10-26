@@ -143,6 +143,19 @@ export const MOTION = {
   ease: "cubic-bezier(0.25, 0.8, 0.25, 1)",
   spring: "cubic-bezier(0.3, 1.3, 0.5, 1)",
   "t-press": "0.15s",
+  // Measured on the Hue app (60 fps recordings): a picker comes up (0.22s) and goes down
+  // (0.24s) slowing down all the way (an ease-out cubic); a scene's card slides in (0.17s) and
+  // out (0.2s) at an even speed while the dim fades in (0.17s, slowing) and out (0.28s,
+  // mostly after the card).
+  decelerate: "cubic-bezier(0.33, 1, 0.68, 1)",
+  // The dim going away: slow at first, mostly once the card is gone.
+  accelerate: "cubic-bezier(0.55, 0, 1, 0.45)",
+  "t-sheet-up": "0.22s",
+  "t-sheet-down": "0.24s",
+  "t-card-in": "0.17s",
+  "t-card-out": "0.2s",
+  "t-dim-in": "0.17s",
+  "t-dim-out": "0.28s",
   // How far a pressed part sinks: round buttons, tiles and buttons, cards, wide rows and banners.
   "press-round": "0.92",
   "press-tile": "0.96",

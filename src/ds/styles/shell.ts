@@ -28,6 +28,15 @@ export const SHELL_CSS = `
   /* The panel does not scroll; every screen has a fixed header and a body that scrolls on its own. */
   main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   main > * { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  /* A picker comes up from the bottom over the screen it was opened from and goes back down
+     over the one it returns to (the Hue app's: about a quarter of a second, slowing down). */
+  main.under { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+  main.current { position: relative; z-index: 1; }
+  main.rise { animation: sheet-up var(--t-sheet-up) var(--decelerate) both; }
+  main.fall { position: absolute; inset: 0; z-index: 3; pointer-events: none; animation: sheet-down var(--t-sheet-down) var(--decelerate) both; }
+  @keyframes sheet-up { from { transform: translateY(100%); } }
+  @keyframes sheet-down { to { transform: translateY(100%); } }
+  @media (prefers-reduced-motion: reduce) { main.rise, main.fall { animation: none; } }
   /* The page's glow (the Hue app's): Home and a room fade from their lit lights' color at the
      top to the page at the bottom; Automations (its sheets and the gallery too) and Sync have
      their own at the top. On a sheet it is the sheet's. */

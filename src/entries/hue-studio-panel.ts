@@ -41,6 +41,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import { keyed } from "lit/directives/keyed.js";
+import { repeat } from "lit/directives/repeat.js";
 
 import { PANEL_PATH, StudioContext } from "../core/context.ts";
 import { fitToViewport, outsidePath, toggleSidebar } from "../core/ha-internals.ts";
@@ -171,6 +172,17 @@ function parseRoute(path: string, search: string): Route {
   return { name: "home" };
 }
 
+/** Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
+ *  page as a rounded panel over it, coming up from the bottom. Flows too: adding devices or a
+ *  bridge, a new MotionAware area, a new scene. */
+const isPicker = (route: Route): boolean =>
+  route.name === "automationNew" ||
+  route.name === "gallery" ||
+  route.name === "deviceAdd" ||
+  route.name === "bridgeAdd" ||
+  (route.name === "motionArea" && route.area === "new") ||
+  (route.name === "scene" && route.scene === NEW_SCENE);
+
 @customElement("hue-studio-panel")
 export class HueStudioPanel extends LitElement {
   static override styles = unsafeCSS(CSS);
@@ -183,6 +195,12 @@ export class HueStudioPanel extends LitElement {
 
   private ctx: StudioContext | null = null;
   private lastRoute = "";
+  /** The route on screen, and the one a picker rises over or the picker falling away (the
+   *  Hue app's: a picker comes up from the bottom over the screen it was opened from and goes
+   *  back down over it); null once the motion is over. */
+  private shown: Route | null = null;
+  private layer: { route: Route; kind: "under" | "leaving" } | null = null;
+  private layerTimer?: ReturnType<typeof setTimeout>;
   private unfit?: () => void;
   private untouch?: () => void;
 
@@ -256,23 +274,43 @@ export class HueStudioPanel extends LitElement {
       (route.name === "bridges" && route.mode === "bridges" && !!route.item) ||
       route.name === "syncSettings" ||
       route.name === "gallery";
-    // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
-    // rounded under the status bar).
-    const newScene = route.name === "scene" && route.scene === NEW_SCENE;
-    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation" ||
-        (route.name === "bridges" && route.mode === "bridges" && !!route.item) || route.name === "syncSettings");
-    // Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
-    // page as a rounded panel over it.
-    // Flows too: adding devices or a bridge, a new MotionAware area.
-    const newArea = route.name === "motionArea" && route.area === "new";
-    const picker =
-      route.name === "automationNew" || route.name === "gallery" || route.name === "deviceAdd" || route.name === "bridgeAdd" || newArea || newScene;
-    const glow = this.glow(ctx, route);
+    if (!this.shown || JSON.stringify(this.shown) !== JSON.stringify(route)) {
+      const from = this.shown;
+      this.layer =
+        from && !isPicker(from) && isPicker(route)
+          ? { route: from, kind: "under" }
+          : from && isPicker(from) && !isPicker(route)
+            ? { route: from, kind: "leaving" }
+            : null;
+      this.shown = route;
+      // The motion's end clears the layer; a timer too, should no animationend come (reduced
+      // motion, a page in the background).
+      clearTimeout(this.layerTimer);
+      if (this.layer)
+        this.layerTimer = setTimeout(() => {
+          this.layer = null;
+          this.requestUpdate();
+        }, 500);
+    }
+    const layer = this.layer;
+    // One element per route (keyed), so the screen under a rising picker and a picker falling
+    // away stay the very elements they were (their scroll too).
+    const layers: { route: Route; kind: "under" | "current" | "leaving" }[] = [
+      ...(layer?.kind === "under" ? [layer] : []),
+      { route, kind: "current" as const },
+      ...(layer?.kind === "leaving" ? [layer] : []),
+    ];
+    const done = (e: AnimationEvent) => {
+      if (e.target !== e.currentTarget) return;
+      this.layer = null;
+      this.requestUpdate();
+    };
     return html`
-      <main
-        class=${classMap({ colorview: route.name === "color", wide: !ctx.narrow, "as-sheet": sheet, picker, [`glow-${glow.kind}`]: !!glow.kind })}
-        style=${styleMap({ "--glow": glow.color })}
-      >${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
+      ${repeat(
+        layers,
+        (l) => JSON.stringify(l.route),
+        (l) => this.main(ctx, l.route, l.kind, l.kind === "current" ? (layer?.kind === "under" ? done : undefined) : l.kind === "leaving" ? done : undefined),
+      )}
       <nav class="tabs" ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) =>
@@ -297,6 +335,32 @@ export class HueStudioPanel extends LitElement {
           : [];
     const color = glowColor(lights.flatMap((id) => lightColors(ctx.hass, id, ctx.lightInfo[id])));
     return color ? { kind: "light", color } : { kind: null };
+  }
+
+  /** A screen: its classes (editors as a sheet on phones, pickers, the glow) and its view. */
+  private main(ctx: StudioContext, route: Route, kind: "under" | "current" | "leaving", end?: (e: AnimationEvent) => void) {
+    // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
+    // rounded under the status bar).
+    const newScene = route.name === "scene" && route.scene === NEW_SCENE;
+    const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation" ||
+        (route.name === "bridges" && route.mode === "bridges" && !!route.item) || route.name === "syncSettings");
+    const glow = this.glow(ctx, route);
+    return html`<main
+      class=${classMap({
+        colorview: route.name === "color",
+        wide: !ctx.narrow,
+        "as-sheet": sheet,
+        picker: isPicker(route),
+        [`glow-${glow.kind}`]: !!glow.kind,
+        current: kind === "current",
+        under: kind === "under",
+        rise: kind === "current" && this.layer?.kind === "under",
+        fall: kind === "leaving",
+      })}
+      style=${styleMap({ "--glow": glow.color })}
+      ?inert=${kind !== "current"}
+      @animationend=${end}
+    >${keyed(JSON.stringify(route), this.view(ctx, route))}</main>`;
   }
 
   /** A fresh element per route (keyed), so no screen state leaks into the next one. */
@@ -389,7 +453,7 @@ export class HueStudioPanel extends LitElement {
     const key = `${this.route?.path ?? ""}${location.search}`;
     if (key !== this.lastRoute) {
       this.lastRoute = key;
-      const body = this.renderRoot.querySelector(".screen-body");
+      const body = this.renderRoot.querySelector("main.current .screen-body");
       if (body) body.scrollTop = 0;
     }
   }

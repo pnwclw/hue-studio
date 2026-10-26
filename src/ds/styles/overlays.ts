@@ -23,10 +23,27 @@ export const OVERLAYS_CSS = `
   /* A scene's card (scene-pick.ts), the Hue app's (measured on its gallery's at 411): 26 from the
      screen's sides; the picture 16:9 with the name and close; the colors on a lighter strip (72)
      with shuffle and the pencil; "Save to my scenes" and "Set once" on the rows' grey, 32px
-     pills in capitals as wide as the wider one. "Copy to…" adds the room or zone between them. */
+     pills in capitals as wide as the wider one. "Copy to…" adds the room or zone between them.
+     The gallery's scenes sit in a row, 12 apart, the next one showing at the side: a swipe
+     brings the next to the middle. The card slides up from the bottom at an even speed while
+     the dim fades in, and back down before the dim fades out. */
   hue-studio-scene-pick { display: contents; }
-  .sheet.scene-pick { padding: 16px 26px; }
-  .scene-pick .box { width: min(100%, 420px); padding-bottom: 0; }
+  .sheet.scene-pick { --card-w: min(calc(100cqw - 52px), 420px); container-type: inline-size; padding: 16px 0; background: none; animation: none; }
+  .sheet.scene-pick::before { content: ""; position: absolute; inset: 0; background: var(--scrim); animation: fade var(--t-dim-in) var(--decelerate) both; }
+  .sheet.scene-pick.closing::before { animation: fade-out var(--t-dim-out) var(--accelerate) both; }
+  .scene-pick .track { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; max-height: 100%; box-sizing: border-box;
+                       padding: 0 calc((100% - var(--card-w)) / 2); overflow-x: auto; overflow-y: hidden; outline: none;
+                       scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none;
+                       animation: card-in var(--t-card-in) linear both; }
+  .scene-pick .track::-webkit-scrollbar { display: none; }
+  .scene-pick.closing .track { animation: card-out var(--t-card-out) linear both; }
+  .scene-pick .box { flex: none; width: var(--card-w); max-height: none; padding-bottom: 0; scroll-snap-align: center; scroll-snap-stop: always; animation: none; }
+  .scene-pick .box.side { cursor: pointer; }
+  .scene-pick .box.side > * { pointer-events: none; }
+  @keyframes card-in { from { transform: translateY(55vh); } }
+  @keyframes card-out { to { transform: translateY(70vh); } }
+  @keyframes fade-out { to { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .scene-pick .track, .scene-pick.closing .track { animation: none; } .scene-pick .track { scroll-behavior: auto; } }
   .scene-pick .pic { aspect-ratio: 16 / 9; }
   .scene-pick .pic h3 { font-size: var(--fs-title-1); }
   .scene-pick .pic .name-input { position: absolute; left: 16px; right: 60px; bottom: 12px; z-index: 1; font-size: var(--fs-title-1); font-weight: 700; }

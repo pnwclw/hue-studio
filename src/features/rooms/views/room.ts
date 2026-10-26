@@ -380,6 +380,7 @@ export class RoomView extends StudioView {
           name: s.name,
           gallery: match?.id ?? null,
           picture: match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : pickPicture(points, mirek),
+          art: match ? paletteArt(match) : pickPicture(points, mirek),
           points,
           mirek,
           gradient: points.length > 1,
