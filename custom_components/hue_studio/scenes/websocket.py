@@ -8,7 +8,7 @@ from typing import Any
 from aiohue.v2.controllers.events import EventType
 from aiohue.v2.models.scene import Scene
 from homeassistant.components import websocket_api
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 import voluptuous as vol
@@ -93,11 +93,34 @@ def ws_subscribe_scenes(
 
     unsubscribers: list[Callable[[], None]] = [
         bridge.scenes.scene.subscribe(
-            on_scene_update(key), event_filter=EventType.RESOURCE_UPDATED
+            on_scene_update(key),
+            event_filter=(EventType.RESOURCE_ADDED, EventType.RESOURCE_UPDATED),
         )
         for key, bridge in bridges.items()
     ]
     unsubscribers.append(hass.data[COVERS].async_listen(on_cover))
+
+    @callback
+    def on_entity(event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        """A new scene, whichever comes last: `hue` adding its entity (on its own
+        connection to the bridge) or our connection hearing of the scene."""
+        if event.data["action"] != "create":
+            return
+        entity_id = event.data["entity_id"]
+        if not entity_id.startswith(f"{SCENE_DOMAIN}."):
+            return
+        for scene in async_all_scenes(hass):
+            if scene.entity_id == entity_id:
+                info = sent[entity_id] = scene_info(hass, scene)
+                connection.send_message(
+                    websocket_api.event_message(
+                        msg["id"], {"scenes": {entity_id: info}}
+                    )
+                )
+
+    unsubscribers.append(
+        hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, on_entity)
+    )
 
     @callback
     def unsubscribe() -> None:

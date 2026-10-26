@@ -12,11 +12,13 @@ from aiohue.v2.models.feature import (
 )
 from aiohue.v2.models.scene import Action, ActionAction, SceneActiveStatus
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.scenes.bridge import light_colors
 
-from .conftest import LIGHTS, make_light, make_scene
+from .conftest import LIGHTS, SCENES, make_light, make_scene
 
 
 async def test_subscribe_lights(
@@ -81,6 +83,45 @@ async def test_subscribe_scenes(
     on_update("update", changed)
     event = (await client.receive_json())["event"]
     assert event["scenes"]["scene.sunset"]["active"] == "inactive"
+
+
+async def test_subscribe_scenes_new_entity(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    hue_lights: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A new scene is sent once both `hue` has its entity and we have the scene."""
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": "hue_studio/scenes/subscribe"})
+    assert (await client.receive_json())["success"]
+    await client.receive_json()
+
+    monkeypatch.setitem(SCENES, "res-new", make_scene("res-new"))
+    er.async_get(hass).async_get_or_create(
+        "scene",
+        "hue",
+        "res-new",
+        config_entry=hass.config_entries.async_entries("hue")[0],
+        suggested_object_id="fresh",
+    )
+    event = (await client.receive_json())["event"]
+    assert list(event["scenes"]) == ["scene.fresh"]
+    assert event["scenes"]["scene.fresh"]["custom"] is True
+
+    # The other order: the entity is there before our connection hears of the scene.
+    er.async_get(hass).async_get_or_create(
+        "scene",
+        "hue",
+        "res-later",
+        config_entry=hass.config_entries.async_entries("hue")[0],
+        suggested_object_id="later",
+    )
+    later = make_scene("res-later")
+    monkeypatch.setitem(SCENES, "res-later", later)
+    hue_lights.scenes.scene.subscribe.call_args.args[0]("add", later)
+    event = (await client.receive_json())["event"]
+    assert list(event["scenes"]) == ["scene.later"]
 
 
 async def test_scene_colors_and_cover(

@@ -260,7 +260,8 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
   puts the Hue app's defaults there for one install).
 - Light icons are the Hue app's, from [elax46/custom-brand-icons](https://github.com/elax46/custom-brand-icons)
   (MIT, attribution in `NOTICE`): a light's CLIP v2 archetype (the shape picked in the Hue app),
-  refined by its product name, picks the icon; an icon set in HA's entity settings wins.
+  refined by its product name, picks the icon; an icon set in HA's entity settings wins. The
+  Hue app's scene glyphs (Read, Relax, …) come from the same set.
 
 ## Plan
 
@@ -293,6 +294,7 @@ custom_components/hue_studio/   the integration: one package per feature, each w
                                 unique ids -> entity ids for the frontend
     websocket.py                hue_studio/config/subscribe|set|set_group|set_room_sensors
     ws.py                       what the commands share: a subscription sending a payload as it changes, a call -> result/error
+    entities.py                 waiting for the entity `hue` adds for a resource we just made (a zone, a scene)
   lights/
     bridge.py                   HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
     targets.py                  a service call's Hue lights (entities, areas, devices, labels; syncing ones left alone), shared values
@@ -409,7 +411,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 an entertainment area), add-sheet (a room's "+": scene, automation or device)
     color/                      effects.ts (pure: effect catalog, 1-12 speed scale); views: color (wheel), effects,
                                 effect-sheet (an effect's "adjust")
-    scenes/                     gallery-data.ts (the bundled gallery, matching), seasons.ts (pure: seasonal gallery),
+    scenes/                     gallery-data.ts (the bundled gallery, matching), icons.ts (pure: the Hue app's scene
+                                glyphs, default scenes drawn as its discs), seasons.ts (pure: seasonal gallery),
                                 share.ts (pure: the Hue app's scene share links, both ways);
                                 views: scene (editor), new-scene, scene-pick (a scene's sheet), gallery,
                                 gallery-settings, scene-sheet (the override's sheet for Hue scenes)

@@ -44,9 +44,10 @@ export const ROOM_CSS = `
   .tile-card > .art .dot { width: var(--art); height: var(--art); border-radius: 50%; background: var(--surface-raised) center / cover no-repeat;
                            box-shadow: var(--shadow-dot); transition: transform 0.25s var(--spring); }
   .tile-card:active > .art .dot { transform: scale(var(--press-round)); }
-  /* A scene's icon over its colors (HA's entity settings), white like the Hue app's glyphs on pictures. */
+  /* A scene's glyph on its disc (a default scene's, or one set in HA's entity settings): white and flat,
+     the Hue app's (23 across on 48; the icons leave a margin in their box, so 30). */
   .dot.glyph { display: flex; align-items: center; justify-content: center; color: #fff; }
-  .tile-card > .art .dot.glyph ha-icon, .dot.glyph ha-icon { --mdc-icon-size: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35)); }
+  .tile-card > .art .dot.glyph ha-icon, .dot.glyph ha-icon { --mdc-icon-size: 30px; }
   .tile-card > .text { flex: none; box-sizing: border-box; width: 100%; height: var(--text-h); margin-top: var(--gap); display: flex;
                        flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
   .tile-card .name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-width: 100%; overflow: hidden;

@@ -7,7 +7,8 @@
 // photo (uploaded to Home Assistant) or an icon over its colors (HA's entity settings).
 // A new scene ("Custom scene" of a room's "+", the scene `new`) is the Hue app's: a picker
 // starting from what the lights show now, its name open in place first; the lights are set the same
-// way (brightness here, colors on the wheel) and "Save" at the bottom creates it.
+// way (brightness here, colors on the wheel), its picture picked the same way, and "Save" at the
+// bottom creates it.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -19,32 +20,17 @@ import { groupSlider, lightTile, sceneArt, sceneColors, sceneDot, sceneGlyph, sc
 import { sceneSpeedToStep, sceneStepToSpeed } from "../../color/effects.ts";
 import { haptic, leavePanel } from "../../../core/ha-internals.ts";
 import type { SceneInfo } from "../../../core/types.ts";
-import type { StringKey } from "../../../i18n/index.ts";
 import { colorsCss, findGroup, friendlyName, type Group, groupState } from "../../../core/model.ts";
 import { syncingIn } from "../../sync/sync.ts";
 import { icon, toggle } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
 import { navRow } from "../../../ds/choice.ts";
+import { SCENE_ICONS } from "../icons.ts";
 
 
 /** The scene "id" of a new one (`/room/<key>/scene/new`). */
 export const NEW_SCENE = "new";
 
-/** Icons a scene of your own can show over its colors, with their names. */
-const SCENE_ICONS: [string, StringKey][] = [
-  ["mdi:book-open-variant", "scene.icon_read"],
-  ["mdi:sofa", "scene.icon_relax"],
-  ["mdi:silverware-fork-knife", "scene.icon_dinner"],
-  ["mdi:movie-open", "scene.icon_movie"],
-  ["mdi:party-popper", "scene.icon_party"],
-  ["mdi:candle", "scene.icon_candles"],
-  ["mdi:coffee", "scene.icon_morning"],
-  ["mdi:laptop", "scene.icon_work"],
-  ["mdi:weather-night", "scene.icon_night"],
-  ["mdi:heart", "scene.icon_romance"],
-  ["mdi:leaf", "scene.icon_nature"],
-  ["mdi:music", "scene.icon_music"],
-];
 
 /** Where Home Assistant serves an uploaded picture (covers.py on the backend). */
 const coverUrl = (image: string): string => `/api/image/serve/${image}/512x512`;
@@ -249,19 +235,22 @@ export class SceneView extends StudioView {
           },
         })
       : nothing}
-    ${this.picturing && info ? this.pictureSheet(info, shown, glyph || null) : nothing}
+    ${this.picturing && info
+      ? this.pictureSheet({ colors: sceneArt(info), cover: shown?.cover ?? null, had: !!info.cover, glyph: glyph || null })
+      : nothing}
     ${this.askSheet()}`;
   }
 
   /**
    * A scene of your own's picture: its colors, a photo from this device, or an icon over its
-   * colors. Picked here, kept with "Save".
+   * colors. Picked here, kept with "Save" (a new scene's with it). `colors`: its colors as a
+   * background; `cover`: the photo it shows now; `had`: it had a photo saved.
    */
-  private pictureSheet(info: SceneInfo, shown: SceneInfo | undefined, glyph: string | null) {
+  private pictureSheet(o: { colors: string; cover: string | null; had: boolean; glyph: string | null }) {
     const { ctx } = this;
     const { t } = ctx;
     const close = () => (this.picturing = false);
-    const cover = shown?.cover ?? null;
+    const { cover, glyph } = o;
     const pick = (patch: Partial<SceneDraft>) => {
       haptic("selection");
       this.edit(patch);
@@ -279,7 +268,8 @@ export class SceneView extends StudioView {
       this.edit({ cover: id, icon: null, uploads: [...(this.draft.uploads ?? []), id] });
     };
     const tick = (on: boolean) => (on ? html`<span class="tick">${icon("check")}</span>` : nothing);
-    const colors = sceneArt(info);
+    // Back to its colors: a photo it had is dropped with "Save"; one picked here only.
+    const noCover = o.had ? null : undefined;
     return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box form sensor-sheet picture-sheet" role="dialog" aria-label=${t("scene.picture")}>
         <div class="sheet-bar">
@@ -291,8 +281,8 @@ export class SceneView extends StudioView {
           <p class="hint">${t("scene.picture_hint")}</p>
           <div class="rows" role="radiogroup">
             <button class=${classMap({ item: true, on: !cover && !glyph })} role="radio" aria-checked=${!cover && !glyph}
-              @click=${() => pick({ cover: info.cover ? null : undefined, icon: null })}>
-              <span class="row-art pic" style=${styleMap({ background: colors })}></span>
+              @click=${() => pick({ cover: noCover, icon: null })}>
+              <span class="row-art pic" style=${styleMap({ background: o.colors })}></span>
               <div class="grow">${t("scene.picture_colors")}<div class="dim small">${t("scene.picture_colors_sub")}</div></div>
               ${tick(!cover && !glyph)}
             </button>
@@ -310,7 +300,7 @@ export class SceneView extends StudioView {
             ${SCENE_ICONS.map(([glyphName, label]) => {
               const on = !cover && glyph === glyphName;
               return html`<button class=${classMap({ "icon-opt": true, on })} role="radio" aria-checked=${on}
-                @click=${() => pick({ icon: glyphName, cover: info.cover ? null : undefined })}>
+                @click=${() => pick({ icon: glyphName, cover: noCover })}>
                 <span class="disc"><ha-icon icon=${glyphName}></ha-icon></span>
                 <span>${t(label)}</span>
               </button>`;
@@ -328,6 +318,7 @@ export class SceneView extends StudioView {
     const room = findGroup(ctx.home, this.key);
     const roomPath = `/room/${encodeURIComponent(this.key)}`;
     const leave = () => {
+      for (const id of this.draft.uploads ?? []) ctx.deleteImage(id);
       ctx.sceneDraft = null;
       ctx.go(roomPath);
     };
@@ -337,8 +328,18 @@ export class SceneView extends StudioView {
     const name = this.draft.name ?? t("room.new_scene");
     const here = `${roomPath}/scene/${NEW_SCENE}`;
     const syncing = syncingIn(ctx.boxes, room);
+    // Its picture as it will be made: what the lights show, a photo or an icon picked here.
+    const draft = this.draft;
+    const colors = colorsCss(state.colors, "var(--surface-raised)");
+    const cover = draft.cover ? coverUrl(draft.cover) : null;
+    const glyph = (!cover && draft.icon) || null;
+    const dotStyle = { background: cover ? `url("${cover}") center / cover, ${colors}` : colors };
+    const dot = html`<ha-icon icon=${glyph}></ha-icon>`;
     const body = html`<div class="scene-top">
-        <div class="dot big" style=${styleMap({ background: colorsCss(state.colors, "var(--surface-raised)") })}></div>
+        ${ctx.hass.user?.is_admin
+          ? html`<button class=${classMap({ dot: true, big: true, glyph: !!glyph })} style=${styleMap(dotStyle)}
+              aria-label=${t("scene.picture")} @click=${() => (this.picturing = true)}>${glyph ? dot : nothing}</button>`
+          : html`<div class="dot big" style=${styleMap(dotStyle)}></div>`}
         <div class="name-row">
           ${this.editingName
             ? html`<input
@@ -376,16 +377,23 @@ export class SceneView extends StudioView {
       <div class="screen-foot">
         <button class="pill apply" ?disabled=${!room.group || !name.trim() || this.busy} @click=${() => this.create(room, name.trim())}>${t("scene.save")}</button>
       </div>
+      ${this.picturing ? this.pictureSheet({ colors, cover, had: false, glyph }) : nothing}
       ${this.askSheet()}`;
   }
 
   private async create(room: Group, name: string): Promise<void> {
     const { ctx } = this;
     if (!room.group || this.busy) return;
+    const draft = this.draft;
+    const data: Record<string, unknown> = { entity_id: room.group, name };
+    // Its picture with it: an icon (HA's entity settings) or a photo.
+    if (draft.cover) data.image = draft.cover;
+    else if (draft.icon) data.icon = draft.icon;
     this.busy = true;
-    const ok = await ctx.call("hue_studio", "create_scene", { entity_id: room.group, name }, { optimistic: false });
+    const ok = await ctx.call("hue_studio", "create_scene", data, { optimistic: false });
     this.busy = false;
     if (!ok) return;
+    for (const id of draft.uploads ?? []) if (id !== draft.cover) ctx.deleteImage(id);
     ctx.sceneDraft = null;
     ctx.toast(ctx.t("room.scene_created", { name }));
     ctx.go(`/room/${encodeURIComponent(this.key)}`);

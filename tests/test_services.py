@@ -19,7 +19,9 @@ from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 
 from custom_components.hue_studio.const import DOMAIN
+from custom_components.hue_studio.core import entities
 from custom_components.hue_studio.rooms import zones
+from custom_components.hue_studio.scenes.covers import COVERS
 
 from .conftest import LIGHTS, SCENES
 
@@ -267,8 +269,12 @@ async def test_recall_scene(hass: HomeAssistant, hue_lights: MagicMock) -> None:
 
 
 @pytest.fixture
-def hue_room(hass: HomeAssistant, hue_lights: MagicMock) -> MagicMock:
+def hue_room(
+    hass: HomeAssistant, hue_lights: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> MagicMock:
     """Make `light.room` a Hue room on the bridge (grouped light owned by a room)."""
+    # A scene made here gets no entity unless the test adds one: don't wait for it.
+    monkeypatch.setattr(entities, "ENTITY_TIMEOUT", 0.01)
     hue_entry = hass.config_entries.async_entries("hue")[0]
     hass.states.async_remove("light.room")
     er.async_get(hass).async_get_or_create(
@@ -302,7 +308,7 @@ async def test_create_scene_from_gallery(
         blocking=True,
         return_response=True,
     )
-    assert result == {"scene_id": "res-new"}
+    assert result == {"scene_id": "res-new", "entity_id": None}
     method, path = hue_room.request.call_args.args
     body = hue_room.request.call_args.kwargs["json"]
     assert (method, path) == ("post", "clip/v2/resource/scene")
@@ -358,6 +364,29 @@ async def test_create_scene_captures_lights(
     assert "palette" not in body
     assert len(body["actions"]) == 2
     assert body["metadata"] == {"name": "Now", "appdata": "hs:custom"}
+
+
+async def test_create_scene_icon_and_picture(
+    hass: HomeAssistant, hue_room: MagicMock
+) -> None:
+    """A new scene gets its icon (HA's entity settings) and picture right away."""
+    registry = er.async_get(hass)
+    entry = registry.async_get_or_create("scene", "hue", "res-new")
+    result = await hass.services.async_call(
+        DOMAIN,
+        "create_scene",
+        {
+            "entity_id": "light.room",
+            "name": "Now",
+            "icon": "hue-studio:scene-read",
+            "image": "abc123",
+        },
+        blocking=True,
+        return_response=True,
+    )
+    assert result == {"scene_id": "res-new", "entity_id": entry.entity_id}
+    assert registry.async_get(entry.entity_id).icon == "hue-studio:scene-read"
+    assert hass.data[COVERS].images["res-new"] == "abc123"
 
 
 async def test_create_scene_rejects(hass: HomeAssistant, hue_room: MagicMock) -> None:

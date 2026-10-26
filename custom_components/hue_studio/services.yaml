@@ -159,6 +159,13 @@ create_scene:
           min: 1
           max: 100
           unit_of_measurement: "%"
+    icon:
+      example: hue-studio:scene-read
+      selector:
+        icon:
+    image:
+      selector:
+        text:
 
 delete_scene:
   target:

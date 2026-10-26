@@ -340,6 +340,14 @@
         "brightness": {
           "name": "Brightness",
           "description": "Brightness of the palette in percent."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Icon of the new scene in Home Assistant (shown over its colors)."
+        },
+        "image": {
+          "name": "Picture",
+          "description": "Id of an image uploaded to Home Assistant, shown as the scene's own picture."
         }
       }
     },

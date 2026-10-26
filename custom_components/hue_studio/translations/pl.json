@@ -340,6 +340,14 @@
         "brightness": {
           "name": "Jasność",
           "description": "Jasność palety w procentach."
+        },
+        "icon": {
+          "name": "Ikona",
+          "description": "Ikona nowej sceny w Home Assistant (widoczna na jej kolorach)."
+        },
+        "image": {
+          "name": "Obraz",
+          "description": "Identyfikator obrazu przesłanego do Home Assistant, pokazywanego jako własny obraz sceny."
         }
       }
     },

@@ -10,6 +10,7 @@ import { colorsArt, paletteArt, paletteColors } from "../core/color.ts";
 import type { StudioContext } from "../core/context.ts";
 import { SCENE_SPEED_DEFAULT, sceneSpeedWord, SPEED_STEPS } from "../features/color/effects.ts";
 import { galleryMatch, thumbUrl } from "../features/scenes/gallery-data.ts";
+import { defaultSceneArt, defaultSceneIcon } from "../features/scenes/icons.ts";
 import { colorsCss, friendlyName, type Group, groupState, type GroupState, lightColors, lightIcon, needsDarkText } from "../core/model.ts";
 import { haptic } from "../core/ha-internals.ts";
 import type { StringKey } from "../i18n/index.ts";
@@ -324,19 +325,29 @@ export function sceneArt(info: SceneInfo | undefined): string {
   return points.length || whites.length ? colorsArt(sceneColors(info)) : FALLBACK_DOT;
 }
 
-/** A scene's round picture: its own photo, its gallery picture (bridge scenes usually come
- *  from the gallery), else its colors. */
+/** A default scene of the Hue app (Read, Relax, Natural light, …), drawn as its icon. */
+function defaultIcon(gallery: Gallery | null, name: string, info: SceneInfo | undefined) {
+  return info?.custom ? null : defaultSceneIcon(galleryMatch(gallery, name, info?.image), name);
+}
+
+/** A scene's round picture: its own photo, a default scene's disc (the Hue app's), its gallery
+ *  picture (bridge scenes usually come from the gallery), else its colors. */
 export function sceneDot(gallery: Gallery | null, name: string, info: SceneInfo | undefined): string {
   if (info?.cover) return `url("${info.cover}") center / cover, ${sceneArt(info)}`;
+  const own = defaultIcon(gallery, name, info);
+  if (own) return defaultSceneArt(own);
   const match = galleryMatch(gallery, name, info?.image);
   return match ? `url("${thumbUrl(match.id)}") center / cover, ${paletteArt(match)}` : sceneArt(info);
 }
 
-/** The icon over a scene's colors: the one set in HA's entity settings (none over a picture). */
+/** The glyph on a scene's disc: the icon set in HA's entity settings (none over a picture), else
+ *  a default scene's own. */
 export function sceneGlyph(hass: Pick<HassData, "entities">, gallery: Gallery | null, entityId: string, name: string, info: SceneInfo | undefined): string | null {
+  if (info?.cover) return null;
+  const own = defaultIcon(gallery, name, info);
   const glyph = hass.entities?.[entityId]?.icon;
-  if (!glyph || info?.cover || galleryMatch(gallery, name, info?.image)) return null;
-  return glyph;
+  if (glyph) return own || !galleryMatch(gallery, name, info?.image) ? glyph : null;
+  return own?.icon ?? null;
 }
 
 /**

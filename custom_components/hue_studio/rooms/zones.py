@@ -20,7 +20,6 @@ devices.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 import logging
@@ -42,6 +41,7 @@ from homeassistant.helpers.storage import Store
 
 from ..bridges.info import bridge_name
 from ..const import CONF_ZONE_LABELS, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
+from ..core.entities import async_wait_entity
 from ..core.options import async_options
 from ..lights.bridge import LIGHT_DOMAIN, async_bridges
 from .areas import ZONE_PATH, async_track_rooms
@@ -493,27 +493,7 @@ async def async_wait_zone_entity(
         zone = bridge.groups.zone.get(zone_id)
         return _zone_entity(entities, zone) if zone is not None else None
 
-    if (found := find()) is not None:
-        return found
-    done: asyncio.Future[str] = hass.loop.create_future()
-
-    @callback
-    def created(event: Event[er.EventEntityRegistryUpdatedData]) -> None:
-        if (
-            event.data["action"] == "create"
-            and not done.done()
-            and (entity_id := find())
-        ):
-            done.set_result(entity_id)
-
-    unsub = hass.bus.async_listen(er.EVENT_ENTITY_REGISTRY_UPDATED, created)
-    try:
-        async with asyncio.timeout(wait or ZONE_ENTITY_TIMEOUT):
-            return await done
-    except TimeoutError:
-        return None
-    finally:
-        unsub()
+    return await async_wait_entity(hass, find, wait or ZONE_ENTITY_TIMEOUT)
 
 
 async def async_track_zones(

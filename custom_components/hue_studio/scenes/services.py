@@ -22,7 +22,8 @@ from homeassistant.helpers.service import (
 )
 import voluptuous as vol
 
-from ..const import DOMAIN
+from ..const import DOMAIN, HUE_DOMAIN
+from ..core.entities import async_wait_entity
 from ..lights.palettes import ATTR_GALLERY_SCENE, ATTR_MIREK, ATTR_POINTS, async_palette
 from ..lights.targets import (
     ATTR_BRIGHTNESS,
@@ -68,6 +69,8 @@ ATTR_DRY_RUN = "dry_run"
 ATTR_KEEP = "keep"
 ATTR_FILE = "file"
 ATTR_REPLACE = "replace"
+ATTR_ICON = "icon"
+ATTR_IMAGE = "image"
 
 
 SCENE_NAME = vol.All(cv.string, vol.Strip, vol.Length(min=1, max=32))
@@ -83,6 +86,10 @@ CREATE_SCENE_SCHEMA = cv.make_entity_service_schema(
         ),
         vol.Exclusive(ATTR_MIREK, "palette"): MIREK,
         vol.Optional(ATTR_BRIGHTNESS): BRIGHTNESS,
+        # Its icon in HA's entity settings, and a picture of its own (covers.py): an
+        # image uploaded to Home Assistant.
+        vol.Optional(ATTR_ICON): cv.icon,
+        vol.Optional(ATTR_IMAGE): vol.All(cv.string, vol.Length(max=64)),
     }
 )
 
@@ -186,7 +193,20 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="command_failed",
                 translation_placeholders={"entity_id": group.entity_id},
             ) from err
-        return {"scene_id": created[0]["rid"] if created else None}
+        scene_id = created[0]["rid"] if created else None
+        if scene_id is None:
+            return {"scene_id": None, "entity_id": None}
+        if ATTR_IMAGE in call.data:
+            hass.data[COVERS].async_set(scene_id, call.data[ATTR_IMAGE])
+        # Its entity, once the native integration has added it.
+        registry = er.async_get(hass)
+        entity_id = await async_wait_entity(
+            hass,
+            lambda: registry.async_get_entity_id(SCENE_DOMAIN, HUE_DOMAIN, scene_id),
+        )
+        if entity_id is not None and ATTR_ICON in call.data:
+            registry.async_update_entity(entity_id, icon=call.data[ATTR_ICON])
+        return {"scene_id": scene_id, "entity_id": entity_id}
 
     async def delete_scene(call: ServiceCall) -> None:
         """Delete scenes from the bridge (and so from the Hue app and HA)."""
