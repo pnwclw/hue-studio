@@ -655,7 +655,8 @@ effects sends nothing to the light (checked on an off light against HA's state).
   "Dynamic scene" rows were compact (52 and 58 instead of 72, separators across, titles not
   medium) — not list rows; now `.rows.list`, the speed row without a chevron, "Reset scene"
   only for gallery scenes, "Colors" only with two lights or more, the tint gone by the rows
-  and darker. The speed scale measured on the bridge (126ths; 7 = 76, 12 = 111, 7 a step) and
+  and darker. The speed scale measured on the bridge, every step saved in the Hue app (126ths: 47, 55,
+  61, 63, 68, 71, 76, 79, 92, 95, 103, 111) and
   the app's words (very slow, slow, medium, medium (default), fast, very fast, extreme); the
   speed sheet as the app's. A row audit over every screen in the harness found one more page
   off the system (Rooms and zones: compact rows), now a settings page.

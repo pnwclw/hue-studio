@@ -55,7 +55,9 @@ test("service data: color or white, speed in percent", () => {
 
 test("a scene's speed reads as the Hue app's steps (measured on the bridge)", async () => {
   const { sceneSpeedToStep, sceneStepToSpeed, sceneSpeedWord } = await import("../../src/features/color/effects.ts");
-  // The bridge's default (76/126) is the app's 7, its 111/126 the app's 12.
+  // Read off the bridge after saving each step in the Hue app.
+  const measured = [0.3730158, 0.4365079, 0.4841269, 0.5, 0.5396825, 0.563492, 0.6031746, 0.6269841, 0.7301587, 0.7539682, 0.8174603, 0.8809523];
+  measured.forEach((speed, i) => assert.equal(sceneSpeedToStep(speed), i + 1));
   assert.equal(sceneSpeedToStep(0.603), 7);
   assert.equal(sceneSpeedToStep(0.8809523), 12);
   assert.equal(sceneSpeedToStep(0), 1);
