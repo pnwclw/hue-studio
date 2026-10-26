@@ -18,10 +18,10 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from . import HueStudioConfigEntry, daylight, pool
-from .connections import is_studio
-from .entity import SyncBoxEntity
-from .sync import (
+from . import HueStudioConfigEntry
+from .automations import daylight, pool
+from .core.connections import is_studio
+from .sync_box.coordinator import (
     INTENSITIES,
     LED_MODES,
     SYNC_MODES,
@@ -30,6 +30,7 @@ from .sync import (
     inputs,
     led_mode,
 )
+from .sync_box.entity import SyncBoxEntity
 
 PARALLEL_UPDATES = 1
 

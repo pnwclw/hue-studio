@@ -9,7 +9,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.util.hass_dict import HassKey
 
-GALLERY_FILE = Path(__file__).parent / "frontend" / "gallery" / "gallery.json"
+GALLERY_FILE = Path(__file__).parent.parent / "frontend" / "gallery" / "gallery.json"
 
 _GALLERY: HassKey[dict[str, dict[str, Any]]] = HassKey("hue_studio_gallery")
 

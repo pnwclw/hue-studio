@@ -6,9 +6,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .connections import SETTINGS_URL
-from .const import DOMAIN
-from .sync import MODELS, SyncBoxCoordinator
+from ..const import DOMAIN
+from ..core.connections import SETTINGS_URL
+from .coordinator import MODELS, SyncBoxCoordinator
 
 
 class SyncBoxEntity(CoordinatorEntity[SyncBoxCoordinator]):

@@ -25,7 +25,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.automations import async_organize
+from custom_components.hue_studio.automations.blueprints import async_organize
 from custom_components.hue_studio.const import HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
 
 from .conftest import ROOMS, SCENES, make_scene

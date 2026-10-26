@@ -39,12 +39,12 @@ from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.storage import Store
 
-from .alignment import archetype_icon
-from .const import CONF_ORGANIZE, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
-from .lights import async_bridges
-from .options import async_group_areas, async_options
-from .rooms import async_track_rooms
-from .scenes import SCENE_DOMAIN, is_custom
+from ..const import CONF_ORGANIZE, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
+from ..core.options import async_group_areas, async_options
+from ..lights.bridge import async_bridges
+from ..rooms.alignment import archetype_icon
+from ..rooms.areas import async_track_rooms
+from .bridge import SCENE_DOMAIN, is_custom
 
 _LOGGER = logging.getLogger(__name__)
 

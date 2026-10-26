@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HueStudioConfigEntry
-from .entity import SyncBoxEntity
+from .sync_box.entity import SyncBoxEntity
 
 PARALLEL_UPDATES = 1
 

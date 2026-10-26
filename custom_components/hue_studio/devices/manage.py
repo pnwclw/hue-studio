@@ -52,9 +52,9 @@ from homeassistant.helpers import (
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util.hass_dict import HassKey
 
-from .const import DOMAIN
-from .lights import HUE_DOMAIN, LIGHT_DOMAIN, async_bridges
-from .rooms import async_align
+from ..const import DOMAIN
+from ..lights.bridge import HUE_DOMAIN, LIGHT_DOMAIN, async_bridges
+from ..rooms.areas import async_align
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 """Tests for the alignment plan (pure: areas <-> Hue rooms)."""
 
-from custom_components.hue_studio.alignment import (
+from custom_components.hue_studio.rooms.alignment import (
     Area,
     Light,
     Move,

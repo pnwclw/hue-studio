@@ -16,10 +16,11 @@ from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import HueStudioConfigEntry, daylight, pool
-from .connections import is_studio
-from .entity import SyncBoxEntity
-from .sync import INPUTS, SyncBoxCoordinator, inputs
+from . import HueStudioConfigEntry
+from .automations import daylight, pool
+from .core.connections import is_studio
+from .sync_box.coordinator import INPUTS, SyncBoxCoordinator, inputs
+from .sync_box.entity import SyncBoxEntity
 
 PARALLEL_UPDATES = 0
 

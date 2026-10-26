@@ -33,11 +33,11 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 
-from .bridges import bridge_name
-from .const import DOMAIN, HUE_DOMAIN
-from .identity import device_mac
-from .lights import LIGHT_DOMAIN, async_bridges
-from .scenes import SCENE_DOMAIN
+from ..bridges.info import bridge_name
+from ..const import DOMAIN, HUE_DOMAIN
+from ..devices.identity import device_mac
+from ..lights.bridge import LIGHT_DOMAIN, async_bridges
+from .bridge import SCENE_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

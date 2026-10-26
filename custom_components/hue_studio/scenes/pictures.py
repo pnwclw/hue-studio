@@ -25,14 +25,14 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import DOMAIN
+from ..const import DOMAIN
 from .gallery import async_gallery_scenes
 
 _LOGGER = logging.getLogger(__name__)
 
 PICTURE_URL = f"/api/{DOMAIN}/gallery/{{scene_id}}.jpg"
-THUMB_DIR = Path(__file__).parent / "frontend" / "gallery" / "thumb"
-LOCAL_DIR = Path(__file__).parent / "frontend" / "gallery" / "local"
+THUMB_DIR = Path(__file__).parent.parent / "frontend" / "gallery" / "thumb"
+LOCAL_DIR = Path(__file__).parent.parent / "frontend" / "gallery" / "local"
 # Twice the 480x270 tile (sharp on phones), cropped to fill, as JPEG.
 PICTURE_QUERY = {"w": "960", "h": "540", "fit": "fill", "fm": "jpg", "q": "80"}
 MAX_BYTES = 2_000_000

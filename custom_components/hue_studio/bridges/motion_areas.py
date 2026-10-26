@@ -40,8 +40,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util.hass_dict import HassKey
 
-from .const import DOMAIN, SIGNAL_BRIDGES_UPDATED
-from .lights import async_bridges
+from ..const import DOMAIN, SIGNAL_BRIDGES_UPDATED
+from ..lights.bridge import async_bridges
 
 _LOGGER = logging.getLogger(__name__)
 

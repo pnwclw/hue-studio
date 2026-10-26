@@ -9,7 +9,7 @@ import pytest
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.const import DOMAIN
-from custom_components.hue_studio.positions import (
+from custom_components.hue_studio.space.positions import (
     async_positions_payload,
     palette_at,
     spatial_colors,

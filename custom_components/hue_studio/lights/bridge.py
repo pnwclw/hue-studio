@@ -14,8 +14,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
-from .connections import async_studio_entry
-from .const import DOMAIN, HUE_DOMAIN
+from ..const import DOMAIN, HUE_DOMAIN
+from ..core.connections import async_studio_entry
 
 LIGHT_DOMAIN = "light"
 # Not real effects: "no effect" stops one, "unknown" is aiohue's fallback.

@@ -38,7 +38,6 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio import sync_follow
 from custom_components.hue_studio.const import (
     CONF_BOX_ID,
     CONF_FOLLOW,
@@ -48,7 +47,8 @@ from custom_components.hue_studio.const import (
     DOMAIN,
     KIND_SYNC_BOX,
 )
-from custom_components.hue_studio.sync import (
+from custom_components.hue_studio.sync_box import follow as sync_follow
+from custom_components.hue_studio.sync_box.coordinator import (
     SyncBoxNotFound,
     async_get_box_id,
     async_link_box_bridge,

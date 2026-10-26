@@ -16,8 +16,8 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio import bridge_setup
-from custom_components.hue_studio.bridge_setup import (
+from custom_components.hue_studio.bridges import setup as bridge_setup
+from custom_components.hue_studio.bridges.setup import (
     BridgeDiscovery,
     FoundBridge,
     LinkFailed,

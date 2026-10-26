@@ -46,8 +46,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
-from .const import DOMAIN, HUE_DOMAIN
-from .lights import LIGHT_DOMAIN, NOT_EFFECTS, async_bridges, supported_effects
+from ..const import DOMAIN, HUE_DOMAIN
+from ..lights.bridge import LIGHT_DOMAIN, NOT_EFFECTS, async_bridges, supported_effects
 
 SCENE_DOMAIN = "scene"
 # `metadata.appdata` of a scene made from your own colors or lights: kept on the bridge,

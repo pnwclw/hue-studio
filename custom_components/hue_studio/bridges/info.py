@@ -20,11 +20,11 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .bridge_setup import MODELS
-from .connections import async_supported_hue_entries
-from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
-from .lights import async_bridges
+from ..const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
+from ..core.connections import async_supported_hue_entries
+from ..lights.bridge import async_bridges
 from .motion_areas import async_bridge_payload, has_motion_aware
+from .setup import MODELS
 
 # Model ids of the Hue Bridge Pro (the bridge with MotionAware).
 PRO_MODELS = {"BSB003"}

@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
-from .pictures import GalleryPictureView
+from .scenes.pictures import GalleryPictureView
 
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 STATIC_URL = f"/{DOMAIN}_static"

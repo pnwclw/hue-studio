@@ -19,9 +19,7 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 
-from .alignment import archetype_icon
-from .connections import async_studio_entry
-from .const import (
+from ..const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
     CONF_FOOTER_TABS,
@@ -39,7 +37,9 @@ from .const import (
     GROUP_ZONE,
     HUE_DOMAIN,
 )
-from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_bridges
+from ..lights.bridge import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_bridges
+from ..rooms.alignment import archetype_icon
+from .connections import async_studio_entry
 
 ATTR_HUE_TYPE = "hue_type"
 

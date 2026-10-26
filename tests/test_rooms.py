@@ -23,8 +23,8 @@ from pytest_homeassistant_custom_component.common import (
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.const import CONF_AUTO_ALIGN, DOMAIN
-from custom_components.hue_studio.options import async_frontend_config
-from custom_components.hue_studio.rooms import merge_payloads
+from custom_components.hue_studio.core.options import async_frontend_config
+from custom_components.hue_studio.rooms.areas import merge_payloads
 
 from .conftest import SCENES
 

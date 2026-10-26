@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from custom_components.hue_studio.daylight import (
+from custom_components.hue_studio.automations.daylight import (
     PHASES,
     Inputs,
     global_tags,

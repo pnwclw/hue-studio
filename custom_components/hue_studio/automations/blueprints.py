@@ -71,20 +71,20 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
-from . import daylight, pool
-from .adaptive import async_mark_manual
-from .const import DOMAIN, SIGNAL_CONFIG_UPDATED
-from .gallery import async_gallery_scenes
-from .lights import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
-from .organize import async_enabled as async_organize_enabled, async_label
-from .rooms import light_area
-from .scenes import (
+from ..const import DOMAIN, SIGNAL_CONFIG_UPDATED
+from ..lights.adaptive import async_mark_manual
+from ..lights.bridge import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
+from ..rooms.areas import light_area
+from ..scenes.bridge import (
     async_resolve_scenes,
     async_show_on_lights,
     light_entity_ids,
     scene_lights,
 )
-from .services import BRIGHTNESS, TRANSITION, async_target_lights
+from ..scenes.gallery import async_gallery_scenes
+from ..scenes.organize import async_enabled as async_organize_enabled, async_label
+from ..services import BRIGHTNESS, TRANSITION, async_target_lights
+from . import daylight, pool
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -522,7 +522,7 @@ def _copy_blueprints(source: Path, target: Path) -> list[str]:
 
 async def async_install_blueprints(hass: HomeAssistant) -> list[str]:
     """Put the blueprints in place; automations using changed ones are reloaded."""
-    source = Path(__file__).parent / "blueprints" / "automation" / BLUEPRINT_DIR
+    source = Path(__file__).parent.parent / "blueprints" / "automation" / BLUEPRINT_DIR
     target = Path(hass.config.path("blueprints", "automation", BLUEPRINT_DIR))
     changed = await hass.async_add_executor_job(_copy_blueprints, source, target)
     if changed and any(

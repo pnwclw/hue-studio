@@ -36,16 +36,16 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
-from .devices import (
+from ..const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
+from ..lights.bridge import LIGHT_DOMAIN, async_bridges
+from ..scenes.bridge import SCENE_DOMAIN
+from ..space.positions import position_store
+from .manage import (
     SIGNAL_DEVICES_UPDATED,
     is_bridge_device,
     light_settings,
     put_light_settings,
 )
-from .lights import LIGHT_DOMAIN, async_bridges
-from .positions import position_store
-from .scenes import SCENE_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

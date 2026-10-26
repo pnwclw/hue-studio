@@ -34,9 +34,9 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.util.hass_dict import HassKey
 
-from .const import DOMAIN
-from .lights import HueLight, async_all_lights
-from .rooms import light_area
+from ..const import DOMAIN
+from ..lights.bridge import HueLight, async_all_lights
+from ..rooms.areas import light_area
 
 _LOGGER = logging.getLogger(__name__)
 

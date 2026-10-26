@@ -13,11 +13,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
-from custom_components.hue_studio.gallery import async_gallery_scenes
 from custom_components.hue_studio.panel import PANEL_URL_PATH, STATIC_URL
-from custom_components.hue_studio.pictures import THUMB_DIR
+from custom_components.hue_studio.scenes.gallery import async_gallery_scenes
+from custom_components.hue_studio.scenes.pictures import THUMB_DIR
 
-PICTURES = "custom_components.hue_studio.pictures"
+PICTURES = "custom_components.hue_studio.scenes.pictures"
 
 
 async def test_panel_lifecycle(

@@ -11,7 +11,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio import daylight, pool
+from custom_components.hue_studio.automations import daylight, pool
 from custom_components.hue_studio.const import CONF_DAYLIGHT, DOMAIN
 
 

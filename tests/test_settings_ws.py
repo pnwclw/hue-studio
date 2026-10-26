@@ -11,8 +11,8 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.bridges import async_bridges_payload
-from custom_components.hue_studio.entertainment import default_points
+from custom_components.hue_studio.bridges.info import async_bridges_payload
+from custom_components.hue_studio.space.entertainment import default_points
 
 from .conftest import ENTERTAINMENT, HUE_DOMAIN, make_entertainment
 

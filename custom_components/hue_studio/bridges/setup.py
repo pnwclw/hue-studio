@@ -41,8 +41,8 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
-from .connections import is_supported_hue_entry
-from .const import HUE_DOMAIN
+from ..const import HUE_DOMAIN
+from ..core.connections import is_supported_hue_entry
 
 _LOGGER = logging.getLogger(__name__)
 

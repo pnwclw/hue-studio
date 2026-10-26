@@ -16,18 +16,27 @@ from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 import voluptuous as vol
 
-from .bridge_setup import (
+from .bridges.info import (
+    NAME_MAX as BRIDGE_NAME_MAX,
+    async_bridges_payload,
+    async_rename_bridge,
+)
+from .bridges.motion_areas import (
+    MAX_LIGHTS as MOTION_MAX_LIGHTS,
+    NAME_MAX as MOTION_NAME_MAX,
+    async_create as async_create_motion_area,
+    async_delete as async_delete_motion_area,
+    async_recalibrate as async_recalibrate_motion_area,
+    async_set_response as async_set_motion_response,
+    async_update as async_update_motion_area,
+    async_watch_bridges as async_watch_motion_areas,
+)
+from .bridges.setup import (
     BridgeDiscovery,
     LinkFailed,
     async_link,
     async_track_hue_entries,
 )
-from .bridges import (
-    NAME_MAX as BRIDGE_NAME_MAX,
-    async_bridges_payload,
-    async_rename_bridge,
-)
-from .connections import async_studio_entry
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_FOOTER,
@@ -42,7 +51,14 @@ from .const import (
     SIGNAL_CONFIG_UPDATED,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
-from .devices import (
+from .core.connections import async_studio_entry
+from .core.options import (
+    async_frontend_config,
+    async_set_group_area,
+    async_set_room_sensors,
+    async_update_options,
+)
+from .devices.manage import (
     LIGHT_FUNCTIONS,
     MAX_INSTALL_CODES,
     MAX_SERIALS,
@@ -56,15 +72,7 @@ from .devices import (
     async_setup_device,
     async_watch_bridges,
 )
-from .entertainment import (
-    TYPES as ENTERTAINMENT_TYPES,
-    async_create as async_create_entertainment,
-    async_delete as async_delete_entertainment,
-    async_entertainment_payload,
-    async_set_positions as async_set_entertainment_positions,
-    async_update as async_update_entertainment,
-)
-from .lights import (
+from .lights.bridge import (
     HUE_DOMAIN,
     LIGHT_DOMAIN,
     async_all_lights,
@@ -72,36 +80,29 @@ from .lights import (
     light_info,
     light_product,
 )
-from .motion_areas import (
-    MAX_LIGHTS as MOTION_MAX_LIGHTS,
-    NAME_MAX as MOTION_NAME_MAX,
-    async_create as async_create_motion_area,
-    async_delete as async_delete_motion_area,
-    async_recalibrate as async_recalibrate_motion_area,
-    async_set_response as async_set_motion_response,
-    async_update as async_update_motion_area,
-    async_watch_bridges as async_watch_motion_areas,
-)
-from .options import (
-    async_frontend_config,
-    async_set_group_area,
-    async_set_room_sensors,
-    async_update_options,
-)
-from .positions import (
-    SIGNAL_POSITIONS_UPDATED,
-    async_positions_payload,
-    async_set_positions,
-)
-from .rooms import (
+from .rooms.areas import (
     async_rooms_payload,
     async_set_light_area,
     async_track_areas,
     async_track_rooms,
 )
-from .scene_backup import async_list as async_list_scene_backups
-from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
-from .sync import (
+from .rooms.zones import SIGNAL_ZONES_UPDATED, ZoneMirror
+from .scenes.backup import async_list as async_list_scene_backups
+from .scenes.bridge import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
+from .space.entertainment import (
+    TYPES as ENTERTAINMENT_TYPES,
+    async_create as async_create_entertainment,
+    async_delete as async_delete_entertainment,
+    async_entertainment_payload,
+    async_set_positions as async_set_entertainment_positions,
+    async_update as async_update_entertainment,
+)
+from .space.positions import (
+    SIGNAL_POSITIONS_UPDATED,
+    async_positions_payload,
+    async_set_positions,
+)
+from .sync_box.coordinator import (
     DEVICE_ACTIONS as SYNC_DEVICE_ACTIONS,
     INPUT_NAME_MAX as SYNC_INPUT_NAME_MAX,
     INPUTS as SYNC_INPUTS,
@@ -113,14 +114,13 @@ from .sync import (
     async_link_box_bridge,
     async_sync_boxes,
 )
-from .sync_follow import (
+from .sync_box.follow import (
     ACTIONS as FOLLOW_ACTIONS,
     SCREEN_OFF_AFTER_MAX,
     SIGNAL_DOMAINS as FOLLOW_SIGNAL_DOMAINS,
     WAKE_DOMAINS as FOLLOW_WAKE_DOMAINS,
     async_set_follow,
 )
-from .zones import SIGNAL_ZONES_UPDATED, ZoneMirror
 
 
 @callback

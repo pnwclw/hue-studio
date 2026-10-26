@@ -40,11 +40,11 @@ from homeassistant.helpers.dispatcher import (
 )
 from homeassistant.helpers.storage import Store
 
-from .bridges import bridge_name
-from .const import CONF_ZONE_LABELS, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
-from .lights import LIGHT_DOMAIN, async_bridges
-from .options import async_options
-from .rooms import ZONE_PATH, async_track_rooms
+from ..bridges.info import bridge_name
+from ..const import CONF_ZONE_LABELS, DOMAIN, HUE_DOMAIN, SIGNAL_CONFIG_UPDATED
+from ..core.options import async_options
+from ..lights.bridge import LIGHT_DOMAIN, async_bridges
+from .areas import ZONE_PATH, async_track_rooms
 
 _LOGGER = logging.getLogger(__name__)
 

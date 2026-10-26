@@ -32,7 +32,10 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio.devices import async_devices_payload, device_kind
+from custom_components.hue_studio.devices.manage import (
+    async_devices_payload,
+    device_kind,
+)
 
 from .conftest import HUE_DOMAIN
 
@@ -199,7 +202,7 @@ async def test_add_devices(
     bridge.devices.set_identify.assert_awaited_once_with("dev-bulb")
 
     with patch(
-        "custom_components.hue_studio.devices.async_align", AsyncMock()
+        "custom_components.hue_studio.devices.manage.async_align", AsyncMock()
     ) as align:
         reply = await _ws(
             client,
@@ -265,18 +268,22 @@ async def test_motion_sensitivity(
     assert "motion sensitivity" in reply["error"]["message"]
 
     # A changed sensitivity on the bridge reaches the panel; plain motion does not.
-    from custom_components.hue_studio.devices import async_watch_bridges
+    from custom_components.hue_studio.devices.manage import async_watch_bridges
 
     async_watch_bridges(hass)
     changed = bridge.sensors.motion.subscribe.call_args.args[0]
     motion = bridge.sensors.motion.get("m1")
-    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+    with patch(
+        "custom_components.hue_studio.devices.manage.async_dispatcher_send"
+    ) as send:
         changed(EventType.RESOURCE_UPDATED, motion)
         changed(EventType.RESOURCE_UPDATED, motion)
     assert send.call_count == 1
     # So does calibration starting after a change.
     motion.sensitivity.status = MotionSensingFeatureSensitivityStatus.CHANGING
-    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+    with patch(
+        "custom_components.hue_studio.devices.manage.async_dispatcher_send"
+    ) as send:
         changed(EventType.RESOURCE_UPDATED, motion)
     assert send.call_count == 1
 
@@ -335,11 +342,13 @@ async def test_light_settings(
     )
     assert not reply["success"]
 
-    from custom_components.hue_studio.devices import async_watch_bridges
+    from custom_components.hue_studio.devices.manage import async_watch_bridges
 
     async_watch_bridges(hass)
     changed = bridge.lights.subscribe.call_args.args[0]
-    with patch("custom_components.hue_studio.devices.async_dispatcher_send") as send:
+    with patch(
+        "custom_components.hue_studio.devices.manage.async_dispatcher_send"
+    ) as send:
         changed(EventType.RESOURCE_UPDATED, light)
         changed(EventType.RESOURCE_UPDATED, light)
         light.metadata.function = LightFunction.FUNCTIONAL

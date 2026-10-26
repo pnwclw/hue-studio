@@ -96,7 +96,7 @@ async def test_unreachable_bridge_retried(
     """A bridge that does not answer does not hold up setup; it is tried again."""
     bridge = mock_bridge.return_value
     bridge.initialize.side_effect = [TimeoutError, None]
-    with patch("custom_components.hue_studio.connections.RETRY_MIN", 0):
+    with patch("custom_components.hue_studio.core.connections.RETRY_MIN", 0):
         assert await hass.config_entries.async_setup(studio_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -112,7 +112,7 @@ async def test_rejected_app_key_not_retried(
     """A rejected app key waits for the native entry to be fixed (and reloaded)."""
     bridge = mock_bridge.return_value
     bridge.initialize.side_effect = Unauthorized
-    with patch("custom_components.hue_studio.connections.RETRY_MIN", 0):
+    with patch("custom_components.hue_studio.core.connections.RETRY_MIN", 0):
         assert await hass.config_entries.async_setup(studio_entry.entry_id)
         await hass.async_block_till_done()
 

@@ -23,8 +23,8 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from .const import DOMAIN, SIGNAL_ENTERTAINMENT_UPDATED
-from .lights import LIGHT_DOMAIN, async_bridges
+from ..const import DOMAIN, SIGNAL_ENTERTAINMENT_UPDATED
+from ..lights.bridge import LIGHT_DOMAIN, async_bridges
 
 TYPES = [t.value for t in EntertainmentConfigurationType]
 NAME_MAX = 32

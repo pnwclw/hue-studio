@@ -40,11 +40,11 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 import voluptuous as vol
 
+from ..const import CONF_DAYLIGHT, DOMAIN, SIGNAL_CONFIG_UPDATED
+from ..core.connections import SETTINGS_URL
+from ..core.options import async_options, async_update_options
+from ..scenes.gallery import async_gallery_scenes
 from . import daylight
-from .connections import SETTINGS_URL
-from .const import CONF_DAYLIGHT, DOMAIN, SIGNAL_CONFIG_UPDATED
-from .gallery import async_gallery_scenes
-from .options import async_options, async_update_options
 
 TAGS_FILE = Path(__file__).parent / "scene_tags.json"
 # The mood changed (the select); options changes come with SIGNAL_CONFIG_UPDATED.

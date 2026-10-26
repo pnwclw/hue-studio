@@ -60,7 +60,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import (
+from ..const import (
     CONF_KIND,
     DOMAIN,
     HUE_DOMAIN,
@@ -68,11 +68,11 @@ from .const import (
     KIND_SYNC_BOX_LINK,
     SIGNAL_ENTERTAINMENT_UPDATED,
 )
-from .lights import LIGHT_DOMAIN, async_bridges
-from .sync_follow import follow_info
+from ..lights.bridge import LIGHT_DOMAIN, async_bridges
+from .follow import follow_info
 
 if TYPE_CHECKING:
-    from . import HueStudioConfigEntry
+    from .. import HueStudioConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 

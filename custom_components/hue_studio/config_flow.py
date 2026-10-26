@@ -34,7 +34,6 @@ from homeassistant.helpers.selector import (
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 import voluptuous as vol
 
-from .connections import async_studio_entry, async_supported_hue_entries
 from .const import (
     CONF_BOX_ID,
     CONF_KIND,
@@ -45,8 +44,9 @@ from .const import (
     KIND_SYNC_BOX,
     KIND_SYNC_BOX_LINK,
 )
-from .sync import SyncBoxNotFound, async_get_box_id
-from .sync_link import async_sync_box_entries, async_sync_box_entry_for
+from .core.connections import async_studio_entry, async_supported_hue_entries
+from .sync_box.coordinator import SyncBoxNotFound, async_get_box_id
+from .sync_box.link import async_sync_box_entries, async_sync_box_entry_for
 
 APP_NAME = "Hue Studio"
 # How long to wait for the button on the Sync Box to be held.

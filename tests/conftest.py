@@ -80,7 +80,7 @@ def mock_native_hue_setup() -> Generator[None]:
 def no_blueprint_install() -> Generator[None]:
     """Setup leaves the test config folder alone (test_automations installs them)."""
     with patch(
-        "custom_components.hue_studio.automations.async_install_blueprints",
+        "custom_components.hue_studio.automations.blueprints.async_install_blueprints",
         AsyncMock(return_value=[]),
     ):
         yield
@@ -278,7 +278,7 @@ def reset_entertainment() -> Generator[None]:
 def mock_bridge() -> Generator[MagicMock]:
     """Patch aiohue's HueBridgeV2 used by Hue Studio."""
     with patch(
-        "custom_components.hue_studio.connections.HueBridgeV2", autospec=True
+        "custom_components.hue_studio.core.connections.HueBridgeV2", autospec=True
     ) as bridge_cls:
         bridge = bridge_cls.return_value
         bridge.initialize = AsyncMock()

@@ -32,7 +32,7 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 
-from .const import (
+from ..const import (
     CONF_KIND,
     DOMAIN,
     HUE_CONF_API_KEY,
@@ -44,7 +44,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from . import HueStudioConfigEntry
+    from .. import HueStudioConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 

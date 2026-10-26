@@ -482,7 +482,7 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   // The global light of the day: ready-made tags (scene_tags.json), the user's tags, settings.
   const daylightListeners = new Set<(msg: unknown) => void>();
   let readyTags: Record<string, SceneTags> = {};
-  fetch(new URL("../custom_components/hue_studio/scene_tags.json", location.href))
+  fetch(new URL("../custom_components/hue_studio/automations/scene_tags.json", location.href))
     .then((r) => r.json())
     .then((t: { scenes: Record<string, SceneTags> }) => {
       readyTags = t.scenes;

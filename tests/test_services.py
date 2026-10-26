@@ -18,8 +18,8 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 
-from custom_components.hue_studio import zones
 from custom_components.hue_studio.const import DOMAIN
+from custom_components.hue_studio.rooms import zones
 
 from .conftest import LIGHTS, SCENES
 

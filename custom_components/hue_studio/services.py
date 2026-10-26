@@ -56,7 +56,6 @@ from homeassistant.helpers.target import (
 )
 import voluptuous as vol
 
-from .adaptive import async_mark_manual
 from .const import (
     CONF_KIND,
     CONF_SYNC_ENTRY_ID,
@@ -65,18 +64,18 @@ from .const import (
     KIND_SYNC_BOX,
     KIND_SYNC_BOX_LINK,
 )
-from .gallery import async_get_gallery_scene
-from .lights import (
+from .lights.adaptive import async_mark_manual
+from .lights.bridge import (
     LIGHT_DOMAIN,
     NOT_EFFECTS,
     HueLight,
     async_resolve_lights,
     supported_effects,
 )
-from .positions import async_light_positions, spatial_colors
-from .rooms import async_align
-from .scene_backup import KEEP, async_export, async_import
-from .scenes import (
+from .rooms.areas import async_align
+from .rooms.zones import async_wait_zone_entity
+from .scenes.backup import KEEP, async_export, async_import
+from .scenes.bridge import (
     SCENE_DOMAIN,
     HueGroup,
     HueScene,
@@ -92,7 +91,9 @@ from .scenes import (
     scene_lights,
     scene_post_json,
 )
-from .sync import (
+from .scenes.gallery import async_get_gallery_scene
+from .space.positions import async_light_positions, spatial_colors
+from .sync_box.coordinator import (
     INTENSITIES,
     PALETTES,
     SYNC_MODES,
@@ -103,9 +104,8 @@ from .sync import (
     ir_execution,
     pct_to_api,
 )
-from .sync_follow import async_wake_source
-from .sync_link import SyncBoxLink
-from .zones import async_wait_zone_entity
+from .sync_box.follow import async_wake_source
+from .sync_box.link import SyncBoxLink
 
 _LOGGER = logging.getLogger(__name__)
 

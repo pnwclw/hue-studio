@@ -14,7 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.const import DOMAIN
-from custom_components.hue_studio.zones import (
+from custom_components.hue_studio.rooms.zones import (
     Side,
     Synced,
     ZoneMirror,

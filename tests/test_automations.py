@@ -26,15 +26,15 @@ from pytest_homeassistant_custom_component.common import (
 )
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
-from custom_components.hue_studio import automations, daylight
-from custom_components.hue_studio.automations import (
+from custom_components.hue_studio.automations import blueprints, daylight
+from custom_components.hue_studio.automations.blueprints import (
     TYPES,
     async_install_blueprints,
     blueprint_path,
     living_lights,
 )
+from custom_components.hue_studio.automations.pool import async_update_settings
 from custom_components.hue_studio.const import DOMAIN
-from custom_components.hue_studio.pool import async_update_settings
 
 from .conftest import BRIDGE_ID
 
@@ -683,7 +683,7 @@ async def test_legacy_auto_light(
     hue_lights: MagicMock,
 ) -> None:
     """The old auto light's settings are offered to new automations."""
-    hass_storage[automations.LEGACY_STORAGE_KEY] = {
+    hass_storage[blueprints.LEGACY_STORAGE_KEY] = {
         "version": 1,
         "data": {
             "areas": {

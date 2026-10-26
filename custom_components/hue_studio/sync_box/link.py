@@ -26,8 +26,8 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import DOMAIN, SYNC_BOX_INTEGRATION
-from .sync import (
+from ..const import DOMAIN, SYNC_BOX_INTEGRATION
+from .coordinator import (
     INPUTS,
     INTENSITIES,
     SYNC_MODES,

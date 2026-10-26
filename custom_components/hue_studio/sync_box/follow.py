@@ -52,7 +52,7 @@ from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 
-from .const import CONF_FOLLOW, CONF_SCREEN
+from ..const import CONF_FOLLOW, CONF_SCREEN
 
 # HDMI inputs of a box (sync.INPUTS; not imported: sync imports this module).
 INPUTS = ["input1", "input2", "input3", "input4"]
@@ -60,7 +60,7 @@ INPUTS = ["input1", "input2", "input3", "input4"]
 if TYPE_CHECKING:
     from homeassistant.core import EventStateChangedData
 
-    from .sync import SyncBoxCoordinator
+    from .coordinator import SyncBoxCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

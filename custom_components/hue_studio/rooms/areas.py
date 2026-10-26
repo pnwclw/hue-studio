@@ -29,11 +29,11 @@ from homeassistant.helpers import (
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
+from ..bridges.info import bridge_name
+from ..const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
+from ..lights.bridge import LIGHT_DOMAIN, async_all_lights, async_bridges
+from ..scenes.bridge import SCENE_DOMAIN, completed_actions, scene_post_json
 from . import alignment
-from .bridges import bridge_name
-from .const import DOMAIN, HUE_DOMAIN, SIGNAL_BRIDGES_UPDATED
-from .lights import LIGHT_DOMAIN, async_all_lights, async_bridges
-from .scenes import SCENE_DOMAIN, completed_actions, scene_post_json
 
 _LOGGER = logging.getLogger(__name__)
 

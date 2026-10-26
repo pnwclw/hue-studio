@@ -14,7 +14,7 @@ import pytest
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.hue_studio.const import DOMAIN
-from custom_components.hue_studio.scene_backup import backup_folder, stale_copies
+from custom_components.hue_studio.scenes.backup import backup_folder, stale_copies
 
 from .conftest import LIGHTS, ROOMS, SCENES
 

@@ -27,13 +27,9 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 
-from .automations import async_setup_automations
-from .connections import (
-    BridgeConnections,
-    async_studio_entry,
-    async_supported_hue_entries,
-    is_studio,
-)
+from .automations.blueprints import async_setup_automations
+from .automations.pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
+from .bridges.motion_areas import async_stop_watching as async_stop_motion_areas
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_BOX_ID,
@@ -54,19 +50,23 @@ from .const import (
     SIGNAL_CONFIG_UPDATED,
     SYNC_BOX_INTEGRATION,
 )
-from .identity import async_setup_identities
-from .motion_areas import async_stop_watching as async_stop_motion_areas
-from .organize import async_track_organize
+from .core.connections import (
+    BridgeConnections,
+    async_studio_entry,
+    async_supported_hue_entries,
+    is_studio,
+)
+from .devices.identity import async_setup_identities
 from .panel import async_register_panel, async_unregister_panel
-from .pool import DEVICE_ID as POOL_DEVICE_ID, async_setup_pool_websocket
-from .positions import async_setup_positions
-from .rooms import async_align, async_track_areas
+from .rooms.areas import async_align, async_track_areas
+from .rooms.zones import ZoneMirror, async_track_zones
+from .scenes.organize import async_track_organize
 from .services import async_setup_services
-from .sync import SyncBoxCoordinator, async_track_entertainment
-from .sync_follow import PictureFollower
-from .sync_link import SyncBoxLink
+from .space.positions import async_setup_positions
+from .sync_box.coordinator import SyncBoxCoordinator, async_track_entertainment
+from .sync_box.follow import PictureFollower
+from .sync_box.link import SyncBoxLink
 from .websocket import async_setup_websocket
-from .zones import ZoneMirror, async_track_zones
 
 _LOGGER = logging.getLogger(__name__)
 
