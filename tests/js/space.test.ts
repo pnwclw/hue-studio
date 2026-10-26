@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allPositions, canSpread, fromView, roundPoint, toView } from "../../src/space.ts";
-import type { PositionsMessage } from "../../src/types.ts";
+import { allPositions, canSpread, fromView, roundPoint, toView } from "../../src/features/rooms/space.ts";
+import type { PositionsMessage } from "../../src/core/types.ts";
 
 const msg: PositionsMessage = {
   office: {
@@ -33,7 +33,7 @@ test("top view: front at the top, round trip", () => {
 });
 
 test("upright lamps move as one; height keeps their ends apart", async () => {
-  const { isUpright, movePoints, setHeight } = await import("../../src/space.ts");
+  const { isUpright, movePoints, setHeight } = await import("../../src/features/rooms/space.ts");
   const signe: [number, number, number][] = [[-0.6, 1, -0.8], [-0.6, 1, 0.2]];
   assert.equal(isUpright(signe), true);
   assert.deepEqual(movePoints(signe, 0, 0, 0.5), [[0, 0.5, -0.8], [0, 0.5, 0.2]]);

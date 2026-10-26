@@ -5,10 +5,10 @@ and sheets, and the dashboard cards. The reference is the Philips Hue app, measu
 app itself (6.3, Android, in an emulator: sizes in dp, which are px here); the system is
 built on Home Assistant's model and its own needs where the Hue app has no counterpart.
 
-- **Tokens** live in `src/tokens.ts` (pure, so tests and a future dashboard theme can read
+- **Tokens** live in `src/ds/tokens.ts` (pure, so tests and a future dashboard theme can read
   them). `styles.ts` turns them into CSS variables on every shadow root (`tokensCss()`).
-- **Components** are CSS classes in `src/styles.ts` plus the template helpers that render
-  them (`controls.ts`, `ui.ts`, `views/base.ts`, `views/choice.ts`, `wheel.ts`).
+- **Components** are CSS classes in `src/ds/styles/index.ts` plus the template helpers that
+  render them (`controls.ts`, `ui.ts`, `base.ts`, `choice.ts`, `wheel.ts`, all in `src/ds/`).
 - **The rule:** a new screen is made of these parts. A part that is missing is added here
   (token or component, with where it is used) before the screen uses it. One-off sizes,
   colors and fonts don't go into views or styles.
@@ -355,7 +355,7 @@ app with a live box (HSB2) at 411dp; the iOS screenshots of 2026-10-23 agree (th
 parts scale with the width: 238 and 95 at 440). Everything here is made of the parts
 above; the Sync tab adds its stage, popovers and dock.
 
-**Tab** (`views/sync.ts`): no title; in the header "+" (add a box), "⋯" (the box's
+**Tab** (`features/sync/views/sync.ts`): no title; in the header "+" (add a box), "⋯" (the box's
 settings) and the box's power switch. The page has no glow (the violet one belongs to the
 empty tab, the Hue app's onboarding). Over the controls, centered in the room between the
 header and the controls:
@@ -396,7 +396,7 @@ Anchored to the bottom:
 - "Where" → **"Entertainment area"** (a sheet from the bottom, as tall as its rows): a
   hint, the areas as rows with a tick, "Create an Entertainment area" with the accent "+".
 
-**A box's settings** (`views/sync-settings.ts`; "⋯" on the tab, or the box's row in
+**A box's settings** (`features/sync/views/sync-settings.ts`; "⋯" on the tab, or the box's row in
 Settings → Bridges): an editor as a sheet, its pages pushed with a back button. Only a box
 paired directly has them; one linked through `huesyncbox` shows Device info and the way
 to pair it.

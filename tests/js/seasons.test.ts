@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { categoryShown, inWindow, isMonthDay, monthDay, sameRule, seasonEntity, seasonNow, shownCategories } from "../../src/seasons.ts";
+import { categoryShown, inWindow, isMonthDay, monthDay, sameRule, seasonEntity, seasonNow, shownCategories } from "../../src/features/scenes/seasons.ts";
 
 const NO_SEASON = { states: {}, entities: {} };
 const WITH_SEASON = {

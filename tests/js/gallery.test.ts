@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { galleryMatch } from "../../src/gallery-data.ts";
-import type { Gallery } from "../../src/types.ts";
+import { galleryMatch } from "../../src/features/scenes/gallery-data.ts";
+import type { Gallery } from "../../src/core/types.ts";
 
 const gallery: Gallery = {
   categories: [{ id: "defaults", name: "Defaults" }],

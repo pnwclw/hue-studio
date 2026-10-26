@@ -4,12 +4,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { CSS } from "../../src/styles.ts";
-import { COLORS, FONT_SIZES, MOTION, RADII, SHADOWS, SIZES, tokensCss } from "../../src/tokens.ts";
+import { CSS } from "../../src/ds/styles/index.ts";
+import { COLORS, FONT_SIZES, MOTION, RADII, SHADOWS, SIZES, tokensCss } from "../../src/ds/tokens.ts";
 
 // The panel's stylesheet plus the CSS that cards, sheets and the dialog add to it (read as text:
 // those modules need a browser).
-const EXTRA = ["src/cards.ts", "src/automation-sheet.ts", "src/scene-sheet.ts", "src/hue-studio-more-info.ts"].map((f) => readFileSync(f, "utf8"));
+const EXTRA = [
+  "src/features/cards/cards.ts",
+  "src/features/automations/views/automation-sheet.ts",
+  "src/features/scenes/views/scene-sheet.ts",
+  "src/entries/hue-studio-more-info.ts",
+].map((f) => readFileSync(f, "utf8"));
 const OWN = CSS.replace(tokensCss(), "");
 const ALL = [OWN, ...EXTRA];
 

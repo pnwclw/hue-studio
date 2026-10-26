@@ -1,8 +1,8 @@
 // A fake `hass` for dev/panel.html: neutral demo data and a tiny simulation of the services
 // the panel calls, so every screen can be clicked through without Home Assistant.
 
-import { mirekToRgb, xyToRgb } from "../src/color.ts";
-import { predictSync } from "../src/sync.ts";
+import { mirekToRgb, xyToRgb } from "../src/core/color.ts";
+import { predictSync } from "../src/features/sync/sync.ts";
 import type {
   Gallery,
   BridgesMessage,
@@ -38,7 +38,7 @@ import type {
   SyncFollow,
   SyncChange,
   XY,
-} from "../src/types.ts";
+} from "../src/core/types.ts";
 
 /** Simulated light state. */
 interface Sim {

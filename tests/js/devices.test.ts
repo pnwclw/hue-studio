@@ -17,8 +17,8 @@ import {
   searchOver,
   searchProgress,
   wifiKey,
-} from "../../src/devices.ts";
-import type { BridgeDevices, BridgeInfo, HassData, HueDeviceInfo } from "../../src/types.ts";
+} from "../../src/features/devices/devices.ts";
+import type { BridgeDevices, BridgeInfo, HassData, HueDeviceInfo } from "../../src/core/types.ts";
 
 const device = (id: string, extra: Partial<HueDeviceInfo> = {}): HueDeviceInfo => ({
   id,

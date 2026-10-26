@@ -11,8 +11,8 @@ import {
   wheelYToMirek,
   xyToRgb,
   xyToWheel,
-} from "../../src/color.ts";
-import type { XY } from "../../src/types.ts";
+} from "../../src/core/color.ts";
+import type { XY } from "../../src/core/types.ts";
 
 const GAMUT_C: XY[] = [[0.6915, 0.3083], [0.17, 0.7], [0.1532, 0.0475]];
 const near = (a: number, b: number, eps: number) => assert.ok(Math.abs(a - b) <= eps, `${a} !~ ${b}`);

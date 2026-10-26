@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { HUE_ICONS } from "../../src/hue-icons-data.ts";
-import { ARCHETYPE_ICONS, lightIcon, PRODUCT_ICONS } from "../../src/model.ts";
-import type { HassData } from "../../src/types.ts";
+import { HUE_ICONS } from "../../src/ds/hue-icons-data.ts";
+import { ARCHETYPE_ICONS, lightIcon, PRODUCT_ICONS } from "../../src/core/model.ts";
+import type { HassData } from "../../src/core/types.ts";
 
 test("every icon the model names is bundled", () => {
   const named = [...Object.values(ARCHETYPE_ICONS), ...PRODUCT_ICONS.map(([, icon]) => icon)];

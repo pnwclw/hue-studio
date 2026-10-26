@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { presenceCheck, presenceReady } from "../../src/presence.ts";
+import { presenceCheck, presenceReady } from "../../src/features/automations/presence.ts";
 
 const hass = (permission: string, trackerState = "home") => ({
   states: {

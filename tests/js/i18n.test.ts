@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { keysOf, localize, LOCALES } from "../../src/i18n.ts";
+import { keysOf, localize, LOCALES } from "../../src/i18n/index.ts";
 
 test("every locale has exactly the English keys", () => {
   const en = keysOf("en").sort();

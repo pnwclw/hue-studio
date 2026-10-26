@@ -503,7 +503,7 @@ and the `huesyncbox` link mode keep one screen.
 
 So that new features are not built on a vision of their own, everything is put on one
 design system first. **Done (2026-10-22, measured on the Hue app 6.3 on 2026-10-23)**:
-`docs/design-system.md`, tokens in `src/tokens.ts`, `styles.ts` and the cards, sheets and
+`docs/design-system.md`, tokens in `src/ds/tokens.ts`, `styles` and the cards, sheets and
 dialog on them, kept there by `tests/js/styles.test.ts`. Still to measure: the Sync screens
 with a box, a gallery scene's sheet.
 
