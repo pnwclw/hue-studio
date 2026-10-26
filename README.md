@@ -52,6 +52,14 @@ its device in the Philips Hue integration), with a link into the panel.
 Palette, gradient and effect services leave lights alone while an entertainment area
 streams to them (Sync Box, PC or TV sync): the stream would overwrite them anyway.
 
+Services that delete or reshape things on the bridge or the box (`delete_scene`,
+`create_zone`, `update_zone`, `delete_zone`, `align_rooms`, `delete_sync_preset` and the
+remote button services) need a Home Assistant administrator, like the panel's settings.
+Automations run them without a user, so they are not affected; a script started by a
+user who is not an administrator (a dashboard button, a voice assistant) is refused.
+Lighting and scene services stay open to everyone, like `light.turn_on`: creating,
+saving and shuffling scenes is everyday use in the Hue app too.
+
 ## Automations
 
 The panel's **Automations** tab has the Hue app's automations: wake up, go to sleep,

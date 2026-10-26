@@ -8,8 +8,13 @@ from unittest.mock import AsyncMock, MagicMock
 from aiohue.errors import AiohueException
 from aiohue.v2.models.feature import GradientMode
 from aiohue.v2.models.resource import ResourceIdentifier, ResourceTypes
-from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.auth.models import User
+from homeassistant.core import Context, HomeAssistant
+from homeassistant.exceptions import (
+    HomeAssistantError,
+    ServiceValidationError,
+    Unauthorized,
+)
 from homeassistant.helpers import area_registry as ar, entity_registry as er
 import pytest
 
@@ -379,6 +384,49 @@ async def test_delete_scene(hass: HomeAssistant, hue_room: MagicMock) -> None:
     hue_room.request.assert_awaited_once_with(
         "delete", "clip/v2/resource/scene/res-scene"
     )
+
+
+@pytest.mark.parametrize(
+    ("service", "data"),
+    [
+        ("delete_scene", {"entity_id": "scene.sunset"}),
+        ("create_zone", {"entity_id": "light.bulb", "name": "Zone"}),
+        ("update_zone", {"entity_id": "light.bulb", "name": "Zone"}),
+        ("delete_zone", {"entity_id": "light.bulb"}),
+        ("align_rooms", {}),
+    ],
+)
+async def test_structural_services_admin_only(
+    hass: HomeAssistant,
+    hue_room: MagicMock,
+    hass_read_only_user: User,
+    service: str,
+    data: dict[str, object],
+) -> None:
+    """Deleting or reshaping things on the bridge needs an admin; automations may."""
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            DOMAIN,
+            service,
+            data,
+            blocking=True,
+            context=Context(user_id=hass_read_only_user.id),
+        )
+    hue_room.request.assert_not_awaited()
+
+
+async def test_lighting_services_open_to_users(
+    hass: HomeAssistant, hue_lights: MagicMock, hass_read_only_user: User
+) -> None:
+    """Lighting stays open to every user, like light.turn_on."""
+    await hass.services.async_call(
+        DOMAIN,
+        "set_effect",
+        {"entity_id": "light.strip", "effect": "candle"},
+        blocking=True,
+        context=Context(user_id=hass_read_only_user.id),
+    )
+    assert hue_lights.lights.update.mock_calls
 
 
 def _b64(palette: dict[str, object]) -> str:
