@@ -344,8 +344,13 @@ Each part: its class (and helper), its measures, where it is used.
 - **Footer** `.screen-foot`: a line over the screen's one action (the accent pill), centered,
   the safe area under it (a new scene's "Save").
 - **Menu** `.menu`: a dropdown from a "⋯" button.
-- **Scene sheet** (`scene-pick.ts`): picture with name and pencil, colors and shuffle, room,
-  "Save to my scenes", "Set once".
+- **Scene card** (`scene-pick.ts`, `.scene-pick`): a card 26 from the screen's sides (at
+  most 420); the picture 16:9 with the name (`--fs-title-1`, 16 in) and a round close at
+  12; the colors on a 72 strip (`--surface-low`): dots 32, 22 apart, from 12, with shuffle
+  and the pencil as round buttons (`--round`) 8 apart at the right; "Save to my scenes"
+  (outlined, a 2px `--separator` ring) over "Set once" (`--round`) on `--surface-row`, 12
+  apart and 12 in: 32px pills in capitals, both as wide as the wider. The gallery's room is
+  fixed; "Copy to…" (ours) adds the room or zone as a row between the strip and the pills.
 - **Dialog** (`hue-studio-more-info.ts`) and **more-info sheets** (`automation-sheet.ts`,
   `scene-sheet.ts`): full screen from the bottom on phones, a card on wide screens.
 
@@ -469,6 +474,7 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | Automation editor | a sheet 37 from the top (corners 12, the screen behind dimmed); sub header bar 56 (`#26282c`: close, title 16, "SAVE"); type icon 24, name 34; rows 72 with no icons, text at 16, values 13 on the right; a lights card with place tiles 144×108; section titles 10 |
 | Fade and choice sheets | sheet bar 56 (close, title 16, "DONE"); caps 10 over a 16 value; slider with ticks 11 under it; choice rows 72 with a 40 picture, a tick on the chosen one; hint 12 |
 | "Custom scene" | a picker: the "Scene name" sheet first (close, "DONE", a 46 field with a 1.5 light border and a clear button, prefilled "New scene"); then picture 48 at 24 / 112, name 34, pencil 32; "Scene brightness" card 20 in (`#24262a`, 12 corners, 120 tall), "Lights" card 20 under it; a line at the bottom over a centered accent "Save" (36); back asks "Your settings will not be saved…" with a red "Close and don't save" and "CANCEL" (13) |
+| A gallery scene's card | over the gallery dimmed, a carousel of cards (the next one 12 to the right); a card 358 at 411 (26 in): the picture 16:9 with the name (cap 16.8 → 24) 16 in and a 32 round close 12 from the corner; a 72 strip `#2f3135`: dots 32, 22 apart from 12, shuffle and pencil 32 (`#4e5053`) 8 apart, 12 from the right; `#24262a` 100: "SAVE TO MY SCENES" (outlined 2 `#3a3c3f`) over "SET ONCE" (`#45474a`), 153×32, 13 capitals, 12 apart; tapping a scene shows it on the room's lights |
 | "+" new automation | a picker (deep blue top, the page a panel from 80): no bar title, the question 28 at 24, picture cards 371×159 (20 from the edges, 12 apart), title 16 over two lines of 14 |
 | Scene editor | a sheet 37 from the top; picture 48, name 34; the top tinted down through the brightness (label 16, value 13, slider 48 under the label), then 22 of page; "Lights" group (`#24262a`, title row 72, tiles 12 in); "Reset scene" and "Delete scene" centered 40 under it, 12 apart, 24 of room around their words (`#4b4b4b`; the red one `#371f22` with a 2 red border) |
 | Settings | large title; rows 72, 24 icons at 20 (the glyph fills the 24: a bulb and a sensor for Devices, the bridge's box, a bulb sending waves for MotionAware, Sync's mark for Entertainment), text at 72, titles 16 (500), subtitles 12, chevrons; separators from the text on; section titles 10 |
@@ -496,7 +502,7 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 
 The Sync screens were measured on the Android app with the live box (the emulator bridged
 to the home network so the app finds the box), after the iOS screenshots; both measure the
-same. Not measured yet: a gallery scene's sheet (it previews on the lights). Switching the picker between color, white and
+same. Switching the picker between color, white and
 effects sends nothing to the light (checked on an off light against HA's state).
 
 ### Hue Studio against it
@@ -579,3 +585,8 @@ effects sends nothing to the light (checked on an off light against HA's state).
   icon grid, TV remote control, Automatic control, Advanced, Software updates), background
   lighting moved there from the mode popover. New parts: `.row-art.disc`, `.field.filled`,
   `.icon-grid`, `.dock-go.ready`.
+- 2026-10-26, a gallery scene's card measured on the Android app (the scene shown on the
+  lights): the card narrower (26 from the sides), the pencil beside shuffle on the colors'
+  strip, the strip lighter and 72 tall, the pills 32 in capitals on the rows' grey, the name
+  24; the room row only for "Copy to…". A stray line left from the old time field's rule
+  (it hid the ticks' rule of choice lists) removed. With it the inventory is complete.

@@ -20,22 +20,29 @@ export const OVERLAYS_CSS = `
   .sheet.bottom.tall { align-items: stretch; padding-top: calc(var(--safe-top) + 8px); }
   .sheet.bottom.tall .box { height: 100%; }
   main.as-sheet .sheet.bottom.tall { padding-top: 0; }
-  /* A scene's sheet (scene-pick.ts), the Hue app's: picture with name and pencil, colors with
-     shuffle, the room or zone it goes to, "Save to my scenes" and "Set once". */
+  /* A scene's card (scene-pick.ts), the Hue app's (measured on its gallery's at 411): 26 from the
+     screen's sides; the picture 16:9 with the name and close; the colors on a lighter strip (72)
+     with shuffle and the pencil; "Save to my scenes" and "Set once" on the rows' grey, 32px
+     pills in capitals as wide as the wider one. "Copy to…" adds the room or zone between them. */
   hue-studio-scene-pick { display: contents; }
-  .scene-pick .box { width: min(100%, 440px); padding-bottom: 0; }
+  .sheet.scene-pick { padding: 16px 26px; }
+  .scene-pick .box { width: min(100%, 420px); padding-bottom: 0; }
   .scene-pick .pic { aspect-ratio: 16 / 9; }
-  .scene-pick .pic .round.rename { top: auto; bottom: 12px; }
-  .scene-pick .pic .name-input { position: absolute; left: 16px; right: 60px; bottom: 12px; z-index: 1; font-size: var(--fs-title-2); font-weight: 700; }
-  .scene-pick .dots { gap: 0; padding: 16px; background: none; }
-  .scene-pick .dots .shuffle { margin-left: auto; background: var(--fill-light); color: var(--text); }
-  .scene-pick h2.label { margin: 8px 18px 8px; }
+  .scene-pick .pic h3 { font-size: var(--fs-title-1); }
+  .scene-pick .pic .name-input { position: absolute; left: 16px; right: 60px; bottom: 12px; z-index: 1; font-size: var(--fs-title-1); font-weight: 700; }
+  .scene-pick .dots { gap: 8px; height: 72px; padding: 0 12px; box-sizing: border-box; background: var(--surface-low); }
+  .scene-pick .dots i { width: 32px; height: 32px; margin-left: -18px; }
+  .scene-pick .dots i:first-child { margin-left: 0; }
+  .scene-pick .dots .round { flex: none; background: var(--round); color: var(--text); }
+  .scene-pick .dots .shuffle { margin-left: auto; }
+  .scene-pick h2.label { margin: 16px 18px 8px; }
   .scene-pick .target-row { display: flex; align-items: center; gap: 24px; width: calc(100% - 32px); margin: 0 16px 18px; min-height: 68px;
                             padding: 0 20px; box-sizing: border-box; border: none; border-radius: var(--r-m); background: var(--surface-2); color: var(--text);
                             font: inherit; font-size: var(--fs-body); text-align: left; cursor: pointer; box-shadow: var(--shadow-raised); }
   .scene-pick .target-row ha-icon { --mdc-icon-size: 28px; }
-  .scene-pick .actions { background: var(--bg); padding: 16px; }
-  .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.4); }
+  .scene-pick .actions { display: grid; grid-template-columns: max-content; justify-content: center; gap: 12px; padding: 12px; background: var(--surface-row); }
+  .scene-pick .actions .pill { width: 100%; min-width: 0; height: var(--control); padding: 0 14px; background: var(--round); letter-spacing: 0.3px; text-transform: uppercase; }
+  .scene-pick .actions .pill.outline { background: transparent; box-shadow: inset 0 0 0 2px var(--separator); }
   /* An action sheet, the Hue app's: centered rows, the red one, "Cancel" under a line. */
   /* An action sheet over the screen blurred and dimmed (the Hue app's; other sheets are a plain dim). */
   .sheet.menu { background: var(--scrim-blur); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }

@@ -110,7 +110,7 @@ export class RoomView extends StudioView {
     ${this.menu ? this.menuSheet(g, this.menu.scene) : nothing}
     ${this.speed ? this.speedSheet(g, this.speed.scene) : nothing}
     ${this.copying
-      ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .scene=${this.copying.scene} .room=${this.copying.room}
+      ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .scene=${this.copying.scene} .room=${this.copying.room} pickRoom
           @close=${() => (this.copying = null)}></hue-studio-scene-pick>`
       : nothing}`;
   }

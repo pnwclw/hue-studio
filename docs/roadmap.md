@@ -369,8 +369,9 @@ off for scenes and automations. The more-info override opens our scene sheet
 (`scene-sheet.ts`) for `scene.*` of `hue` outside `/config/...`: the picture in the
 scene's colors and its room, "Activate" (shown at once, Adaptive Lighting told), and
 while it is on dynamic play and "Shuffle colors", "Edit scene" (the panel's editor,
-which returns to the page it was opened from), "Details" (HA's dialog). Not done: names
-in the HA language with Hue-style icons (scenes keep the bridge's names).
+which returns to the page it was opened from), "Details" (HA's dialog). Dropped
+(2026-10-26): names in the HA language with Hue-style icons. Scenes keep the bridge's
+names, the ones the Hue app shows: the bridge is the one place they live.
 
 1. **Markers. Hue Studio recognizes its scenes and automations by them, not by name.**
    - Scenes: platform `hue` plus the bridge scene id (as today). The bridge stays the
@@ -389,7 +390,8 @@ in the HA language with Hue-style icons (scenes keep the bridge's names).
    - **Automation category** "Hue Studio" (HA categories are per list).
    - **Area:** a scene gets its room's area. An automation gets the area of its one room;
      with several rooms it gets no area.
-   - **Names:** names follow the HA language (translations), with Hue-style icons.
+   - ~~**Names:** names follow the HA language (translations), with Hue-style icons.~~
+     Dropped: a scene's name is the bridge's.
    - **The user's choice wins.** We fill only what is empty or still ours. We never
      overwrite a category, area or label the user set. A rename or move on the bridge
      updates a category only while it is still one of ours.
@@ -421,8 +423,10 @@ for G. The automation parts land together with G.
 
 Open questions:
 - ~~Whether HA's scene list opens our sheet~~ — no, by rule: `/config/...` stays HA's.
-- Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
-  (read-only, opening in HA), or left out.
+- ~~Whether HA scenes from `scenes.yaml` that touch only Hue lights are shown in a room
+  (read-only, opening in HA), or left out.~~ —
+  no (2026-10-26): they live in HA, not on the bridge, so the Hue app never sees them;
+  a room shows what the bridge holds.
 
 ### I. One style for every dashboard: our cards, and theirs (2026-10-22)
 
@@ -503,10 +507,10 @@ and the `huesyncbox` link mode keep one screen.
 So that new features are not built on a vision of their own, everything is put on one
 design system first. **Done (2026-10-22, measured on the Hue app 6.3 on 2026-10-23)**:
 `docs/design-system.md`, tokens in `src/ds/tokens.ts`, `styles` and the cards, sheets and
-dialog on them, kept there by `tests/js/styles.test.ts`. Still to measure: the Sync screens
-with a box, a gallery scene's sheet.
+dialog on them, kept there by `tests/js/styles.test.ts`. The last screens were measured on
+2026-10-26: the Sync screens with the live box and a gallery scene's card.
 
-1. **Inventory of the Hue app** (done but for the screens above): every screen of the real app (home, rooms, scenes and
+1. **Inventory of the Hue app** (done): every screen of the real app (home, rooms, scenes and
    the gallery, the wheel, effects, automations, Sync, settings, devices, sheets and
    pickers), with sizes in dp, measured on the app in the Android emulator.
 2. **Inventory of Hue Studio:** every screen and part of the panel, the dialogs and the

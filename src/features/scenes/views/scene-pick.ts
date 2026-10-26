@@ -1,8 +1,8 @@
-// A scene's sheet, like the Hue app's for a gallery scene: its picture with its name (renamed
-// with the pencil), its colors (shuffled with a button), the room or zone it goes to (a
-// sheet of rooms and zones to pick from), "Save to my scenes" (a bridge scene there, with
-// the gallery picture) and "Set once". The gallery opens it for a scene, a room's "Copy to…"
-// for one of its scenes.
+// A scene's sheet, like the Hue app's for a gallery scene: its picture with its name, its
+// colors with shuffle and the pencil (rename), "Save to my scenes" (a bridge scene in the
+// room, with the gallery picture) and "Set once". The gallery opens it for a scene of the
+// room it was opened from; a room's "Copy to…" for one of its scenes, with the room or zone
+// it goes to as a row (a sheet of rooms and zones to pick from), which is ours.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -37,6 +37,8 @@ export class ScenePick extends LightElement {
   @property({ attribute: false }) accessor scene!: PickedScene;
   /** The room or zone (group key) it goes to at first. */
   @property() accessor room = "";
+  /** Show the room or zone as a row to change it ("Copy to…"); the gallery's is fixed. */
+  @property({ type: Boolean }) accessor pickRoom = false;
 
   @state() private accessor name: string | null = null;
   @state() private accessor editing = false;
@@ -122,22 +124,24 @@ export class ScenePick extends LightElement {
                   @keydown=${(e: KeyboardEvent) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} @blur=${done} />`
               : html`<h3>${name}</h3>`}
             <button class="round close" aria-label=${t("common.close")} @click=${() => this.close()}>${icon("close")}</button>
+          </div>
+          <div class="dots">
+            ${dots.map((c) => html`<i style=${styleMap({ background: c })}></i>`)}
+            ${s.points.length > 1 ? html`<button class="round shuffle" aria-label=${t("scene.shuffle_colors")} @click=${() => this.shuffle()}>${icon("shuffle")}</button>` : nothing}
             <button class="round rename" aria-label=${t("scene.rename")} @click=${() => {
               this.editing = true;
               void this.updateComplete.then(() => this.querySelector<HTMLInputElement>(".name-input")?.focus());
             }}>${icon("pencil")}</button>
           </div>
-          <div class="dots">
-            ${dots.map((c) => html`<i style=${styleMap({ background: c })}></i>`)}
-            ${s.points.length > 1 ? html`<button class="round shuffle" aria-label=${t("scene.shuffle_colors")} @click=${() => this.shuffle()}>${icon("shuffle")}</button>` : nothing}
-          </div>
-          <h2 class="label">${t("gallery.room_or_zone")}</h2>
-          <button class="target-row" @click=${() => {
-            haptic("selection");
-            this.picking = true;
-          }}>
-            <ha-icon icon=${g?.icon || "mdi:sofa-outline"}></ha-icon><span>${g?.name ?? t("gallery.pick_room")}</span>
-          </button>
+          ${this.pickRoom
+            ? html`<h2 class="label">${t("gallery.room_or_zone")}</h2>
+                <button class="target-row" @click=${() => {
+                  haptic("selection");
+                  this.picking = true;
+                }}>
+                  <ha-icon icon=${g?.icon || "mdi:sofa-outline"}></ha-icon><span>${g?.name ?? t("gallery.pick_room")}</span>
+                </button>`
+            : nothing}
           <div class="actions">
             <button class="pill outline" ?disabled=${!g || this.busy} @click=${() => this.save()}>${t("gallery.save_mine")}</button>
             <button class="pill" ?disabled=${!g} @click=${() => this.setOnce()}>${t("gallery.set_once")}</button>

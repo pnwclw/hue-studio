@@ -11,7 +11,6 @@ export const CHOICES_CSS = `
   .rows .item .row-art.pic { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: var(--bar-bottom); box-shadow: none; }
   .rows .item .row-art.pic ha-icon { --mdc-icon-size: 24px; }
   :is(.choice-sheet, .sensor-sheet) .rows .item:has(> .row-art.pic) { gap: 16px; padding-left: 16px; }
-                            font-variant-numeric: tabular-nums; text-align: right; color-scheme: dark; cursor: pointer; }
   .choice-list .item .tick, .moment-list .item .tick { display: flex; flex: none; color: var(--accent); }
   .moment-list .item .tick svg { width: 22px; height: 22px; fill: currentColor; }
   /* Time screen (momentChoice): the wheels under the chosen kind, one band across them. */
