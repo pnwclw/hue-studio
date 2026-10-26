@@ -34,7 +34,7 @@ export const OVERLAYS_CSS = `
   .scene-pick .dots i { width: 32px; height: 32px; margin-left: -18px; }
   .scene-pick .dots i:first-child { margin-left: 0; }
   .scene-pick .dots .round { flex: none; background: var(--round); color: var(--text); }
-  .scene-pick .dots .shuffle { margin-left: auto; }
+  .scene-pick .dots .round:first-of-type { margin-left: auto; }
   .scene-pick h2.label { margin: 16px 18px 8px; }
   .scene-pick .target-row { display: flex; align-items: center; gap: 24px; width: calc(100% - 32px); margin: 0 16px 18px; min-height: 68px;
                             padding: 0 20px; box-sizing: border-box; border: none; border-radius: var(--r-m); background: var(--surface-2); color: var(--text);
