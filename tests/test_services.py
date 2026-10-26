@@ -300,6 +300,7 @@ async def test_create_scene_from_gallery(
     method, path = hue_room.request.call_args.args
     body = hue_room.request.call_args.kwargs["json"]
     assert (method, path) == ("post", "clip/v2/resource/scene")
+    # A gallery scene as it is: a preset, not marked as one of your own.
     assert body["metadata"] == {"name": "Ocean"}
     assert body["group"] == {"rid": "res-room", "rtype": "room"}
     assert [a["target"]["rid"] for a in body["actions"]] == ["res-strip", "res-bulb"]
@@ -331,6 +332,8 @@ async def test_create_scene_gallery_colors_in_order(
         "rid": "a8897dcb-5c90-4459-8e4a-02b984bd32b5",
         "rtype": "public_image",
     }
+    # Your own colors under a gallery picture: marked on the bridge.
+    assert body["metadata"]["appdata"] == "hs:custom"
     colors = [c["color"]["xy"] for c in body["palette"]["color"]]
     assert [[c["x"], c["y"]] for c in colors] == points
 
@@ -348,6 +351,7 @@ async def test_create_scene_captures_lights(
     body = hue_room.request.call_args.kwargs["json"]
     assert "palette" not in body
     assert len(body["actions"]) == 2
+    assert body["metadata"] == {"name": "Now", "appdata": "hs:custom"}
 
 
 async def test_create_scene_rejects(hass: HomeAssistant, hue_room: MagicMock) -> None:

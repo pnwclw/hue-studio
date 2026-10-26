@@ -385,6 +385,8 @@ export interface SceneInfo {
   lights: string[];
   /** Id of the scene's picture in the Hue app (`public_image` of a gallery scene). */
   image: string | null;
+  /** A scene of your own (captured or from your colors), not a preset of the Hue app. */
+  custom: boolean;
 }
 
 export interface ScenesMessage {

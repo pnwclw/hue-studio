@@ -24,7 +24,8 @@ its device in the Philips Hue integration), with a link into the panel.
 > dynamic speed, auto-play, reset, dynamic playback), the scene gallery with
 > "set once", Hue rooms that follow your HA areas (a "Rooms and zones" screen with
 > a zone editor), Hue scenes kept tidy in Home Assistant's lists (a "Hue Studio" label,
-> a category per Hue room or zone, the room's area) with a Hue-style sheet when you open
+> a "Hue custom scene" label on scenes of your own, a category per Hue room or zone, the
+> room's area) with a Hue-style sheet when you open
 > one, and the Hue Play HDMI Sync Box (a Sync tab, its own entities and service). See
 > the roadmap below.
 
@@ -35,7 +36,7 @@ its device in the Philips Hue integration), with a link into the panel.
 | `hue_studio.apply_palette` | Apply a gallery scene (`gallery_scene`), up to 5 colors (`points`, CIE xy), a white (`mirek`) or a `palette` reference (`gallery:<id>`, `b64:<base64 JSON>`) to Hue lights, rooms or areas (an area uses its Hue lights only). Gradient lights get the whole palette (laid out by `mode` when they support it), others one color each; with `layout: spatial`, colors follow where the lights stand (see "Space"). Optional `brightness` and `transition` (s). |
 | `hue_studio.set_gradient` | Set 2-5 color points (and the mode) of Hue gradient lights. |
 | `hue_studio.set_effect` | Play an effect (`candle`, `fire`, `sparkle`, `glisten`, `opal`, `prism`, `underwater`, `cosmos`, `sunbeam`, `enchant`; `no_effect` stops it) with an optional color (`xy_color` or `mirek`), `speed` and `brightness`. |
-| `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. |
+| `hue_studio.create_scene` | Create a scene in a Hue room or zone (target its light group), visible in the Hue app: from a `gallery_scene`, `points` or `mirek` (spread over the lights and stored as the scene palette), otherwise from what the lights show now. Returns the new `scene_id`. A scene of your own (not a gallery scene as it is) is marked so on the bridge (`metadata.appdata`), whatever picture it carries. |
 | `hue_studio.delete_scene` | Delete Hue scenes from the bridge. |
 | `hue_studio.create_zone` | Create a Hue zone of the targeted lights (e.g. an area's Hue lights), so the area gets scenes of its own. Returns the new `zone_id`. |
 | `hue_studio.update_zone` | Rename a Hue zone (`name`) or give it other `lights`. |

@@ -458,7 +458,9 @@ async def _async_keep_split_scenes(bridge: HueBridgeV2, plan: alignment.Plan) ->
         for scene in scenes:
             post = ScenePost(
                 metadata=SceneMetadata(
-                    name=scene.metadata.name, image=scene.metadata.image
+                    name=scene.metadata.name,
+                    image=scene.metadata.image,
+                    appdata=scene.metadata.appdata,
                 ),
                 group=zone,
                 actions=scene.actions,
