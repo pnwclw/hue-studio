@@ -302,6 +302,12 @@ function sceneXy(info: SceneInfo | undefined): { points: XY[]; whites: number[] 
   return { points: info.colors ?? [], whites: info.whites ?? [] };
 }
 
+/** A scene as a palette: its colors (up to the palette's five), else its white. */
+export function scenePalette(info: SceneInfo | undefined): { points: XY[]; mirek: number | null } {
+  const { points, whites } = sceneXy(info);
+  return { points: points.slice(0, 5), mirek: points.length ? null : (whites[0] ?? null) };
+}
+
 /** Soft colors of a scene (or a warm fallback). */
 export function sceneColors(info: SceneInfo | undefined): string[] {
   const { points, whites } = sceneXy(info);

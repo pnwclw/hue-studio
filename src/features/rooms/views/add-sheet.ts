@@ -1,11 +1,12 @@
 // "+" of a room or zone, like the Hue app's: a picker (a deep blue top, the page a rounded
 // panel over it) asking what to add, as picture tiles. A scene (from the Hue scene gallery,
 // a custom one set light by light, from what the lights show now, or an all-day scene: a
-// schedule showing the scene of the day), a device ("Add devices", the room's area picked) or an automation of the room.
-// Fires `close`.
+// schedule showing the scene of the day, or one from a Hue app link: fires `shared` with it), a
+// device ("Add devices", the room's area picked) or an automation of the room. Fires `close`.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt } from "../../../core/color.ts";
@@ -16,12 +17,16 @@ import { friendlyName, type Group } from "../../../core/model.ts";
 import { icon } from "../../../ds/ui.ts";
 import { StudioView } from "../../../ds/base.ts";
 import "../../scenes/views/new-scene.ts";
+import { readShareLink } from "../../scenes/share.ts";
 
 @customElement("hue-studio-add-sheet")
 export class AddSheet extends StudioView {
   @property({ attribute: false }) accessor group: Group | null = null;
 
-  @state() private accessor step: "menu" | "scene" | "current" = "menu";
+  @state() private accessor step: "menu" | "scene" | "current" | "link" = "menu";
+  /** The link being pasted, and whether it was read as no scene. */
+  @state() private accessor link = "";
+  @state() private accessor badLink = false;
 
   private close = (): void => {
     this.dispatchEvent(new Event("close"));
@@ -37,7 +42,7 @@ export class AddSheet extends StudioView {
       this.close();
       ctx.go(path);
     };
-    const next = (step: "menu" | "scene" | "current") => {
+    const next = (step: "menu" | "scene" | "current" | "link") => {
       haptic("selection");
       this.step = step;
     };
@@ -47,7 +52,7 @@ export class AddSheet extends StudioView {
     // A scene's ways: the picture at the top left, the name at the bottom.
     const small = (art: TemplateResult, title: StringKey, act: () => void) =>
       html`<button class="pick-tile way" @click=${act}><span class="art">${art}</span><span class="name">${t(title)}</span></button>`;
-    const scene = this.step === "scene";
+    const scene = this.step === "scene" || this.step === "link";
     const three = (ctx.gallery?.scenes ?? []).filter((_, i, all) => i % Math.max(1, Math.floor(all.length / 3)) === 0).slice(0, 3);
     const name = g.group ? friendlyName(ctx.hass, g.group) : g.name;
     return html`<div class="add-picker" role="dialog" aria-label=${scene ? t("add.scene_title") : t("add.title")}>
@@ -69,6 +74,11 @@ export class AddSheet extends StudioView {
                 ${small(html`<ha-icon icon="mdi:pencil"></ha-icon>`, "add.custom", () => go(`/room/${room}/scene/new`))}
                 ${small(html`<ha-icon icon="mdi:check"></ha-icon>`, "add.current", () => next("current"))}
                 ${small(html`<ha-icon icon="mdi:clock-time-four"></ha-icon>`, "add.all_day", () => go(`/automations/new/schedule?room=${room}&preset=all_day`))}
+                ${small(html`<ha-icon icon="mdi:link-variant"></ha-icon>`, "share.from_link", () => {
+                  this.link = "";
+                  this.badLink = false;
+                  next("link");
+                })}
               </div>`
           : html`<h1 class="big">${t("add.question", { room: name })}</h1>
               <div class="pick-tiles">
@@ -77,7 +87,68 @@ export class AddSheet extends StudioView {
                 ${big("mdi:lightning-bolt", "add.add_automation", () => go(`/automations/new?room=${room}`))}
               </div>`}
       </div>
+    </div>
+    ${this.step === "link" ? this.linkSheet() : nothing}`;
+  }
+
+  /** "Scene link": a link someone shared from the Hue app (or Hue Studio), pasted; "Done" opens its card. */
+  private linkSheet() {
+    const { ctx } = this;
+    const { t } = ctx;
+    const cancel = () => (this.step = "scene");
+    const done = async () => {
+      const scene = await readShareLink(this.link);
+      if (!scene) {
+        haptic("warning");
+        this.badLink = true;
+        return;
+      }
+      haptic("success");
+      this.dispatchEvent(new CustomEvent("shared", { detail: scene }));
+      this.close();
+    };
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && cancel()}>
+      <div class="box form name-sheet" role="dialog" aria-label=${t("share.link")}>
+        <div class="sheet-bar">
+          <button class="round close" aria-label=${t("common.close")} @click=${cancel}>${icon("close")}</button>
+          <div class="grow">${t("share.link")}</div>
+          <button class="pill" ?disabled=${!this.link.trim()} @click=${() => void done()}>${t("common.done")}</button>
+        </div>
+        <div class="form-body">
+          <label class="name-field">
+            <input
+              class="field outlined"
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              placeholder="https://scenesharing.meethue.com/…"
+              aria-label=${t("share.link")}
+              .value=${this.link}
+              @input=${(e: InputEvent) => {
+                this.link = (e.target as HTMLInputElement).value;
+                this.badLink = false;
+              }}
+              @keydown=${(e: KeyboardEvent) => e.key === "Enter" && this.link.trim() && void done()}
+            />
+            ${this.link
+              ? html`<button class="round mini" aria-label=${t("common.clear")} @click=${(e: Event) => {
+                  e.preventDefault();
+                  this.link = "";
+                  this.badLink = false;
+                  this.querySelector<HTMLInputElement>(".name-field input")?.focus();
+                }}>${icon("close")}</button>`
+              : nothing}
+          </label>
+          <p class=${classMap({ hint: true, warn: this.badLink })}>${t(this.badLink ? "share.bad_link" : "share.link_hint")}</p>
+        </div>
+      </div>
     </div>`;
+  }
+
+  protected override updated(changed: Map<PropertyKey, unknown>): void {
+    super.updated(changed);
+    // The link sheet comes up ready to paste into.
+    if (changed.has("step") && this.step === "link") this.querySelector<HTMLInputElement>(".name-sheet input")?.focus();
   }
 }
 

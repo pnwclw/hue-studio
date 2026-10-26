@@ -12,7 +12,7 @@ import { repeat } from "lit/directives/repeat.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { paletteArt, paletteColors } from "../../../core/color.ts";
-import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, sceneGlyph, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../../../ds/controls.ts";
+import { banner, groupSlider, groupToggle, lightTile, sceneColors, sceneDot, sceneGlyph, scenePalette, shownState, speedSheet, surfaceOf, syncBanner, tileCard } from "../../../ds/controls.ts";
 import { speedToStep, stepToSpeed } from "../../color/effects.ts";
 import { galleryMatch, thumbUrl } from "../../scenes/gallery-data.ts";
 
@@ -36,7 +36,8 @@ import { icon, refuse, toggle } from "../../../ds/ui.ts";
 import "./add-sheet.ts";
 import { roomAutomations } from "../../automations/views/automations.ts";
 import { StudioView } from "../../../ds/base.ts";
-import { otherRoom, type PickedScene, pickPicture } from "../../scenes/views/scene-pick.ts";
+import { otherRoom, type PickedScene, pickPicture, sharedPick } from "../../scenes/views/scene-pick.ts";
+import { paletteShare, sendLink, type SharedScene, shareLink } from "../../scenes/share.ts";
 
 @customElement("hue-studio-room-view")
 export class RoomView extends StudioView {
@@ -102,7 +103,11 @@ export class RoomView extends StudioView {
       ${roomAutomations(ctx, g)}
     </div></div>
     ${this.adding
-      ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}></hue-studio-add-sheet>`
+      ? html`<hue-studio-add-sheet .ctx=${this.ctx} .rev=${this.rev} .group=${g} @close=${() => (this.adding = false)}
+          @shared=${(e: CustomEvent<SharedScene>) => {
+            // A scene from a link: its card, for this room (another one can be picked).
+            this.copying = { scene: sharedPick(ctx.t("share.scene_name"), ctx.gallery, e.detail), room: g.key };
+          }}></hue-studio-add-sheet>`
       : nothing}
     ${this.menu ? this.menuSheet(g, this.menu.scene) : nothing}
     ${this.speed ? this.speedSheet(g, this.speed.scene) : nothing}
@@ -351,8 +356,7 @@ export class RoomView extends StudioView {
     // "Copy to…": the scene's sheet, another room or zone picked, saved there or set once.
     const copy = () => {
       const match = galleryMatch(ctx.gallery, s.name, info?.image);
-      const points = info?.palette ?? [];
-      const mirek = info?.mirek[0] ?? null;
+      const { points, mirek } = scenePalette(info);
       this.copying = {
         scene: {
           name: s.name,
@@ -365,6 +369,17 @@ export class RoomView extends StudioView {
         },
         room: otherRoom(ctx, g.key),
       };
+    };
+    // "Share": the scene as a Hue app link (its colors, its gallery picture, its speed).
+    const share = async () => {
+      const { points, mirek } = scenePalette(info);
+      const image = info?.image ?? galleryMatch(ctx.gallery, s.name, info?.image)?.public_image ?? null;
+      // Its whites too: a Hue palette has colors for color lights and whites for white ones.
+      const whites = info?.mirek.length ? info.mirek : (info?.whites ?? []);
+      const link = await shareLink(paletteShare({ points, whites, mirek, image, speed: info?.speed }));
+      const sent = await sendLink(link, s.name);
+      if (sent === "copied") ctx.toast(t("share.copied"));
+      else if (sent === null) ctx.toast(t("share.failed"));
     };
     const shuffle = async () => {
       const data = { entity_id: entityId, shuffle: true, recall: true };
@@ -380,6 +395,7 @@ export class RoomView extends StudioView {
     return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, menu: true })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box action-sheet" role="dialog" aria-label=${s.name}>
         <button @click=${act(copy)}>${t("scene.copy_to")}</button>
+        <button @click=${act(() => void share())}>${t("share.share")}</button>
         ${info?.dynamic ? html`<button @click=${act(() => (this.speed = { scene: entityId, step: speedToStep(info.speed) }))}>${t("scene.change_speed")}</button>` : nothing}
         ${info?.resettable && (info.palette.length > 1 || info.mirek.length > 1) ? html`<button @click=${act(shuffle)}>${t("scene.shuffle_colors")}</button>` : nothing}
         ${ctx.hass.user?.is_admin ? html`<button class="danger" @click=${remove}>${t("scene.delete")}</button>` : nothing}

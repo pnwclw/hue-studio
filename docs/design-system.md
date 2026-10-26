@@ -362,7 +362,8 @@ Each part: its class (and helper), its measures, where it is used.
   "Device info", a scene's picture); the shorter choices ("Function", "Room") rise from the bottom as tall as
   their rows.
 - **Name sheet** (`.name-sheet`): "Scene name" in the sheet bar with close and "DONE", the
-  name in a 46px field with a 1.5px `--outline` border and a round clear button.
+  name in a 46px field with a 1.5px `--outline` border and a round clear button; "Scene link"
+  the same, a hint (or its warning) under the field.
 - **Footer** `.screen-foot`: a line over the screen's one action (the accent pill), centered,
   the safe area under it (a new scene's "Save").
 - **Menu** `.menu`: a dropdown from a "⋯" button.
@@ -373,6 +374,9 @@ Each part: its class (and helper), its measures, where it is used.
   (outlined, a 2px `--separator` ring) over "Set once" (`--round`) on `--surface-row`, 12
   apart and 12 in: 32px pills in capitals, both as wide as the wider. The gallery's room is
   fixed; "Copy to…" (ours) adds the room or zone as a row between the strip and the pills.
+  Share (ours) is the first round button on the strip: the card's scene as a Hue app link (the
+  share sheet on phones, else copied); a scene from a link opens on such a card with its room
+  as a row.
   The gallery's scenes are a row of such cards, 12 apart, the neighbours showing at the
   sides; a swipe brings the next one to the middle (Motion).
 - **Dialog** (`hue-studio-more-info.ts`) and **more-info sheets** (`automation-sheet.ts`,
@@ -628,3 +632,7 @@ effects sends nothing to the light (checked on an off light against HA's state).
   colors (a captured scene has no palette), or a picture of its own: a photo or an icon on
   its colors, picked on a tall sheet from the editor's picture (rows with pictures, the icon
   grid). Adaptive Lighting's badges are gone with its support.
+- 2026-10-26, scenes shared as the Hue app's links (scenesharing.meethue.com): a round share
+  button on a scene's card, "Share" on a scene's "⋯", and "From a link" among a room's ways
+  to add a scene (a name sheet with the link, its warning under the field; the scene's card
+  then). Sheets a picker opens lie over it.

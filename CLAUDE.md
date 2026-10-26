@@ -406,7 +406,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
                                 an entertainment area), add-sheet (a room's "+": scene, automation or device)
     color/                      effects.ts (pure: effect catalog, 1-12 speed scale); views: color (wheel), effects,
                                 effect-sheet (an effect's "adjust")
-    scenes/                     gallery-data.ts (the bundled gallery, matching), seasons.ts (pure: seasonal gallery);
+    scenes/                     gallery-data.ts (the bundled gallery, matching), seasons.ts (pure: seasonal gallery),
+                                share.ts (pure: the Hue app's scene share links, both ways);
                                 views: scene (editor), new-scene, scene-pick (a scene's sheet), gallery,
                                 gallery-settings, scene-sheet (the override's sheet for Hue scenes)
     automations/                automations.ts (pure: blueprint inputs <-> config, the list, the light picker),

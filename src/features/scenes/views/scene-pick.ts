@@ -3,7 +3,9 @@
 // room, with the gallery picture) and "Set once". The gallery opens it on the scene tapped,
 // the gallery's other scenes beside it to swipe to; a room's "Copy to…" for one of its
 // scenes, with the room or zone it goes to as a row (a sheet of rooms and zones to pick from),
-// which is ours. It comes up from the bottom over a fading dim and goes back down.
+// which is ours; a scene from a Hue app link (share.ts, a room's "+"). Its share button
+// gives the card's scene as such a link. It comes up from the bottom over a fading dim and
+// goes back down.
 
 import { html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -16,7 +18,9 @@ import type { StudioContext } from "../../../core/context.ts";
 import { haptic } from "../../../core/ha-internals.ts";
 import { allGroups, findGroup, type Group } from "../../../core/model.ts";
 import { canSpread } from "../../rooms/space.ts";
-import type { XY } from "../../../core/types.ts";
+import type { Gallery, XY } from "../../../core/types.ts";
+import { thumbUrl } from "../gallery-data.ts";
+import { paletteShare, sendLink, type SharedScene, sharedPalette, shareLink } from "../share.ts";
 import { icon, LightElement } from "../../../ds/ui.ts";
 
 /** What the sheet shows: a gallery scene, or a scene's palette (its gallery picture if it has one). */
@@ -32,6 +36,10 @@ export interface PickedScene {
   /** A white scene. */
   mirek: number | null;
   gradient: boolean;
+  /** Its picture in the Hue app (`public_image`), shared with it. */
+  image?: string | null;
+  /** Its brightness (0-100), when it has one of its own (a scene from a link). */
+  brightness?: number | null;
 }
 
 @customElement("hue-studio-scene-pick")
@@ -191,9 +199,24 @@ export class ScenePick extends LightElement {
   private colors(i: number): Record<string, unknown> {
     const s = this.list[i];
     const order = this.orders[i];
-    if (order) return { points: order.slice(0, 5) };
-    if (s.gallery) return { gallery_scene: s.gallery };
-    return s.points.length ? { points: s.points.slice(0, 5) } : { mirek: s.mirek ?? 366 };
+    const brightness = s.brightness != null ? { brightness: s.brightness } : {};
+    if (order) return { points: order.slice(0, 5), ...brightness };
+    if (s.gallery) return { gallery_scene: s.gallery, ...brightness };
+    return s.points.length ? { points: s.points.slice(0, 5), ...brightness } : { mirek: s.mirek ?? 366, ...brightness };
+  }
+
+  /** The card's scene as a Hue app link: to the share sheet (phones), else copied. */
+  private async share(i: number): Promise<void> {
+    const { ctx } = this;
+    const s = this.list[i];
+    const g = s.gallery ? ctx.gallery?.scenes.find((x) => x.id === s.gallery) : undefined;
+    haptic("selection");
+    const link = await shareLink(
+      paletteShare({ points: this.orders[i] ?? s.points, mirek: s.mirek, brightness: s.brightness ?? g?.brightness, image: s.image ?? g?.public_image }),
+    );
+    const sent = await sendLink(link, this.names[i] ?? s.name);
+    if (sent === "copied") ctx.toast(ctx.t("share.copied"));
+    else if (sent === null) ctx.toast(ctx.t("share.failed"));
   }
 
   /** What apply_palette takes for a card: its colors, laid out by position for a gradient
@@ -289,6 +312,7 @@ export class ScenePick extends LightElement {
         </div>
         <div class="dots">
           ${dots.map((c) => html`<i style=${styleMap({ background: c })}></i>`)}
+          <button class="round share" aria-label=${t("share.share")} @click=${() => void this.share(i)}>${icon("share")}</button>
           ${s.points.length > 1 ? html`<button class="round shuffle" aria-label=${t("scene.shuffle_colors")} @click=${() => this.shuffle(i)}>${icon("shuffle")}</button>` : nothing}
           <button class="round rename" aria-label=${t("scene.rename")} @click=${() => {
             this.editing = i;
@@ -347,7 +371,11 @@ export class ScenePick extends LightElement {
 }
 
 /** A gallery scene for the sheet. */
-export const galleryPick = (scene: { id: string; name: string; kind: string; points?: XY[]; mirek?: number }, picture: string, art: string): PickedScene => ({
+export const galleryPick = (
+  scene: { id: string; name: string; kind: string; points?: XY[]; mirek?: number; public_image?: string },
+  picture: string,
+  art: string,
+): PickedScene => ({
   name: scene.name,
   gallery: scene.id,
   picture,
@@ -355,7 +383,26 @@ export const galleryPick = (scene: { id: string; name: string; kind: string; poi
   points: scene.points ?? [],
   mirek: scene.mirek ?? null,
   gradient: scene.kind === "gradient",
+  image: scene.public_image ?? null,
 });
+
+/** A scene from a Hue app link: its colors (its gallery picture, when the link names one we have). */
+export function sharedPick(name: string, gallery: Gallery | null, shared: SharedScene): PickedScene {
+  const { points, mirek, brightness } = sharedPalette(shared);
+  const art = pickPicture(points, mirek);
+  const match = shared.image ? gallery?.scenes.find((s) => s.public_image === shared.image) : undefined;
+  return {
+    name,
+    gallery: null,
+    picture: match ? `url("${thumbUrl(match.id)}") center / cover, ${art}` : art,
+    art,
+    points,
+    mirek,
+    gradient: points.length > 1,
+    image: shared.image,
+    brightness,
+  };
+}
 
 /** Every room and zone, for "Copy to…" (the first one other than `except`). */
 export const otherRoom = (ctx: StudioContext, except: string): string => allGroups(ctx.home).find((g) => g.key !== except)?.key ?? except;

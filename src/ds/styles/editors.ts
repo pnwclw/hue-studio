@@ -40,6 +40,8 @@ export const EDITORS_CSS = `
   .name-sheet .name-field { position: relative; display: flex; align-items: center; }
   .name-sheet .name-field .field { padding-right: 44px; }
   .name-sheet .name-field .round { position: absolute; right: 8px; }
+  /* A hint under the field (a scene link's), with the sheet's room under it. */
+  .name-sheet .name-field + .hint { margin: 10px 2px calc(8px + var(--safe-bottom)); }
   .scene-edit > .center { margin-top: 40px; }
   .scene-edit > .center + .delete-area { margin-top: 12px; }
   .name-row { display: flex; align-items: center; gap: 12px; margin: 10px 0 18px; }
@@ -68,6 +70,8 @@ export const EDITORS_CSS = `
   main > :has(.add-picker) { position: static; }
   .add-picker { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column;
                 background: linear-gradient(100deg, var(--picker-top), var(--picker-top-2) 60%); }
+  /* A sheet the picker opens (a scene link) lies over it. */
+  .add-picker ~ .sheet { z-index: 31; }
   .add-picker > .bar { flex: none; padding: max(6px, var(--safe-top)) 16px 6px; }
   .add-panel { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 20px 20px calc(28px + var(--safe-bottom));
                border-radius: var(--r-2xl) var(--r-2xl) 0 0; background: var(--bg); box-shadow: inset 0 1px 0 var(--surface-low); }
