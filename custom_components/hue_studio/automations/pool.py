@@ -25,9 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from astral import sun as astral_sun
-from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.dispatcher import (
@@ -315,13 +313,6 @@ def async_track_light_of_the_day(
 # ---- WebSocket API ----
 
 
-@callback
-def async_setup_pool_websocket(hass: HomeAssistant) -> None:
-    """Register the commands of the global light of the day."""
-    for command in (ws_subscribe, ws_set, ws_set_tags, ws_merge):
-        websocket_api.async_register_command(hass, command)
-
-
 async def async_payload(hass: HomeAssistant) -> dict[str, Any]:
     """Everything the panel shows of the global light of the day."""
     settings = async_settings(hass)
@@ -350,108 +341,3 @@ async def async_payload(hass: HomeAssistant) -> dict[str, Any]:
         "mood_entity": registry.async_get_entity_id("select", DOMAIN, MOOD_UNIQUE_ID),
         "phase_entity": registry.async_get_entity_id("sensor", DOMAIN, PHASE_UNIQUE_ID),
     }
-
-
-@websocket_api.websocket_command(
-    {vol.Required("type"): "hue_studio/daylight/subscribe"}
-)
-@callback
-def ws_subscribe(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """The global light of the day, now and whenever it changes.
-
-    Event payload: {"settings": {weather, season, light_sensor, night_from, shifts,
-    defaults}, "user_tags": {scene: tags}, "defaults": {scene: tags} (ready-made),
-    "tags": {scene: tags} (the pool), "sources": {weather, season, light_sensor}
-    (what is read), "now": {phase, season, weather, mood, scene, …}, "moods": [mood],
-    "mood_entity", "phase_entity"}
-    """
-    last: dict[str, Any] = {}
-
-    async def send() -> None:
-        payload = await async_payload(hass)
-        if payload == last.get("payload"):
-            return
-        last["payload"] = payload
-        connection.send_message(websocket_api.event_message(msg["id"], payload))
-
-    @callback
-    def changed() -> None:
-        hass.async_create_task(send(), eager_start=True)
-
-    connection.subscriptions[msg["id"]] = async_track_light_of_the_day(hass, changed)
-    connection.send_result(msg["id"])
-    changed()
-
-
-@websocket_api.require_admin
-@websocket_api.websocket_command(
-    {vol.Required("type"): "hue_studio/daylight/set", **SETTINGS}
-)
-@callback
-def ws_set(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Change global settings (sources, phase times, ready-made tags on/off)."""
-    changes = {k: v for k, v in msg.items() if k not in ("type", "id")}
-    try:
-        async_update_settings(hass, changes)
-    except HomeAssistantError as err:
-        connection.send_error(msg["id"], "not_set_up", str(err))
-        return
-    connection.send_result(msg["id"])
-
-
-@websocket_api.require_admin
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "hue_studio/daylight/tags",
-        vol.Required("scene"): cv.string,
-        vol.Required("tags"): vol.Any(None, TAGS),
-    }
-)
-@callback
-def ws_set_tags(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """A scene's tags ({}: out of the pool; null: back to the ready-made ones)."""
-    try:
-        async_set_tags(hass, msg["scene"], msg["tags"])
-    except HomeAssistantError as err:
-        connection.send_error(msg["id"], "not_set_up", str(err))
-        return
-    connection.send_result(msg["id"])
-
-
-@websocket_api.require_admin
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "hue_studio/daylight/merge",
-        vol.Optional("pools", default=dict): dict,
-        vol.Optional("holidays", default=list): [dict],
-    }
-)
-@websocket_api.async_response
-async def ws_merge(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Move an automation's own pools (before 0.10) into the global pool.
-
-    Result: {"scenes": number of scenes merged}. The panel then saves the automation
-    without them.
-    """
-    try:
-        count = await async_merge_pools(hass, msg["pools"], msg["holidays"])
-    except HomeAssistantError as err:
-        connection.send_error(msg["id"], "not_set_up", str(err))
-        return
-    connection.send_result(msg["id"], {"scenes": count})

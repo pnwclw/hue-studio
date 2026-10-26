@@ -31,8 +31,8 @@ from custom_components.hue_studio.automations.blueprints import (
     TYPES,
     async_install_blueprints,
     blueprint_path,
-    living_lights,
 )
+from custom_components.hue_studio.automations.light import living_lights
 from custom_components.hue_studio.automations.pool import async_update_settings
 from custom_components.hue_studio.const import DOMAIN
 

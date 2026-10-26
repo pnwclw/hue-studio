@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from homeassistant.core import HomeAssistant, callback
 
-from .automations.pool import async_setup_pool_websocket as async_setup_daylight
+from .automations.websocket import async_setup_websocket as async_setup_automations
 from .bridges.websocket import async_setup_websocket as async_setup_bridges
 from .core.websocket import async_setup_websocket as async_setup_config
 from .devices.websocket import async_setup_websocket as async_setup_devices
@@ -27,6 +27,6 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         async_setup_devices,
         async_setup_bridges,
         async_setup_sync_boxes,
-        async_setup_daylight,
+        async_setup_automations,
     ):
         setup(hass)
