@@ -400,6 +400,23 @@ export interface ZoneNote {
   lights?: string[];
 }
 
+/** A copy of the bridge scenes (`hue_studio/scenes/backups`). */
+export interface SceneBackup {
+  file: string;
+  created: string | null;
+  scenes: number;
+  bridges: string[];
+}
+
+/** What `hue_studio.import_scenes` did (or would do). */
+export interface SceneRestore {
+  file: string;
+  created: { scene: string; group: string }[];
+  replaced: { scene: string; group: string }[];
+  skipped: { scene: string; group: string; reason: string }[];
+  missing_lights: { scene: string; group: string; lights: string[] }[];
+}
+
 export interface ScenesMessage {
   scenes: Record<string, SceneInfo>;
 }

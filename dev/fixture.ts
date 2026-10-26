@@ -29,6 +29,7 @@ import type {
   SceneTags,
   RoomsPlan,
   StudioConfig,
+  SceneBackup,
   SceneInfo,
   ZoneNote,
   ServiceData,
@@ -313,6 +314,10 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   }
 
   const sceneInfo: Record<string, SceneInfo> = {};
+  const backups: SceneBackup[] = [
+    { file: "scenes-1.json", created: "2026-10-25T03:00:00Z", scenes: 24, bridges: ["Hue Bridge"] },
+    { file: "scenes-0.json", created: "2026-10-24T03:00:00Z", scenes: 25, bridges: ["Hue Bridge"] },
+  ];
   const sceneListeners = new Set<(msg: unknown) => void>();
   /** A bridge scene of a Hue group, as the native integration and our WS API show it. */
   const sceneId = (group: string, name: string) => `scene.${group}_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
@@ -1168,6 +1173,16 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         return { config: { id: config.id, alias: config.alias, triggers: [], actions: [] } } as T;
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
+      if (msg.type === "hue_studio/scenes/backups") return { backups } as T;
+      if (msg.type === "call_service" && msg.service === "export_scenes") {
+        const count = Object.keys(sceneInfo).length;
+        backups.unshift({ file: `scenes-${backups.length}.json`, created: new Date().toISOString(), scenes: count, bridges: ["Hue Bridge"] });
+        return { response: { file: backups[0].file, scenes: count, removed: [] } } as T;
+      }
+      if (msg.type === "call_service" && msg.service === "import_scenes") {
+        const one = { scene: "Ocean dawn", group: "Office" };
+        return { response: { file: "", created: [one, one], replaced: [], skipped: [{ ...one, reason: "exists" }], missing_lights: [] } } as T;
+      }
       if (msg.type === "hue_studio/daylight/set") {
         const { type: _type, ...change } = msg;
         const settings = day.settings as unknown as Record<string, unknown>;

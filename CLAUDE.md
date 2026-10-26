@@ -276,6 +276,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
   scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
   services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
+                                export_scenes, import_scenes,
                                 align_rooms, save_scene, reset_scene, recall_scene, set_sync
   websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
                                 hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
@@ -335,6 +336,8 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   options.py                    the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
                                 unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
+  scene_backup.py               scenes to a file in <config>/hue_studio/scenes/ and back (export_scenes, import_scenes,
+                                hue_studio/scenes/backups): lights by Zigbee MAC, copies kept while they hold a deleted scene
   zones.py                      "Zones as labels": each Hue zone mirrored as an HA label "Hue zone: <name>", both ways
                                 (the side that changed wins, the bridge on a tie; no automatic deletes); pairs in a Store;
                                 hue_studio/zones/subscribe|relink; create_zone waits for the zone's entity
