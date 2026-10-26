@@ -74,6 +74,7 @@ import voluptuous as vol
 from ..const import DOMAIN, SIGNAL_CONFIG_UPDATED
 from ..lights.adaptive import async_mark_manual
 from ..lights.bridge import ATTR_IS_HUE_GROUP, LIGHT_DOMAIN, async_all_lights
+from ..lights.targets import BRIGHTNESS, TRANSITION, async_target_lights
 from ..rooms.areas import light_area
 from ..scenes.bridge import (
     async_resolve_scenes,
@@ -83,7 +84,6 @@ from ..scenes.bridge import (
 )
 from ..scenes.gallery import async_gallery_scenes
 from ..scenes.organize import async_enabled as async_organize_enabled, async_label
-from ..services import BRIGHTNESS, TRANSITION, async_target_lights
 from . import daylight, pool
 
 _LOGGER = logging.getLogger(__name__)
