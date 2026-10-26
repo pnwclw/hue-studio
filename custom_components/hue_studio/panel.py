@@ -20,7 +20,7 @@ PANEL_ICON = "mdi:lightbulb-group"
 PANEL_TITLE = "Hue"
 
 # Loaded on every HA page: the more-info override, dashboard cards, the experimental
-# footer (each part on its own, see src/hue-studio-extra.ts).
+# footer (each part on its own, see src/entries/hue-studio-extra.ts).
 EXTRA_MODULE = "hue-studio-extra.js"
 
 _STATIC_REGISTERED = f"{DOMAIN}_static_registered"

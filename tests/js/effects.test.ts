@@ -11,8 +11,8 @@ import {
   speedToStep,
   speedWord,
   stepToSpeed,
-} from "../../src/effects.ts";
-import type { LightInfo } from "../../src/types.ts";
+} from "../../src/features/color/effects.ts";
+import type { LightInfo } from "../../src/core/types.ts";
 
 test("speed steps 1-12 cover the bridge's 0-1 and round-trip", () => {
   assert.equal(speedToStep(0), 1);

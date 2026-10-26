@@ -141,12 +141,18 @@ touching anything outside this repository.
 - **Code style follows Home Assistant core:** `async`, full type hints,
   `ConfigEntry.runtime_data`, translated exceptions, `config_flow` (a menu: add Hue Studio
   once — it uses every `hue` bridge — or a Sync Box: pair it or use HACS `huesyncbox`). Ruff with HA-like settings (`pyproject.toml`).
+- **One package per feature**, on both sides (`custom_components/hue_studio/<feature>/`,
+  `src/features/<feature>/`). A package holds only what belongs to it: its own
+  `services.py` and `websocket.py` with its own services and commands (the root files
+  only call them); in the frontend its pure modules at its root, its screens in `views/`. Repeating a file name in
+  several packages is fine; a shared grab-bag is not. What several features use lives in
+  `core/` (and `lights/targets.py`, `lights/palettes.py` for service targets and palettes).
 - **Every screen works on phone and desktop.** Verified with screenshots at the widths of
   iPhone 17 Pro (402×874) and 17 Pro Max (440×956), and 1440 (how: see `CLAUDE.local.md`).
   A UI change is not done without screenshots.
 - **Design system** (`docs/design-system.md`): every screen, sheet and card is made of its
-  parts — tokens in `src/tokens.ts` (colors, type scale, radii, shadows, sizes, motion) and
-  the components in `styles.ts` and their helpers. A missing part is added to the system
+  parts — tokens in `src/ds/tokens.ts` (colors, type scale, radii, shadows, sizes, motion) and
+  the components in `src/ds/styles/` and their helpers. A missing part is added to the system
   (and the doc) first; no one-off sizes, colors or fonts (`tests/js/styles.test.ts`).
 - **Scale.** The Hue app is the reference, measured on the app itself (6.3 in the Android
   emulator, dp = px here; how and every number: `docs/design-system.md`). Cards sit 12px
@@ -162,7 +168,7 @@ touching anything outside this repository.
   red border at the bottom. The automation editor's rows have no icons (its type's icon
   sits by its name).
 - **Times are chosen on wheels**, never the system's time picker: a time screen
-  (`momentChoice`/`timeChoice` in `views/choice.ts`, wheels in `wheel.ts`) like the Hue
+  (`momentChoice`/`timeChoice` in `ds/choice.ts`, wheels in `wheel.ts`) like the Hue
   app's "Start at" — each kind (a time, sunrise, sunset, none) a row with a tick, the
   chosen one's wheels under it, "Done" in the header. An automation's own time of day
   (wake up, go to sleep) sits on its wheels in place (`timeWheels`) under a "Time" switch
@@ -204,7 +210,7 @@ touching anything outside this repository.
   fields (`@property() accessor x`), `strict` TypeScript, `erasableSyntaxOnly` so the pure
   modules run in Node without a build. Views and controls are light-DOM Lit elements
   (`LightElement`) under one shadow root per panel/dialog, so the single stylesheet in
-  `styles.ts` applies. Views get `ctx` plus a `rev` counter that the owner bumps on every
+  `ds/styles/` applies. Views get `ctx` plus a `rev` counter that the owner bumps on every
   change (new `hass`, WebSocket data, optimistic state). The built JS is git-ignored; it
   ships in the release zip.
 - HACS compatibility is a hard requirement: `hacs.json` at the root, a single integration
@@ -272,47 +278,86 @@ rooms: {"room_a": {"name": "Room A", "light": "light.example_lamp"},
 ## Layout
 
 ```
-custom_components/hue_studio/   the integration (manifest, config flow, translations, …)
-  lights.py                     HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
-  scenes.py                     HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
-  services.py, services.yaml    apply_palette, set_gradient, set_effect, create_scene, delete_scene, create_zone, update_zone, delete_zone,
-                                export_scenes, import_scenes,
-                                align_rooms, save_scene, reset_scene, recall_scene, set_sync
-  websocket.py                  hue_studio/lights|scenes|config|sync|rooms|positions|devices/subscribe, hue_studio/lights/set_area,
-                                hue_studio/config/set|set_group|set_room_sensors, hue_studio/positions/set,
-                                hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
-                                hue_studio/bridges/subscribe|motion_area|rename|discover|link,
-                                hue_studio/sync/configure|behavior|follow|input|link_bridge
-  alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
-  rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
-  devices.py                    adding devices: Zigbee search (serials, other brands, install codes from QR codes where the
+custom_components/hue_studio/   the integration: one package per feature, each with its own services.py / websocket.py
+                                (only that feature's services and commands); HA's own files stay at the root
+  __init__.py, const.py         setup of the entries; constants shared by every package
+  config_flow.py                setup (menu: Hue Studio once, for every `hue` bridge; Sync Box: pair or use `huesyncbox`); no options flow
+  diagnostics.py                a paired Sync Box's own state (redacted), to match the Hue app's settings with its fields
+  switch.py, select.py, number.py, sensor.py   platforms: Sync Box entities; the Hue Studio entry's phase sensor and mood select
+  services.py, services.yaml    calls each package's async_setup_services; services.yaml describes them all
+  websocket.py                  calls each package's async_setup_websocket
+  panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
+  core/
+    connections.py              the Hue Studio entry: one connection per `hue` bridge, following its entry; bridges as service devices
+    options.py                  the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
+                                unique ids -> entity ids for the frontend
+    websocket.py                hue_studio/config/subscribe|set|set_group|set_room_sensors
+    ws.py                       what the commands share: a subscription sending a payload as it changes, a call -> result/error
+  lights/
+    bridge.py                   HA light entity <-> bridge resource (aiohue), gamut/gradient/effect info
+    targets.py                  a service call's Hue lights (entities, areas, devices, labels; syncing ones left alone), shared values
+    palettes.py                 the palette a call names: gallery scene, colors, white, `gallery:<id>`, `b64:<json>`
+    adaptive.py                 Adaptive Lighting: mark lights manual after our commands
+    services.py                 apply_palette, set_gradient, set_effect
+    websocket.py                hue_studio/lights/subscribe
+  rooms/
+    alignment.py                pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
+    areas.py                    feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
+    zones.py                    "Zones as labels": each Hue zone mirrored as an HA label "Hue zone: <name>", both ways
+                                (the side that changed wins, the bridge on a tie; no automatic deletes); pairs in a Store;
+                                create_zone waits for the zone's entity
+    services.py                 create_zone, update_zone, delete_zone, align_rooms
+    websocket.py                hue_studio/rooms/subscribe, hue_studio/lights/set_area, hue_studio/zones/subscribe|relink
+  space/
+    positions.py                light positions (entertainment areas + Store), editor saves, spatial palette layout
+    entertainment.py            entertainment areas: list, create, change (name, type, lights), positions, delete
+    websocket.py                hue_studio/positions/subscribe|set, hue_studio/entertainment/subscribe|create|update|delete|positions
+  scenes/
+    bridge.py                   HA scene entity <-> bridge scene: info, create/save (capture lights or palette), reset (palette)
+    gallery.py                  backend access to the bundled gallery
+    pictures.py                 gallery pictures: the Hue app's, downloaded once into HA's cache; the bundled tile otherwise
+    backup.py                   scenes to a file in <config>/hue_studio/scenes/ and back: lights by Zigbee MAC, copies kept
+                                while they hold a deleted scene
+    organize.py                 bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
+                                icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
+                                the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option
+    services.py                 create_scene, delete_scene, save_scene, reset_scene, recall_scene, export_scenes, import_scenes
+    websocket.py                hue_studio/scenes/subscribe|backups
+  automations/
+    blueprints.py               blueprints in place, our automations (markers) and the others on Hue lights,
+                                label/category/area of ours, setup (living light started)
+    light.py                    apply_light (scene/white/natural/scene of the day/off), living light (keeps up with the day
+                                until changed)
+    daylight.py                 pure: phase, season, weather, mood, scene tags -> pool, scene of the day, natural light, brightness;
+                                global + an automation's own settings (resolve), old pools -> tags; change tolerance
+    pool.py                     the global light of the day: settings in the entry's options, ready-made tags, mood, sources
+    scene_tags.json             ready-made tags of every gallery scene (hand-made: phases, seasons, weather, moods)
+    websocket.py                hue_studio/automations/subscribe|organize|preview|legacy_auto_light,
+                                hue_studio/daylight/subscribe|set|tags|merge
+  blueprints/automation/hue_studio/   one blueprint per Hue app type (wake up, go to sleep, coming/leaving home,
+                                mimic presence, schedule, motion sensor), validated in tests by HA itself
+  devices/
+    manage.py                   adding devices: Zigbee search (serials, other brands, install codes from QR codes where the
                                 bridge takes them), all devices, name + area + Hue room,
                                 a light's function and power-on preset, delete
-  entertainment.py              entertainment areas: list, create, change (name, type, lights), positions, delete
-  bridges.py                    every bridge (connected or not): facts, Bridge Pro, rename; MotionAware areas (health, on/off)
-  identity.py                   every Hue device remembered by Zigbee MAC (its entities' ids and settings, HA device area,
+    identity.py                 every Hue device remembered by Zigbee MAC (its entities' ids and settings, HA device area,
                                 name, labels; bridge name, archetype, light settings), rooms/zones/scenes by name; a device
                                 or room that comes back as new resources (any way: "Add devices", the Hue app, pairing
                                 again) takes its ids and settings back once the old entities are gone
-  bridge_setup.py               adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
+    websocket.py                hue_studio/devices/subscribe|search|identify|setup|sensitivity|delete
+  bridges/
+    info.py                     every bridge (connected or not): facts, Bridge Pro, rename
+    setup.py                    adding a bridge: find it (mDNS, Hue discovery), link it through the native `hue` config flow
                                 (its button); Wi-Fi bridges are put on the network by the Hue app
-  automations.py                blueprints in place, apply_light (scene/white/natural/scene of the day/off), living light
-                                (keeps up with the day until changed), label/category/area of our automations,
-                                hue_studio/automations/subscribe|organize|preview|legacy_auto_light
-  blueprints/automation/hue_studio/   one blueprint per Hue app type (wake up, go to sleep, coming/leaving home,
-                                mimic presence, schedule, motion sensor), validated in tests by HA itself
-  daylight.py                   pure: phase, season, weather, mood, scene tags -> pool, scene of the day, natural light, brightness;
-                                global + an automation's own settings (resolve), old pools -> tags; change tolerance
-  pool.py                       the global light of the day: settings in the entry's options, ready-made tags, mood, sources,
-                                hue_studio/daylight/subscribe|set|tags|merge
-  scene_tags.json               ready-made tags of every gallery scene (hand-made: phases, seasons, weather, moods)
-  positions.py                  light positions (entertainment areas + Store), editor saves, spatial palette layout
-  sync.py                       Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV, inputs' names and
+    motion_areas.py             MotionAware areas: health, on/off, create, change, recalibrate, what motion does, delete
+    websocket.py                hue_studio/bridges/subscribe|motion_area|rename|discover|link, MotionAware area commands
+  sync_box/
+    coordinator.py              Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV, inputs' names and
                                 types, Bluetooth for the Hue Sync app's Wi-Fi change, updates at night, restart; the Hue app's
                                 automatic control: CEC/HPD/USB/inactivity power, per-input CEC/HPD switching and auto sync,
                                 ARC bypass), link to bridge entertainment areas, moving it to another bridge
                                 (that bridge's button: its own entertainment credentials, the area of the same name)
-  sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): the
+    follow.py                   following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): the
                                 box sees a picture (`linked`) only on the input it is on and none asleep, so each input's picture
                                 is an HA entity (its player, a sensor) or the box's link while on it; a picture switches (and
                                 wakes) the box in that input's mode, another input with one takes over when it is gone; its
@@ -321,79 +366,64 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 stopped for the session; picking an input wakes its source (a wake entity). Edges only; the
                                 box entry's options. All of it is the home-made HDMI CEC of "HDMI CEC: Hue Studio" (the box
                                 then does not follow the TV); with "HDMI CEC: the box" nothing here acts
-  sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
-  diagnostics.py                a paired Sync Box's own state (redacted), to match the Hue app's settings with its fields
-  entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities; the Hue Studio entry's phase sensor and mood select
+    link.py                     Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
+    entity.py                   the Sync Box entities' base
+    services.py                 set_sync, save/delete_sync_preset, learn/set/delete_sync_ir_code
+    websocket.py                hue_studio/sync/subscribe|configure|behavior|follow|input|link_bridge
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
-  config_flow.py                setup (menu: Hue Studio once, for every `hue` bridge; Sync Box: pair or use `huesyncbox`); no options flow
-  connections.py                the Hue Studio entry: one connection per `hue` bridge, following its entry; bridges as service devices
-  options.py                    the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
-                                unique ids -> entity ids for the frontend
-  adaptive.py                   Adaptive Lighting: mark lights manual after our commands
-  scene_backup.py               scenes to a file in <config>/hue_studio/scenes/ and back (export_scenes, import_scenes,
-                                hue_studio/scenes/backups): lights by Zigbee MAC, copies kept while they hold a deleted scene
-  zones.py                      "Zones as labels": each Hue zone mirrored as an HA label "Hue zone: <name>", both ways
-                                (the side that changed wins, the bridge on a tie; no automatic deletes); pairs in a Store;
-                                hue_studio/zones/subscribe|relink; create_zone waits for the zone's entity
-  organize.py                   bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
-                                icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
-                                the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option
-  panel.py                      registers the `/hue` panel and serves frontend/ at /hue_studio_static
-  gallery.py                    backend access to the bundled gallery
-  pictures.py                   gallery pictures: the Hue app's, downloaded once into HA's cache; the bundled tile otherwise
   frontend/                     build output (git-ignored) + gallery/
     gallery/                    generated by scripts/build_gallery.py — do not edit by hand
-src/                            frontend sources (TypeScript + Lit), bundled into frontend/
-  hue-studio-panel.ts           panel shell: routing, tab bar; owns the StudioContext
-  hue-studio-extra.ts           extra JS on every HA page: loads more-info, cards and footer, each on its own
-  hue-studio-more-info.ts       more-info override + Hue-style dialog
-  automation-sheet.ts           the override's sheet for automations made with Hue Studio
-  scene-sheet.ts                the override's sheet for Hue scenes (activate, play, shuffle, edit in the panel)
-  cards.ts                      dashboard cards (room, automations, gallery) sharing one StudioContext
-  footer.ts, footer-model.ts    experimental Liquid Glass footer (element; pure: tabs, active tab, visibility)
-  context.ts                    shared by panel and dialog: optimistic hass, WS subscriptions, calls
-  optimistic.ts                 pure: predicted state of a service call until HA confirms it
-  controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
-  views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
-                                sync-settings (a Sync Box's settings, the Hue app's pages: device, HDMI inputs, TV remote, automatic
-                                control with HDMI CEC by Hue Studio, advanced, updates, presets),
-                                automations (the tab, "+" with a picture card per type and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
-                                natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, its motion automation edited in place, sensitivity), scene-pick (a scene's sheet: save it to a room or set it once),
-                                experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's
-                                settings: name, room, function, power on, info, delete), device-add (the "Add devices" flow), bridges (list, a bridge's or Sync Box's page,
-                                MotionAware), bridge-add (Ethernet / Wi-Fi, found, address, link button), qr-scan (devices' QR codes: the companion app's scanner or the camera), entertainment, integration (options),
-                                automation-parts (what the automation editor and a sensor's settings share: lights, light,
-                                timers on slider sheets, the natural light page), gallery-settings (all scenes, or each category by its rule), daylight-settings (the light of the day: mood,
-                                phase times, sources, the scene pool and a scene's tags); day-parts.ts: steppers, phase times, scene picker
-                                — one Lit element per screen; base.ts: fixed header + scrolling body, tab/sub headers;
-                                choice.ts: a row with its value opens the list to pick from (a sheet for one value, a screen
-                                for several) — no <select>, segments or chips inside a section
-  space.ts                      pure: placed lights, top-view coordinate mapping
-  automations.ts                pure: blueprint inputs <-> automation config, defaults, what the list shows,
-                                the light picker (whole rooms/zones or single lights)
-  automation-art.ts             pictures of the automation types ("+" cards), drawn here
-  presence.ts                   pure: whether HA knows who is home (home zone, people's phones from the companion
-                                app, their location access) before coming/leaving home can be set up
-  daylight.ts                   pure: scene tags and pool views, an automation's own settings (extra/skipped, own phases, offsets),
-                                splitting settings from before 0.10
-  rooms.ts                      pure: mismatches, lights without area, zones — from the alignment plan and `hass`
-  sync.ts                       pure: Sync Box <-> rooms, predicted state of set_sync, the memo more-info reads
-  devices.ts                    pure: adding devices (serial numbers, QR codes -> MAC + install code, search progress,
-                                found devices), Bridge Pro, Wi-Fi;
-                                Settings → Devices (kinds, search and filters, by room, a device's picture)
-  seasons.ts                    pure: seasonal gallery (a rule per category: seasons and/or dates; season source)
-  effects.ts                    pure: effect catalog (categories, presets), 1-12 speed scale
-  model.ts                      pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`
-  color.ts                      pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
-  types.ts                      the subset of HA's `hass` we use + our WebSocket payloads
-  wheel.ts                      the picker wheel (scroll snapping, a drum look) of the time screens
-  ui.ts, styles.ts              icons, toggle, throttle, LightElement; the panel CSS
-  tokens.ts                     pure: the design system's tokens (docs/design-system.md), as CSS variables
-  i18n.ts                       UI strings (en is the source; same keys in every locale)
-  ha-internals.ts               the only place that touches HA frontend internals (incl. panel sizing, icon sets,
+src/                            frontend sources (TypeScript + Lit), bundled into frontend/; by feature: a feature's
+                                pure modules at its root, its Lit screens and sheets in views/
+  entries/                      the esbuild entry points (built as frontend/<name>.js)
+    hue-studio-panel.ts         panel shell: routing, tab bar; owns the StudioContext
+    hue-studio-more-info.ts     more-info override + Hue-style dialog
+    hue-studio-extra.ts         extra JS on every HA page: loads more-info, cards, footer and icons, each on its own
+  core/                         what every feature shares
+    context.ts                  shared by panel and dialog: optimistic hass, WS subscriptions, calls
+    optimistic.ts               pure: predicted state of a service call until HA confirms it
+    model.ts                    pure: rooms/zones/scenes/sensors/Adaptive Lighting from `hass`, light icons
+    color.ts                    pure color math (xy/RGB, wheel, gamut clipping, mirek, gradients)
+    types.ts                    the subset of HA's `hass` we use + our WebSocket payloads
+    ha-internals.ts             the only place that touches HA frontend internals (incl. panel sizing, icon sets,
                                 the companion app's QR scanner)
-  hue-icons.ts, hue-icons-data.ts   the Hue app's light icons as the `hue-studio:` icon set (data generated,
-                                do not edit), matched to lights by archetype and product in model.ts
+  i18n/                         UI strings: index.ts (localize, LOCALES), en.ts (the source and its keys), pl.ts —
+                                one file per locale, typed by the English keys
+  ds/                           the design system (docs/design-system.md)
+    tokens.ts                   pure: its tokens, as CSS variables
+    styles/                     the panel CSS: one sheet split by area, joined in order by index.ts (the cascade
+                                depends on that order)
+    controls.ts                 hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard
+                                (the one card layout), banner
+    ui.ts                       icons, toggle, throttle, LightElement
+    base.ts                     StudioView: fixed header + scrolling body, tab/sub headers, sheets, flows
+    choice.ts                   a row with its value opens the list to pick from (a sheet for one value, a screen
+                                for several), time screens — no <select>, segments or chips inside a section
+    wheel.ts                    the picker wheel (scroll snapping, a drum look) of the time screens
+    hue-icons.ts, hue-icons-data.ts   the Hue app's light icons as the `hue-studio:` icon set (data generated,
+                                do not edit), matched to lights by archetype and product in core/model.ts
+  features/
+    rooms/                      rooms.ts (pure: mismatches, lights without area, zones), space.ts (pure: placed lights,
+                                top-view mapping); views: home, room, rooms (rooms and zones), space (arrange a room or
+                                an entertainment area), add-sheet (a room's "+": scene, automation or device)
+    color/                      effects.ts (pure: effect catalog, 1-12 speed scale); views: color (wheel), effects,
+                                effect-sheet (an effect's "adjust")
+    scenes/                     gallery-data.ts (the bundled gallery, matching), seasons.ts (pure: seasonal gallery);
+                                views: scene (editor), new-scene, scene-pick (a scene's sheet), gallery,
+                                gallery-settings, scene-sheet (the override's sheet for Hue scenes)
+    automations/                automations.ts (pure: blueprint inputs <-> config, the list, the light picker),
+                                daylight.ts (pure: scene tags, pools, own settings), presence.ts (pure: whether HA
+                                knows who is home); views: automations (the tab, "+"), automation-edit,
+                                automation-parts (shared with a sensor's settings), day-parts, daylight-settings,
+                                automation-sheet (the override's sheet), automation-art (pictures of the types)
+    devices/                    devices.ts (pure: adding devices, QR codes, Settings → Devices); views: devices, device,
+                                device-add, qr-scan, sensor (a Hue sensor's settings)
+    bridges/                    motion.ts (pure: MotionAware); views: bridges, bridge-add, motion-area, entertainment
+    sync/                       sync.ts (pure: Sync Box <-> rooms, predicted set_sync, the more-info memo);
+                                views: sync, sync-settings (a Sync Box's settings, the Hue app's pages)
+    settings/                   views: settings (tab), integration (options), experimental
+    footer/                     footer.ts, footer-model.ts: experimental Liquid Glass footer (element; pure model)
+    cards/                      cards.ts: dashboard cards (room, automations, gallery) sharing one StudioContext
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
 scripts/build_hue_icons.py      rebuilds hue-icons-data.ts from elax46/custom-brand-icons (pinned release)

@@ -1,9 +1,9 @@
 """Build the bundled Hue light icons from elax46/custom-brand-icons (MIT).
 
-Writes `src/hue-icons-data.ts`: the icons `src/model.ts` names as `hue-studio:<name>`
-(the Hue app's light shapes), each as its SVG view box and path. The frontend registers
-them as the `hue-studio:` icon set, so `<ha-icon icon="hue-studio:bulb-candle">` works
-without the HACS plugin installed.
+Writes `src/ds/hue-icons-data.ts`: the icons `src/core/model.ts` names as
+`hue-studio:<name>` (the Hue app's light shapes), each as its SVG view box and path. The
+frontend registers them as the `hue-studio:` icon set, so
+`<ha-icon icon="hue-studio:bulb-candle">` works without the HACS plugin installed.
 
 Usage: uv run python scripts/build_hue_icons.py
 Downloads the pinned release's `custom-brand-icons.js` and reads it as text only (the
@@ -23,8 +23,8 @@ VERSION = "2026.10.1"
 URL = f"https://github.com/{REPO}/releases/download/{VERSION}/custom-brand-icons.js"
 
 ROOT = Path(__file__).resolve().parent.parent
-MODEL = ROOT / "src" / "model.ts"
-OUT = ROOT / "src" / "hue-icons-data.ts"
+MODEL = ROOT / "src" / "core" / "model.ts"
+OUT = ROOT / "src" / "ds" / "hue-icons-data.ts"
 
 ENTRY = re.compile(r'^\s*"([^"]+)":(\[.*\]),?\s*$', re.MULTILINE)
 WANTED = re.compile(r'"hue-studio:([a-z0-9-]+)"')

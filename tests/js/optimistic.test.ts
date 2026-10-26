@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Optimistic, predict } from "../../src/optimistic.ts";
+import { Optimistic, predict } from "../../src/core/optimistic.ts";
 
 const hass = {
   states: {

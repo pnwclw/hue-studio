@@ -11,7 +11,7 @@ custom_components/hue_studio/frontend/gallery/
   Changes: converted to gallery.json, pictures cropped to 16:9 and resized to 480x270
   (scripts/build_gallery.py). The source commit is recorded in gallery.json.
 
-src/hue-icons-data.ts (the `hue-studio:` icon set)
+src/ds/hue-icons-data.ts (the `hue-studio:` icon set)
   Light icons of the Philips Hue app taken from elax46/custom-brand-icons
   (release 2026.10.1) — https://github.com/elax46/custom-brand-icons
   Changes: only the light icons Hue Studio uses are kept (scripts/build_hue_icons.py),

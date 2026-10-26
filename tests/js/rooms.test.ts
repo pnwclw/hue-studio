@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildHome } from "../../src/model.ts";
+import { buildHome } from "../../src/core/model.ts";
 import {
   bridgeAreas,
   bridgeRoomAreas,
@@ -15,8 +15,8 @@ import {
   mismatchesIn,
   planHasNews,
   severalBridges,
-} from "../../src/rooms.ts";
-import type { HassData, RoomsPlan } from "../../src/types.ts";
+} from "../../src/features/rooms/rooms.ts";
+import type { HassData, RoomsPlan } from "../../src/core/types.ts";
 
 const light = (name: string, attrs = {}) => ({ state: "on", attributes: { friendly_name: name, ...attrs } });
 

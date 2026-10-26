@@ -1,4 +1,4 @@
-// Builds the frontend: src/*.ts -> custom_components/hue_studio/frontend/ (served by panel.py),
+// Builds the frontend: src/entries/*.ts -> custom_components/hue_studio/frontend/ (served by panel.py),
 // plus the dev harness fixture. Usage: node scripts/build-frontend.mjs [--watch] [--dev]
 //   --watch  rebuild on change (implies --dev)
 //   --dev    no minification
@@ -32,7 +32,7 @@ const contexts = [
   // The entries share chunks, so custom elements are defined exactly once.
   await esbuild.context({
     ...common,
-    entryPoints: [`${root}src/hue-studio-panel.ts`, `${root}src/hue-studio-more-info.ts`, `${root}src/hue-studio-extra.ts`],
+    entryPoints: [`${root}src/entries/hue-studio-panel.ts`, `${root}src/entries/hue-studio-more-info.ts`, `${root}src/entries/hue-studio-extra.ts`],
     outdir,
     splitting: true,
     chunkNames: "chunk-[hash]",

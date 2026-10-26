@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildHome, glowColor, groupState, hueSensor, sensitivityLevels, splitSensors } from "../../src/model.ts";
-import type { HassData, XY } from "../../src/types.ts";
+import { buildHome, glowColor, groupState, hueSensor, sensitivityLevels, splitSensors } from "../../src/core/model.ts";
+import type { HassData, XY } from "../../src/core/types.ts";
 
 const light = (state: string, attrs = {}) => ({ state, attributes: { friendly_name: "x", ...attrs } });
 
@@ -77,8 +77,8 @@ test("group state averages lit lights", () => {
   assert.equal(state.colors.length, 1);
 });
 
-import { adaptiveFor } from "../../src/model.ts";
-import { resample, smoothPath } from "../../src/color.ts";
+import { adaptiveFor } from "../../src/core/model.ts";
+import { resample, smoothPath } from "../../src/core/color.ts";
 
 test("options map a Hue group onto an area and mark another as a zone", () => {
   const { rooms, zones } = buildHome(hass, { groups: { "light.downstairs": "kitchen", "light.office": "zone" } });

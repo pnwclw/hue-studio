@@ -17,8 +17,8 @@ import {
   withOwnPhases,
   withSettings,
   withTag,
-} from "../../src/daylight.ts";
-import type { SceneTags } from "../../src/types.ts";
+} from "../../src/features/automations/daylight.ts";
+import type { SceneTags } from "../../src/core/types.ts";
 
 test("an automation's extra and skipped scenes, offsets and settings", () => {
   const empty = dayConfig(null);

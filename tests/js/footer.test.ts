@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { activeTab, choosablePanels, footerTabs, footerVisible, moveTab, panelLabel, tabTarget } from "../../src/footer-model.ts";
-import type { HassPanel } from "../../src/types.ts";
+import { activeTab, choosablePanels, footerTabs, footerVisible, moveTab, panelLabel, tabTarget } from "../../src/features/footer/footer-model.ts";
+import type { HassPanel } from "../../src/core/types.ts";
 
 const panels: Record<string, HassPanel> = {
   lovelace: { url_path: "lovelace", title: null, icon: null },

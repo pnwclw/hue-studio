@@ -15,8 +15,8 @@ import {
   syncedLights,
   syncingIn,
   syncMemo,
-} from "../../src/sync.ts";
-import type { SyncBoxInfo } from "../../src/types.ts";
+} from "../../src/features/sync/sync.ts";
+import type { SyncBoxInfo } from "../../src/core/types.ts";
 
 const BOX: SyncBoxInfo = {
   available: true,

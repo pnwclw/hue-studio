@@ -12,8 +12,8 @@ import {
   groupChoices,
   lightsInAreas,
   motionBridges,
-} from "../../src/motion.ts";
-import type { BridgeInfo, MotionArea } from "../../src/types.ts";
+} from "../../src/features/bridges/motion.ts";
+import type { BridgeInfo, MotionArea } from "../../src/core/types.ts";
 
 const light = (n: string, health: string | null = "healthy") => ({ id: `cand-${n}`, device: `dev-${n}`, entity_id: `light.${n}`, health });
 

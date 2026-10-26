@@ -1,7 +1,7 @@
 # Rooms, zones and scenes: HA-first with the bridge
 
 How Hue Studio keeps Home Assistant and the Hue bridge (and so the Hue app) consistent.
-Status: implemented (`alignment.py`, `rooms.py`, the panel's "Rooms and zones" screen);
+Status: implemented (`rooms/alignment.py`, `rooms/areas.py`, the panel's "Rooms and zones" screen);
 see `roadmap.md`, section "Rooms and zones", for what is left.
 
 ## Two models

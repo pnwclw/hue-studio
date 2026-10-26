@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { allDayDraft, areaFor, cardLines, controlsGroup, pickedOf, withGroup, withLight, daysLine, fromConfig, isOurAutomation, lightLine, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, summaryRows, toConfig, typeOfPath, whenLine, withPlace } from "../../src/automations.ts";
-import { localize } from "../../src/i18n.ts";
+import { allDayDraft, areaFor, cardLines, controlsGroup, pickedOf, withGroup, withLight, daysLine, fromConfig, isOurAutomation, lightLine, missing, momentLine, newDraft, offsetDuration, offsetMinutes, placesOf, roomsLine, summaryRows, toConfig, typeOfPath, whenLine, withPlace } from "../../src/features/automations/automations.ts";
+import { localize } from "../../src/i18n/index.ts";
 
 const t = localize(null);
 
