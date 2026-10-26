@@ -215,10 +215,23 @@ async def test_old_bridge_entries_merged(
         "groups": {"grp-a": "office", "grp-b": "zone"},
         "rooms": {"area.office": {"motion": ["binary_sensor.a"]}},
         "auto_align": True,
-        "footer": True,
     }
     assert first.state is ConfigEntryState.LOADED
     assert set(_bridges(first)) == {hue_entry.entry_id, other.entry_id}
+
+
+async def test_dropped_options_removed(
+    hass: HomeAssistant, studio_entry: MockConfigEntry, mock_bridge: MagicMock
+) -> None:
+    """Options of features that are gone leave the entry on setup."""
+    hass.config_entries.async_update_entry(
+        studio_entry,
+        options={"auto_align": True, "footer": True, "footer_tabs": ["hue"]},
+    )
+    assert await hass.config_entries.async_setup(studio_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert studio_entry.options == {"auto_align": True}
 
 
 async def test_unknown_entry_kind(hass: HomeAssistant, mock_bridge: MagicMock) -> None:

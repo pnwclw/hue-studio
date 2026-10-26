@@ -2,7 +2,6 @@
 // own: if one fails, the others keep working and HA's own dialogs and pages stay as they are.
 //   more-info  our dialog instead of HA's more-info for Hue lights and Hue Studio's automations
 //   cards      dashboard cards (custom:hue-studio-…)
-//   footer     the experimental "Liquid Glass" footer (only when turned on)
 //   icons      the Hue app's light icons as the `hue-studio:` icon set
 
 // The Hue app's light icons (`hue-studio:` set), for our views and for anyone's dashboards.
@@ -13,7 +12,6 @@ import("../ds/hue-icons.ts")
 const parts: [string, () => Promise<unknown>][] = [
   ["more-info", () => import("./hue-studio-more-info.ts")],
   ["cards", () => import("../features/cards/cards.ts")],
-  ["footer", () => import("../features/footer/footer.ts")],
 ];
 for (const [name, load] of parts) {
   load().catch((err: unknown) => console.error(`hue_studio: ${name} failed to load`, err));

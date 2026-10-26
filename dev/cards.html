@@ -1,8 +1,8 @@
 <!doctype html>
 <!--
-  Dev harness for the dashboard cards and the experimental footer: the real extra module
-  (hue-studio-extra.js, loaded on every HA page) with a fake `hass` (dev/fixture.ts).
-  http://localhost:8765/dev/cards.html?lang=en   (&footer=1 turns the footer on; it shows below 870 px)
+  Dev harness for the dashboard cards: the real extra module (hue-studio-extra.js, loaded
+  on every HA page) with a fake `hass` (dev/fixture.ts).
+  http://localhost:8765/dev/cards.html?lang=en
 -->
 <html>
 <head>
@@ -77,7 +77,6 @@
       root.append(card);
       cards.push(card);
     }
-    if (params.get("footer")) hass.callWS({ type: "hue_studio/config/set", footer: true, footer_tabs: ["lovelace", "hue", "dashboard-living", "energy"] });
   </script>
 </body>
 </html>

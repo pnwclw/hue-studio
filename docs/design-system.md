@@ -175,8 +175,7 @@ Each part: its class (and helper), its measures, where it is used.
   `--fs-body` 500 at 72 (where list rows' text starts; so in every bar and sheet bar), actions at the end ("Save" here, an uppercase grey pill). Everything
   in it is 32px tall.
 - **Tab bar** (`nav.tabs`): the page fading into `--bar-bottom` over 40px (no line), icons
-  26px over `--fs-tab` labels, the chosen tab in `--tab-on`, the others in `--tab-off`; on top
-  while the experimental footer is at the bottom. Hidden while the keyboard is up, under a
+  26px over `--fs-tab` labels, the chosen tab in `--tab-on`, the others in `--tab-off`. Hidden while the keyboard is up, under a
   sheet that fills the screen and under the room's "+"; dimmed under any other sheet (and
   blurred under an action sheet), like the screen.
 - **Page** (`.page`): max 960px, `--gutter` sides, a container for `@container` rules

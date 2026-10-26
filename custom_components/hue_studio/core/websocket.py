@@ -13,13 +13,10 @@ import voluptuous as vol
 
 from ..const import (
     CONF_AUTO_ALIGN,
-    CONF_FOOTER,
-    CONF_FOOTER_TABS,
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
     CONF_ORGANIZE,
     CONF_ZONE_LABELS,
-    FOOTER_MAX_TABS,
     GALLERY_SEASONS,
     SIGNAL_CONFIG_UPDATED,
 )
@@ -97,10 +94,6 @@ MONTH_DAY = r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$"
         vol.Optional(CONF_AUTO_ALIGN): bool,
         vol.Optional(CONF_ORGANIZE): bool,
         vol.Optional(CONF_ZONE_LABELS): bool,
-        vol.Optional(CONF_FOOTER): bool,
-        vol.Optional(CONF_FOOTER_TABS): vol.All(
-            [cv.string], vol.Length(max=FOOTER_MAX_TABS)
-        ),
         vol.Optional(CONF_GALLERY_SEASONAL): bool,
         vol.Optional(CONF_GALLERY_RULES): {
             cv.string: {
@@ -132,8 +125,6 @@ def ws_set_config(
             CONF_AUTO_ALIGN,
             CONF_ORGANIZE,
             CONF_ZONE_LABELS,
-            CONF_FOOTER,
-            CONF_FOOTER_TABS,
             CONF_GALLERY_SEASONAL,
             CONF_GALLERY_RULES,
         )

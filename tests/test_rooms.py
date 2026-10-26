@@ -372,29 +372,6 @@ async def test_ws_set_config(
     assert studio_entry.options[CONF_AUTO_ALIGN] is True
 
 
-async def test_ws_set_footer(
-    hass: HomeAssistant,
-    rooms_bridge: MagicMock,
-    studio_entry: MockConfigEntry,
-    hass_ws_client: WebSocketGenerator,
-) -> None:
-    """Experimental footer settings are panel options too; at most five tabs."""
-    client = await hass_ws_client(hass)
-    await client.send_json_auto_id(
-        {"type": "hue_studio/config/set", "footer": True, "footer_tabs": ["hue", "map"]}
-    )
-    assert (await client.receive_json())["success"]
-    assert studio_entry.options["footer"] is True
-    assert studio_entry.options["footer_tabs"] == ["hue", "map"]
-    config = async_frontend_config(hass)
-    assert (config["footer"], config["footer_tabs"]) == (True, ["hue", "map"])
-
-    await client.send_json_auto_id(
-        {"type": "hue_studio/config/set", "footer_tabs": list("abcdef")}
-    )
-    assert not (await client.receive_json())["success"]
-
-
 async def test_ws_set_gallery_seasons(
     hass: HomeAssistant,
     rooms_bridge: MagicMock,

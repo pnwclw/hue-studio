@@ -33,8 +33,6 @@ from .bridges.motion_areas import async_stop_watching as async_stop_motion_areas
 from .const import (
     CONF_AUTO_ALIGN,
     CONF_BOX_ID,
-    CONF_FOOTER,
-    CONF_FOOTER_TABS,
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
     CONF_GROUPS,
@@ -73,6 +71,9 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 STUDIO_TITLE = "Hue Studio"
+
+# Options of features that are gone (the experimental "Liquid Glass" footer).
+DROPPED_OPTIONS = {"footer", "footer_tabs"}
 
 # The Hue Studio entry's own entities: phase of the day and mood.
 STUDIO_PLATFORMS = [Platform.SELECT, Platform.SENSOR]
@@ -152,12 +153,7 @@ async def _async_merge_bridge_entries(hass: HomeAssistant) -> None:
         CONF_AUTO_ALIGN: any(s.options.get(CONF_AUTO_ALIGN) for s in sources),
     }
     # Panel settings were written to every bridge entry alike: the first one's.
-    for key in (
-        CONF_FOOTER,
-        CONF_FOOTER_TABS,
-        CONF_GALLERY_SEASONAL,
-        CONF_GALLERY_RULES,
-    ):
+    for key in (CONF_GALLERY_SEASONAL, CONF_GALLERY_RULES):
         if (owner := next((s for s in sources if key in s.options), None)) is not None:
             options[key] = owner.options[key]
     if studio is None:
@@ -182,6 +178,10 @@ async def _async_setup_studio(hass: HomeAssistant, entry: HueStudioConfigEntry) 
         # An unknown kind of entry (from a newer version, after a downgrade).
         raise ConfigEntryError(
             translation_domain=DOMAIN, translation_key="unknown_entry"
+        )
+    if stale := entry.options.keys() & DROPPED_OPTIONS:
+        hass.config_entries.async_update_entry(
+            entry, options={k: v for k, v in entry.options.items() if k not in stale}
         )
     connections = BridgeConnections(hass, entry)
     entry.runtime_data = HueStudioData(connections=connections)

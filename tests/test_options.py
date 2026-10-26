@@ -47,8 +47,6 @@ async def test_config_pushed_to_panel(
         "auto_align": False,
         "organize": True,
         "zone_labels": False,
-        "footer": False,
-        "footer_tabs": [],
         "gallery_seasonal": False,
         "gallery_rules": {},
         "icons": {},

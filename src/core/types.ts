@@ -216,22 +216,10 @@ export interface MotionGroup {
   lights: string[];
 }
 
-/** A sidebar panel (`hass.panels`). */
-export interface HassPanel {
-  url_path: string;
-  /** A dashboard's title, or a translation key for built-in panels ("map", "history"). */
-  title: string | null;
-  icon: string | null;
-  component_name?: string;
-}
-
 export interface Hass extends HassData {
   connection?: HassConnection;
   /** The signed-in user (HA's automation config API is for administrators only). */
   user?: { id?: string; is_admin?: boolean };
-  panels?: Record<string, HassPanel>;
-  /** HA's own translations ("panel.map", …). */
-  localize?: (key: string) => string;
   callService(domain: string, service: string, data?: ServiceData): Promise<unknown>;
   /** One WebSocket command (HA's frontend API). */
   callWS?<T>(msg: { type: string } & Record<string, unknown>): Promise<T>;
@@ -346,9 +334,6 @@ export interface StudioConfig {
   zone_labels?: boolean;
   /** Not an option: Hue group entity id -> the icon of its archetype (picked in the Hue app). */
   icons?: Record<string, string>;
-  /** Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths). */
-  footer?: boolean;
-  footer_tabs?: string[];
   /** Scene gallery: each category only in its time; the user's rules (seasons, a "MM-DD" window) per category. */
   gallery_seasonal?: boolean;
   gallery_rules?: Record<string, { seasons?: ("winter" | "spring" | "summer" | "autumn")[]; window?: [string, string] }>;

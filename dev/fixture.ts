@@ -854,16 +854,6 @@ export function createHass({ language = "en", onChange }: { language?: string; o
     config: { location_name: "Home" },
     user: { id: "user_demo", is_admin: true },
     areas: AREAS,
-    // Sidebar panels (the experimental footer's tabs).
-    panels: {
-      lovelace: { url_path: "lovelace", title: null, icon: null },
-      hue: { url_path: "hue", title: "Hue", icon: "mdi:lightbulb-group" },
-      "dashboard-living": { url_path: "dashboard-living", title: "Living room", icon: "mdi:sofa" },
-      energy: { url_path: "energy", title: "energy", icon: "mdi:lightning-bolt" },
-      map: { url_path: "map", title: "map", icon: "mdi:map" },
-      config: { url_path: "config", title: "config", icon: "mdi:cog" },
-    },
-    localize: (key: string) => ({ "panel.states": "Overview", "panel.energy": "Energy", "panel.map": "Map" })[key] || "",
     devices,
     entities,
     states,

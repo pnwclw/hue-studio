@@ -32,10 +32,6 @@ CONF_AUTO_ALIGN: Final = "auto_align"
 CONF_ORGANIZE: Final = "organize"
 # Options: Hue zones mirrored as HA labels "Hue zone: <name>", both ways (zones.py).
 CONF_ZONE_LABELS: Final = "zone_labels"
-# Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths).
-CONF_FOOTER: Final = "footer"
-CONF_FOOTER_TABS: Final = "footer_tabs"
-FOOTER_MAX_TABS: Final = 5
 # Scene gallery: each category only in its time (else all, all year), and the user's
 # rules per category that replace the panel's defaults:
 # {category: {"seasons": [season], "window": ["MM-DD", "MM-DD"]}}; empty: always.

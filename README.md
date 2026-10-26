@@ -191,10 +191,8 @@ everything else opens Home Assistant's.
 
 ## Experimental
 
-Settings → Experimental in the panel. **Liquid Glass footer**: a floating tab bar at the
-bottom of every page on phones, instead of the side menu — your dashboards and the Hue
-panel as tabs, More opens the side menu. It applies to every user of the instance and
-stays away from Home Assistant's settings pages.
+Settings → Experimental in the panel: features that are still taking shape. There are none
+right now.
 
 ## Hue Play HDMI Sync Box
 

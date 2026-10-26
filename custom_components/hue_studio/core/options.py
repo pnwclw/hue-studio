@@ -21,8 +21,6 @@ from homeassistant.helpers import (
 
 from ..const import (
     CONF_AUTO_ALIGN,
-    CONF_FOOTER,
-    CONF_FOOTER_TABS,
     CONF_GALLERY_RULES,
     CONF_GALLERY_SEASONAL,
     CONF_GROUPS,
@@ -216,8 +214,6 @@ def async_frontend_config(hass: HomeAssistant) -> dict[str, Any]:
         CONF_AUTO_ALIGN: options.get(CONF_AUTO_ALIGN, False),
         CONF_ORGANIZE: options.get(CONF_ORGANIZE, True),
         CONF_ZONE_LABELS: options.get(CONF_ZONE_LABELS, False),
-        CONF_FOOTER: options.get(CONF_FOOTER, False),
-        CONF_FOOTER_TABS: options.get(CONF_FOOTER_TABS, []),
         CONF_GALLERY_SEASONAL: options.get(CONF_GALLERY_SEASONAL, False),
         CONF_GALLERY_RULES: options.get(CONF_GALLERY_RULES, {}),
         # Not an option: what the bridges say, for the panel's room and zone icons.

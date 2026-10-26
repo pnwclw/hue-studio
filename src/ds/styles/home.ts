@@ -31,23 +31,12 @@ export const HOME_CSS = `
   /* The on-screen keyboard is up (fitToViewport): it covers the tab bar and the home indicator,
      and dialogs move up so their fields stay above it. */
   :host([keyboard]) { --safe-bottom: 0px; }
-  :host([keyboard]) nav.tabs:not(.top) { display: none; }
+  :host([keyboard]) nav.tabs { display: none; }
   :host([keyboard]) .sheet { align-items: flex-start; padding-top: max(16px, calc(var(--safe-top) + 8px)); }
   nav.tabs button { flex: 0 1 120px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0 4px; border: none;
                     background: none; cursor: pointer; color: var(--tab-off); font-size: var(--fs-tab); letter-spacing: 0.4px; text-transform: uppercase;
                     transition: color 0.2s; }
   nav.tabs button svg { width: 26px; height: 26px; }
   nav.tabs button.on { color: var(--tab-on); }
-  /* tabs on top while the experimental footer sits at the bottom */
-  nav.tabs.top { order: -1; gap: 4px;
-                 padding: max(8px, var(--safe-top)) 12px 8px; border-top: none; border-bottom: 1px solid var(--hairline); }
-  nav.tabs.top button { flex: 1 1 0; min-width: 0; flex-direction: row; justify-content: center; gap: 5px; padding: 7px 8px;
-                        border-radius: var(--r-m); font-size: var(--fs-caption); letter-spacing: 0; text-transform: none;
-                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  nav.tabs.top button svg { flex: none; }
-  nav.tabs.top button svg { width: 18px; height: 18px; }
-  nav.tabs.top button.on { background: var(--surface); }
-  main.under-footer { padding-bottom: var(--safe-bottom); }
-  main.under-footer .topbar, main.under-footer .screen-head { padding-top: 6px; }
 
 `;

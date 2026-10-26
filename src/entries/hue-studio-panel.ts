@@ -17,7 +17,7 @@
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
 //   /sync/settings?box=<entry id>   a Sync Box's settings ("⋯"), the Hue app's pages
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
-//   /settings/experimental     experimental features (the Liquid Glass footer)
+//   /settings/experimental     experimental features (none right now)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
 //   /settings/daylight         light of the day: mood, phase times, sources, scene pool
 //   /settings/devices          Hue devices by kind (lights, switches, sensors, other); new ones
@@ -44,7 +44,6 @@ import { keyed } from "lit/directives/keyed.js";
 
 import { PANEL_PATH, StudioContext } from "../core/context.ts";
 import { fitToViewport, outsidePath, toggleSidebar } from "../core/ha-internals.ts";
-import { tabTarget } from "../features/footer/footer-model.ts";
 import { type DeviceGroup, isDeviceGroup } from "../features/devices/devices.ts";
 import { findGroup, glowColor, lightColors } from "../core/model.ts";
 import { CSS } from "../ds/styles/index.ts";
@@ -81,6 +80,11 @@ registerHueIcons();
 
 /** The page each tab showed last (path below the panel, with its query): a tab goes back there. */
 const lastPaths: Record<string, string> = {};
+
+/** Where a tab leads, like a phone app's tab bar: back to the page it showed last, or to its
+ *  start when it is the tab shown already (or showed nothing yet). */
+const tabTarget = (last: Record<string, string>, tab: string, active: string | null, start: string): string =>
+  tab === active ? start : (last[tab] ?? start);
 
 type Route =
   | { name: "home" }
@@ -264,14 +268,12 @@ export class HueStudioPanel extends LitElement {
     const picker =
       route.name === "automationNew" || route.name === "gallery" || route.name === "deviceAdd" || route.name === "bridgeAdd" || newArea || newScene;
     const glow = this.glow(ctx, route);
-    // With the experimental footer at the bottom of the screen, the panel's tabs go on top.
-    const top = !!ctx.config.footer && ctx.narrow;
     return html`
       <main
-        class=${classMap({ colorview: route.name === "color", "under-footer": top, wide: !ctx.narrow, "as-sheet": sheet, picker, [`glow-${glow.kind}`]: !!glow.kind })}
+        class=${classMap({ colorview: route.name === "color", wide: !ctx.narrow, "as-sheet": sheet, picker, [`glow-${glow.kind}`]: !!glow.kind })}
         style=${styleMap({ "--glow": glow.color })}
       >${keyed(JSON.stringify(route), this.view(ctx, route))}</main>
-      <nav class=${classMap({ tabs: true, top })} ?hidden=${full}>
+      <nav class="tabs" ?hidden=${full}>
         ${tabs.map(
           ([id, to, name, label]) =>
             html`<button class=${classMap({ on: id === tab })} @click=${() => ctx.go(tabTarget(lastPaths, id, tab, to))}>${icon(name)}${label}</button>`,

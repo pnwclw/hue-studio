@@ -107,9 +107,8 @@ touching anything outside this repository.
    bridge to know which lights sync. New Sync Box features (presets, IR codes, music
    palettes, input types, …) are built for direct pairing only; the link mode keeps
    working with what `huesyncbox` exposes and degrades to "unavailable" if it changes.
-5. **Experimental** (Settings → Experimental): a global "Liquid Glass" footer on phones
-   instead of the side menu, with dashboards and the `/hue` panel as its tabs. It reserves
-   its room through HA's `--safe-area-inset-bottom` and never shows on `/config/...`.
+5. **Experimental** (Settings → Experimental): features that are still taking shape. Empty
+   for now; the screen stays as the place for the next one.
 
 ## Rules that must not be broken
 
@@ -195,13 +194,13 @@ touching anything outside this repository.
   (`--ha-font-family-body`, falling back to the system font in the harness).
 - **The on-screen keyboard.** Text fields are at least 16px (smaller ones make iOS zoom in).
   While one has focus and the visible viewport shrinks, `fitToViewport` sizes the panel to
-  what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top); the
-  footer hides while a field has focus. New fields need nothing else.
+  what stays visible (`keyboard` attribute: tab bar hidden, dialogs at the top). New fields
+  need nothing else.
 - **Haptics.** Picks, drops, snaps, steps and toggles call `haptic()` (`ha-internals.ts`): HA's
   companion apps turn it into the phone's haptics, browsers get `navigator.vibrate`.
 - **Sheets and overlays never live inside a scrolling element**: iOS clips them to it. A view
   that opens one renders it outside its scrolling body (the color view's `layers`).
-- **Touch drags stay inside.** The panel, the dialog and the footer use `keepTouchInside`: a
+- **Touch drags stay inside.** The panel and the dialog use `keepTouchInside`: a
   drag that nothing under the finger can scroll is not handed to HA's page (no rubber-band,
   no pull to refresh in the app). Scroll containers need `overflow: auto` plus
   `overscroll-behavior: contain`; gestures use pointer events.
@@ -378,7 +377,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   entries/                      the esbuild entry points (built as frontend/<name>.js)
     hue-studio-panel.ts         panel shell: routing, tab bar; owns the StudioContext
     hue-studio-more-info.ts     more-info override + Hue-style dialog
-    hue-studio-extra.ts         extra JS on every HA page: loads more-info, cards, footer and icons, each on its own
+    hue-studio-extra.ts         extra JS on every HA page: loads more-info, cards and icons, each on its own
   core/                         what every feature shares
     context.ts                  shared by panel and dialog: optimistic hass, WS subscriptions, calls
     optimistic.ts               pure: predicted state of a service call until HA confirms it
@@ -421,8 +420,7 @@ src/                            frontend sources (TypeScript + Lit), bundled int
     bridges/                    motion.ts (pure: MotionAware); views: bridges, bridge-add, motion-area, entertainment
     sync/                       sync.ts (pure: Sync Box <-> rooms, predicted set_sync, the more-info memo);
                                 views: sync, sync-settings (a Sync Box's settings, the Hue app's pages)
-    settings/                   views: settings (tab), integration (options), experimental
-    footer/                     footer.ts, footer-model.ts: experimental Liquid Glass footer (element; pure model)
+    settings/                   views: settings (tab), integration (options), experimental (empty for now)
     cards/                      cards.ts: dashboard cards (room, automations, gallery) sharing one StudioContext
 scripts/build-frontend.mjs      esbuild: src/ -> frontend/ (shared chunk), dev fixture -> dev/build/
 scripts/build_gallery.py        rebuilds the bundled gallery from Hypfer/hass-scene_presets
@@ -432,7 +430,7 @@ scripts/hue_scene_pictures.json picture id -> Hue app scene name and its picture
 scripts/build_icon.py           renders brand/ (icon, logo, dark variants)
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
                                 simulated services), no HA needed
-dev/cards.html                  harness: the dashboard cards and the footer (&footer=1) with the same fake `hass`
+dev/cards.html                  harness: the dashboard cards with the same fake `hass`
 tests/                          pytest + pytest-homeassistant-custom-component
 tests/js/                       node:test (TypeScript, run by Node directly) for the pure modules
 package.json, tsconfig.json     frontend toolchain (Lit, esbuild, TypeScript)

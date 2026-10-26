@@ -195,27 +195,6 @@ export function fitToViewport(host: HTMLElement): () => void {
   };
 }
 
-/**
- * Open HA's sidebar (a drawer on phones) from outside any panel: the event has to start
- * inside `home-assistant-main`, which listens for it.
- */
-export function openSidebar(): void {
-  const main = homeAssistantElement()?.shadowRoot?.querySelector("home-assistant-main");
-  const inner = main?.shadowRoot?.firstElementChild ?? main;
-  inner?.dispatchEvent(new Event("hass-toggle-menu", { bubbles: true, composed: true }));
-}
-
-/**
- * Reserve room at the bottom of every page (the experimental footer). HA pads its pages
- * by `--safe-area-inset-bottom` (the phone's home indicator), so growing it by the
- * footer's height keeps the last content above the footer. `null` gives it back.
- */
-export function reserveBottom(px: number | null): void {
-  const style = document.documentElement.style;
-  if (px === null) style.removeProperty("--safe-area-inset-bottom");
-  else style.setProperty("--safe-area-inset-bottom", `calc(env(safe-area-inset-bottom, 0px) + ${px}px)`);
-}
-
 /** The companion app's message bus (`hass.auth.external`, HA's ExternalMessaging). */
 interface ExternalBus {
   config?: { hasBarCodeScanner?: number };

@@ -61,7 +61,7 @@ export class SettingsView extends StudioView {
           ${row("mdi:palette-swatch-variant", t("daylight.title"), "/settings/daylight", this.daylightSub())}
           ${row("mdi:image-multiple-outline", t("settings.gallery"), "/settings/gallery", t(ctx.config.gallery_seasonal ? "settings.gallery_seasonal" : "settings.gallery_all"))}
           ${row("mdi:cog-outline", t("settings.integration"), "/settings/integration", t("settings.integration_sub"))}
-          ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t(ctx.config.footer ? "exp.on" : "exp.sub"))}
+          ${row("mdi:flask-outline", t("exp.title"), "/settings/experimental", t("exp.sub"))}
         </div>`,
       { cls: "settings-page" },
     );
