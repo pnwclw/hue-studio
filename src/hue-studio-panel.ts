@@ -15,6 +15,7 @@
 //                              all-day scene; sensor/lux: a motion one started from a sensor's "Add lights")
 //   /automations/<id>[?from=]  an automation (its config id; `from`: the page its more-info sheet was on)
 //   /sync?box=<entry id>       Sync Box (tab shown only when one is set up)
+//   /sync/settings?box=<entry id>   a Sync Box's settings ("⋯"), the Hue app's pages
 //   /settings                  settings (tab): rooms and zones, alignment, integration options
 //   /settings/experimental     experimental features (the Liquid Glass footer)
 //   /settings/gallery          scene gallery: all scenes, or everyday plus seasonal
@@ -26,7 +27,8 @@
 //   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
 //   /settings/devices/lost     devices a move let go that no bridge took: look for them again, forget
-//   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry)
+//   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry:
+//                              its settings, as from the Sync tab)
 //   /settings/bridges/add      add a bridge (Ethernet or Wi-Fi; found, or by address; the link button)
 //   /settings/bridges/move     move to another bridge: ?bridge=<hue entry id> (all of it), ?area=<id> (a room)
 //                              or ?lights=<ids>&to_area=<id>,
@@ -58,6 +60,7 @@ import "./views/daylight-settings.ts";
 import "./views/bridge-add.ts";
 import "./views/bridge-move.ts";
 import "./views/bridges.ts";
+import "./views/sync-settings.ts";
 import "./views/color.ts";
 import "./views/entertainment.ts";
 import "./views/integration.ts";
@@ -94,6 +97,7 @@ type Route =
   | { name: "sensor"; key: string; device: string }
   | { name: "gallery"; room: string | null }
   | { name: "sync"; box: string | null }
+  | { name: "syncSettings"; box: string | null }
   | { name: "rooms" }
   | { name: "settings" }
   | { name: "experimental" }
@@ -138,6 +142,7 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "room" && parts[1] && parts[2] === "sensor" && parts[3]) return { name: "sensor", key: parts[1], device: parts[3] };
   if (parts[0] === "room" && parts[1]) return { name: "room", key: parts[1] };
   if (parts[0] === "gallery") return { name: "gallery", room: params.get("room") };
+  if (parts[0] === "sync" && parts[1] === "settings") return { name: "syncSettings", box: params.get("box") };
   if (parts[0] === "sync") return { name: "sync", box: params.get("box") };
   if (parts[0] === "rooms") return { name: "rooms" };
   if (parts[0] === "automations" && parts[1] === "new" && parts[2]) return {
@@ -222,7 +227,7 @@ export class HueStudioPanel extends LitElement {
     const path = this.route?.path ?? location.pathname.replace(PANEL_PATH, "");
     const route = parseRoute(path, location.search);
     const tab =
-      route.name === "sync"
+      route.name === "sync" || route.name === "syncSettings"
         ? "sync"
         : route.name === "automations" || route.name === "automationNew" || route.name === "automation"
           ? "automations"
@@ -246,7 +251,7 @@ export class HueStudioPanel extends LitElement {
       ["home", "", "home", ctx.t("nav.home")],
       ["automations", "/automations", "bolt", ctx.t("nav.automations")],
     ];
-    if (Object.keys(ctx.boxes).length || route.name === "sync") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
+    if (Object.keys(ctx.boxes).length || route.name === "sync" || route.name === "syncSettings") tabs.push(["sync", "/sync", "sync", ctx.t("nav.sync")]);
     tabs.push(["settings", "/settings", "cog", ctx.t("nav.settings")]);
     const full =
       route.name === "color" ||
@@ -260,12 +265,13 @@ export class HueStudioPanel extends LitElement {
       route.name === "bridgeAdd" ||
       (route.name === "motionArea" && route.area === "new") ||
       (route.name === "bridges" && route.mode === "bridges" && !!route.item) ||
+      route.name === "syncSettings" ||
       route.name === "gallery";
     // Editors come up as a sheet over the screen on phones (the Hue app's: its top corners
     // rounded under the status bar).
     const newScene = route.name === "scene" && route.scene === NEW_SCENE;
     const sheet = ctx.narrow && ((route.name === "scene" && !newScene) || route.name === "sensor" || route.name === "deviceSensor" || route.name === "device" || route.name === "automation" ||
-        (route.name === "bridges" && route.mode === "bridges" && !!route.item));
+        (route.name === "bridges" && route.mode === "bridges" && !!route.item) || route.name === "syncSettings");
     // Pickers (the gallery, a new automation's types) are the Hue app's: a deep blue top with the
     // page as a rounded panel over it.
     // Flows too: adding devices or a bridge, a new MotionAware area.
@@ -291,10 +297,11 @@ export class HueStudioPanel extends LitElement {
   }
 
   /** The page's glow, the Hue app's: Home and a room in their lit lights' colors, the
-   *  Automations and Sync tabs in their own; Settings and sub screens have none. */
+   *  Automations tab and the empty Sync tab in their own; Settings and sub screens have none. */
   private glow(ctx: StudioContext, route: Route): { kind: "light" | "blue" | "violet" | null; color?: string } {
     if (route.name === "automations") return { kind: "blue" };
-    if (route.name === "sync") return { kind: "violet" };
+    // Sync glows only without a box (the Hue app's onboarding).
+    if (route.name === "sync" && !Object.keys(ctx.boxes).length) return { kind: "violet" };
     const lights =
       route.name === "home"
         ? [...new Set([...ctx.home.rooms, ...ctx.home.zones].flatMap((g) => g.lights))]
@@ -350,7 +357,16 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-bridge-add-view .ctx=${ctx} .rev=${rev}></hue-studio-bridge-add-view>`;
       case "bridgeMove":
         return html`<hue-studio-bridge-move-view .ctx=${ctx} .rev=${rev} .bridge=${route.bridge} .area=${route.area} .lights=${route.lights} .toArea=${route.toArea} .to=${route.to}></hue-studio-bridge-move-view>`;
+      case "syncSettings": {
+        const box = route.box && ctx.boxes[route.box] ? route.box : (Object.keys(ctx.boxes)[0] ?? "");
+        const back = `/sync${route.box ? `?box=${encodeURIComponent(route.box)}` : ""}`;
+        return html`<hue-studio-sync-settings-view .ctx=${ctx} .rev=${rev} .box=${box} .back=${back}></hue-studio-sync-settings-view>`;
+      }
       case "bridges":
+        // A Sync Box's row opens its settings, the same as "⋯" on the Sync tab.
+        if (route.mode === "bridges" && route.item && ctx.boxes[route.item]) {
+          return html`<hue-studio-sync-settings-view .ctx=${ctx} .rev=${rev} .box=${route.item} .back=${"/settings/bridges"}></hue-studio-sync-settings-view>`;
+        }
         return html`<hue-studio-bridges-view .ctx=${ctx} .rev=${rev} .mode=${route.mode} .item=${route.item}></hue-studio-bridges-view>`;
       case "motionArea":
         return html`<hue-studio-motion-area-view .ctx=${ctx} .rev=${rev} .area=${route.area} .bridge=${route.bridge}></hue-studio-motion-area-view>`;

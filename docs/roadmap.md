@@ -482,6 +482,17 @@ holds the box's settings, presets and remote buttons, the mode popover backgroun
 and the music palette (direct pairing). The brightness control is shared with the color
 screen (`BrightnessControl`).
 
+**Done (2026-10-26), measured on the Android Hue app with the live box:** the tab's measures
+(the picture and pills scale with the width, square picture, the dock 20 from the edges, the
+start button showing a box that is on, no glow with a box), and a box's settings as the Hue
+app's pages behind "⋯" and Settings → Bridges (`sync-settings.ts`): Device (LED, updates at
+night, network and device info, restart, remove), Change Hue Bridge, Change Wi-Fi network,
+HDMI inputs (name and icon on an icon grid), TV remote control, Automatic control (the box's
+CEC / HPD / USB / inactivity power, per-input CEC and HPD switching and auto sync; HDMI CEC
+by Hue Studio on top), Advanced (background lighting, ARC bypass), Software updates;
+Presets ours. Backend: `hue_studio/sync/behavior`, updates and actions in
+`hue_studio/sync/configure`, diagnostics with the box's own state.
+
 The Sync tab and a box's page get the same pass the rooms, scenes and automations got:
 the Hue app's Sync screens as the reference (modes, intensity, inputs, the entertainment
 area, music and background lighting), laid out on the design system (DS). Direct pairing

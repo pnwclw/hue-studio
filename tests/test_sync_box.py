@@ -108,6 +108,7 @@ BOX_STATE: dict[str, Any] = {
         "inactivePowersave": 20,
         "cecPowersave": True,
         "hpdInputSwitch": True,
+        "hpdOutputEnableMs": 1500,
         "input1": {"cecInputSwitch": True, "linkAutoSync": True},
         "input4": {
             "cecInputSwitch": True,
@@ -730,6 +731,9 @@ async def test_subscribe_sync(
         "bluetooth": None,
         "led": "normal",
         "tv_power": True,
+        "auto_update": None,
+        "network": None,
+        "code": "HSB2",
         "ha_device": None,
     }
 
@@ -860,6 +864,112 @@ async def test_move_box_to_bridge(
     }
     assert sent[-1] == {"groupId": "new-tv"}
     assert coordinator.panel_info()["bridge"] == bridge.entry_id
+
+
+async def test_box_behavior(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    sync_box: FakeBox,
+    box_entry: MockConfigEntry,
+) -> None:
+    """The Hue app's "Automatic control" and "Advanced" from the panel: the box's
+    behavior as 0/1, an input's switches whole."""
+    info = box_entry.runtime_data.sync.panel_info()
+    assert info["behavior"] == {
+        "cec_power": True,
+        "hpd_power": True,
+        "usb_power": None,
+        "hpd_switch": True,
+        "inactivity": 20,
+        "arc_bypass": None,
+        "inputs": {
+            "input1": {"cec_switch": True, "hpd_switch": None, "auto_sync": True},
+            "input4": {"cec_switch": True, "hpd_switch": True, "auto_sync": False},
+        },
+    }
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id(
+        {
+            "type": "hue_studio/sync/behavior",
+            "entry_id": box_entry.entry_id,
+            "hpd_power": False,
+            "usb_power": True,
+            "inactivity": 0,
+            "arc_bypass": False,
+            "inputs": {"input4": {"auto_sync": True}, "input2": {"cec_switch": True}},
+        }
+    )
+    assert (await client.receive_json())["success"]
+    # input2 has no behavior of its own on this box: left alone.
+    assert sync_box.sent(path="/behavior") == [
+        {
+            "inactivePowersave": 0,
+            "usbPowersave": 1,
+            "hpdOutputEnableMs": 0,
+            "arcBypassMode": 0,
+            "input4": {"cecInputSwitch": 1, "linkAutoSync": 1, "hpdInputPortSwitch": 1},
+        }
+    ]
+    await client.send_json_auto_id(
+        {"type": "hue_studio/sync/behavior", "entry_id": "nope", "cec_power": True}
+    )
+    assert not (await client.receive_json())["success"]
+
+
+async def test_box_updates_and_restart(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    sync_box: FakeBox,
+    box_entry: MockConfigEntry,
+) -> None:
+    """Updates at night on or off (at the box's own hour), restart, look for one."""
+    update = {"autoUpdateEnabled": False, "autoUpdateTime": 3}
+    sync_box.state["device"]["update"] = update
+    sync_box.state["device"]["wifiState"] = "wan"
+    await box_entry.runtime_data.sync.async_refresh()
+    device = box_entry.runtime_data.sync.panel_info()["device"]
+    assert device["auto_update"] is False
+    assert (device["network"], device["code"]) == ("wan", "HSB2")
+    client = await hass_ws_client(hass)
+    changes = (
+        {"auto_update": True},
+        {"action": "restart"},
+        {"action": "check_update"},
+        {"background": {"game": True}},
+    )
+    for change in changes:
+        await client.send_json_auto_id(
+            {
+                "type": "hue_studio/sync/configure",
+                "entry_id": box_entry.entry_id,
+                **change,
+            }
+        )
+        assert (await client.receive_json())["success"]
+    assert sync_box.sent(path="/device") == [
+        {"update": {"autoUpdateEnabled": True, "autoUpdateTime": 3}},
+        {"action": "doSoftwareRestart"},
+        {"action": "checkForFirmwareUpdates"},
+    ]
+    # A mode's background lighting without switching to it.
+    assert sync_box.sent()[-1] == {
+        "game": {"intensity": "moderate", "backgroundLighting": True}
+    }
+
+
+async def test_box_diagnostics(
+    hass: HomeAssistant, sync_box: FakeBox, box_entry: MockConfigEntry
+) -> None:
+    """Diagnostics show the box's own state without its token or addresses."""
+    from custom_components.hue_studio.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    data = await async_get_config_entry_diagnostics(hass, box_entry)
+    assert data["data"][CONF_ACCESS_TOKEN] == "**REDACTED**"
+    assert data["box"]["behavior"]["inactivePowersave"] == 20
+    assert data["box"]["device"]["ipAddress"] == "**REDACTED**"
+    assert data["box"]["device"]["wifi"]["ssid"] == "**REDACTED**"
 
 
 async def test_box_bluetooth(

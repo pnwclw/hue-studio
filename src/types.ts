@@ -566,6 +566,8 @@ export interface SyncBoxInfo {
   screen?: SyncScreen | null;
   /** The box itself (settings only for a box paired directly). */
   device?: SyncBoxDevice;
+  /** Its automatic control (paired directly). */
+  behavior?: SyncBehavior | null;
   /** Music mode's palette. */
   palette?: string | null;
   background_lighting?: { video: boolean; game: boolean };
@@ -623,7 +625,30 @@ export interface SyncBoxDevice {
   led: "off" | "dimmed" | "normal" | null;
   /** Turns on and off with the TV (HDMI CEC). */
   tv_power: boolean | null;
+  /** Installs updates by itself at night. */
+  auto_update?: boolean | null;
+  /** "lan": the local network only, "wan": the internet too. */
+  network?: string | null;
+  /** Its model as the box names it ("HSB2"). */
+  code?: string | null;
   ha_device: string | null;
+}
+
+/** The box's automatic control and audio pass-through (the Hue app's). */
+export interface SyncBehavior {
+  /** Sleeps when the TV sends CEC off. */
+  cec_power: boolean;
+  /** Wakes by the TV's hot plug (null: not reported). */
+  hpd_power: boolean | null;
+  /** Sleeps when the TV's USB power goes (null: no such port). */
+  usb_power: boolean | null;
+  /** Switches to any source plugged in (the old, whole-box switch). */
+  hpd_switch: boolean | null;
+  /** Minutes without a picture before it sleeps (0: never). */
+  inactivity: number;
+  arc_bypass: boolean | null;
+  /** Per input: switch to it over CEC or hot plug, start syncing on its picture. */
+  inputs: Record<string, { cec_switch: boolean; hpd_switch: boolean | null; auto_sync: boolean }>;
 }
 
 /** Data of `hue_studio.set_sync`. */

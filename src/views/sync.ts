@@ -1,9 +1,9 @@
 // Sync: the Hue Play HDMI Sync Box, the Hue app's Sync tab. What plays (the input's picture),
 // mode, intensity and brightness as three buttons that open their popovers, and a dock:
 // what (the HDMI input), start/stop, where (the entertainment area). Every change is one
-// `hue_studio.set_sync` call and shows at once (StudioContext.setSync). A box paired
-// directly also has the music palette, background lighting (in the mode popover), presets
-// and remote buttons ("⋯").
+// `hue_studio.set_sync` call and shows at once (StudioContext.setSync). "⋯" opens the box's
+// settings (sync-settings.ts); a box paired directly also has the music palette (in the
+// mode popover).
 
 import { html, nothing, svg } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -13,8 +13,8 @@ import { styleMap } from "lit/directives/style-map.js";
 import { BrightnessControl, type BrightnessSource, tileCard } from "../controls.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
-import { currentArea, currentInput, hasFeature, inputIcon, INTENSITIES, IR_ACTIONS, PALETTES, statusKey, SYNC_MODES } from "../sync.ts";
-import type { SyncBoxInfo, SyncChange, SyncIrCode } from "../types.ts";
+import { currentArea, currentInput, hasFeature, inputIcon, INTENSITIES, PALETTES, statusKey, SYNC_MODES } from "../sync.ts";
+import type { SyncBoxInfo, SyncChange } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -46,25 +46,14 @@ const PALETTE_ART: Record<string, string> = {
   neutral: "linear-gradient(135deg, #f5e6c8, #c9d6df, #f5e6c8)",
 };
 
-/** The remote button editor: a known code (or one just learned), its name and action. */
-interface IrDraft {
-  code: string;
-  name: string;
-  action: string;
-  known: boolean;
-}
-
 /** What is open over the screen: a popover above the controls, or a sheet. */
-type Open = { kind: "mode" | "intensity"; at: { top: number; center: number; width: number } } | { kind: "what" | "where" | "more" };
+type Open = { kind: "mode" | "intensity"; at: { top: number; center: number; width: number } } | { kind: "what" | "where" };
 
 @customElement("hue-studio-sync-view")
 export class SyncView extends StudioView {
   /** Config entry id of the box to show (null: the first one). */
   @property() accessor box: string | null = null;
   @state() private accessor open: Open | null = null;
-  /** The "save as preset" sheet: the name typed so far (null: closed). */
-  @state() private accessor presetName: string | null = null;
-  @state() private accessor ir: IrDraft | null = null;
   private readonly bri = new BrightnessControl(this);
 
   protected override render() {
@@ -75,7 +64,7 @@ export class SyncView extends StudioView {
     const box = id ? ctx.boxes[id] : undefined;
     const actions = html`
       <button class="round" aria-label=${t("bridges.add_box")} @click=${() => ctx.openSettings()}>${icon("plus")}</button>
-      ${box ? html`<button class="round" aria-label=${t("sync.settings")} @click=${() => (this.open = { kind: "more" })}>${icon("dots")}</button>` : nothing}
+      ${box ? html`<button class="round" aria-label=${t("sync.settings")} @click=${() => ctx.go(`/sync/settings?box=${encodeURIComponent(id)}`)}>${icon("dots")}</button>` : nothing}
       ${box?.available ? toggle(!!box.power, t("sync.power"), () => this.set(id, { power: !box.power })) : nothing}`;
     if (!box) return this.tabScreen(t("sync.title"), html`<p class="empty">${this.box ? t("sync.not_found") : t("sync.none")}</p>`, { end: actions });
     const bri = this.briSource(id, box);
@@ -83,10 +72,7 @@ export class SyncView extends StudioView {
       ${this.bri.layer(bri)}
       ${this.open?.kind === "mode" || this.open?.kind === "intensity" ? this.popCard(id, box, this.open.kind, this.open.at) : nothing}
       ${this.open?.kind === "what" ? this.whatSheet(id, box) : nothing}
-      ${this.open?.kind === "where" ? this.whereSheet(id, box) : nothing}
-      ${this.open?.kind === "more" ? this.moreSheet(id, box) : nothing}
-      ${this.presetName !== null ? this.presetSheet(box) : nothing} ${this.ir ? this.irSheet(box, this.ir) : nothing}
-      ${this.askSheet()}`;
+      ${this.open?.kind === "where" ? this.whereSheet(id, box) : nothing}`;
   }
 
   /** The screen: the box (when there are several), what plays, the three controls, the dock. */
@@ -104,7 +90,8 @@ export class SyncView extends StudioView {
       haptic("light");
       const button = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const column = (e.currentTarget as HTMLElement).closest(".sync-stage")!.getBoundingClientRect();
-      this.open = { kind, at: { top: button.top - 44, center: column.left + column.width / 2, width: column.width } };
+      // 20 from the screen's edges: the column is the page less its gutters (12 each).
+      this.open = { kind, at: { top: button.top - 44, center: column.left + column.width / 2, width: column.width + 24 - 40 } };
     };
     return html`<div class="sync-stage">
       ${ids.length > 1
@@ -114,14 +101,16 @@ export class SyncView extends StudioView {
             </button>`,
           )}</div>`
         : nothing}
-      <div class=${classMap({ "sync-picture": true, syncing: !!box.syncing, off, [`m-${box.mode}`]: true })}>
-        <div class="glow"></div>
-        <ha-icon icon=${inputIcon(input)}></ha-icon>
-      </div>
-      <div class="sync-caption">
-        <div class="caps">${box.name || "Sync Box"}</div>
-        <div class="sync-what">${input?.name || t("sync.title")}</div>
-        <div class="sync-status">${status}</div>
+      <div class="sync-what-plays">
+        <div class=${classMap({ "sync-picture": true, syncing: !!box.syncing, off, [`m-${box.mode}`]: true })}>
+          <div class="glow"></div>
+          <ha-icon icon=${inputIcon(input)}></ha-icon>
+        </div>
+        <div class="sync-caption">
+          <div class="caps">${box.name || "Sync Box"}</div>
+          <div class="sync-what">${input?.name || t("sync.title")}</div>
+          <div class="sync-status">${status}</div>
+        </div>
       </div>
       <div class=${classMap({ "sync-controls": true, inert: off })}>
         <div class="sync-ctl">
@@ -144,7 +133,7 @@ export class SyncView extends StudioView {
           <span class="caps">${t("sync.what")}</span><span class="dock-value">${input?.name || "–"}</span>
         </button>
         <button
-          class=${classMap({ "dock-go": true, on: !!box.syncing, [`m-${box.mode}`]: true })}
+          class=${classMap({ "dock-go": true, on: !!box.syncing, ready: !off && !box.syncing, [`m-${box.mode}`]: true })}
           aria-label=${box.syncing ? t("sync.stop") : t("sync.start")}
           aria-pressed=${!!box.syncing}
           ?disabled=${!box.available}
@@ -197,39 +186,31 @@ export class SyncView extends StudioView {
           )}</div>`;
     return html`<div class="pop-layer" @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="pop-card" role="dialog" aria-label=${t(`sync.${kind}` as StringKey)}
-        style=${styleMap({ top: `${at.top}px`, left: `${at.center}px`, width: `min(400px, ${at.width - 24}px)` })}>
+        style=${styleMap({ top: `${at.top}px`, left: `${at.center}px`, width: `min(400px, ${at.width}px)` })}>
         <div class="pop-title">${t(`sync.${kind}` as StringKey)}</div>
         ${body}
       </div>
     </div>`;
   }
 
-  /** Music: the palette; video and game: background lighting (a box paired directly). */
+  /** Music: the palette (a box paired directly). Background lighting is in the box's settings
+   *  (Advanced), as in the Hue app. */
   private modeSettings(id: string, box: SyncBoxInfo) {
     const { t } = this.ctx;
-    if (box.mode === "music" && hasFeature(box, "palette")) {
-      return html`<div class="pop-sub caps">${t("sync.palette")}</div>
-        <div class="palettes">${PALETTES.map(
-          (p) => html`<button class=${classMap({ palette: true, on: box.palette === p })} aria-pressed=${box.palette === p} @click=${() => this.set(id, { palette: p })}>
-            <span class="art" style="background:${PALETTE_ART[p]}"></span><span>${t(`sync.palette_${p}` as StringKey)}</span>
-          </button>`,
-        )}</div>`;
-    }
-    if ((box.mode === "video" || box.mode === "game") && hasFeature(box, "background_lighting")) {
-      const on = !!box.background_lighting?.[box.mode];
-      return html`<div class="pop-row">
-        <div class="grow">${t("sync.background")}<div class="dim small">${t("sync.background_sub")}</div></div>
-        ${toggle(on, t("sync.background"), () => this.set(id, { background_lighting: !on }))}
-      </div>`;
-    }
-    return nothing;
+    if (box.mode !== "music" || !hasFeature(box, "palette")) return nothing;
+    return html`<div class="pop-sub caps">${t("sync.palette")}</div>
+      <div class="palettes">${PALETTES.map(
+        (p) => html`<button class=${classMap({ palette: true, on: box.palette === p })} aria-pressed=${box.palette === p} @click=${() => this.set(id, { palette: p })}>
+          <span class="art" style="background:${PALETTE_ART[p]}"></span><span>${t(`sync.palette_${p}` as StringKey)}</span>
+        </button>`,
+      )}</div>`;
   }
 
-  /** A sheet: its bar (close, title, an action) over the body. */
-  private sheet(title: string, body: unknown, end: unknown = nothing) {
+  /** A sheet: its bar (close, title, an action) over the body; `tall` fills the screen. */
+  private sheet(title: string, body: unknown, end: unknown = nothing, tall = false) {
     const { ctx } = this;
     const close = () => (this.open = null);
-    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
+    return html`<div class=${classMap({ sheet: true, bottom: ctx.narrow, tall })} @click=${(e: Event) => e.target === e.currentTarget && close()}>
       <div class="box form sensor-sheet choice-sheet sync-sheet" role="dialog" aria-label=${title}>
         <div class="sheet-bar">
           <button class="round close" aria-label=${ctx.t("common.close")} @click=${close}>${icon("close")}</button>
@@ -241,13 +222,15 @@ export class SyncView extends StudioView {
     </div>`;
   }
 
-  /** "What": the box's HDMI inputs as tiles, the one in use checked (the Hue app's "Sync options"). */
+  /** "What": the box's HDMI inputs as tiles, the one in use checked (the Hue app's "Sync
+   *  options", a tall sheet; its "+" adds a box). */
   private whatSheet(id: string, box: SyncBoxInfo) {
-    const { t } = this.ctx;
+    const { ctx } = this;
+    const { t } = ctx;
     const inputs = box.inputs || [];
     return this.sheet(
       t("sync.options"),
-      html`<h2 class="label">${t("sync.input")}</h2>
+      html`<h2 class="label">${t("sync.tv")}</h2>
         <div class="rows sync-inputs">
           <div class="item"><div class="grow">${box.name || "Sync Box"}</div></div>
           <div class="input-row">${inputs.map((input) => {
@@ -266,6 +249,8 @@ export class SyncView extends StudioView {
             });
           })}</div>
         </div>`,
+      html`<button class="round plus-blue" aria-label=${t("bridges.add_box")} @click=${() => ctx.openSettings()}>${icon("plus")}</button>`,
+      true,
     );
   }
 
@@ -293,158 +278,6 @@ export class SyncView extends StudioView {
           </button>
         </div>`,
     );
-  }
-
-  /** "⋯": the box's own settings, then (paired directly) presets and remote buttons. */
-  private moreSheet(id: string, box: SyncBoxInfo) {
-    const { ctx } = this;
-    const { t } = ctx;
-    return this.sheet(
-      t("sync.settings"),
-      html`<div class="rows">
-          <button class="item" @click=${() => ctx.go(`/settings/bridges/${encodeURIComponent(id)}`)}>
-            <ha-icon icon="hue-studio:sync"></ha-icon>
-            <div class="grow">${t("sync.device")}<div class="dim small">${box.name || "Sync Box"}</div></div>
-            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-          </button>
-        </div>
-        ${hasFeature(box, "presets") ? this.presets(id, box) : nothing}
-        ${hasFeature(box, "ir") ? this.remote(box) : nothing}`,
-    );
-  }
-
-  /** Presets of the box: start one, save the current state, delete. */
-  private presets(id: string, box: SyncBoxInfo) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const remove = (preset: string, name: string) =>
-      this.askDelete(t("sync.preset_delete_note", { name }), t("sync.preset_delete"), () =>
-        void ctx.call("hue_studio", "delete_sync_preset", { entity_id: box.entity_id!, preset }, { optimistic: false }),
-      );
-    return html`<h2 class="label">${t("sync.presets")}</h2>
-      <div class="rows">
-        ${(box.presets || []).map(
-          (p) => html`<div class="item">
-            <ha-icon icon="mdi:bookmark-outline"></ha-icon>
-            <button class="grow plain" @click=${() => this.set(id, { preset: p.id })}>${p.name}</button>
-            <button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
-              <ha-icon icon="mdi:delete-outline"></ha-icon>
-            </button>
-          </div>`,
-        )}
-        <button class="item" @click=${() => (this.presetName = "")}>
-          <ha-icon icon="mdi:plus"></ha-icon><div class="grow">${t("sync.preset_save")}<div class="dim small">${t("sync.preset_save_sub")}</div></div>
-        </button>
-      </div>`;
-  }
-
-  private presetSheet(box: SyncBoxInfo) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const close = () => (this.presetName = null);
-    const name = (this.presetName || "").trim();
-    const save = async () => {
-      if (!name) return;
-      if (await ctx.call("hue_studio", "save_sync_preset", { entity_id: box.entity_id!, name }, { optimistic: false })) {
-        close();
-        ctx.toast(t("sync.preset_saved", { name }));
-      }
-    };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form" role="dialog" aria-label=${t("sync.preset_save")}>
-        <div class="sheet-bar"><div class="grow">${t("sync.preset_save")}</div>
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-        </div>
-        <div class="form-body">
-          <input class="field" maxlength="24" placeholder=${t("sync.preset_name")} aria-label=${t("sync.preset_name")} .value=${this.presetName || ""}
-            @input=${(e: InputEvent) => (this.presetName = (e.target as HTMLInputElement).value)} @keydown=${(e: KeyboardEvent) => e.key === "Enter" && save()} />
-          <p class="hint">${t("sync.preset_save_sub")}</p>
-        </div>
-        <div class="actions"><button class="pill apply" ?disabled=${!name} @click=${save}>${t("scene.save")}</button></div>
-      </div>
-    </div>`;
-  }
-
-  /** Remote buttons: what each one does; learn a new one. */
-  private remote(box: SyncBoxInfo) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const ir = box.ir!;
-    const known = new Set(ir.codes.map((c) => c.code));
-    const fresh = ir.scanned.filter((c) => !known.has(c));
-    const learn = () => ctx.call("hue_studio", "learn_sync_ir_code", { entity_id: box.entity_id! }, { optimistic: false });
-    return html`<h2 class="label">${t("sync.remote")}</h2>
-      <p class="lead small">${t("sync.remote_hint")}</p>
-      <div class="rows">
-        ${ir.codes.map(
-          (c) => html`<button class="item" @click=${() => (this.ir = { code: c.code, name: c.name, action: c.action || "toggle_sync", known: true })}>
-            <ha-icon icon="mdi:remote"></ha-icon>
-            <div class="grow">${c.name}<div class="dim small">${this.actionLabel(box, c)}</div></div>
-            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-          </button>`,
-        )}
-        ${fresh.map(
-          (code) => html`<button class="item" @click=${() => (this.ir = { code, name: "", action: "toggle_sync", known: false })}>
-            <ha-icon icon="mdi:remote-tv"></ha-icon>
-            <div class="grow">${t("sync.remote_new", { code })}<div class="dim small">${t("sync.remote_assign")}</div></div>
-            <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
-          </button>`,
-        )}
-        <button class="item" ?disabled=${ir.scanning} @click=${learn}>
-          <ha-icon icon=${ir.scanning ? "mdi:access-point" : "mdi:plus"}></ha-icon>
-          <div class="grow">${ir.scanning ? t("sync.remote_listening") : t("sync.remote_learn")}</div>
-        </button>
-      </div>`;
-  }
-
-  private actionLabel(box: SyncBoxInfo, c: Pick<SyncIrCode, "action">): string {
-    const { t } = this.ctx;
-    const action = c.action;
-    if (!action) return t("sync.action_other");
-    const [kind, value] = action.split(":");
-    if (kind === "input") return t("sync.action_input", { name: box.inputs?.find((i) => i.id === value)?.name || value });
-    if (kind === "preset") return t("sync.action_preset", { name: box.presets?.find((p) => p.id === value)?.name || value });
-    return t(`sync.action_${action}` as StringKey);
-  }
-
-  private irSheet(box: SyncBoxInfo, draft: IrDraft) {
-    const { ctx } = this;
-    const { t } = ctx;
-    const close = () => (this.ir = null);
-    const set = (patch: Partial<IrDraft>) => (this.ir = { ...this.ir!, ...patch });
-    const actions = [
-      ...IR_ACTIONS,
-      ...(box.inputs || []).map((i) => `input:${i.id}`),
-      ...(box.presets || []).map((p) => `preset:${p.id}`),
-    ];
-    const name = draft.name.trim();
-    const save = async () => {
-      if (!name) return;
-      const data = { entity_id: box.entity_id!, code: draft.code, name, action: draft.action };
-      if (await ctx.call("hue_studio", "set_sync_ir_code", data, { optimistic: false })) close();
-    };
-    const forget = async () => {
-      if (await ctx.call("hue_studio", "delete_sync_ir_code", { entity_id: box.entity_id!, code: draft.code }, { optimistic: false })) close();
-    };
-    return html`<div class="sheet" @click=${(e: Event) => e.target === e.currentTarget && close()}>
-      <div class="box form" role="dialog" aria-label=${t("sync.remote")}>
-        <div class="sheet-bar"><div class="grow">${draft.known ? draft.name : t("sync.remote_new", { code: draft.code })}</div>
-          <button class="round close" aria-label=${t("common.close")} @click=${close}>${icon("close")}</button>
-        </div>
-        <div class="form-body">
-          <input class="field" maxlength="24" placeholder=${t("sync.remote_name")} aria-label=${t("sync.remote_name")} .value=${draft.name}
-            @input=${(e: InputEvent) => set({ name: (e.target as HTMLInputElement).value })} />
-          <select class="select wide" aria-label=${t("sync.remote_action")} @change=${(e: Event) => set({ action: (e.target as HTMLSelectElement).value })}>
-            ${actions.map((a) => html`<option value=${a} ?selected=${a === draft.action}>${this.actionLabel(box, { action: a })}</option>`)}
-          </select>
-          <p class="hint">${t("sync.remote_code", { code: draft.code })}</p>
-        </div>
-        <div class="actions">
-          ${draft.known ? html`<button class="pill" @click=${forget}>${t("sync.remote_forget")}</button>` : nothing}
-          <button class="pill apply" ?disabled=${!name} @click=${save}>${t("scene.save")}</button>
-        </div>
-      </div>
-    </div>`;
   }
 
   private set(id: string, change: SyncChange): void {

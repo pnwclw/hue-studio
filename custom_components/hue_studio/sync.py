@@ -24,6 +24,7 @@ from aiohue.v2.models.entertainment_configuration import (
 from aiohuesyncbox import (
     AiohuesyncboxException,
     CycleDirection,
+    DeviceAction,
     DeviceUpdate,
     ExecutionMode,
     GameMode,
@@ -45,7 +46,9 @@ from aiohuesyncbox.controllers.behavior import Behavior
 from aiohuesyncbox.controllers.device import Device
 from aiohuesyncbox.controllers.hdmi import Hdmi
 from aiohuesyncbox.models import (
+    BehaviorData,
     BehaviorUpdate,
+    DeviceAutoUpdate,
     ExecutionUpdate,
     InputBehavior,
     PortUpdate,
@@ -96,6 +99,18 @@ BRIGHTNESS_STEP = 20  # of the box's 0-200
 LED_MODES = {"off": LedMode.OFF, "normal": LedMode.REGULAR, "dimmed": LedMode.DIMMED}
 NAME_MAX = 32
 INPUT_NAME_MAX = 18
+# Minutes without a picture before the box sleeps, as the Hue app turns it on.
+INACTIVITY_MINUTES = 20
+# How long the box waits after the TV's hot plug before it wakes (the Hue app's).
+HPD_WAKE_MS = 1500
+# The hour (UTC) the box installs updates at when it has none of its own yet.
+AUTO_UPDATE_HOUR = 10
+# What the panel can ask of the box itself.
+DEVICE_ACTIONS = {
+    "restart": DeviceAction.SOFTWARE_RESTART,
+    "check_update": DeviceAction.CHECK_FOR_FIRMWARE_UPDATES,
+    "update": DeviceAction.FIRMWARE_UPDATE,
+}
 # Input types the Hue Sync app offers (its icons); not "unknown".
 PORT_TYPES = [t.value for t in PortType if t is not PortType.UNKNOWN_API_VALUE]
 
@@ -179,6 +194,16 @@ class SyncDevice(Device):
         """Let the Hue Sync app find the box over Bluetooth (to change its Wi-Fi)."""
         await self._put(DeviceUpdate(bluetooth=enabled).to_dict())
 
+    async def set_auto_update(self, enabled: bool) -> None:
+        """Updates installed by the box itself at night (at its own hour)."""
+        hour = self.update.auto_update_time if self.update else AUTO_UPDATE_HOUR
+        update = DeviceAutoUpdate(auto_update_enabled=enabled, auto_update_time=hour)
+        await self._put(DeviceUpdate(update=update).to_dict())
+
+    async def do(self, action: DeviceAction) -> None:
+        """Restart the box, look for an update or install the one found."""
+        await self._put(DeviceUpdate(action=action).to_dict())
+
 
 class SyncHdmi(Hdmi):
     """The box's HDMI ports with what aiohuesyncbox (0.1.6) does not have yet: an
@@ -200,13 +225,37 @@ class SyncHdmi(Hdmi):
         )
 
 
+@dataclass
+class SyncBehaviorData(BehaviorData):
+    """The behavior aiohuesyncbox (0.1.6) reads, and how long the box waits after the
+    TV's hot plug before it wakes (the Hue app's "Power state detection: HPD"; 0: it
+    does not wake by it)."""
+
+    hpd_output_enable_ms: int | None = None
+
+
+@dataclass
+class SyncBehaviorUpdate(BehaviorUpdate):
+    """A behavior change, with the wake by the TV's hot plug."""
+
+    hpd_output_enable_ms: int | None = None
+
+
 class SyncBehavior(Behavior):
     """The box's behavior with what aiohuesyncbox (0.1.6) does not have yet: its own
-    HDMI CEC as a whole. Built on its controller and models."""
+    HDMI CEC as a whole and the wake by the TV's hot plug. Built on its controller and
+    models; the hot plug is read from the box's last full state (`last_response`)."""
 
-    def __init__(self, behavior: Behavior) -> None:
+    def __init__(self, behavior: Behavior, state: dict[str, Any] | None = None) -> None:
         """Wrap the behavior resource of a box (same data, same request function)."""
-        super().__init__(behavior._data, behavior._request)
+        raw = (state or {}).get("behavior")
+        data = SyncBehaviorData.from_dict(raw) if raw else behavior._data
+        super().__init__(data, behavior._request)
+
+    @property
+    def hpd_output_enable_ms(self) -> int | None:
+        """Hot plug wake delay of the box (None: not reported)."""
+        return getattr(self._data, "hpd_output_enable_ms", None)
 
     async def set_own_cec(self, enabled: bool) -> None:
         """The box's own HDMI CEC: following the TV (on with it, standby with it) and
@@ -230,6 +279,73 @@ class SyncBehavior(Behavior):
         )
         # The box takes its behavior switches as 0/1 and refuses JSON booleans.
         await self._put(_ints(update.to_dict()))
+
+    async def set_behavior(
+        self,
+        *,
+        cec_power: bool | None = None,
+        hpd_power: bool | None = None,
+        usb_power: bool | None = None,
+        hpd_switch: bool | None = None,
+        inactivity: int | None = None,
+        arc_bypass: bool | None = None,
+        inputs: dict[str, dict[str, bool]] | None = None,
+    ) -> None:
+        """The Hue app's "Automatic control" and "Advanced": what turns the box on and
+        off, which inputs it switches to by themselves and starts syncing on, and the
+        audio pass-through. An input's switches are sent whole (the box wants them so),
+        its others as they are."""
+        changed: dict[str, InputBehavior] = {}
+        for key, change in (inputs or {}).items():
+            current = getattr(self, key)
+            if current is None:
+                continue
+            changed[key] = InputBehavior(
+                cec_input_switch=change.get("cec_switch", current.cec_input_switch),
+                link_auto_sync=change.get("auto_sync", current.link_auto_sync),
+                hpd_input_port_switch=change.get(
+                    "hpd_switch", current.hpd_input_port_switch
+                ),
+            )
+        update = SyncBehaviorUpdate(
+            cec_powersave=cec_power,
+            hpd_output_enable_ms=None
+            if hpd_power is None
+            else HPD_WAKE_MS
+            if hpd_power
+            else 0,
+            usb_powersave=usb_power,
+            hpd_input_switch=hpd_switch,
+            inactive_powersave=inactivity,
+            arc_bypass_mode=arc_bypass,
+            **changed,
+        )
+        await self._put(_ints(update.to_dict()))
+
+
+def behavior_info(api: HueSyncBox) -> dict[str, Any] | None:
+    """The box's automatic control and audio pass-through, for the panel."""
+    if api.behavior is None:
+        return None
+    behavior = SyncBehavior(api.behavior, api.last_response)
+    hpd = behavior.hpd_output_enable_ms
+    return {
+        "cec_power": behavior.cec_powersave,
+        "hpd_power": None if hpd is None else hpd > 0,
+        "usb_power": behavior.usb_powersave,
+        "hpd_switch": behavior.hpd_input_switch,
+        "inactivity": behavior.inactive_powersave,
+        "arc_bypass": behavior.arc_bypass_mode,
+        "inputs": {
+            key: {
+                "cec_switch": current.cec_input_switch,
+                "hpd_switch": current.hpd_input_port_switch,
+                "auto_sync": current.link_auto_sync,
+            }
+            for key in INPUTS
+            if (current := getattr(behavior, key)) is not None
+        },
+    }
 
 
 def _ints(data: dict[str, Any]) -> dict[str, Any]:
@@ -462,9 +578,14 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
         led: str | None = None,
         tv_power: bool | None = None,
         bluetooth: bool | None = None,
+        auto_update: bool | None = None,
+        action: str | None = None,
+        background: dict[str, bool] | None = None,
     ) -> None:
-        """The box's own settings: its name, its LED, following the TV and its
-        Bluetooth (the Hue Sync app changes its Wi-Fi over it)."""
+        """The box's own settings: its name, its LED, following the TV, its
+        Bluetooth (the Hue Sync app changes its Wi-Fi over it), updates at night, each
+        mode's background lighting (without switching to it); and an action (restart,
+        look for an update, install it)."""
         if name is not None:
             name = name.strip()[:NAME_MAX]
             if name and name != self.api.device.name:
@@ -484,6 +605,29 @@ class SyncBoxCoordinator(DataUpdateCoordinator[None]):
             await self.async_command(
                 SyncDevice(self.api.device).set_bluetooth(bluetooth)
             )
+        if auto_update is not None:
+            await self.async_command(
+                SyncDevice(self.api.device).set_auto_update(auto_update)
+            )
+        for mode, on in (background or {}).items():
+            await self.async_set_state(
+                **self.mode_changes(mode, background_lighting=on)
+            )
+        if action is not None:
+            await self.async_command(
+                SyncDevice(self.api.device).do(DEVICE_ACTIONS[action])
+            )
+
+    async def async_set_behavior(self, **changes: Any) -> None:
+        """The box's automatic control and audio pass-through (SyncBehavior)."""
+        if self.api.behavior is None:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="sync_box_command_failed",
+                translation_placeholders={"name": self.box_name},
+            )
+        behavior = SyncBehavior(self.api.behavior, self.api.last_response)
+        await self.async_command(behavior.set_behavior(**changes))
 
     async def async_set_input(
         self, key: str, *, name: str | None = None, port_type: str | None = None
@@ -825,8 +969,15 @@ def sync_box_info(
             "bluetooth": api.device.bluetooth,
             "led": led_mode(api),
             "tv_power": api.behavior.cec_powersave if api.behavior else None,
+            "auto_update": api.device.update.auto_update_enabled
+            if api.device.update
+            else None,
+            # "lan": the local network only, "wan": the internet too.
+            "network": api.device.wifi_state.value if api.device.wifi_state else None,
+            "code": api.device.device_type,
             "ha_device": device.id if device else None,
         },
+        "behavior": behavior_info(api),
         "content": (hdmi.content_specs or None) if hdmi else None,
         "video_supported": hdmi.video_sync_supported if hdmi else True,
         "audio_supported": hdmi.audio_sync_supported if hdmi else True,

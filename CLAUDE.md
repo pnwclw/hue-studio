@@ -282,7 +282,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 hue_studio/devices/search|identify|setup|sensitivity|delete, hue_studio/entertainment/subscribe|create|update|delete|positions,
                                 hue_studio/bridges/subscribe|motion_area|rename|discover|link|move_plan|move|move/retry|move/skip|move/finish|move/subscribe,
                                 hue_studio/bridges/lost/subscribe|find|forget,
-                                hue_studio/sync/configure|follow|input|link_bridge
+                                hue_studio/sync/configure|behavior|follow|input|link_bridge
   alignment.py                  pure: HA areas <-> Hue rooms of one bridge -> alignment plan (rooms hold devices)
   rooms.py                      feeds/applies the plan (registries + bridge), set a light's area, watch changes, auto-align
   devices.py                    adding devices: Zigbee search (serials, other brands, install codes from QR codes where the
@@ -316,7 +316,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   scene_tags.json               ready-made tags of every gallery scene (hand-made: phases, seasons, weather, moods)
   positions.py                  light positions (entertainment areas + Store), editor saves, spatial palette layout
   sync.py                       Sync Box (aiohuesyncbox): coordinator, state, its settings (name, LED, TV, inputs' names and
-                                types, Bluetooth for the Hue Sync app's Wi-Fi change), link to bridge entertainment areas, moving it to another bridge
+                                types, Bluetooth for the Hue Sync app's Wi-Fi change, updates at night, restart; the Hue app's
+                                automatic control: CEC/HPD/USB/inactivity power, per-input CEC/HPD switching and auto sync,
+                                ARC bypass), link to bridge entertainment areas, moving it to another bridge
                                 (that bridge's button: its own entertainment credentials, the area of the same name)
   sync_follow.py                following the picture (HDMI CEC for sources without it, e.g. a PC behind an EDID manager): the
                                 box sees a picture (`linked`) only on the input it is on and none asleep, so each input's picture
@@ -328,6 +330,7 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
                                 box entry's options. All of it is the home-made HDMI CEC of "HDMI CEC: Hue Studio" (the box
                                 then does not follow the TV); with "HDMI CEC: the box" nothing here acts
   sync_link.py                  Sync Box used through HACS `huesyncbox`: its entities -> panel payload, set_sync_state
+  diagnostics.py                a paired Sync Box's own state (redacted), to match the Hue app's settings with its fields
   entity.py, switch.py, select.py, number.py, sensor.py   Sync Box entities; the Hue Studio entry's phase sensor and mood select
   brand/                        icon and logo (scripts/build_icon.py), shown by HA 2026.3+
   config_flow.py                setup (menu: Hue Studio once, for every `hue` bridge; Sync Box: pair or use `huesyncbox`); no options flow
@@ -355,6 +358,8 @@ src/                            frontend sources (TypeScript + Lit), bundled int
   optimistic.ts                 pure: predicted state of a service call until HA confirms it
   controls.ts                   hue-studio-slider, room surface/meta, brightness throttled to bridge limits, tileCard (the one card layout)
   views/                        home, room, color (wheel), effects, scene (editor), gallery, sync, settings (tab), rooms (rooms and zones),
+                                sync-settings (a Sync Box's settings, the Hue app's pages: device, HDMI inputs, TV remote, automatic
+                                control with HDMI CEC by Hue Studio, advanced, updates, presets),
                                 automations (the tab, "+" with a picture card per type and a room's list), add-sheet (a room's "+": scene, automation or device), automation-edit (one automation;
                                 natural light / scene of the day settings as its second page), new-scene (the "New scene" sheet), effect-sheet (an effect's "adjust"), space (arrange a room or an entertainment area), sensor (a Hue sensor's settings: name, room, its motion automation edited in place, sensitivity), scene-pick (a scene's sheet: save it to a room or set it once),
                                 experimental, devices (Settings → Devices: kinds with counts, a kind's list by room with search and filters), device (a device's

@@ -114,6 +114,7 @@ from .rooms import (
 )
 from .scenes import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
 from .sync import (
+    DEVICE_ACTIONS as SYNC_DEVICE_ACTIONS,
     INPUT_NAME_MAX as SYNC_INPUT_NAME_MAX,
     INPUTS as SYNC_INPUTS,
     LED_MODES,
@@ -177,6 +178,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_find_lost,
         ws_forget_lost,
         ws_configure_sync_box,
+        ws_sync_box_behavior,
         ws_follow_sync_box,
         ws_sync_box_input,
         ws_link_sync_box_bridge,
@@ -1396,6 +1398,9 @@ def ws_subscribe_move(
         vol.Optional("led"): vol.In(list(LED_MODES)),
         vol.Optional("tv_power"): bool,
         vol.Optional("bluetooth"): bool,
+        vol.Optional("auto_update"): bool,
+        vol.Optional("action"): vol.In(list(SYNC_DEVICE_ACTIONS)),
+        vol.Optional("background"): {vol.In(["video", "game"]): bool},
     }
 )
 @websocket_api.async_response
@@ -1421,8 +1426,59 @@ async def ws_configure_sync_box(
             led=msg.get("led"),
             tv_power=msg.get("tv_power"),
             bluetooth=msg.get("bluetooth"),
+            auto_update=msg.get("auto_update"),
+            action=msg.get("action"),
+            background=msg.get("background"),
         ),
     )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/sync/behavior",
+        vol.Required("entry_id"): str,
+        vol.Optional("cec_power"): bool,
+        vol.Optional("hpd_power"): bool,
+        vol.Optional("usb_power"): bool,
+        vol.Optional("hpd_switch"): bool,
+        vol.Optional("inactivity"): vol.All(int, vol.Range(min=0, max=10000)),
+        vol.Optional("arc_bypass"): bool,
+        vol.Optional("inputs"): {
+            vol.In(SYNC_INPUTS): {
+                vol.Optional("cec_switch"): bool,
+                vol.Optional("hpd_switch"): bool,
+                vol.Optional("auto_sync"): bool,
+            }
+        },
+    }
+)
+@websocket_api.async_response
+async def ws_sync_box_behavior(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """A Sync Box's automatic control and audio pass-through (paired directly only)."""
+    box = async_sync_boxes(hass).get(msg["entry_id"])
+    if not isinstance(box, SyncBoxCoordinator):
+        connection.send_error(
+            msg["id"],
+            websocket_api.ERR_NOT_FOUND,
+            "Not a Sync Box paired with Hue Studio",
+        )
+        return
+    keys = (
+        "cec_power",
+        "hpd_power",
+        "usb_power",
+        "hpd_switch",
+        "inactivity",
+        "arc_bypass",
+        "inputs",
+    )
+    changes = {key: msg[key] for key in keys if key in msg}
+    await _ws_call(connection, msg, box.async_set_behavior(**changes))
 
 
 @websocket_api.require_admin

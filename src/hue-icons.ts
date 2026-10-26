@@ -9,7 +9,7 @@ import { ICONS } from "./ui.ts";
 export const ICON_PREFIX = "hue-studio";
 
 /** Glyphs of the panel's chrome (ui.ts) offered as icons of the set. */
-const CHROME = ["sync", "devices", "bridge", "motionaware"] as const;
+const CHROME = ["sync", "devices", "bridge", "motionaware", "syncbox", "bolt"] as const;
 
 const names = [...new Set([...Object.values(ARCHETYPE_ICONS), ...PRODUCT_ICONS.map(([, icon]) => icon)])].map((icon) =>
   icon.slice(ICON_PREFIX.length + 1),

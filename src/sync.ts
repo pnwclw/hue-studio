@@ -52,6 +52,12 @@ export const PORT_ICONS = {
   hdmisplitter: "mdi:call-split",
 } as const;
 export type PortType = keyof typeof PORT_ICONS;
+/** The types the Hue app offers for an input, in its order ("Edit name and icon"); the
+ *  others stay for inputs that already have them. */
+export const GRID_TYPES: readonly PortType[] = [
+  "xbox", "playstation", "nintendoswitch", "phone", "desktop", "laptop", "appletv", "roku", "shield",
+  "chromecast", "firetv", "diskplayer", "settopbox", "satellite", "avreceiver", "soundbar", "generic",
+];
 export const PORT_TYPES = Object.keys(PORT_ICONS) as PortType[];
 
 export const inputIcon = (input: SyncInput | null | undefined): string => PORT_ICONS[(input?.type || "generic") as PortType] || "mdi:hdmi-port";

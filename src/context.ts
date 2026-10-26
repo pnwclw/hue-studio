@@ -491,6 +491,18 @@ export class StudioContext {
     }
   }
 
+  /** Remove a config entry from HA (a Sync Box), as its integration page does. */
+  async deleteEntry(entryId: string): Promise<boolean> {
+    if (!this.raw?.callApi) return false;
+    try {
+      await this.raw.callApi("DELETE", `config/config_entries/entry/${encodeURIComponent(entryId)}`);
+      return true;
+    } catch (err) {
+      this.toast(this.t("common.error", { error: (err as Error)?.message || String(err) }));
+      return false;
+    }
+  }
+
   /** A page of HA itself (e.g. its automation editor). */
   openHa(path: string): void {
     navigate(path);

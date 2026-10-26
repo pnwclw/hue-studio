@@ -92,6 +92,12 @@
     panel.addEventListener("hass-toggle-menu", () => console.info("hass-toggle-menu"));
     root.append(panel);
     document.body.append(root);
+    // ?click=.dock-side|.item:nth-of-type(2) clicks each selector (searched through every
+    // shadow root, the first match) in turn, 700 ms apart: a sheet or popover for a headless shot.
+    if (params.get("click")) {
+      const deep = (sel, r = document) => r.querySelector(sel) || [...r.querySelectorAll("*")].map((e) => e.shadowRoot && deep(sel, e.shadowRoot)).find(Boolean);
+      params.get("click").split("|").forEach((sel, i) => setTimeout(() => deep(sel)?.click(), 900 + 700 * i));
+    }
     // ?moreinfo=light.desk_lamp opens the more-info override like a dashboard card would.
     if (params.get("moreinfo")) {
       setTimeout(() => panel.dispatchEvent(new CustomEvent("hass-more-info", {

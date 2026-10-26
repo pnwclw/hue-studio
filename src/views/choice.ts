@@ -78,6 +78,8 @@ export interface Row {
   /** The sub line in orange (something is missing). */
   warn?: boolean;
   disabled?: boolean;
+  /** No chevron (the Hue app's lists that only lead on, e.g. a Sync Box's settings). */
+  bare?: boolean;
 }
 
 /** A row that opens something: picture, title (and its line), the value, a chevron. */
@@ -86,7 +88,7 @@ export function navRow(row: Row, open: () => void): TemplateResult {
     ${lead(row.icon, row.art)}
     <div class="grow">${row.title}${row.sub ? html`<div class=${classMap({ "dim small": true, warn: !!row.warn })}>${row.sub}</div>` : nothing}</div>
     ${row.value ? html`<span class="value">${row.value}</span>` : nothing}
-    <ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>
+    ${row.bare ? nothing : html`<ha-icon class="chevron" icon="mdi:chevron-right"></ha-icon>`}
   </button>`;
 }
 

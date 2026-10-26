@@ -68,7 +68,7 @@ everything else stays.
 | `--accent` | `#006aff` | switches on, checks, the main button, "+", a chosen chip's ring |
 | `--bar-bottom`, `--tab-off`, `--tab-on` | `#0d1013`, `#404345`, `#b9baba` | the tab bar (the page fading into it); its tabs that are not chosen; the chosen one (grey, not white) |
 | `--glow-blue`, `--glow-blue-wash` | blues | Automations' glow at the top of the page |
-| `--glow-violet`, `--glow-violet-wash` | violets | Sync's glow |
+| `--glow-violet`, `--glow-violet-wash` | violets | the empty Sync tab's glow (no box yet: the onboarding) |
 | `--picker-top`, `--picker-top-2` | `#08225d`, `#091b40` | a picker's deep blue top (gallery, a new automation's types, a room's "+") |
 | `--info`, `--info-head`, `--info-mark`, `--info-line`, `--info-bg`, `--info-tint` | blues | links and info icons; the info banner (title, mark and border in the accent, `#171f2a` inside); info notes |
 | `--warn`, `--warn-line`, `--warn-bg`, `--warn-tint` | amber | "Unreachable", warnings; the warning banner; mismatch notes |
@@ -83,7 +83,7 @@ pictures) keeps its own colors: those are drawings, not interface.
 **The page's glow** (`main.glow-*`, the panel picks it per screen): Home and a room fade from
 their lit lights' mean color (10% over the page, `glowColor` in `model.ts`) at the top to the
 page at the bottom, over the whole height, and have none when nothing is lit; Automations has
-a blue glow at the top (gone by ~330px), Sync a violet one; Settings and sub screens have
+a blue glow at the top (gone by ~330px), the empty Sync tab a violet one; Settings and sub screens have
 none. On a sheet the glow is the sheet's.
 
 ### Type
@@ -214,7 +214,10 @@ Each part: its class (and helper), its measures, where it is used.
   be used.
 - **Check** `.check` / `.pick-check`: a 24px round tick box (accent when on; `.some` for part
   of a room). **Radio** `.radio`: 24px ring.
-- **Field** `.field` (44px, `--fs-headline`); **outlined field** `.field.outlined`, the Hue
+- **Field** `.field` (44px, `--fs-headline`); **filled field** `.field.filled` (48px,
+  `--surface`, no border: a Sync Box input's name); **icon grid** `.icon-grid` / `.icon-opt`
+  (three columns of 128px cells, a 40px disc over the name, the accent when chosen);
+  **outlined field** `.field.outlined`, the Hue
   app's (46px, a 1.5px `--outline` border, `--r-xs`, `--surface`, 16px: names on sheets,
   addresses and codes in flows, a zone's name); **search** `.search-field` (32px),
   `.name-input`. All at least 16px.
@@ -236,7 +239,8 @@ Each part: its class (and helper), its measures, where it is used.
 ### Rows
 
 - **Group of rows** `.rows`: `--surface-row`, `--r-m`; full width on phones in settings,
-  editors and device lists.
+  editors and device lists; the first one 20 under a sub screen's bar, one after a hint 20
+  under it. **Row disc** `.row-art.disc`: a 48px disc at 12 (`--surface-raised`), text at 72.
 - **List row** (`.rows .item` inside `.settings-page`, `.sensor-edit`, `.choice-sheet`, and
   `.rows.device-list`): ≥ `--row-h`, a `--row-icon` (28) icon centered 32px in, so an MDI
   glyph is as big as the Hue app's 24px ones (32px icons at 16 in device lists), text from `--row-text`, a 500 `--fs-body` title over a 400 `--fs-caption` line,
@@ -248,6 +252,7 @@ Each part: its class (and helper), its measures, where it is used.
   picture (`.row-art.pic`, 40px: its light on a disc, or its sign on a dark one) keeps its
   text at 72. A device's facts ("Device info") are rows with the value under the title.
 - **Choice row** (`navRow`, `choiceRows`): a row with its value opens the list to pick from —
+  (`bare`: no chevron, for lists that only lead on, as a Sync Box's settings) —
   a sheet for one value, a screen for several; the chosen one gets a tick. Its caption keeps
   to one line and its value to 42% of the row, both cut short with an ellipsis.
 
@@ -306,6 +311,9 @@ Each part: its class (and helper), its measures, where it is used.
 - **Note** `.sync-note` (info tint, 13px; `.all` centered for a screen that is locked),
   `.mismatch` (warn tint), `.power-cycle` (a step's art and text, info tint). Prefer a banner
   for anything new.
+- **Empty state** `.empty-state` + `.empty-art`: a centered title (`--fs-title`), a
+  `--fs-body` grey lead, a round picture; its button in the footer (a Sync Box's "TV remote
+  control" with no buttons learned).
 - **Toast** `.toast` at the bottom.
 
 ### Overlays
@@ -340,22 +348,96 @@ Each part: its class (and helper), its measures, where it is used.
 - **Dialog** (`hue-studio-more-info.ts`) and **more-info sheets** (`automation-sheet.ts`,
   `scene-sheet.ts`): full screen from the bottom on phones, a card on wide screens.
 
-### Sync screen
+### Sync
 
-`views/sync.ts`, the Hue app's Sync tab: no title; in the header "+" (add a box), "⋯" (the
-box's settings, presets and remote buttons on a sheet) and the power switch. What plays as
-a 238px square picture of the input (`.sync-picture`, glowing in the mode's colors while
-syncing), the box's name in small capitals, the input's name (`--fs-title-3`) and status
-(`--fs-body`). Mode, intensity and brightness: three 48px pills (`.sync-pill`, the
-brightness control) under 10px capitals; mode and intensity open a **popover**
-(`.pop-card`, the row surface, a title and the options, the chosen one white) above the
-controls over the scrim, anchored to the button that opened it (its bottom 44px above the
-button, not measured from the window's height): three mode tiles 100px tall and four
-intensity pills drawn as waves of growing height, on `--surface-raised` (tiles on a sheet). The **dock** (`.sync-dock`, the tab bar's near-black, `--r-3xl`):
-"What" (the inputs as light tiles with a check, on a sheet), a 76px start/stop button
-(in the mode's colors while syncing), "Where" (the entertainment areas with a tick, and a
-way to a new one). On shorter screens the picture and the gaps give way so the dock stays
-in view.
+The Hue app's Sync tab and a Sync Box's settings, measured on 2026-10-26 on the Android
+app with a live box (HSB2) at 411dp; the iOS screenshots of 2026-10-23 agree (the tab's
+parts scale with the width: 238 and 95 at 440). Everything here is made of the parts
+above; the Sync tab adds its stage, popovers and dock.
+
+**Tab** (`views/sync.ts`): no title; in the header "+" (add a box), "⋯" (the box's
+settings) and the box's power switch. The page has no glow (the violet one belongs to the
+empty tab, the Hue app's onboarding). Over the controls, centered in the room between the
+header and the controls:
+
+- **Picture** `.sync-picture`: what plays, a square 54% of the width (223 at 411, at most
+  238), square corners, `--surface` darkening toward the bottom (`#3b3d41` → `#2f3235`),
+  `--shadow-raised`; the input's type as a 120px glyph; glowing in the mode's colors while
+  syncing.
+- **Caption** `.sync-caption`, 20 under it: the box's name in small capitals
+  (`--fs-label`), the input (`--fs-title-3`, 500), its status (`--fs-body`, `--text-2`).
+
+Anchored to the bottom:
+
+- **Controls** `.sync-controls`: mode, intensity and brightness as three 48px pills
+  (`.sync-pill`, `--surface-raised`; brightness the `BrightnessControl`), each 21.4% of the
+  width (88 at 411, at most 95), 24 apart, their 10px capitals 8 above.
+- **Dock** `.sync-dock`: 20 under the pills, 20 from the screen's edges (not the gutter),
+  114 tall, `--r-2xl`, `--bar-bottom`, 22 over the tab bar. "What" and "Where": 48 round
+  buttons (`--surface-raised`) over 10px capitals and the value (`--fs-caption`,
+  `--text-2`). **Start** `.dock-go` in the middle, 76 round: grey while the box sleeps
+  (`--surface-raised`, the glyph dimmed), ready while it is on (`.ready`: a 4px ring of
+  the accent at 65% over the accent at 16%), in the mode's colors while syncing.
+- **Popovers** `.pop-card` (mode, intensity): over the scrim (the tab bar under it too),
+  20 from the screen's edges, `--surface-row`, `--r-m`, 16 in, the title (`--fs-body`
+  500) 20 from the top; three mode tiles 100 tall (`--surface-2`, a 24px glyph over 10px
+  capitals) or four intensity pills 48 tall drawn as waves (`--surface-raised`), 12
+  apart; the chosen one white with dark ink (`--selected`). Anchored to the button that
+  opened it. A box paired directly adds the music palette under music's tile (ours).
+- **Brightness**: the color screen's slider rising from the button (88×200, "100%" in a
+  small badge over it).
+
+**Sheets of the tab**:
+
+- "What" → **"Sync options"** (`.sheet.bottom.tall`): close, title, the accent "+" (add a
+  box) in the bar; section "TV"; a group across the sheet titled by the box's name with
+  its inputs as tile cards (102×160) in a row that scrolls, a round check in the switch
+  zone.
+- "Where" → **"Entertainment area"** (a sheet from the bottom, as tall as its rows): a
+  hint, the areas as rows with a tick, "Create an Entertainment area" with the accent "+".
+
+**A box's settings** (`views/sync-settings.ts`; "⋯" on the tab, or the box's row in
+Settings → Bridges): an editor as a sheet, its pages pushed with a back button. Only a box
+paired directly has them; one linked through `huesyncbox` shows Device info and the way
+to pair it.
+
+- **Settings**: list rows (72, 24px glyphs at 20, text at 72, chevrons): Device, Change
+  Hue Bridge, Change Wi-Fi network, HDMI inputs, TV remote control, Automatic control,
+  Advanced, Software updates; then ours, Presets. (Voice assistants is the Hue cloud's:
+  not here.)
+- **Device**: the hero (the box's glyph, its name `--fs-large` with the round pencil:
+  the name sheet), rows: LED indicator brightness (a choice sheet: Normal, Off, Dimmed),
+  Automatic updates (a switch, a hint under it), Network info and Device info (tall
+  sheets of facts, the value under the title; ours: how the box is connected and its
+  device in Home Assistant); "Restart sync box" (`.pill`) over "Remove sync box"
+  (`.delete-btn`, asked on an action sheet), centered 40 under the rows, 12 apart.
+- **HDMI inputs**: a lead, the inputs as rows with their type on a 48px disc
+  (`.row-art.disc`, `--surface-raised`) at 12, the name over "HDMI n". A row opens
+  **"Edit name and icon"** (a tall sheet, "DONE" in the bar): the glyph (32) centered, the
+  name in a 48px filled field (`.field.filled`, `--surface`, no border), the types as an
+  **icon grid** (`.icon-grid`: three columns of 128px cells, a 40px disc in
+  `--surface-raised`, the accent when chosen, the name `--fs-footnote` under it) on
+  `--surface-row`.
+- **TV remote control**: with no buttons learned, the empty state (a picture, a title
+  `--fs-title` centered, a `--fs-body` grey lead, the accent "Next" in the footer, which
+  starts learning); then the buttons as rows (name over what it does), each opening its
+  sheet (name, a choice row for what it does, "Forget").
+- **Automatic control**: sections of switch rows, each its own group with its hint under
+  it: POWER STATE DETECTION (CEC, Hot-plug detection (HPD), USB, Inactivity detection),
+  HDMI DEVICE SWITCHING (HPD, CEC: each a page with a lead and a switch row per input,
+  with its glyph, a hint), START LIGHT SYNC (Video signal detected: the same page).
+  Ours on top: **HDMI CEC** (a choice row: the box, or Hue Studio); with Hue Studio the
+  box's CEC rows are off and locked, and the rows of Hue Studio's own follow: the screen
+  and, per input, what its picture starts (its page: action, signal, wake).
+- **Advanced**: BACKGROUND LIGHTING (Video, Game: switch rows with the mode's glyph) and
+  its hint; AUDIO PASS-THROUGH (ARC/eARC bypass) and its hint.
+- **Software updates**: the firmware and what the box last found as facts, an update to
+  install or "Check for updates" (`.pill`), Automatic updates repeated as a switch row.
+- **Change Hue Bridge** (the bridges as rows with a tick, the move under them) and
+  **Change Wi-Fi network** (the box's Bluetooth for the Hue app) are sheets: the Wi-Fi
+  itself is changed by the Hue app.
+- **Presets** (ours): rows (start one), "Save current" (the name sheet), delete on an
+  action sheet.
 
 ### Color screen
 
@@ -400,15 +482,20 @@ tile with a round "+"), the tiles a scene tile's: 102×110, a 48px picture, name
 | New MotionAware area | the empty list a picker's art ("Create a MotionAware area", "How does it work?" / "Create area"); the bridge on an action sheet with a title; "Before you choose devices…" ×3 (art, "Next"); "Where are the lights that you want to detect motion?" (radio rows by room, "Next") |
 | Deleting, a room's "⋯" | action sheets over the screen blurred and dimmed (~50%): a 13px grey note ("By deleting this light, it can no longer be controlled."), the red action ("Delete light", "Delete Room"), "CANCEL" |
 | Scene gallery | a picker (deep blue top, the page a panel from 80): title 28 at 24, lead 16, category titles 10, tiles 147×83 (16:9), 12 apart, names 13 |
-| Settings, Explore, Sync (tabs) | Settings has no glow; Explore a blue one like Automations; Sync a violet one (`#3f296d` in the middle at the top, gone by ~280) |
-| Sync (iOS, 440pt) | header "+", "⋯", the switch; no title; the input's picture a 238 square (`#3b3d41`); "SYNC BOX" 10 capitals, the input 20, its status 16 grey; "MODE / INTENSITY / BRIGHTNESS" 10 capitals over pills 95×48 (`#47484c`, brightness white-to-grey), 24 apart; a dock 400 wide (`#0d1114`, radius ~22): "WHAT" and "WHERE" 48 round buttons over 10 capitals and a 12 value, a 76 round start in the middle |
-| Sync popovers | over a dimmed screen, 20 from the edges, the row surface, radius ~24: "Mode" 16, three tiles 115×100 (24 icon, 10 capitals), "Intensity", four pills 83×48 with waves; the chosen one white with dark ink; brightness: the color screen's slider from the button with "100%" over it |
-| Sync sheets | "Sync options": section "TV", a card titled by the box with its inputs as light tiles (102×160) and a round check in the switch zone; "Entertainment area": a hint, rows with a tick, "Create an Entertainment area" with a blue "+"; "⋯" → "Settings": rows 72 (Device, Change Hue Bridge, Wi-Fi, HDMI inputs, TV remote control, voice assistants, shortcuts, automatic control, advanced, updates) |
+| Settings, Explore, Sync (tabs) | Settings has no glow; Explore a blue one like Automations; Sync without a box (onboarding) a violet one (`#3f296d` in the middle at the top, gone by ~280), none with a box |
+| Sync (411dp, a box on; iOS 440pt the same scaled) | header "+", "⋯", the switch; no title, no glow (violet only on the empty tab); the input's picture a 223 square (54% of the width), square corners, `#3b3d41` → `#2f3235`; "SYNC BOX" 10 capitals 20 under it, the input 20, its status 16 grey; "MODE / INTENSITY / BRIGHTNESS" 10 capitals 8 over pills 88×48 (`#46494c`, brightness white-to-grey), 24 apart; a dock 20 from the edges (371×114, `#0e1115`, radius 18) 20 under the pills and 22 over the tab bar: "WHAT" and "WHERE" 48 round buttons (`#3e4144`) over 10 capitals and a 12 value, a 76 round start in the middle (box on: a 4px ring `#0549a8`, the accent at 65%, over `#0c1e38`, at 16%; box off: grey) |
+| Sync popovers | over the dimmed screen and tab bar, 20 from the edges, `#24262a`, radius ~13: "Mode" 16 at 20, three tiles 105×99 (`#3a3c3f`, 24 icon, 10 capitals) 12 apart, 16 in; "Intensity", four pills 76×48 (`#505155`) with waves; the chosen one white with dark ink; brightness: the color screen's slider from the button (88×200) with "100%" in a badge over it |
+| Sync sheets | "Sync options" (tall): the accent "+" in the bar, section "TV", a group titled by the box with its inputs as light tiles (102×160) and a round check in the switch zone; "Entertainment area": a hint, rows with a tick, "Create an Entertainment area" with a blue "+"; "⋯" → "Settings" (tall): rows 72 (Device, Change Hue Bridge, Change Wi-Fi network, HDMI inputs, TV remote control, Voice assistants, Automatic control, Advanced, Software updates) |
+| Sync Box: Device | hero: the box's glyph, its name 34 (wide), a round pencil; rows LED indicator brightness (Normal / Off / Dimmed on a sheet), Automatic updates (switch, hint under it), Network info (SSID, IP address, Signal quality, Network "Local + Internet"), Device info (Model "HSB2", Manufacturer, Identifier, Firmware): tall sheets with the value under the title; "Restart sync box" (grey pill `#4b4b4b`) over "Remove sync box" (red outlined), 12 apart |
+| Sync Box: HDMI inputs | a lead 16 grey; rows 72 with the type on a 48 disc (`#4b4b4b`) at 12, the name over "HDMI n"; "SAVE" in the bar; a row: "Edit name and icon" (tall, "DONE"): the glyph centered, the name in a 48 filled field (`#3b3d41`), the 20 types as a grid of 3 (cells 128×120: a 40 disc `#4b4b4b`, the accent when chosen, the name 13 under it) |
+| Sync Box: TV remote control | empty: a title 28 centered ("No remote configured just yet!"), a 16 grey lead, a round picture (the box and a remote), "Next" (accent) in a footer |
+| Sync Box: Automatic control | POWER STATE DETECTION: switch rows CEC, Hot-plug detection (HPD), USB, Inactivity detection, each its own group with a 13 hint under it; HDMI DEVICE SWITCHING: HPD and CEC rows with chevrons (a page each: a lead, INPUTS, a switch row per input with its glyph, a hint); START LIGHT SYNC: "Video signal detected" (the same page). On the box: `cecPowersave`, `hpdOutputEnableMs` (1500 on, 0 off), `usbPowersave`, `inactivePowersave` (20 / 0); per input `hpdInputPortSwitch`, `cecInputSwitch`, `linkAutoSync` |
+| Sync Box: Advanced, updates, bridge, Wi-Fi | Advanced: BACKGROUND LIGHTING (Video, Game: switch rows with the mode's glyph), a hint; AUDIO PASS-THROUGH (ARC/eARC bypass), a hint. Software updates: a flow ("Checking for updates…" under the box's picture). Change Hue Bridge: a picker, "Which Hue Bridge do you want to use?" over the bridges as rows. Change Wi-Fi network: the pairing flow (hold the button 10 s, "LED is blinking blue"). "+": a picker of six tiles (Sync box, Screen sync, Spotify, LG TV, Samsung TV, PC or Mac) |
 | Colors | page `#181b1f`; rows and sheets `#24262a`; cards and tiles white 12% over the page (`#34353a` on the plain page), automation cards and chips 10% (`#2f3235`); header bar `#26282c`; header pills `#36383c`; round buttons white 15% (`#47484c` on a bar); action pills `#4b4b4b`; separators `#3a3c3f`; secondary text `#babbbc`; accent `#006aff`; red `#e63535`; switch off `#5e5e61`; tab bar `#0d1013`, the chosen tab `#b9baba` |
 
-The Sync screens come from the iOS app (the emulator's copy can't discover a box through
-its NAT); iOS and Android measure the same (rows 72, text from 72, titles 16). Not measured
-yet: a gallery scene's sheet (it previews on the lights). Switching the picker between color, white and
+The Sync screens were measured on the Android app with the live box (the emulator bridged
+to the home network so the app finds the box), after the iOS screenshots; both measure the
+same. Not measured yet: a gallery scene's sheet (it previews on the lights). Switching the picker between color, white and
 effects sends nothing to the light (checked on an off light against HA's state).
 
 ### Hue Studio against it
@@ -421,10 +508,10 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Scene editor, new scene, scene sheet (`scene`, `new-scene`, `scene-pick`) | hero, rows, tile cards, sheets, footer, action sheet | matches; "Custom scene" as the Hue app's (a picker, the name first, "Save" at the bottom) |
 | Gallery (`gallery`, `gallery-settings`) | tiles, search, list rows | gallery matches; seasonal rules are ours |
 | Automations (`automations`, `automation-edit`, `automation-parts`, `choice`, `day-parts`, `daylight-settings`) | automation cards, type headers, type cards, list rows, wheels, days, sliders on sheets, place tiles | matches; light of the day is ours; a room's screen lists its own automations |
-| Sync (`sync`) | picture, sync pills, popovers, brightness control, dock, sheets with tiles and rows | matches; background lighting and the music palette (in the mode popover), presets and remote buttons ("⋯") are ours |
+| Sync (`sync`, `sync-settings`) | picture, sync pills, popovers, brightness control, dock, sheets with tiles and rows; the box's settings as list rows, switch rows with hints, the hero, choice and fact sheets, the icon grid | matches, the box's settings page by page; the music palette (in the mode popover), presets, HDMI CEC by Hue Studio (its screen, an input's picture, signal and wake) are ours; voice assistants are not here (the Hue cloud) |
 | Settings (`settings`, `integration`, `rooms`, `experimental`) | list rows, banners | matches; rooms and zones, integration and experimental are ours |
 | Devices (`devices`, `device`, `device-add`, `qr-scan`, `sensor`) | list rows, filter chips, search, kind tiles, steps, delete | matches |
-| Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours, and so is a Sync Box's page beyond the Hue Sync app's (HDMI CEC by Hue Studio, its screen, automatic switching, an input's page with its name and icon, signal and wake): list rows and choice sheets, hints under the rows |
+| Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours, a Sync Box's row opens its settings (`sync-settings`) |
 | Moving between bridges (`bridge-move`, `lost`) | — | dropped (roadmap K), not maintained |
 | More-info dialog and sheets, dashboard cards | the same parts | cards follow the dashboard's theme colors |
 
@@ -484,3 +571,11 @@ effects sends nothing to the light (checked on an off light against HA's state).
   footer), the white `.go` pill gone; questions only on action sheets (a zone, a Sync preset;
   "Reset scene" acts at once, the Hue app's); the outlined field shared; a zone's editor a
   tall sheet; the tab bar dimmed or hidden under sheets. Segments and `--segment-on` removed.
+- 2026-10-26, the Sync screens measured again on the Android app with the live box, every
+  page of its settings too: the tab's parts scale with the width (picture 54%, pills
+  21.4%), the picture has square corners, the dock sits 20 from the edges with radius 18,
+  the start button shows a box that is on (an accent ring), no glow on the tab (it was the
+  onboarding's); the box's settings are the Hue app's pages (Device, HDMI inputs with the
+  icon grid, TV remote control, Automatic control, Advanced, Software updates), background
+  lighting moved there from the mode popover. New parts: `.row-art.disc`, `.field.filled`,
+  `.icon-grid`, `.dock-go.ready`.

@@ -164,7 +164,19 @@ const SYNC_BOX: SyncBoxInfo = {
   features: ["palette", "background_lighting", "presets", "settings", "follow", "ir"],
   follow: { input4: { action: "game", signal: "binary_sensor.pc_picture" }, input1: { action: "video", signal: null } },
   screen: { entity_id: "media_player.example_tv", source: "HDMI 3", off_after: 300 },
-  device: { id: "c42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 3, wifi_name: "Home", bluetooth: false, led: "normal", tv_power: false, ha_device: "dev_sync_box" },
+  device: {
+    id: "C42996000000", host: "192.0.2.30", firmware: "2.5.4", update: null, wifi: 4, wifi_name: "Home", bluetooth: false, led: "normal",
+    tv_power: false, auto_update: true, network: "wan", code: "HSB2", ha_device: "dev_sync_box",
+  },
+  behavior: {
+    cec_power: false, hpd_power: true, usb_power: true, hpd_switch: false, inactivity: 0, arc_bypass: false,
+    inputs: {
+      input1: { cec_switch: false, hpd_switch: false, auto_sync: true },
+      input2: { cec_switch: false, hpd_switch: false, auto_sync: false },
+      input3: { cec_switch: false, hpd_switch: false, auto_sync: false },
+      input4: { cec_switch: false, hpd_switch: false, auto_sync: true },
+    },
+  },
   palette: "neutral",
   background_lighting: { video: false, game: true },
   presets: [
@@ -376,6 +388,8 @@ export function createHass({ language = "en", onChange }: { language?: string; o
   const push = (lights: Record<string, LightInfo>) => listeners.forEach((cb) => cb({ lights }));
 
   let box: SyncBoxInfo = { ...SYNC_BOX, syncing: new URLSearchParams(location.search).get("sync") === "1" };
+  // ?ir=0: a box with no remote buttons learned yet (the empty TV remote control).
+  if (new URLSearchParams(location.search).get("ir") === "0") box = { ...box, ir: { scanning: false, scanned: [], codes: [] } };
   const syncListeners = new Set<(msg: unknown) => void>();
   /** What the box does to its area's lights. */
   const showSync = () => {
@@ -1387,9 +1401,19 @@ export function createHass({ language = "en", onChange }: { language?: string; o
         return null as T;
       }
       if (msg.type === "hue_studio/sync/configure") {
-        const { entry_id: _, type: __, ...change } = msg;
+        const { entry_id: _, type: __, action: ___, background, ...change } = msg;
         if (typeof change.name === "string") box = { ...box, name: change.name };
+        if (background) box = { ...box, background_lighting: { ...box.background_lighting!, ...(background as Record<string, boolean>) } };
+        if (typeof change.tv_power === "boolean") box = { ...box, behavior: { ...box.behavior!, cec_power: change.tv_power } };
         box = { ...box, device: { ...box.device!, ...(change as Partial<SyncBoxDevice>) } };
+        setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
+        return null as T;
+      }
+      if (msg.type === "hue_studio/sync/behavior") {
+        const { entry_id: _, type: __, inputs, ...change } = msg;
+        const behavior = { ...box.behavior!, ...(change as Partial<NonNullable<SyncBoxInfo["behavior"]>>) };
+        for (const [id, part] of Object.entries((inputs ?? {}) as Record<string, object>)) behavior.inputs = { ...behavior.inputs, [id]: { ...behavior.inputs[id], ...part } };
+        box = { ...box, behavior };
         setTimeout(() => syncListeners.forEach((cb) => cb({ boxes: { box_tv: box } })), 150);
         return null as T;
       }
