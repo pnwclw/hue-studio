@@ -161,8 +161,11 @@ moving part against time):
   while the dim fades out after it (`--t-dim-out`, 0.28s, `--accelerate`). The cards swipe
   sideways one at a time (scroll snapping, the browser's own settling); a card beside the
   middle one brings itself to the middle when tapped.
+- The card in the middle shows on the room's lights (the Hue app's): as the card opens,
+  then each card a swipe brings there once it has settled; closing it without "Save to my
+  scenes" or "Set once" puts the lights back as they were (scenes/preview.py).
 - Shuffle does not move the dots in the Hue app (it deals the colors to the lights anew);
-  here the dots take the new order, since the card does not show on the lights.
+  here the dots take the new order too, and the lights follow.
 - Under `prefers-reduced-motion` the sheets and cards appear and go without sliding.
 
 ## Components
