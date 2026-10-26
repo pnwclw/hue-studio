@@ -371,6 +371,9 @@ export function createHass({ language = "en", onChange }: { language?: string; o
 
   const expand = (ids: string | string[] | undefined): string[] => [ids].flat().flatMap((id) => (!id ? [] : states[id]?.attributes.is_hue_group ? states[id].attributes.entity_id : [id]));
   const update = (id: string, patch: Sim) => setLight(id.replace("light.", ""), { ...states[id]._s, ...patch });
+  // A gallery card shown on a room's lights (scenes/preview.py): by token, the target and
+  // what its lights showed before.
+  const previews: Record<string, { target: unknown; lights: [string, Sim, LightInfo][] }> = {};
 
   let gallery: Gallery | undefined;
   // The page is dev/panel.html (this module is bundled into dev/build/).
@@ -1057,6 +1060,29 @@ export function createHass({ language = "en", onChange }: { language?: string; o
       }
       if (msg.type === "hue_studio/automations/organize") return null as T;
       if (msg.type === "hue_studio/scenes/backups") return { backups } as T;
+      if (msg.type === "hue_studio/preview/start") {
+        const ids = expand(msg.entity_id as string | string[]);
+        previews[String(msg.token)] = { target: msg.entity_id, lights: ids.map((id) => [id, structuredClone(states[id]._s!), structuredClone(lightInfo[id])]) };
+        return { lights: ids.length } as T;
+      }
+      if (msg.type === "hue_studio/preview/show") {
+        const p = previews[String(msg.token)];
+        if (p) await this.callService("hue_studio", "apply_palette", { entity_id: p.target, ...(msg.colors as object) } as ServiceData);
+        return null as T;
+      }
+      if (msg.type === "hue_studio/preview/end") {
+        const p = previews[String(msg.token)];
+        delete previews[String(msg.token)];
+        if (p && !msg.keep) {
+          for (const [id, sim, info] of p.lights) {
+            lightInfo[id] = info;
+            update(id, sim);
+          }
+          push(Object.fromEntries(p.lights.map(([id]) => [id, lightInfo[id]])));
+          onChange({ ...hass, states: { ...states } });
+        }
+        return null as T;
+      }
       if (msg.type === "call_service" && msg.service === "export_scenes") {
         const count = Object.keys(sceneInfo).length;
         backups.unshift({ file: `scenes-${backups.length}.json`, created: new Date().toISOString(), scenes: count, bridges: ["Hue Bridge"] });

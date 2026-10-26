@@ -9,12 +9,14 @@ from aiohue.v2.controllers.events import EventType
 from aiohue.v2.models.scene import Scene
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 import voluptuous as vol
 
 from ..lights.bridge import HUE_DOMAIN, async_bridges
 from .backup import async_list as async_list_scene_backups
 from .bridge import SCENE_DOMAIN, HueScene, async_all_scenes, scene_info
+from .preview import async_end as async_end_preview, async_show, async_start
 
 
 @callback
@@ -23,6 +25,9 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     for command in (
         ws_subscribe_scenes,
         ws_scene_backups,
+        ws_preview_start,
+        ws_preview_show,
+        ws_preview_end,
     ):
         websocket_api.async_register_command(hass, command)
 
@@ -65,13 +70,6 @@ def ws_subscribe_scenes(
 
         return handle
 
-    unsubscribers: list[Callable[[], None]] = [
-        bridge.scenes.scene.subscribe(
-            on_scene_update(key), event_filter=EventType.RESOURCE_UPDATED
-        )
-        for key, bridge in bridges.items()
-    ]
-
     @callback
     def unsubscribe() -> None:
         for unsub in unsubscribers:
@@ -97,3 +95,84 @@ async def ws_scene_backups(
     """
     backups = await async_list_scene_backups(hass)
     connection.send_result(msg["id"], {"backups": backups})
+
+
+TOKEN = vol.All(cv.string, vol.Length(min=1, max=64))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/preview/start",
+        vol.Required("token"): TOKEN,
+        vol.Required("entity_id"): vol.Any(cv.entity_id, [cv.entity_id]),
+    }
+)
+@websocket_api.async_response
+async def ws_preview_start(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """A scene's card opens on a room: remember what its lights show (preview.py).
+
+    A connection that closes before hue_studio/preview/end puts the lights back.
+    Result: {"lights": count}.
+    """
+    token = msg["token"]
+
+    @callback
+    def gone() -> None:
+        hass.async_create_task(async_end_preview(hass, token, keep=False, detach=False))
+
+    @callback
+    def detach() -> None:
+        connection.subscriptions.pop(msg["id"], None)
+
+    try:
+        count = await async_start(hass, token, msg["entity_id"], detach)
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.subscriptions[msg["id"]] = gone
+    connection.send_result(msg["id"], {"lights": count})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/preview/show",
+        vol.Required("token"): TOKEN,
+        # What apply_palette takes: gallery_scene, points or mirek, layout, brightness.
+        vol.Required("colors"): dict,
+    }
+)
+@websocket_api.async_response
+async def ws_preview_show(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Show the card in the middle on the room's lights."""
+    try:
+        await async_show(hass, msg["token"], msg["colors"])
+    except (HomeAssistantError, vol.Invalid) as err:
+        connection.send_error(msg["id"], websocket_api.ERR_INVALID_FORMAT, str(err))
+        return
+    connection.send_result(msg["id"])
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_studio/preview/end",
+        vol.Required("token"): TOKEN,
+        vol.Optional("keep", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_preview_end(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """The card closes: keep what is shown (saved, set once) or put the lights back."""
+    await async_end_preview(hass, msg["token"], keep=msg["keep"])
+    connection.send_result(msg["id"])

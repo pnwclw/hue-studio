@@ -73,7 +73,7 @@ export class GalleryView extends StudioView {
       ${ctx.galleryError ? html`<div class="note">${t("gallery.load_error")}</div>` : nothing}`;
     return html`${this.tabScreen(t("gallery.title"), body, { lead: close, center: field, end: search })}
       ${this.open
-        ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .room=${target.key} .index=${this.open.index}
+        ? html`<hue-studio-scene-pick .ctx=${ctx} .rev=${this.rev} .room=${target.key} .index=${this.open.index} preview
             .scenes=${guard([this.open.scenes], () => this.open!.scenes.map((s) => galleryPick(s, `url("${thumbUrl(s.id)}") center / cover, ${paletteArt(s)}`, paletteArt(s))))}
             @close=${() => (this.open = null)}></hue-studio-scene-pick>`
         : nothing}`;

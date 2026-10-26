@@ -47,6 +47,9 @@ export class ScenePick extends LightElement {
   @property() accessor room = "";
   /** Show the room or zone as a row to change it ("Copy to…"); the gallery's is fixed. */
   @property({ type: Boolean }) accessor pickRoom = false;
+  /** Show the card in the middle on the room's lights (the gallery's, the Hue app's): put
+   *  back as they were when it closes, unless saved or set once (scenes/preview.py). */
+  @property({ type: Boolean }) accessor preview = false;
 
   /** The card in the middle. */
   @state() private accessor current = 0;
@@ -62,6 +65,11 @@ export class ScenePick extends LightElement {
   @state() private accessor closing = false;
   private frame = 0;
   private closeTimer?: ReturnType<typeof setTimeout>;
+  /** The preview on the lights: its token, whether it started, the card shown on them. */
+  private token = "";
+  private started: Promise<boolean> | null = null;
+  private shownOn: string | null = null;
+  private showTimer?: ReturnType<typeof setTimeout>;
 
   private get list(): PickedScene[] {
     return this.scenes.length ? this.scenes : this.scene ? [this.scene] : [];
@@ -77,12 +85,49 @@ export class ScenePick extends LightElement {
     const track = this.track;
     if (track && this.current) track.scrollLeft = this.current * this.step(track);
     track?.focus({ preventScroll: true });
+    if (this.preview) this.startPreview();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     cancelAnimationFrame(this.frame);
     clearTimeout(this.closeTimer);
+    void this.endPreview(false);
+  }
+
+  /** Remember what the room's lights show, then show the card in the middle on them. */
+  private startPreview(): void {
+    const g = this.group;
+    if (!g) return;
+    this.token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    this.started = this.ctx
+      .query({ type: "hue_studio/preview/start", token: this.token, entity_id: g.target }, { quiet: true })
+      .then((r) => r !== null);
+    this.showSoon(0);
+  }
+
+  /** Show the card in the middle once it has settled (a swipe through several shows only
+   *  the last; the Hue app's lights follow as a card stops). */
+  private showSoon(delay = 350): void {
+    if (!this.started) return;
+    clearTimeout(this.showTimer);
+    this.showTimer = setTimeout(async () => {
+      const i = this.current;
+      const colors = this.palette(i);
+      const key = `${i}:${JSON.stringify(colors)}`;
+      if (key === this.shownOn || !(await this.started)) return;
+      this.shownOn = key;
+      await this.ctx.query({ type: "hue_studio/preview/show", token: this.token, colors }, { quiet: true });
+    }, delay);
+  }
+
+  /** The card closes: keep what the lights show (saved, set once) or put them back. */
+  private async endPreview(keep: boolean): Promise<void> {
+    const started = this.started;
+    if (!started) return;
+    this.started = null;
+    clearTimeout(this.showTimer);
+    if (await started) await this.ctx.query({ type: "hue_studio/preview/end", token: this.token, keep }, { quiet: true });
   }
 
   /** From one card to the next: its width and the gap. */
@@ -101,6 +146,7 @@ export class ScenePick extends LightElement {
       this.current = i;
       this.editing = null;
       haptic("selection");
+      this.showSoon();
     });
   };
 
@@ -121,6 +167,8 @@ export class ScenePick extends LightElement {
   private close(): void {
     if (this.closing) return;
     this.closing = true;
+    // Not saved or set once (those keep it first): the lights go back as they were.
+    void this.endPreview(false);
     // Gone once the card is down; a timer too, should no animationend come (reduced motion,
     // a page in the background).
     this.closeTimer = setTimeout(() => this.closed(), 400);
@@ -148,14 +196,22 @@ export class ScenePick extends LightElement {
     return s.points.length ? { points: s.points.slice(0, 5) } : { mirek: s.mirek ?? 366 };
   }
 
+  /** What apply_palette takes for a card: its colors, laid out by position for a gradient
+   *  where the room's lights have places. */
+  private palette(i: number): Record<string, unknown> {
+    const g = this.group;
+    const spatial = !!g && this.list[i].gradient && canSpread(this.ctx.positions, g.lights);
+    return { ...this.colors(i), ...(spatial ? { layout: "spatial" } : {}) };
+  }
+
   private async setOnce(): Promise<void> {
     const g = this.group;
     const i = this.current;
     if (!g) return;
     haptic("success");
-    const spatial = this.list[i].gradient && canSpread(this.ctx.positions, g.lights);
-    if (await this.ctx.call("hue_studio", "apply_palette", { entity_id: g.target, ...this.colors(i), ...(spatial ? { layout: "spatial" } : {}) }, { optimistic: false }))
+    if (await this.ctx.call("hue_studio", "apply_palette", { entity_id: g.target, ...this.palette(i) }, { optimistic: false }))
       this.ctx.markManual(g);
+    await this.endPreview(true);
     this.close();
   }
 
@@ -175,6 +231,7 @@ export class ScenePick extends LightElement {
     if (!ok) return;
     haptic("success");
     ctx.toast(ctx.t("gallery.saved", { name: g.name }));
+    await this.endPreview(true);
     this.close();
   }
 
@@ -186,6 +243,7 @@ export class ScenePick extends LightElement {
       [points[j], points[k]] = [points[k], points[j]];
     }
     this.orders = { ...this.orders, [i]: points };
+    this.showSoon(0);
   }
 
   protected override render() {
