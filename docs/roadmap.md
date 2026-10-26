@@ -466,13 +466,12 @@ Light of the day):
 
 Not done on purpose: a calendar of holidays.
 
-### K. Moving between bridges: dropped (2026-10-22)
+### K. Moving between bridges: dropped (2026-10-22), removed (2026-10-26)
 
-Moving a bridge, a room, lights or a Sync Box to another bridge, and lost devices, were
-built (`migration.py`, `identity.py`, views `bridge-move`, `lost`) and are hidden from
-users (no way in from the panel). Dropped: the code and the routes stay as they are, but
-no more work goes into them — no fixes, no features, no bringing it back.
-
+Moving a bridge, a room or lights to another bridge, and lost
+devices, were built (`migration.py`, views `bridge-move`, `lost`), hidden from users and
+then removed. What `identity.py` needed of it (a device's Zigbee MAC, its services by
+type, taking over an old entity's id and settings) lives there now.
 
 ### S. The Sync Box screen, reworked (2026-10-22)
 

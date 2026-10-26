@@ -26,13 +26,9 @@
 //   /settings/devices/device/<id>     a device's settings (its bridge id): name, room, function, power on, delete
 //   /settings/devices/sensor/<device> a Hue sensor's settings, opened from the sensors (its HA device id)
 //   /settings/devices/add?room=<key>  adding devices: what, getting it ready, search, name and room
-//   /settings/devices/lost     devices a move let go that no bridge took: look for them again, forget
 //   /settings/bridges[/<entry id>]    bridges and Sync Boxes; one bridge (hue entry) or box (its entry:
 //                              its settings, as from the Sync tab)
 //   /settings/bridges/add      add a bridge (Ethernet or Wi-Fi; found, or by address; the link button)
-//   /settings/bridges/move     move to another bridge: ?bridge=<hue entry id> (all of it), ?area=<id> (a room)
-//                              or ?lights=<ids>&to_area=<id>,
-//                              optionally &to=<hue entry id>; without them the move in progress
 //   /settings/motionaware[?bridge=<hue entry id>]  MotionAware areas (Hue Bridge Pro)
 //   /settings/motionaware/new[?bridge=]      a new area: room or zone, lights, calibration
 //   /settings/motionaware/<id>                an area: on/off, what happens on motion, lights, sensitivity
@@ -58,7 +54,6 @@ import "./views/automation-edit.ts";
 import "./views/automations.ts";
 import "./views/daylight-settings.ts";
 import "./views/bridge-add.ts";
-import "./views/bridge-move.ts";
 import "./views/bridges.ts";
 import "./views/sync-settings.ts";
 import "./views/color.ts";
@@ -71,7 +66,6 @@ import "./views/experimental.ts";
 import "./views/gallery.ts";
 import "./views/gallery-settings.ts";
 import "./views/home.ts";
-import "./views/lost.ts";
 import "./views/motion-area.ts";
 import "./views/room.ts";
 import "./views/rooms.ts";
@@ -107,11 +101,9 @@ type Route =
   | { name: "device"; device: string }
   | { name: "deviceSensor"; device: string }
   | { name: "deviceAdd"; room: string | null }
-  | { name: "lost" }
   | { name: "bridges"; mode: "bridges" | "motion"; item: string | null }
   | { name: "motionArea"; area: string; bridge: string | null }
   | { name: "bridgeAdd" }
-  | { name: "bridgeMove"; bridge: string | null; area: string | null; lights: string[] | null; toArea: string | null; to: string | null }
   | { name: "entertainment"; area: string | null; arrange: boolean }
   | { name: "integration" }
   | { name: "automations" }
@@ -161,16 +153,11 @@ function parseRoute(path: string, search: string): Route {
   if (parts[0] === "settings" && parts[1] === "experimental") return { name: "experimental" };
   if (parts[0] === "settings" && parts[1] === "gallery") return { name: "gallerySettings" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "add") return { name: "deviceAdd", room: params.get("room") };
-  if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "lost") return { name: "lost" };
   if (parts[0] === "settings" && parts[1] === "daylight") return { name: "daylight" };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "device" && parts[3]) return { name: "device", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices" && parts[2] === "sensor" && parts[3]) return { name: "deviceSensor", device: parts[3] };
   if (parts[0] === "settings" && parts[1] === "devices") return { name: "devices", list: isDeviceGroup(parts[2]) ? parts[2] : null, bridge: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "add") return { name: "bridgeAdd" };
-  if (parts[0] === "settings" && parts[1] === "bridges" && parts[2] === "move") {
-    const lights = params.get("lights");
-    return { name: "bridgeMove", bridge: params.get("bridge"), area: params.get("area"), lights: lights ? lights.split(",") : null, toArea: params.get("to_area"), to: params.get("to") };
-  }
   if (parts[0] === "settings" && parts[1] === "bridges") return { name: "bridges", mode: "bridges", item: parts[2] || null };
   if (parts[0] === "settings" && parts[1] === "motionaware" && parts[2]) return { name: "motionArea", area: parts[2], bridge: params.get("bridge") };
   if (parts[0] === "settings" && parts[1] === "motionaware") return { name: "bridges", mode: "motion", item: params.get("bridge") };
@@ -237,11 +224,9 @@ export class HueStudioPanel extends LitElement {
               route.name === "device" ||
               route.name === "deviceSensor" ||
               route.name === "deviceAdd" ||
-              route.name === "lost" ||
               route.name === "bridges" ||
               route.name === "motionArea" ||
               route.name === "bridgeAdd" ||
-              route.name === "bridgeMove" ||
               route.name === "entertainment" ||
               route.name === "integration"
             ? "settings"
@@ -355,8 +340,6 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-settings-view .ctx=${ctx} .rev=${rev}></hue-studio-settings-view>`;
       case "bridgeAdd":
         return html`<hue-studio-bridge-add-view .ctx=${ctx} .rev=${rev}></hue-studio-bridge-add-view>`;
-      case "bridgeMove":
-        return html`<hue-studio-bridge-move-view .ctx=${ctx} .rev=${rev} .bridge=${route.bridge} .area=${route.area} .lights=${route.lights} .toArea=${route.toArea} .to=${route.to}></hue-studio-bridge-move-view>`;
       case "syncSettings": {
         const box = route.box && ctx.boxes[route.box] ? route.box : (Object.keys(ctx.boxes)[0] ?? "");
         const back = `/sync${route.box ? `?box=${encodeURIComponent(route.box)}` : ""}`;
@@ -382,8 +365,6 @@ export class HueStudioPanel extends LitElement {
         return html`<hue-studio-device-view .ctx=${ctx} .rev=${rev} .device=${route.device}></hue-studio-device-view>`;
       case "deviceSensor":
         return html`<hue-studio-sensor-view .ctx=${ctx} .rev=${rev} .device=${route.device} .back=${"/settings/devices/sensors"}></hue-studio-sensor-view>`;
-      case "lost":
-        return html`<hue-studio-lost-view .ctx=${ctx} .rev=${rev}></hue-studio-lost-view>`;
       case "deviceAdd":
         return html`<hue-studio-device-add-view .ctx=${ctx} .rev=${rev} .room=${route.room}></hue-studio-device-add-view>`;
       case "experimental":

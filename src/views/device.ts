@@ -61,8 +61,8 @@ export class DeviceView extends StudioView {
   }
 
   /**
-   * A light going to a room on another bridge: an area belongs to one bridge, so the light
-   * moves there (views/bridge-move.ts) instead of being saved into it.
+   * A light going to a room on another bridge: an area belongs to one bridge, so such a
+   * room is not offered.
    */
   private crossBridge(d: FoundDevice, area: string | null): string | null {
     if (d.kind !== "light" || area === d.area) return null;

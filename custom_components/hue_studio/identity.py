@@ -1,7 +1,7 @@
 """Hue devices, rooms, zones and scenes keep their Home Assistant identity.
 
-A device that leaves a bridge and joins one again (moved by Hue Studio, added again with
-"Add devices", migrated by the Hue app, reset and paired anew) comes back as new bridge
+A device that leaves a bridge and joins one again (added again with "Add devices",
+migrated by the Hue app, reset and paired anew) comes back as new bridge
 resources, so the native `hue` integration makes new entities with new entity ids. Hue
 Studio remembers every device by its Zigbee MAC (each light's and each other service's
 entity: id, name, icon, area, labels, aliases, enabled and hidden state; the device's
@@ -13,19 +13,21 @@ name and settings back; a room or zone of a remembered name, and its scenes, lik
 
 It never takes an entity id something else still holds (the old device while it is still
 on its bridge, e.g. until the old bridge's entry is removed): it tries again on the next
-change. While a move runs, the move does this itself.
+change.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 import logging
+import time
 from typing import Any
 
 from aiohttp import ClientError
 from aiohue import HueBridgeV2
 from aiohue.errors import AiohueException
+from aiohue.v2.models.resource import ResourceTypes
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -42,26 +44,129 @@ from .devices import (
     put_light_settings,
 )
 from .lights import LIGHT_DOMAIN, async_bridges
-from .migration import (
-    DEVICE_PATH,
-    STORAGE_KEY as MOVE_KEY,
-    Mover,
-    async_take_over,
-    device_lights,
-    device_mac,
-    remember_entity,
-    service_keys,
-)
 from .positions import position_store
 from .scenes import SCENE_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+DEVICE_PATH = "clip/v2/resource/device"
+# How long the native integration may take to show a new resource as an entity.
+ENTITY_WAIT = 60.0
 
 STORAGE_KEY = f"{DOMAIN}.identity"
 STORAGE_VERSION = 1
 # Changes come in bursts (a device's entities one by one): look once they settle.
 SETTLE = 5.0
 SAVE_DELAY = 10.0
+
+
+# --- what a device is on any bridge ------------------------------------------
+
+
+def device_mac(bridge: HueBridgeV2, device_id: str) -> str | None:
+    connectivity = bridge.devices.get_zigbee_connectivity(device_id)
+    return getattr(connectivity, "mac_address", None) if connectivity else None
+
+
+def device_lights(device: Any) -> list[str]:
+    """A device's lights in the order of its services (a stable order to map by)."""
+    return [s.rid for s in device.services if s.rtype == ResourceTypes.LIGHT]
+
+
+def _strings(values: Iterable[Any]) -> list[str]:
+    return [v for v in values if isinstance(v, str)]
+
+
+@callback
+def remember_entity(hass: HomeAssistant, entity_id: str | None) -> dict[str, Any]:
+    entry = er.async_get(hass).async_get(entity_id) if entity_id else None
+    if entry is None:
+        return {"entity_id": entity_id}
+    return {
+        "entity_id": entry.entity_id,
+        "name": entry.name,
+        "icon": entry.icon,
+        "area_id": entry.area_id,
+        "labels": sorted(entry.labels),
+        "aliases": _strings(entry.aliases),
+        "enabled": entry.disabled_by is None,
+        "hidden_by_user": entry.hidden_by == er.RegistryEntryHider.USER,
+    }
+
+
+def service_keys(device: Any, *, lights: bool = False) -> list[tuple[str, str]]:
+    """(key, resource id) of a device's services (lights only with `lights`); the key
+    (type and index among that type) is the same for the device on any bridge."""
+    seen: dict[str, int] = {}
+    keys = []
+    for service in device.services:
+        if service.rtype == ResourceTypes.LIGHT and not lights:
+            continue
+        index = seen[service.rtype.value] = seen.get(service.rtype.value, -1) + 1
+        keys.append((f"{service.rtype.value}:{index}", service.rid))
+    return keys
+
+
+async def _async_until(check: Callable[[], bool]) -> bool:
+    """Whether `check` holds within ENTITY_WAIT (the bridge's event stream and the
+    native integration bring the changes in their own time)."""
+    deadline = time.monotonic() + ENTITY_WAIT
+    while not check():
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(1)
+    return True
+
+
+async def async_take_over(
+    hass: HomeAssistant,
+    domain: str,
+    unique_id: str,
+    old: dict[str, Any],
+    *,
+    keep_area: bool = True,
+) -> str | None:
+    """Give a new entity the entity id and the settings of the one it replaces
+    (without `keep_area`, no area of its own: it follows its device)."""
+    entities = er.async_get(hass)
+
+    def new() -> str | None:
+        return entities.async_get_entity_id(domain, HUE_DOMAIN, unique_id)
+
+    if not await _async_until(lambda: new() is not None):
+        return None
+    entity_id = new()
+    assert entity_id is not None
+    changes: dict[str, Any] = {}
+    wanted = old.get("entity_id")
+
+    def free() -> bool:
+        return entities.async_get(wanted) is None and hass.states.async_available(
+            wanted
+        )
+
+    # The old entity goes when its bridge reports the resource gone.
+    if wanted and wanted != entity_id and await _async_until(free):
+        changes["new_entity_id"] = wanted
+    for key in ("name", "icon"):
+        if old.get(key) is not None:
+            changes[key] = old[key]
+    if old.get("labels"):
+        changes["labels"] = set(old["labels"])
+    if old.get("aliases"):
+        changes["aliases"] = list(old["aliases"])
+    if not keep_area:
+        changes["area_id"] = None
+    elif old.get("area_id") is not None:
+        changes["area_id"] = old["area_id"]
+    entry = entities.async_get(entity_id)
+    if old.get("enabled") and entry is not None and entry.disabled_by is not None:
+        changes["disabled_by"] = None
+    if old.get("hidden_by_user"):
+        changes["hidden_by"] = er.RegistryEntryHider.USER
+    if changes:
+        entities.async_update_entity(entity_id, **changes)
+    return changes.get("new_entity_id", entity_id)
 
 
 class Identities:
@@ -113,11 +218,6 @@ class Identities:
     async def async_reconcile(self) -> None:
         """Give devices, rooms, zones and scenes that came back their identity, then
         remember everything as it is now."""
-        mover: Mover | None = self.hass.data.get(MOVE_KEY)
-        if mover is not None and mover.busy:
-            # A move restores what it moves; look once it is done.
-            self.async_schedule()
-            return
         async with self._lock:
             changed = False
             for entry_id, bridge in async_bridges(self.hass).items():

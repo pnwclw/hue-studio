@@ -26,7 +26,7 @@ import { banner } from "../controls.ts";
 import { haptic } from "../ha-internals.ts";
 import type { StringKey } from "../i18n.ts";
 import { hueSensor } from "../model.ts";
-import type { DevicesMessage, HueDeviceInfo, LostDevice } from "../types.ts";
+import type { DevicesMessage, HueDeviceInfo } from "../types.ts";
 import { icon } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -48,16 +48,11 @@ export class DevicesView extends StudioView {
   @state() private accessor devices: DevicesMessage | null = null;
   @state() private accessor filter: DeviceFilter = { query: "", area: null, type: null };
   @state() private accessor picker: Picker | null = null;
-  /** Devices a move let go that no bridge took (administrators only). */
-  @state() private accessor lost: LostDevice[] = [];
   private stops: (() => void)[] = [];
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.stops = [this.ctx.watch<DevicesMessage>("hue_studio/devices/subscribe", (msg) => (this.devices = msg))];
-    if (this.ctx.hass.user?.is_admin) {
-      this.stops.push(this.ctx.watch<LostDevice[]>("hue_studio/bridges/lost/subscribe", (msg) => (this.lost = msg ?? [])));
-    }
   }
 
   override disconnectedCallback(): void {

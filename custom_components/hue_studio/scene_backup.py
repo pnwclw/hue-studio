@@ -35,8 +35,8 @@ from homeassistant.util import dt as dt_util
 
 from .bridges import bridge_name
 from .const import DOMAIN, HUE_DOMAIN
+from .identity import device_mac
 from .lights import LIGHT_DOMAIN, async_bridges
-from .migration import device_mac
 from .scenes import SCENE_DOMAIN
 
 _LOGGER = logging.getLogger(__name__)

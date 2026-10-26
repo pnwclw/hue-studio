@@ -16,7 +16,7 @@ import { friendlyName } from "../model.ts";
 import { areaState } from "../motion.ts";
 import { bridgeAreas, bridgeOf } from "../rooms.ts";
 import { hasFeature } from "../sync.ts";
-import type { BridgeInfo, BridgesMessage, MotionArea, MoveState, SyncBoxInfo } from "../types.ts";
+import type { BridgeInfo, BridgesMessage, MotionArea, SyncBoxInfo } from "../types.ts";
 import { icon, toggle } from "../ui.ts";
 import { StudioView } from "./base.ts";
 
@@ -29,26 +29,19 @@ export class BridgesView extends StudioView {
   /** A bridge (its native hue entry id) or a Sync Box (its entry id) to show; null: the list. */
   @property() accessor item: string | null = null;
   @state() private accessor bridges: BridgesMessage | null = null;
-  /** A move to another bridge in progress or waiting (admins). */
-  @state() private accessor move: MoveState | null = null;
   /** The name being typed (null: not renaming). */
   @state() private accessor name: string | null = null;
   @state() private accessor busy = false;
   private stop?: () => void;
-  private stopMove?: () => void;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.stop = this.ctx.watch<BridgesMessage>("hue_studio/bridges/subscribe", (m) => (this.bridges = m));
-    if (this.ctx.hass.user?.is_admin) {
-      this.stopMove = this.ctx.watch<MoveState | null>("hue_studio/bridges/move/subscribe", (m) => (this.move = m));
-    }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stop?.();
-    this.stopMove?.();
   }
 
   protected override renderPage() {
@@ -117,16 +110,6 @@ export class BridgesView extends StudioView {
         </button>
       </div>
       <p class="lead small">${t("bridges.hint")}</p>`;
-  }
-
-  /** "Move everything to another bridge" (admins, with another bridge connected). */
-  private moveAllLink(id: string, b: BridgeInfo): TemplateResult | typeof nothing {
-    const { ctx } = this;
-    const others = Object.entries(this.bridges || {}).filter(([other, o]) => other !== id && o.connected !== false);
-    if (!ctx.hass.user?.is_admin || !others.length || !b.devices) return nothing;
-    return this.link("mdi:swap-horizontal", ctx.t("move.all_row", { to: others.length === 1 ? others[0][1].name : ctx.t("move.all_another") }), ctx.t("move.all_row_sub"), () =>
-      ctx.go(`/settings/bridges/move?bridge=${encodeURIComponent(id)}`),
-    );
   }
 
   /** What a connected bridge is and holds: "Hue Bridge Pro · 9 lights · 6 rooms". */

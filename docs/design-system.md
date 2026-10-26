@@ -512,7 +512,6 @@ effects sends nothing to the light (checked on an off light against HA's state).
 | Settings (`settings`, `integration`, `rooms`, `experimental`) | list rows, banners | matches; rooms and zones, integration and experimental are ours |
 | Devices (`devices`, `device`, `device-add`, `qr-scan`, `sensor`) | list rows, filter chips, search, kind tiles, steps, delete | matches |
 | Bridges, MotionAware, entertainment (`bridges`, `bridge-add`, `motion-area`, `entertainment`, `space`) | list rows, steps, art, arrange view | matches; arranging lights without a Bridge Pro is ours, a Sync Box's row opens its settings (`sync-settings`) |
-| Moving between bridges (`bridge-move`, `lost`) | — | dropped (roadmap K), not maintained |
 | More-info dialog and sheets, dashboard cards | the same parts | cards follow the dashboard's theme colors |
 
 ### History

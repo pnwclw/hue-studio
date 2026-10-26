@@ -212,18 +212,6 @@
     "no_scene_of_the_day": {
       "message": "The scene of the day has no scene for now: add scenes to the pool in Hue Studio (Settings → Light of the day)."
     },
-    "move_nothing": {
-      "message": "There are no Hue lights to move."
-    },
-    "move_one_source": {
-      "message": "The lights to move are on different bridges; move them from one bridge at a time."
-    },
-    "move_same_bridge": {
-      "message": "The lights are on that bridge already."
-    },
-    "move_busy": {
-      "message": "Another move to a bridge is not finished yet."
-    },
     "motion_area_lights": {
       "message": "A MotionAware area needs {min} to {max} lights."
     },

@@ -607,15 +607,6 @@ async def put_light_settings(
         await bridge.request("put", f"clip/v2/resource/light/{rid}", json=body)
 
 
-@callback
-def async_forget_new(hass: HomeAssistant, device_ids: list[str]) -> None:
-    """Devices that are not new any more (e.g. moved from another bridge)."""
-    setup = _setup(hass)
-    for device_id in device_ids:
-        setup.found.pop(device_id, None)
-    async_dispatcher_send(hass, SIGNAL_DEVICES_UPDATED)
-
-
 async def async_delete_device(hass: HomeAssistant, device_id: str) -> None:
     """Remove a device from its bridge (never the bridge itself); the native
     integration removes its HA device when the bridge reports it gone."""

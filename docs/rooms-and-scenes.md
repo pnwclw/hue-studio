@@ -57,61 +57,20 @@ areas and accessories never span two bridges. Hue Studio keeps them apart the sa
   room searches on the room's bridge.
 - The rooms payload (`hue_studio/rooms/subscribe`) carries `bridges`, `bridge_of` (light,
   room, zone and scene entities) and `split_areas`.
-- **Moving between bridges** (`migration.py`, the panel's "Move to another bridge"): a
-  whole bridge (its page → "Move everything"), a room (the bridge next to "Lights" on
-  its page; it moves with its switches and sensors) or a light that goes to a room on
-  another bridge (its room picker, or a room's note about lights elsewhere):
-  - everything is remembered first, in a Store (`hue_studio.move`), so a restart in
-    between loses nothing: devices (Zigbee MAC, names, light settings, every HA entity),
-    the rooms that move whole, zones, scenes, entertainment areas;
-  - one device at a time (lights first, switches and sensors last), so never more than
-    one device is on neither bridge, and each is found its own way, given per device
-    before the move (or when it is not found): by its serial number while the old bridge
-    still has it (the new one resets it over touchlink; not found, it simply stays where
-    it was), by the install code of its QR code where the new bridge takes them (Bridge
-    Pro: it lets exactly that device in — tried live, a light deleted from one bridge
-    joined a Bridge Pro seconds after its QR code and serial number went with the
-    search), by being switched off and on while the new bridge searches (a light that
-    was let go looks for a bridge open to it only as it is switched on: a Zigbee device
-    steers into an open network as it starts — tried live, one only deleted joined
-    neither bridge; asked for when part of a bridge moves), or by its setup button
-    (switches and sensors). In practice lights without Bluetooth were easier; the Hue
-    app seems to add Bluetooth bulbs to an older bridge through the phone, which Home
-    Assistant cannot do;
-  - for each device: the old bridge lets it go (deleted there; with a serial number only
-    after it was found), the new bridge searches (a few rounds of about a minute) and
-    knows it again by its Zigbee MAC; name, archetype, function and power-on come back,
-    and in HA every entity of the device takes the old entity id, name, icon, labels,
-    area and enabled/hidden state;
-  - a device not found leaves the move waiting on it: search again (a serial number or
-    QR code given now), let it go first (one looked for by its serial number), skip it
-    (it stays on the old bridge, or, let go already, it is kept among the lost devices),
-    put everything back on the old bridge while nothing has been found (the devices
-    rejoin their scenes, zones and entertainment areas there), or stop waiting: with
-    devices moved already the rest is skipped and rooms, scenes, zones and entertainment
-    areas still follow what moved (tried live: stopped before this, a move left the
-    rooms and scenes behind); devices let go and not found are kept as lost too;
-  - then a room that moved whole is made again on the new bridge (name, archetype,
-    devices); lights going to another area follow room alignment. Scenes are copied,
-    zones and entertainment areas whose lights all moved are copied (positions kept) and
-    deleted on the old bridge, those left behind in part (or with a skipped light) are
-    split; only then the old scenes and emptied rooms go, and the copies take over their
-    entity ids;
-  - every step goes into the move's journal (the panel shows it; Home Assistant's log
-    has it at info level), so which way works for which light can be told;
-  - lost devices (Settings → Devices → Lost devices, `hue_studio.lost`): looked for
-    again on a bridge (QR code, serial number, switched off and on) as a move of that
-    one device — found, it gets its settings, entities, area and room back — or
-    forgotten.
-  - identity (`identity.py`, `hue_studio.identity`): apart from moves, Hue Studio
-    remembers every device by its Zigbee MAC (its entities' ids, names, icons, areas,
+- **Moving between bridges** was built and removed (roadmap K). What was learned on the
+  live bridges: a light deleted from one bridge looks for a bridge open to it only as it
+  is switched on (a Zigbee device steers into an open network as it starts); a Bridge Pro
+  lets in exactly the device whose QR code install code it was given; a serial number
+  lets the new bridge reset a light close to it over touchlink; lights without Bluetooth
+  were easier (the Hue app seems to add Bluetooth bulbs through the phone).
+- **Identity** (`identity.py`, `hue_studio.identity`): Hue Studio remembers every device by its Zigbee MAC (its entities' ids, names, icons, areas,
     labels, enabled/hidden state; the HA device's area, name and labels; its name,
     archetype and light settings on the bridge) and every room, zone and scene by name.
     A device that comes back as new bridge resources in any way (added again with "Add
     devices", migrated by the Hue app, paired anew) takes its entity ids and settings
     back as soon as the old entities are gone; a room or zone of a remembered name and
-    its scenes likewise. Tried live: lights found late in a move and added again by hand
-    kept the native integration's new ids, as did the rooms.
+    its scenes likewise (without it, lights added again by hand keep the native
+    integration's new ids, as do the rooms).
 
 ## HA -> bridge (Hue Studio)
 

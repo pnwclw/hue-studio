@@ -55,7 +55,6 @@ from .const import (
     SYNC_BOX_INTEGRATION,
 )
 from .identity import async_setup_identities
-from .migration import async_setup_moves
 from .motion_areas import async_stop_watching as async_stop_motion_areas
 from .organize import async_track_organize
 from .panel import async_register_panel, async_unregister_panel
@@ -110,7 +109,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_websocket(hass)
     async_setup_pool_websocket(hass)
     await async_setup_positions(hass)
-    await async_setup_moves(hass)
     await async_setup_identities(hass)
     await async_setup_automations(hass)
     return True
