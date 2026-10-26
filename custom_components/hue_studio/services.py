@@ -101,6 +101,7 @@ from .sync import (
 )
 from .sync_follow import async_wake_source
 from .sync_link import SyncBoxLink
+from .zones import async_wait_zone_entity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -499,7 +500,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="command_failed",
                 translation_placeholders={"entity_id": lights[0].entity_id},
             ) from err
-        return {"zone_id": created[0]["rid"] if created else None}
+        zone_id = created[0]["rid"] if created else None
+        # Its grouped light, once the native integration has added it.
+        entity_id = (
+            await async_wait_zone_entity(hass, bridge, zone_id) if zone_id else None
+        )
+        return {"zone_id": zone_id, "entity_id": entity_id}
 
     async def update_zone(call: ServiceCall) -> None:
         """Rename a Hue zone or give it other lights (rooms are aligned instead)."""

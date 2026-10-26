@@ -335,6 +335,9 @@ custom_components/hue_studio/   the integration (manifest, config flow, translat
   options.py                    the entry's options (room mapping, room sensors, panel settings) as the panel changes them;
                                 unique ids -> entity ids for the frontend
   adaptive.py                   Adaptive Lighting: mark lights manual after our commands
+  zones.py                      "Zones as labels": each Hue zone mirrored as an HA label "Hue zone: <name>", both ways
+                                (the side that changed wins, the bridge on a tie; no automatic deletes); pairs in a Store;
+                                hue_studio/zones/subscribe|relink; create_zone waits for the zone's entity
   organize.py                   bridge scenes in HA's lists: "Hue Studio" label, category by Hue room/zone (its archetype's
                                 icon, alignment.ARCHETYPE_ICONS, also sent to the panel), area of the room;
                                 the user's choice wins (what is ours in a Store); "Organize in Home Assistant" option

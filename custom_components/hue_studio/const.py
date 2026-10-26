@@ -30,6 +30,8 @@ CONF_AUTO_ALIGN: Final = "auto_align"
 # Options: label, category and area for our scenes and automations in HA (on unless
 # False).
 CONF_ORGANIZE: Final = "organize"
+# Options: Hue zones mirrored as HA labels "Hue zone: <name>", both ways (zones.py).
+CONF_ZONE_LABELS: Final = "zone_labels"
 # Experimental: the "Liquid Glass" footer on phones, and its tabs (panel url paths).
 CONF_FOOTER: Final = "footer"
 CONF_FOOTER_TABS: Final = "footer_tabs"
