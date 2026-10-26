@@ -309,7 +309,7 @@ export class SyncView extends StudioView {
           </button>
         </div>
         ${hasFeature(box, "presets") ? this.presets(id, box) : nothing}
-        ${hasFeature(box, "ir") ? this.remote(box) : nothing}`,
+        ${hasFeature(box, "ir") && ctx.hass.user?.is_admin ? this.remote(box) : nothing}`,
     );
   }
 
@@ -327,9 +327,11 @@ export class SyncView extends StudioView {
           (p) => html`<div class="item">
             <ha-icon icon="mdi:bookmark-outline"></ha-icon>
             <button class="grow plain" @click=${() => this.set(id, { preset: p.id })}>${p.name}</button>
-            <button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
-              <ha-icon icon="mdi:delete-outline"></ha-icon>
-            </button>
+            ${ctx.hass.user?.is_admin
+              ? html`<button class="round mini-step" aria-label=${t("sync.preset_delete")} @click=${() => remove(p.id, p.name)}>
+                  <ha-icon icon="mdi:delete-outline"></ha-icon>
+                </button>`
+              : nothing}
           </div>`,
         )}
         <button class="item" @click=${() => (this.presetName = "")}>

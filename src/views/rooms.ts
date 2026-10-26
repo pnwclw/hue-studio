@@ -125,8 +125,10 @@ export class RoomsView extends StudioView {
       title: t("zones.unlinked_title", { zone: n.name }),
       text: t("zones.unlinked"),
       warn: true,
-      buttons: html`<button class="pill" @click=${relink}>${t("zones.relink")}</button>
-        ${n.entity_id ? html`<button class="pill" @click=${remove}>${t("zone.delete")}</button>` : nothing}`,
+      buttons: ctx.hass.user?.is_admin
+        ? html`<button class="pill" @click=${relink}>${t("zones.relink")}</button>
+            ${n.entity_id ? html`<button class="pill" @click=${remove}>${t("zone.delete")}</button>` : nothing}`
+        : undefined,
     });
   }
 

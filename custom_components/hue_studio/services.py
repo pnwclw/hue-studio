@@ -46,7 +46,10 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv, entity_registry as er
-from homeassistant.helpers.service import async_extract_entity_ids
+from homeassistant.helpers.service import (
+    async_extract_entity_ids,
+    async_register_admin_service,
+)
 from homeassistant.helpers.target import (
     TargetSelection,
     async_extract_referenced_entity_ids,
@@ -701,7 +704,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         (SERVICE_SET_SYNC_IR_CODE, set_sync_ir_code, SET_SYNC_IR_CODE_SCHEMA),
         (SERVICE_DELETE_SYNC_IR_CODE, delete_sync_ir_code, DELETE_SYNC_IR_CODE_SCHEMA),
     ):
-        hass.services.async_register(DOMAIN, name, handler, schema=schema)
+        async_register_admin_service(hass, DOMAIN, name, handler, schema=schema)
     hass.services.async_register(
         DOMAIN, SERVICE_RECALL_SCENE, recall_scene, schema=RECALL_SCENE_SCHEMA
     )
@@ -718,23 +721,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
         schema=CREATE_SCENE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_SCENE, delete_scene, schema=DELETE_SCENE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_CREATE_ZONE,
         create_zone,
         schema=CREATE_ZONE_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_UPDATE_ZONE, update_zone, schema=UPDATE_ZONE_SCHEMA
     )
-    hass.services.async_register(
-        DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
+    async_register_admin_service(
+        hass, DOMAIN, SERVICE_DELETE_ZONE, delete_zone, schema=DELETE_ZONE_SCHEMA
     )
-    hass.services.async_register(
+    async_register_admin_service(
+        hass,
         DOMAIN,
         SERVICE_ALIGN_ROOMS,
         align_rooms,

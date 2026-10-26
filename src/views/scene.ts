@@ -189,11 +189,13 @@ export class SceneView extends StudioView {
             ${t("scene.reset")}
           </button></div>`
         : nothing}
-      <div class="delete-area">
-        <button class="delete-btn" @click=${() => this.askDelete(t("scene.delete_note"), t("scene.delete"), () => void this.deleteScene())}>
-          ${t("scene.delete")}
-        </button>
-      </div>
+      ${this.ctx.hass.user?.is_admin
+        ? html`<div class="delete-area">
+            <button class="delete-btn" @click=${() => this.askDelete(t("scene.delete_note"), t("scene.delete"), () => void this.deleteScene())}>
+              ${t("scene.delete")}
+            </button>
+          </div>`
+        : nothing}
     </div></div>
     ${this.speedStep !== null
       ? speedSheet(ctx, {
