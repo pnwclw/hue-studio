@@ -1,0 +1,90 @@
+# The documentation site (MkDocs Material), published to GitHub Pages by
+# .github/workflows/docs.yml. Local preview: uv run --group docs mkdocs serve
+site_name: Hue Studio
+site_description: The Philips Hue app's look and Home Assistant's logic, on top of the native Hue integration.
+site_url: https://pnwclw.github.io/hue-studio/
+repo_url: https://github.com/pnwclw/hue-studio
+repo_name: pnwclw/hue-studio
+edit_uri: edit/dev/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/icon.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+hooks:
+  - scripts/mkdocs_services.py
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Hue Play HDMI Sync Box: getting-started/sync-box.md
+  - Guide:
+      - The panel: guide/panel.md
+      - Lights and colors: guide/lights.md
+      - Scenes and gallery: guide/scenes.md
+      - Rooms and zones: guide/rooms-and-zones.md
+      - Space: guide/space.md
+      - Automations: guide/automations.md
+      - Settings and devices: guide/settings.md
+      - Dashboard cards: guide/cards.md
+  - Reference:
+      - Services: reference/services.md
+      - Entities: reference/entities.md
+      - Blueprints: reference/blueprints.md
+  - Help:
+      - Troubleshooting: help/troubleshooting.md
+  - Development:
+      - development/index.md
+      - Documentation: development/docs.md
+      - Design system: design-system.md
+      - Rooms and scenes design: rooms-and-scenes.md
+      - Roadmap: roadmap.md

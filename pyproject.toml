@@ -20,6 +20,9 @@ dev = [
     "ruff>=0.13",
     "aiohuesyncbox==0.1.6",
 ]
+docs = [
+    "mkdocs-material>=9.8.0",
+]
 
 [tool.uv]
 package = false

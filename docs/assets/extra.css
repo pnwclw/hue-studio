@@ -1,0 +1,16 @@
+/* Screenshots: phones side by side, desktops full width. */
+.shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  margin: 1.5rem 0;
+}
+.shots img {
+  width: 100%;
+  max-width: 16rem;
+}
+.md-typeset img.shot {
+  border-radius: 0.75rem;
+  box-shadow: var(--md-shadow-z2);
+}

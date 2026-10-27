@@ -434,6 +434,8 @@ scripts/build_hue_icons.py      rebuilds hue-icons-data.ts from elax46/custom-br
 scripts/hue_public_images.json  Hue app scene name -> picture id (`public_image`), from real bridges
 scripts/hue_scene_pictures.json picture id -> Hue app scene name and its picture's address (build_gallery.py --pictures)
 scripts/build_icon.py           renders brand/ (icon, logo, dark variants)
+scripts/mkdocs_services.py      MkDocs hook: docs/reference/services.md from services.yaml + translations/en.json
+scripts/docs_screenshots.py     the docs' screenshots from the harness (headless Chrome) -> docs/assets/screenshots/
 dev/panel.html, dev/fixture.ts  harness: the built panel with a fake `hass` (neutral demo data,
                                 simulated services), no HA needed
 dev/cards.html                  harness: the dashboard cards with the same fake `hass`
@@ -442,7 +444,10 @@ tests/js/                       node:test (TypeScript, run by Node directly) for
 package.json, tsconfig.json     frontend toolchain (Lit, esbuild, TypeScript)
 hacs.json                       HACS metadata
 NOTICE                          third-party attribution (gallery, Apache-2.0; light icons, MIT)
-.github/workflows/              HACS validation, hassfest, ruff, pytest, frontend; release zip
+mkdocs.yml, docs/               the documentation site (MkDocs Material, GitHub Pages): getting-started/, guide/,
+                                reference/, help/, development/; design-system.md, rooms-and-scenes.md and
+                                roadmap.md stay at the root of docs/ (nav: Development)
+.github/workflows/              HACS validation, hassfest, ruff, pytest, frontend; release zip; docs (strict build, Pages)
 ```
 
 ## Tests
@@ -484,3 +489,9 @@ NOTICE                          third-party attribution (gallery, Apache-2.0; li
   or pins merged by dropping one on another); a tap spreads them around a disc to pull one
   out. There is no point-count control and no "all lights one color" switch.
 - UI, final check: screenshots (phone + desktop) on a live HA instance.
+- Docs: `uv run --group docs mkdocs build --strict` (Claude: `preview_start` with `docs`).
+  The user-facing docs live on the site (`docs/`), the README is only its landing page.
+  A new service needs its `<!-- service: name -->` marker in `docs/reference/services.md`
+  (the strict build fails without it); a feature that users see gets its guide page
+  updated in the same change, and a screen that changed gets its docs screenshot retaken
+  (`uv run python scripts/docs_screenshots.py <name>`).

@@ -7,6 +7,13 @@
       "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-8765}\" --bind 127.0.0.1"],
       "port": 8765,
       "autoPort": true
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "NO_MKDOCS_2_WARNING=1 exec uv run --group docs mkdocs serve --dev-addr 127.0.0.1:${PORT:-8000}"],
+      "port": 8000,
+      "autoPort": true
     }
   ]
 }

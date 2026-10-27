@@ -28,3 +28,5 @@ custom_components/hue_studio/frontend/*.LEGAL.txt
 # Gallery pictures an install has of its own and may not share (pictures.py)
 custom_components/hue_studio/frontend/gallery/local/
 dev/build/
+# The documentation site (mkdocs build)
+site/
